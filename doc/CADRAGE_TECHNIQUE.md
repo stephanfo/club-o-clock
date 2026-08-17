@@ -1,12 +1,18 @@
 # Cadrage technique — Application de gestion du planning d'entraînement
 
-**Statut : proposition de cadrage à valider.** Ce document compare les options de stack et
-recommande une cible. Il ne déclenche **pas** l'initialisation du dépôt : l'init reste subordonnée
-à la validation des maquettes M0 (cf. feuille de route interne §2, non distribuée) **et** de ce cadrage.
+**Statut : cadrage validé, stack en production.** Ce document compare les options envisagées et
+justifie la cible retenue — Laravel, Blade + Livewire + Alpine, MariaDB/MySQL sur hébergement
+mutualisé. Il est conservé tel qu'il a servi à décider : c'est un **instantané d'arbitrage**, utile
+pour comprendre *pourquoi* la stack est celle-là, et non une description de l'état livré.
 
-> La **source de vérité produit** reste le [PRD](PRD.md). En cas de divergence, le PRD prime —
-> à l'exception des **assouplissements ops** explicitement listés ici (§8 et §11), arbitrés avec
-> le porteur du projet pour tenir compte du contexte « club bénévole, hébergement mutualisé ».
+> **Ce qui a été construit** se lit dans le code et dans [INSTALL.md](INSTALL.md) ; **ce que le
+> produit doit faire**, dans le [PRD](PRD.md), qui prime en cas de divergence — à l'exception des
+> **assouplissements ops** listés ici (§8 et §11), arbitrés pour tenir compte du contexte « club
+> bénévole, hébergement mutualisé ».
+>
+> Quelques renvois pointent vers des documents de travail **non publiés** (feuille de route interne,
+> maquettes M0, bundle `design/`) : ils appartiennent à l'historique de fabrication et ne sont pas
+> résolvables depuis ce dépôt.
 
 ---
 
@@ -56,7 +62,7 @@ un seul artefact à déployer, pas de runtime Node, pas d'API REST ni d'auth cro
 
 ### 1.4 Méthode
 Exigences PRD → implications techniques (§4) → comparatif d'options (§6) → décisions sur les points
-« à arbitrer » de la ROADMAP (§7) → tensions & compromis (§8) → matrice de décision (§9) →
+« à arbitrer » de la feuille de route (§7) → tensions & compromis (§8) → matrice de décision (§9) →
 recommandation (§10).
 
 ---
@@ -189,7 +195,7 @@ Lecture : *énoncé PRD → implication → où c'est tranché*. Les exigences s
 - Matrice de préférences type × canal + pause globale. **Temps réel non requis** (souhaitable seul.). Le **type « nouveau débrief »** (PRD §4.12.5) emprunte la même file `outbox` que les autres notifs (publication seule, pas de renotif à l'édition).
 - → §6.3 (email/push), §8 (outbox/cron, temps réel).
 
-### 4.7 Traitements planifiés (PRD §4.5, §4.13.5, ROADMAP §3)
+### 4.7 Traitements planifiés (PRD §4.5, §4.13.5)
 - **Pré-calcul météo** fenêtre J-16 + **drain de l'`outbox`** notifications → **un cron unique** pilotant
   le scheduler du framework (inventaire exhaustif en §7.13). Le **reset annuel des surclassements** est
   une **action admin manuelle** (pas un cron, §7.9) ; les **sauvegardes** sont natives OVH (§8.2). → §7.13, §7.14, §8.
@@ -387,7 +393,7 @@ vérité** pour l'implémentation du frontend.
 
 ---
 
-## 7. Décisions sur les points « à arbitrer » (ROADMAP §3)
+## 7. Décisions sur les points laissés « à arbitrer »
 
 | # | Point | Décision proposée |
 |---|---|---|

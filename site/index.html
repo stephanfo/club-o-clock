@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Club'O'Clock — le planning d'entraînement de ton club</title>
-<meta name="description" content="Application web libre de gestion du planning d'entraînement pour club sportif associatif : inscriptions, liste d'attente, quotas, tutelle parentale et notifications. Une instance par club, vos données restent chez vous.">
+<meta name="description" content="Application web libre de gestion du planning d'entraînement pour club sportif associatif : inscriptions, liste d'attente, quotas, tutelle parentale et notifications. Une instance par club, tes données restent chez toi.">
 
 <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <meta name="theme-color" content="#4338CA">
@@ -312,7 +312,7 @@
     <div class="wrap">
       <div class="section-head">
         <span class="eyebrow">Installer</span>
-        <h2>Trois étapes, et le club a son instance</h2>
+        <h2>Quelques commandes, et le club a son instance</h2>
         <p>
           Il n'y a pas d'inscription publique : le premier administrateur se crée en ligne de
           commande, et c'est lui qui invite le reste du club.
@@ -327,8 +327,8 @@
         </div>
         <div class="step">
           <h3>Configurer</h3>
-          <p>Le fichier <code>.env</code>, la base de données, l'envoi d'email, et un cron toutes
-            les cinq minutes.</p>
+          <p>Le fichier <code>.env</code>, la base de données, l'envoi d'email, et un cron
+            <b>chaque minute</b> — c'est lui qui cadence les notifications et la météo.</p>
         </div>
         <div class="step">
           <h3>Créer le premier compte</h3>
@@ -338,8 +338,9 @@
 
       <div class="codeblock">
         <span class="p">$</span> git clone https://github.com/stephanfo/club-o-clock.git<br>
-        <span class="p">$</span> composer install --no-dev &amp;&amp; npm ci &amp;&amp; npm run build<br>
-        <span class="p">$</span> php artisan migrate --force<br>
+        <span class="p">$</span> composer setup <span class="c"># dépendances, .env, clé, migrations, assets</span><br>
+        <span class="p">$</span> php artisan db:seed <span class="c"># catalogues — indispensable, même en production</span><br>
+        <span class="p">$</span> php artisan storage:link <span class="c"># sans lui, le logo du club est en 404</span><br>
         <span class="p">$</span> php artisan club:create-admin <span class="c"># le seul point d'entrée d'une base vide</span>
       </div>
 
@@ -382,7 +383,7 @@
     </div>
     <div class="foot-bottom">
       Publié sous licence <a href="https://github.com/stephanfo/club-o-clock/blob/main/LICENSE">AGPL-3.0</a>.
-      Une instance par club — vos données restent chez vous.
+      Une instance par club — tes données restent chez toi.
     </div>
   </div>
 </footer>

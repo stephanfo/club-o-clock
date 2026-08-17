@@ -1,6 +1,6 @@
 # PRD — Application de gestion du planning d'entraînement (Club Triathlon)
 
-**Statut** : cadrage fonctionnel figé. Stack technique volontairement non choisie (cadrage technique dédié à venir).
+**Statut** : cadrage fonctionnel figé, **V1 livrée**. Ce document reste volontairement agnostique de la stack — les choix techniques et leurs contreparties vivent dans le [cadrage technique](CADRAGE_TECHNIQUE.md).
 
 > Ce document est la **source de vérité produit** pour la V1. Il décrit *l'état cible* sans historique de versions et sans choix d'implémentation. Toute proposition qui s'en écarte doit être discutée explicitement avant codage.
 

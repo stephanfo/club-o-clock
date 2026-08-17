@@ -170,7 +170,7 @@ export default defineConfig({
 
     footer: {
       message: 'Publié sous licence AGPL-3.0.',
-      copyright: 'Une instance par club — vos données restent chez vous.',
+      copyright: 'Une instance par club — tes données restent chez toi.',
     },
   },
 })

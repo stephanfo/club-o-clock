@@ -6,53 +6,53 @@ par des bénévoles**.
 
 Chaque club installe **sa propre instance** : ses données restent chez lui, et il n'existe
 aucun compte central. C'est le principe qui structure aussi cette documentation — elle
-s'adresse à celui qui va héberger, exploiter et faire vivre l'application.
+s'adresse à toi si tu vas héberger, exploiter et faire vivre l'application pour ton club.
 
 ## Par où commencer
 
-| Vous voulez… | Lire |
+| Tu veux… | Lire |
 |---|---|
-| **Voir l'application** sans rien installer | La [démo publique](https://demo.cluboclock.ratelet.fr/), ou [l'application en images](CAPTURES) |
-| **Installer une instance** pour votre club | [Installation & déploiement](INSTALL) |
-| **Explorer le jeu de démonstration** | [Comptes de démonstration](COMPTES_DEMO) |
-| **Comprendre ce que fait le produit**, et ce qu'il ne fait pas | [Spécification produit](PRD) |
-| **Comprendre les choix techniques** et ce qu'ils coûtent | [Cadrage technique](CADRAGE_TECHNIQUE) |
-| **Recetter votre instance** avant l'ouverture aux adhérents | [Plan de tests — membres](PLAN_TESTS_MEMBRES) |
-| **Contribuer** au projet | [Guide de contribution](../CONTRIBUTING) |
+| **Voir l'application** sans rien installer | La [démo publique](https://demo.cluboclock.ratelet.fr/), ou [l'application en images](CAPTURES.md) |
+| **Installer une instance** pour ton club | [Installation & déploiement](INSTALL.md) |
+| **Explorer le jeu de démonstration** | [Comptes de démonstration](COMPTES_DEMO.md) |
+| **Comprendre ce que fait le produit**, et ce qu'il ne fait pas | [Spécification produit](PRD.md) |
+| **Comprendre les choix techniques** et ce qu'ils coûtent | [Cadrage technique](CADRAGE_TECHNIQUE.md) |
+| **Recetter ton instance** avant l'ouverture aux adhérents | [Plan de tests — membres](PLAN_TESTS_MEMBRES.md) |
+| **Contribuer** au projet | [Guide de contribution](../CONTRIBUTING.md) |
 
 ## Les documents
 
 ### Démarrer
 
-- **[Installation & déploiement](INSTALL)** — du poste de développement à la production.
+- **[Installation & déploiement](INSTALL.md)** — du poste de développement à la production.
   Prérequis, configuration (email, OAuth, notifications push), premier démarrage,
   déploiement sur mutualisé ou sur VPS, maintenance et dépannage.
-- **[Comptes de démonstration](COMPTES_DEMO)** — le jeu de données du club fictif
+- **[Comptes de démonstration](COMPTES_DEMO.md)** — le jeu de données du club fictif
   « TEAM44 » : qui est qui, quels cas chaque compte illustre, et la semaine type seedée.
-- **[L'application en images](CAPTURES)** — treize écrans commentés, côté adhérent, coach
+- **[L'application en images](CAPTURES.md)** — treize écrans commentés, côté adhérent, coach
   et bureau.
 
 ### Comprendre
 
-- **[Spécification produit](PRD)** — la source de vérité fonctionnelle. Rôles, cycle de vie
+- **[Spécification produit](PRD.md)** — la source de vérité fonctionnelle. Rôles, cycle de vie
   des comptes mineurs, quotas, liste d'attente, encadrement, notifications, traçabilité.
   Précise aussi ce qui est **hors périmètre**, et pourquoi.
-- **[Cadrage technique](CADRAGE_TECHNIQUE)** — les décisions techniques et leurs
+- **[Cadrage technique](CADRAGE_TECHNIQUE.md)** — les décisions techniques et leurs
   contreparties assumées : pourquoi un monolithe, pourquoi pas de SPA, ce que l'hébergement
   mutualisé impose.
 
 ### Recetter
 
-- **[Plan de tests — membres](PLAN_TESTS_MEMBRES)** — parcours de recette entièrement en
+- **[Plan de tests — membres](PLAN_TESTS_MEMBRES.md)** — parcours de recette entièrement en
   interface, sans ligne de commande. Destiné aux testeurs du club.
-- **[Plan de tests — technique](PLAN_TESTS)** — la même recette côté organisateur, avec
+- **[Plan de tests — technique](PLAN_TESTS.md)** — la même recette côté organisateur, avec
   accès aux journaux, aux commandes Artisan et à la base.
 
 ### Contribuer
 
-- **[Guide de contribution](../CONTRIBUTING)** — porte de qualité, conventions, périmètre.
-- **[Politique de sécurité](../SECURITY)** — signaler une vulnérabilité.
-- **[Journal des versions](../CHANGELOG)** — ce qui change à chaque version.
+- **[Guide de contribution](../CONTRIBUTING.md)** — porte de qualité, conventions, périmètre.
+- **[Politique de sécurité](../SECURITY.md)** — signaler une vulnérabilité.
+- **[Journal des versions](../CHANGELOG.md)** — ce qui change à chaque version.
 
 ## Bon à savoir
 
