@@ -689,7 +689,7 @@ L'email prend le relais.
 
 ## Aller plus loin
 
-- **[README](../README.md)** — présentation, architecture, flux réseau sortants
+- **[README](https://github.com/stephanfo/club-o-clock/blob/main/README.md)** — présentation, architecture, flux réseau sortants
 - **[COMPTES_DEMO.md](COMPTES_DEMO.md)** — comptes et scénarios du jeu de démonstration
 - **[CONTRIBUTING.md](../CONTRIBUTING.md)** — contribuer au projet
 - **[SECURITY.md](../SECURITY.md)** — signaler une vulnérabilité

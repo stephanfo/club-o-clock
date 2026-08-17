@@ -47,14 +47,14 @@
 ### 1.3 Planning (PRD §4.7, §4.5)
 - [ ] Vues **Semaine / Jour / Mois** ; navigation précédent/suivant/aujourd'hui ; « cette semaine » signalée.
 - [ ] Filtres : Tout / Natation / Vélo / Course / Compét. + case « Mes inscriptions ».
-- [ ] Vue Mois : pastilles par discipline, clic sur un jour → vue Jour, clic sur « S<n> » → vue Semaine.
+- [ ] Vue Mois : pastilles par discipline, clic sur un jour → vue Jour, clic sur « `S<n>` » → vue Semaine.
 - [ ] La séance **annulée** (Course à pied jeudi) apparaît barrée/grisée avec chip « Annulée ».
 - [ ] **Filtrage par catégorie (§4.5)** : Marie (Adulte) voit les séances **adultes** (Natation du mercredi et du samedi 10:45, Cuisses du dimanche) et les séances **ouvertes à tous** (Vélo piste du mardi, PPG du vendredi), mais **PAS** les séances réservées aux jeunes (« Natation samedi matin — jeunes », « Enchaînement — jeunes » du dimanche). Contre-épreuve avec un mineur autonome (`enzo@demo.club`, Cadets) : il voit les séances jeunes + tout-public, **pas** les séances adultes.
 
 ### 1.4 Inscription / désinscription (PRD §4.9)
 - [ ] S'inscrire sur une séance future avec des places → chip « Tu participes » immédiat (bouton `+` planning mobile ou fiche).
 - [ ] Se désinscrire → confirmation demandée, chip disparaît.
-- [ ] **Séance pleine** : sur « Natation samedi matin — jeunes » (capacité 6, saturée) → bouton « Rejoindre la liste d'attente » → statut « En liste d'attente · <rang> ».
+- [ ] **Séance pleine** : sur « Natation samedi matin — jeunes » (capacité 6, saturée) → bouton « Rejoindre la liste d'attente » → statut « En liste d'attente · `<rang>` ».
 - [ ] **Quota** : Marie a 1 natation cette semaine (quota NAT = 1/sem). S'inscrire à une **2ᵉ natation de la même semaine** → dialog « Quota atteint » ; confirmer → waitlist « quota ». Annuler → aucune inscription.
 - [ ] **Conflit horaire** : s'inscrire à une séance qui chevauche une inscription existante → alerte non bloquante (confirmation), l'inscription reste possible.
 - [ ] **Séance commencée / passée** : aucun bouton d'inscription ni de désinscription.

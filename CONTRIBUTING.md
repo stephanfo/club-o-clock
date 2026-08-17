@@ -61,7 +61,7 @@ php artisan db:seed --class=DemoSeeder
 
 ### Faire évoluer le schéma
 
-La source de vérité est **[database/migrations/](database/migrations/)**. Une évolution passe par une
+La source de vérité est **[database/migrations/](https://github.com/stephanfo/club-o-clock/tree/main/database/migrations/)**. Une évolution passe par une
 **nouvelle migration** — ne jamais éditer une migration déjà livrée, des instances l'ont déjà jouée.
 
 `database/schema/mariadb-schema.sql` est un **artefact dérivé** que Laravel charge au début de
@@ -144,7 +144,7 @@ de rythme du tout. **Une exception** : un correctif de **sécurité** part seul 
 
 ## Licence
 
-Le projet est sous **[AGPL-3.0](LICENSE)**. En contribuant, tu acceptes que ta contribution soit
+Le projet est sous **[AGPL-3.0](https://github.com/stephanfo/club-o-clock/blob/main/LICENSE)**. En contribuant, tu acceptes que ta contribution soit
 distribuée sous cette licence.
 
 Concrètement, l'AGPL implique que **si tu déploies une version modifiée accessible en réseau**, tu

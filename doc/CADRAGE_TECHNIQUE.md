@@ -211,7 +211,7 @@ Lecture : *énoncé PRD → implication → où c'est tranché*. Les exigences s
 
 ## 5. Vocabulaire et services tiers (rappel des garde-fous)
 
-Conformément à [CLAUDE.md](../CLAUDE.md) :
+Conformément à [CLAUDE.md](https://github.com/stephanfo/club-o-clock/blob/main/CLAUDE.md) :
 - Statut d'inscription **`participating` | `waitlist` | `cancelled`** (uniforme sur les 3 `kind`).
 - Récurrence par **générateur `SessionTemplate`** (pas de RRULE/EXDATE).
 - Seuls tiers **nommés** tolérés comme choix produit/légal : **OpenRunner Pro** (embed) et
