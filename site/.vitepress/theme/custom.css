@@ -1,0 +1,110 @@
+/* ============================================================================
+   Thème de la documentation — Club'O'Clock
+   ----------------------------------------------------------------------------
+   La palette est celle du club de démonstration (DemoSeeder), pas celle des
+   tokens livrés dans resources/css/club-tokens.css. Ce n'est pas un oubli :
+   les treize captures du site montrent la démo, et le site renvoie vers elle.
+   Une vitrine en vert illustrée de captures indigo se contredirait elle-même.
+
+   Le vert/rose/bleu des tokens n'est que la valeur de repli d'une instance qui
+   n'a pas encore choisi ses couleurs. Chaque club met les siennes — c'est
+   l'argument que ce site défend, donc la couleur ne peut pas être « celle du
+   produit ».
+
+   En revanche la STRUCTURE des tokens est reprise telle quelle : nommage des
+   échelles, espacements sur base 4px, rayons, courbes d'animation.
+   ============================================================================ */
+
+:root {
+  /* --- Indigo : couleur principale ------------------------------------- */
+  --coc-brand-50: #eef2ff;
+  --coc-brand-100: #e0e7ff;
+  --coc-brand-200: #c7d2fe;
+  --coc-brand-300: #a5b4fc;
+  --coc-brand-400: #818cf8;
+  --coc-brand-500: #6366f1;
+  --coc-brand: #4338ca;
+  --coc-brand-700: #3730a3;
+  --coc-brand-800: #312e81;
+  --coc-brand-900: #1e1b4b;
+
+  /* --- Ambre : accent. Contraste ~2:1 sur blanc, donc JAMAIS en texte.
+         Réservé aux fonds, badges et filets décoratifs. ------------------ */
+  --coc-accent: #f59e0b;
+  --coc-accent-600: #d97706;
+  --coc-accent-700: #b45309;
+
+  /* --- Cyan : information, liens secondaires --------------------------- */
+  --coc-info: #0891b2;
+  --coc-info-600: #0e7490;
+  --coc-info-700: #155e75;
+
+  /* --- Neutres (repris des tokens de l'app) ---------------------------- */
+  --coc-ink: #0a0a0a;
+  --coc-paper: #ffffff;
+
+  --coc-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* --- Mapping sur les variables de VitePress ----------------------------
+   `brand-1` sert au TEXTE des liens : il doit passer AA sur blanc. L'indigo
+   #4338CA tient ~8:1, largement au-dessus du seuil. C'est `brand-3`, non
+   textuel, qui porte la couleur vive. */
+:root {
+  --vp-c-brand-1: var(--coc-brand);
+  --vp-c-brand-2: var(--coc-brand-700);
+  --vp-c-brand-3: var(--coc-brand-500);
+  --vp-c-brand-soft: var(--coc-brand-100);
+
+  --vp-c-text-1: var(--coc-ink);
+  --vp-c-bg: var(--coc-paper);
+
+  --vp-font-family-base: 'Manrope', system-ui, -apple-system, sans-serif;
+
+  /* Titres : mêmes réglages que h1..h4 dans club-app.css — graisse 800,
+     interlettrage resserré. L'app pousse jusqu'aux capitales ; ici non, sur
+     des titres de documentation souvent longs ça deviendrait illisible. */
+  --vp-font-family-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+/* Le bandeau d'accueil de VitePress, si une page l'utilise. */
+:root {
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(
+    135deg,
+    var(--coc-brand) 0%,
+    var(--coc-accent) 100%
+  );
+}
+
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.02em;
+  font-weight: 800;
+}
+
+/* Filet d'accent sous les titres de section : le seul endroit où l'ambre est
+   employé au trait, jamais en texte. */
+.vp-doc h2 {
+  border-top-color: var(--vp-c-divider);
+}
+
+/* Les captures de CAPTURES.md portent leurs dimensions en attributs (elles
+   évitent ainsi le saut de page au chargement) ; il faut donc les autoriser à
+   se réduire sur mobile sans se déformer. */
+.vp-doc img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+/* Le tableau à trois colonnes de CAPTURES.md déborde sur téléphone : il doit
+   défiler dans son propre conteneur, jamais faire défiler la page. */
+.vp-doc div[class*='table'],
+.vp-doc table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+}

@@ -37,7 +37,7 @@ Thumbs.db
 # et fichiers copiés depuis l'application au moment de l'assemblage (cf. site/build-local.sh).
 /site/.vitepress/dist
 /site/.vitepress/.cache
-/site/assets/*.woff2
+/site/public/assets/*.woff2
 /_site
 
 # OS / éditeur
