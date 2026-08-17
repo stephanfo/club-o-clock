@@ -17,8 +17,8 @@
         "livewire/livewire": "^3.0",
         "minishlink/web-push": "^10.1",
         "phpoffice/phpspreadsheet": "^5.8",
-        "symfony/brevo-mailer": "^8.1",
-        "symfony/http-client": "^8.1"
+        "symfony/brevo-mailer": "^7.4 || ^8.0",
+        "symfony/http-client": "^7.4 || ^8.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -94,6 +94,9 @@
         "optimize-autoloader": true,
         "preferred-install": "dist",
         "sort-packages": true,
+        "platform": {
+            "php": "8.3.0"
+        },
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
