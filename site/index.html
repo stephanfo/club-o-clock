@@ -29,11 +29,24 @@
 <a class="skip" href="#contenu">Aller au contenu</a>
 
 <header class="topbar">
+  <!--
+    Menu sans JavaScript : une case à cocher visuellement masquée porte l'état ouvert/fermé,
+    et le label lui sert de bouton. Fonctionne partout, y compris si le script ne charge pas,
+    et reste accessible au clavier — la case est focusable et se coche à la barre d'espace.
+  -->
+  <input type="checkbox" id="menu" class="menu-state">
   <div class="topbar-in">
-    <a href="/" aria-label="Club'O'Clock, accueil"><img src="/assets/logo-blanc.svg" alt="Club'O'Clock"></a>
+    <a class="brand" href="/" aria-label="Club'O'Clock, accueil"><img src="/assets/logo-blanc.svg" alt="Club'O'Clock"></a>
+
+    <label for="menu" class="burger" aria-label="Ouvrir le menu">
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+    </label>
+
     <nav>
-      <a href="#fonctionnalites" class="hide-sm">Fonctionnalités</a>
-      <a href="#apercu" class="hide-sm">Aperçu</a>
+      <a href="#fonctionnalites">Fonctionnalités</a>
+      <a href="#apercu">Aperçu</a>
       <a href="/doc/">Documentation</a>
       <a href="https://github.com/stephanfo/club-o-clock">GitHub</a>
     </nav>
