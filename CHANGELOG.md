@@ -7,10 +7,11 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ## [Non publié]
 
-## [1.0.0] — à paraître
+## [1.0.0] — 2026-08-17
 
 Première version publique. Application complète de gestion du planning d'entraînement pour club
-sportif associatif, utilisée en production par un club depuis 2026.
+sportif associatif, **déployée et éprouvée sur hébergement mutualisé**, avec une
+[démonstration publique](https://demo.cluboclock.ratelet.fr/) réinitialisée chaque nuit.
 
 ### Planning et inscriptions
 
@@ -72,7 +73,7 @@ sportif associatif, utilisée en production par un club depuis 2026.
   du club.
 - Conçue pour l'**hébergement mutualisé** : ni Docker, ni Node en fonctionnement continu, ni
   WebSocket, ni file d'attente externe — un cron minute suffit.
-- **655 tests** automatisés, analyse statique PHPStan niveau 5.
+- **735 tests** automatisés, analyse statique PHPStan niveau 5, rejoués par la CI à chaque poussée.
 - Modèle **une instance par club** : pas de multi-tenant, chaque club est propriétaire de ses
   données.
 
