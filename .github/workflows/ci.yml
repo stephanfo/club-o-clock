@@ -75,6 +75,20 @@ jobs:
       - name: Installer les dépendances
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      - name: Installer Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # public/build/ est un artefact gitignoré : sans ce build, `manifest.json` n'existe pas et
+      # TOUT test qui rend une vue tombe en 500 (ViteManifestNotFoundException), y compris de
+      # simples assertions d'affichage sans rapport avec le front.
+      - name: Builder les assets front
+        run: |
+          npm ci
+          npm run build
+
       - name: Préparer l'environnement
         run: |
           cp .env.example .env
