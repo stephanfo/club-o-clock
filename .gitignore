@@ -38,6 +38,7 @@ Thumbs.db
 /site/.vitepress/dist
 /site/.vitepress/.cache
 /site/public/assets/*.woff2
+/site/public/img/
 /_site
 
 # OS / éditeur

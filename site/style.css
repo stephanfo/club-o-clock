@@ -1,0 +1,494 @@
+/* ============================================================================
+   Vitrine — Club'O'Clock
+   ----------------------------------------------------------------------------
+   Palette : celle du club de démonstration (indigo / ambre / cyan), la même que
+   sur les captures et sur la démo vers laquelle cette page renvoie.
+
+   Le vert des tokens de l'application (resources/css/club-tokens.css) n'est que
+   la valeur de repli d'une instance qui n'a pas encore choisi ses couleurs. Le
+   produit affirme que chaque club met les siennes : sa vitrine ne peut donc pas
+   se présenter comme ayant « une » couleur.
+
+   La STRUCTURE des tokens est en revanche reprise telle quelle — échelle
+   d'espacement sur base 4px, rayons, courbes d'animation, graisses.
+   ============================================================================ */
+
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  /* Copiée depuis public/fonts/ au moment de l'assemblage (site/build-local.sh).
+     Le chemin diffère de celui de l'application, où elle est servie sur /fonts/. */
+  src: url('/assets/manrope-latin-variable.woff2') format('woff2-variations');
+}
+
+:root {
+  --brand-50: #eef2ff;
+  --brand-100: #e0e7ff;
+  --brand-200: #c7d2fe;
+  --brand-300: #a5b4fc;
+  --brand-400: #818cf8;
+  --brand-500: #6366f1;
+  --brand: #4338ca;
+  --brand-700: #3730a3;
+  --brand-800: #312e81;
+  --brand-900: #1e1b4b;
+
+  /* Ambre : ~2:1 sur blanc. Fonds, filets et pastilles uniquement — jamais de texte. */
+  --accent: #f59e0b;
+  --accent-600: #d97706;
+
+  --info: #0891b2;
+  --info-600: #0e7490;
+
+  --ink: #0a0a0a;
+  --ink-soft: #1a1a1a;
+  --paper: #ffffff;
+  --slate-50: #f7f8fa;
+  --slate-100: #eef0f4;
+  --slate-200: #e2e5ea;
+  --slate-500: #6b7280;
+  --slate-600: #4b5563;
+  --slate-700: #374151;
+
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(10, 10, 10, 0.08), 0 0 0 1px rgba(10, 10, 10, 0.04);
+  --shadow-md: 0 4px 14px rgba(10, 10, 10, 0.1), 0 1px 2px rgba(10, 10, 10, 0.06);
+  --shadow-lg: 0 12px 30px rgba(10, 10, 10, 0.14), 0 2px 6px rgba(10, 10, 10, 0.06);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur: 220ms;
+
+  --maxw: 1120px;
+}
+
+/* --- Base ---------------------------------------------------------------- */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  /* La page ne défile jamais horizontalement : le contenu large (code, captures) défile
+     dans son propre conteneur. */
+  overflow-x: hidden;
+}
+
+/* `overflow-wrap` seul, sans `hyphens` : la césure automatique coupait « d'en-traînement » et
+   « re-viennent » en plein titre, ce qui casse la lecture. Les mots passent à la ligne entiers,
+   et seul un mot plus large que le conteneur serait coupé — cas qui ne se produit pas ici. */
+h1, h2, h3 { overflow-wrap: break-word; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+h1, h2, h3 {
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  font-weight: 800;
+  margin: 0;
+}
+
+p { margin: 0; }
+
+a { color: var(--brand); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+a:hover { color: var(--brand-700); }
+
+img { max-width: 100%; height: auto; }
+
+.wrap {
+  max-width: var(--maxw);
+  margin-inline: auto;
+  padding-inline: var(--space-6);
+}
+
+.eyebrow {
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brand-500);
+  margin-bottom: var(--space-3);
+}
+
+/* Lien d'évitement : premier élément focusable de la page. */
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--ink);
+  color: var(--paper);
+  padding: var(--space-3) var(--space-4);
+  z-index: 100;
+}
+.skip:focus { left: var(--space-4); top: var(--space-4); }
+
+:focus-visible {
+  outline: 3px solid var(--brand-400);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* --- Boutons ------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 14px 26px;
+  border-radius: var(--radius-pill);
+  font-weight: 800;
+  font-size: 16px;
+  text-decoration: none;
+  border: 2px solid transparent;
+  transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out),
+    background-color var(--dur) var(--ease-out);
+  text-align: center;
+  max-width: 100%;
+}
+.btn:hover { transform: translateY(-2px); }
+
+.btn-primary {
+  background: var(--brand);
+  color: var(--paper);
+  box-shadow: 0 8px 24px rgba(67, 56, 202, 0.3);
+}
+.btn-primary:hover { background: var(--brand-700); color: var(--paper); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--paper);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+.btn-ghost:hover { background: rgba(255, 255, 255, 0.1); color: var(--paper); }
+
+.btn-outline {
+  background: var(--paper);
+  color: var(--brand);
+  border-color: var(--slate-200);
+  box-shadow: var(--shadow-sm);
+}
+.btn-outline:hover { border-color: var(--brand-300); color: var(--brand-700); }
+
+/* --- En-tête ------------------------------------------------------------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(10, 10, 10, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.topbar-in {
+  max-width: var(--maxw);
+  margin-inline: auto;
+  padding: var(--space-3) var(--space-6);
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+/* Le lockup a un ratio de ~7,5:1 : une hauteur fixe le rend très large, et sur un écran de
+   390 px il pousserait la barre au-delà du viewport. D'où la largeur maximale, qui prime. */
+.topbar img { height: 28px; width: auto; max-width: 46vw; }
+.topbar nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-width: 0;
+}
+.topbar nav a {
+  color: rgba(255, 255, 255, 0.82);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 15px;
+}
+.topbar nav a:hover { color: var(--paper); }
+
+@media (max-width: 720px) {
+  .topbar nav a.hide-sm { display: none; }
+}
+
+/* --- Héros --------------------------------------------------------------- */
+
+.hero {
+  background:
+    radial-gradient(120% 85% at 12% 0%, var(--brand) 0%, rgba(67, 56, 202, 0) 60%),
+    radial-gradient(90% 70% at 100% 100%, rgba(245, 158, 11, 0.22) 0%, rgba(245, 158, 11, 0) 70%),
+    var(--ink);
+  color: var(--paper);
+  padding: var(--space-24) 0 var(--space-16);
+  position: relative;
+  overflow: hidden;
+}
+/* Filet tricolore : un clin d'œil aux trois disciplines. */
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 6px;
+  background: linear-gradient(90deg, var(--brand) 0%, var(--info) 50%, var(--accent) 100%);
+}
+
+.hero h1 {
+  font-size: clamp(2.4rem, 6vw, 4.2rem);
+  max-width: 16ch;
+  margin-bottom: var(--space-6);
+}
+.hero .tagline {
+  font-size: clamp(1.05rem, 2.4vw, 1.3rem);
+  color: var(--brand-200);
+  font-weight: 600;
+  margin-bottom: var(--space-4);
+}
+.hero .lead {
+  font-size: clamp(1.05rem, 2vw, 1.2rem);
+  color: rgba(255, 255, 255, 0.78);
+  max-width: 62ch;
+  margin-bottom: var(--space-8);
+}
+.hero-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+.hero-note {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* --- Sections ------------------------------------------------------------ */
+
+section { padding: var(--space-24) 0; }
+section.alt { background: var(--slate-50); }
+
+.section-head { max-width: 62ch; margin-bottom: var(--space-12); }
+.section-head h2 { font-size: clamp(1.9rem, 4vw, 2.6rem); margin-bottom: var(--space-4); }
+.section-head p { color: var(--slate-600); font-size: 1.05rem; }
+
+/* --- Problème → réponse -------------------------------------------------- */
+
+.solves { display: grid; gap: var(--space-4); }
+@media (min-width: 860px) { .solves { grid-template-columns: 1fr 1fr; } }
+
+.solve {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-4);
+  align-items: start;
+  background: var(--paper);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+.solve .q {
+  font-size: 15px;
+  color: var(--slate-600);
+  font-style: italic;
+  margin-bottom: var(--space-2);
+}
+.solve .a { font-weight: 600; color: var(--slate-700); }
+/* Volontairement en encre, pas en indigo : colorés, ces libellés se liraient comme des liens
+   cliquables alors qu'ils n'en sont pas. */
+.solve .a b { color: var(--ink); font-weight: 800; }
+
+.tick {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--brand-50);
+  color: var(--brand);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+/* --- Différenciateurs ---------------------------------------------------- */
+
+.feats { display: grid; gap: var(--space-6); }
+@media (min-width: 720px) { .feats { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .feats { grid-template-columns: repeat(3, 1fr); } }
+
+.feat {
+  background: var(--paper);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+.feat:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+.feat h3 { font-size: 1.15rem; margin-bottom: var(--space-3); }
+.feat p { color: var(--slate-600); font-size: 15px; }
+.feat .ico {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+  margin-bottom: var(--space-4);
+  background: var(--brand-50);
+  color: var(--brand);
+}
+.feat .ico svg { width: 22px; height: 22px; }
+
+/* --- Captures ------------------------------------------------------------ */
+
+/* Les captures mobiles (390×843) et la capture d'administration (1024×844) n'ont pas le même
+   format : les mêler dans une grille uniforme laisserait la carte paysage à moitié vide.
+   Les portraits vont donc sur trois colonnes, le paysage occupe sa propre rangée. */
+.shots { display: grid; gap: var(--space-8); }
+@media (min-width: 900px) { .shots { grid-template-columns: repeat(3, 1fr); } }
+.shots .wide { grid-column: 1 / -1; }
+@media (min-width: 900px) {
+  .shots .wide figure {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: var(--space-8);
+    align-items: center;
+  }
+  .shots .wide figcaption { margin-top: 0; }
+}
+
+.shot {
+  background: var(--paper);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+.shot figure { margin: 0; }
+.shot img {
+  display: block;
+  margin-inline: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--slate-100);
+}
+.shot figcaption { margin-top: var(--space-4); }
+.shot figcaption b { display: block; margin-bottom: var(--space-2); }
+.shot figcaption span { color: var(--slate-600); font-size: 15px; }
+
+/* --- Démo ---------------------------------------------------------------- */
+
+.demo {
+  background: linear-gradient(135deg, var(--brand-900) 0%, var(--ink) 100%);
+  color: var(--paper);
+  border-radius: var(--radius-xl);
+  padding: clamp(var(--space-8), 5vw, var(--space-16));
+  text-align: center;
+}
+.demo h2 { font-size: clamp(1.8rem, 4vw, 2.4rem); margin-bottom: var(--space-4); }
+.demo p { color: rgba(255, 255, 255, 0.78); max-width: 60ch; margin-inline: auto; }
+.demo .btn { margin-top: var(--space-8); }
+.demo .fine {
+  margin-top: var(--space-6);
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* --- Installation -------------------------------------------------------- */
+
+.steps { display: grid; gap: var(--space-6); counter-reset: step; }
+@media (min-width: 860px) { .steps { grid-template-columns: repeat(3, 1fr); } }
+
+/* La pastille numérotée fait 34 px : il lui faut plus que --space-8, sinon elle chevauche
+   le titre. */
+.step { position: relative; padding-top: 52px; }
+.step::before {
+  counter-increment: step;
+  content: counter(step);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  color: var(--paper);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 15px;
+}
+.step h3 { font-size: 1.05rem; margin-bottom: var(--space-2); }
+.step p { color: var(--slate-600); font-size: 15px; }
+
+.codeblock {
+  margin-top: var(--space-8);
+  background: var(--ink);
+  color: #e5e7eb;
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  overflow-x: auto;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.codeblock .c { color: #9ca3af; }
+.codeblock .p { color: var(--brand-300); user-select: none; }
+
+/* --- Pied de page -------------------------------------------------------- */
+
+footer {
+  background: var(--ink);
+  color: rgba(255, 255, 255, 0.6);
+  padding: var(--space-16) 0 var(--space-12);
+  font-size: 15px;
+}
+footer img { height: 26px; width: auto; margin-bottom: var(--space-6); }
+footer a { color: var(--brand-200); }
+footer a:hover { color: var(--paper); }
+.foot-grid {
+  display: grid;
+  gap: var(--space-8);
+  margin-bottom: var(--space-12);
+}
+@media (min-width: 720px) { .foot-grid { grid-template-columns: 2fr 1fr 1fr; } }
+.foot-grid h4 {
+  color: var(--paper);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 var(--space-4);
+}
+.foot-grid ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.foot-bottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: var(--space-6);
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.45);
+}
