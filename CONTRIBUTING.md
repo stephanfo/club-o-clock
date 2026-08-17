@@ -142,6 +142,34 @@ de rythme du tout. **Une exception** : un correctif de **sécurité** part seul 
 - Décris **le comportement observable** : ce qui change pour l'utilisateur, pas seulement pour le
   code. Une capture avant/après aide beaucoup sur un changement visuel.
 
+## Le site du projet
+
+<https://cluboclock.ratelet.fr> réunit la vitrine et la documentation. Il se construit depuis ce
+dépôt, et se déploie tout seul : le workflow `.github/workflows/pages.yml` se déclenche à chaque
+poussée sur `main` qui touche `doc/`, `site/` ou les documents de la racine.
+
+Pour le voir avant de pousser :
+
+```bash
+./site/build-local.sh --serve      # http://localhost:8080
+```
+
+Le script assemble `_site/` — la vitrine à la racine, la documentation sous `/doc/` — et **c'est
+lui que le workflow appelle**. Ce qui marche en local marche en CI, puisque ce sont les mêmes
+étapes. Il échoue si un lien est mort, si la police n'est pas servie ou s'il manque un fichier.
+
+Deux réglages ne vivent pas dans le dépôt et n'ont à être faits **qu'une fois** :
+
+1. **GitHub** → *Settings* → *Pages* → *Source* = **GitHub Actions**. Sans lui, le job `deploy`
+   échoue en fin de course.
+2. **Chez le registrar du domaine** : un enregistrement `CNAME` de `cluboclock` vers
+   `stephanfo.github.io.` (le point final compte). Le fichier `CNAME` de l'artefact, lui, est
+   écrit par `build-local.sh` — il ne se modifie pas à la main. Une fois le DNS propagé, cocher
+   *Enforce HTTPS* dans les réglages Pages.
+
+> Le sous-domaine `demo.` est indépendant : il pointe vers l'hébergement mutualisé et n'est pas
+> concerné par GitHub Pages.
+
 ## Licence
 
 Le projet est sous **[AGPL-3.0](https://github.com/stephanfo/club-o-clock/blob/main/LICENSE)**. En contribuant, tu acceptes que ta contribution soit
