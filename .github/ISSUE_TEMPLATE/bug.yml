@@ -1,0 +1,79 @@
+name: 🐛 Signaler un bug
+description: Quelque chose ne fonctionne pas comme attendu
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci pour ce signalement.
+
+        ⚠️ **Faille de sécurité ?** N'utilise pas ce formulaire — suis
+        [SECURITY.md](../blob/main/SECURITY.md) (signalement privé).
+
+        ⚠️ **Aucune donnée réelle d'adhérent** : ni nom, ni email, ni capture non floutée.
+        Reproduis sur le jeu de démonstration quand c'est possible.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Que s'est-il passé ?
+      description: Ce que tu faisais, ce que tu attendais, ce qui s'est produit à la place.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Comment le reproduire
+      placeholder: |
+        1. Se connecter en tant que…
+        2. Aller sur…
+        3. Cliquer sur…
+        4. → le bug apparaît
+    validations:
+      required: true
+
+  - type: dropdown
+    id: role
+    attributes:
+      label: Avec quel rôle ?
+      description: Beaucoup de comportements dépendent du rôle.
+      options:
+        - Athlète
+        - Coach
+        - Admin
+        - Parent (garant)
+        - Visiteur non connecté
+        - Plusieurs / je ne sais pas
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device
+    attributes:
+      label: Sur quel format ?
+      options:
+        - Mobile
+        - Desktop
+        - Les deux
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Navigateur et appareil
+      placeholder: "Safari 17 sur iPhone 13 · Firefox 128 sur Windows…"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (facultatif)
+      description: Extrait pertinent de `storage/logs/laravel.log`, **expurgé de toute donnée personnelle**.
+      render: text
+
+  - type: input
+    id: version
+    attributes:
+      label: Version ou commit
+      placeholder: "v1.0.0 ou le hash du commit"

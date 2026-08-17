@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Signaler une faille de sécurité
+    url: https://github.com/stephanfo/club-o-clock/security/advisories/new
+    about: Signalement privé — n'ouvre jamais d'issue publique pour une vulnérabilité.
+  - name: 💬 Question d'installation ou d'usage
+    url: https://github.com/stephanfo/club-o-clock/discussions
+    about: Pour une question plutôt qu'un bug. Consulte d'abord doc/INSTALL.md.

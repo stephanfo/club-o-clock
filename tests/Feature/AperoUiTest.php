@@ -1,0 +1,110 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Livewire\SessionShow;
+use App\Models\AperoFlag;
+use App\Models\Session;
+use App\Models\User;
+use App\Services\AperoService;
+use App\Services\RegistrationService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Livewire\Livewire;
+use Tests\Concerns\EnrollableCategory;
+use Tests\TestCase;
+
+// UI flag apéro sur la fiche séance (PRD §4.14.5) : offrir / ne plus offrir / modération coach.
+class AperoUiTest extends TestCase
+{
+    use EnrollableCategory;
+    use RefreshDatabase;
+
+    private function makeSession(): Session
+    {
+        return $this->targetCategory(Session::create([
+            'kind' => 'training', 'title' => 'Natation seuil',
+            'start_at' => Carbon::now()->addDays(2)->setTime(19, 0),
+            'duration_min' => 90, 'capacity' => 10,
+            'created_by' => User::factory()->coach()->create()->id,
+        ]));
+    }
+
+    private function participant(Session $s): User
+    {
+        $u = $this->athlete();
+        app(RegistrationService::class)->register($s, $u, $u);
+
+        return $u;
+    }
+
+    public function test_participant_offers_apero_with_motif(): void
+    {
+        $s = $this->makeSession();
+        $u = $this->participant($s);
+
+        Livewire::actingAs($u)->test(SessionShow::class, ['session' => $s])
+            ->set('aperoMotif', 'mon anniversaire')
+            ->call('flagApero')
+            ->assertSet('aperoMotif', ''); // réinitialisé après pose
+
+        $this->assertDatabaseHas('apero_flags', [
+            'session_id' => $s->id, 'user_id' => $u->id, 'motif' => 'mon anniversaire', 'parked_at' => null,
+        ]);
+    }
+
+    public function test_payer_retracts_own_flag(): void
+    {
+        $s = $this->makeSession();
+        $u = $this->participant($s);
+        app(AperoService::class)->flag($s, $u);
+
+        Livewire::actingAs($u)->test(SessionShow::class, ['session' => $s])
+            ->call('unflagApero', $u->id);
+
+        $this->assertDatabaseMissing('apero_flags', ['session_id' => $s->id, 'user_id' => $u->id]);
+    }
+
+    public function test_coach_moderates_a_flag(): void
+    {
+        $s = $this->makeSession();
+        $payer = $this->participant($s);
+        $coach = User::factory()->coach()->create();
+        app(AperoService::class)->flag($s, $payer);
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s])
+            ->call('unflagApero', $payer->id);
+
+        $this->assertDatabaseMissing('apero_flags', ['session_id' => $s->id, 'user_id' => $payer->id]);
+    }
+
+    public function test_athlete_cannot_moderate_another_flag(): void
+    {
+        $s = $this->makeSession();
+        $payer = $this->participant($s);
+        $other = $this->participant($s);
+        app(AperoService::class)->flag($s, $payer);
+
+        Livewire::actingAs($other)->test(SessionShow::class, ['session' => $s])
+            ->call('unflagApero', $payer->id)
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('apero_flags', ['session_id' => $s->id, 'user_id' => $payer->id]);
+    }
+
+    public function test_session_cancel_parks_and_restore_reactivates_via_fiche(): void
+    {
+        $s = $this->makeSession();
+        $u = $this->participant($s);
+        $coach = User::factory()->coach()->create();
+        app(AperoService::class)->flag($s, $u);
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s])
+            ->call('cancel');
+        $this->assertNotNull(AperoFlag::where('session_id', $s->id)->first()->parked_at);
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s->fresh()])
+            ->call('restore');
+        $this->assertNull(AperoFlag::where('session_id', $s->id)->first()->parked_at);
+    }
+}

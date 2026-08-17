@@ -1,0 +1,40 @@
+# Laravel
+*.log
+# Liste blanche plutôt que liste noire : le squelette Laravel n'énumérait que .env,
+# .env.backup et .env.production, si bien qu'un .env.demo, .env.tbd ou .env.ovh — les
+# noms qu'on invente en préparant un déploiement — partaient dans un `git add -A`.
+# Ici tout .env.* est exclu SAUF l'exemple, qui doit rester versionné.
+.env
+.env.*
+!.env.example
+.phpactor.json
+.phpunit.result.cache
+/.codex
+/.cursor/
+/.idea
+/.nova
+/.phpunit.cache
+/.vscode
+/.zed
+/auth.json
+/node_modules
+/public/build
+/public/fonts-manifest.dev.json
+/public/hot
+/public/storage
+# Surcharge PHP propre à un déploiement (plafond d'upload de la démo, cf. INSTALL §6 bis).
+# Versionné, il imposerait à chaque club les limites d'une autre instance.
+/public/.user.ini
+/storage/*.key
+/storage/pail
+/vendor
+_ide_helper.php
+Homestead.json
+Homestead.yaml
+Thumbs.db
+
+# OS / éditeur
+.DS_Store
+
+# Outillage local Claude Code (propre à la machine, jamais distribué)
+.claude/

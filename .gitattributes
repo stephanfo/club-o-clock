@@ -1,0 +1,16 @@
+* text=auto eol=lf
+
+*.blade.php diff=html
+*.css diff=css
+*.html diff=html
+*.md diff=markdown
+*.php diff=php
+
+# PAS d'export-ignore sur /.github ni CHANGELOG.md. Ces lignes venaient du squelette Laravel, où
+# elles allègent les tarballs de release Composer — ce dépôt n'en produit pas, mais il est EXPORTÉ
+# par `git archive` pour constituer le dépôt public (plan open source OS6). Elles y retiraient :
+#   • CHANGELOG.md, alors que le README, SECURITY.md et INSTALL.md y renvoient tous les trois
+#     → trois liens morts sur la vitrine dès le premier commit ;
+#   • /.github, donc le workflow CI qui alimente le badge « tests » du README, et les templates
+#     d'issue vers lesquels SECURITY.md et config.yml pointent.
+.styleci.yml export-ignore

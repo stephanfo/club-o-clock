@@ -1,0 +1,48 @@
+# =============================================================================
+# .htaccess racine — hébergement mutualisé OVH « Pro »
+#
+# Contexte : sur ce mutualisé, le docroot Apache pointe sur la RACINE du dépôt
+# (là où vivent app/, vendor/, .env…). Sans ce fichier, ces sources seraient
+# servies en clair par HTTP. Ce .htaccess :
+#   1. force HTTPS (redirection 301) ;
+#   2. bloque en dur tout accès aux fichiers/dossiers sensibles ;
+#   3. redirige tout le trafic applicatif vers public/ (front controller Laravel).
+#
+# À terme, si le manager OVH permet de fixer le dossier racine du site sur
+# .../public, ce fichier devient une simple ceinture de sécurité (à conserver).
+# =============================================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # -- 1. Forçage HTTPS -----------------------------------------------------
+    # Derrière le proxy OVH, la terminaison TLS se fait en amont : on teste
+    # d'abord X-Forwarded-Proto (évite une boucle de redirection), puis HTTPS
+    # en repli pour un accès direct.
+    RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
+    RewriteCond %{HTTPS} off
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # -- 2. Redirection du trafic vers public/ --------------------------------
+    # Ne pas re-préfixer si déjà dans public/ (évite public/public/…).
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# -- 3. Blocage défensif des chemins sensibles --------------------------------
+# Ceinture + bretelles : même si une règle rewrite était contournée, ces
+# ressources ne doivent jamais être servies.
+#
+# ⚠ Exception : /vendor/livewire/ est un asset PUBLIC (livewire.min.js publié
+# via `vendor:publish --tag=livewire:assets`, servi en statique pour éviter le
+# framing HTTP/2 cassé d'OVH sur la route PHP). Le blocage /vendor/ ci-dessous
+# vise le vendor Composer à la RACINE, pas cet asset. RedirectMatch (mod_alias)
+# est indépendant des RewriteRule ci-dessus : on exclut « livewire » directement
+# dans le motif via un négatif look-ahead, sinon /vendor/livewire/ tombe en 404.
+RedirectMatch 404 (?i)/\.(env|git|gitignore|gitattributes|editorconfig|npmrc)
+RedirectMatch 404 (?i)/(app|bootstrap|config|database|resources|routes|storage|tests|node_modules|doc|design)(/|$)
+RedirectMatch 404 (?i)/vendor/(?!livewire/)
+RedirectMatch 404 (?i)/(artisan|composer\.(json|lock)|package(-lock)?\.json|phpunit\.xml|vite\.config\.js|README\.md|CLAUDE\.md)$
+
+# Empêche l'indexation de dossier
+Options -Indexes

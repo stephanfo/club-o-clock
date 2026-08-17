@@ -1,0 +1,253 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Instanceof between App\\Models\\User and Illuminate\\Contracts\\Auth\\MustVerifyEmail will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: app/Actions/Fortify/UpdateUserProfileInformation.php
+
+		-
+			message: '#^Access to an undefined property App\\Livewire\\Admin\\MemberCreate\:\:\$age\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Livewire/Admin/MemberCreate.php
+
+		-
+			message: '#^Access to an undefined property App\\Livewire\\Admin\\MemberCreate\:\:\$isMinor\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Livewire/Admin/MemberCreate.php
+
+		-
+			message: '#^Access to an undefined property App\\Livewire\\Admin\\MemberCreate\:\:\$isP1\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Livewire/Admin/MemberCreate.php
+
+		-
+			message: '#^Access to an undefined property App\\Livewire\\Admin\\MemberCreate\:\:\$primaryCategory\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Livewire/Admin/MemberCreate.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Qualification\:\:\$pivot\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Livewire/Admin/MemberShow.php
+
+		-
+			message: '#^Parameter \#1 \$dob of static method App\\Support\\AgeCategory\:\:derive\(\) expects Illuminate\\Support\\Carbon, Carbon\\Carbon given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Livewire/Admin/MemberShow.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>label" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Livewire/SessionForm.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Livewire/SessionForm.php
+
+		-
+			message: '#^Unsafe access to private property App\\Models\\ClubSettings\:\:\$cached through static\:\:\.$#'
+			identifier: staticClassAccess.privateProperty
+			count: 2
+			path: app/Models/ClubSettings.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Builder\:\:deletionPending\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:deletionEligibleAt\(\) should return Illuminate\\Support\\Carbon\|null but returns Carbon\\Carbon\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>matrix" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Notifications/NotificationDispatcher.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 10
+			path: app/Services/CatalogueService.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:sessions\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/CatalogueService.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:templates\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/CatalogueService.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:users\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Services/CatalogueService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,object\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/JournalService.php
+
+		-
+			message: '#^Parameter \#1 \$rows of method App\\Services\\JournalService\:\:decorate\(\) expects Illuminate\\Support\\Collection\<int, object\>, Illuminate\\Support\\Collection\<int, stdClass\> given\.$#'
+			identifier: argument.type
+			count: 3
+			path: app/Services/JournalService.php
+
+		-
+			message: '#^Offset ''dob''\|''first_name''\|''last_name'' on array\{last_name\: ''nom'', first_name\: ''prénom'', dob\: ''date_nais''\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/MemberImportService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Relations\\Pivot\:\:\$is_primary\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/MemberService.php
+
+		-
+			message: '#^Offset ''qualifications'' on array\{first_name\: string, last_name\: string, dob\: string, email\: string\|null, roles\: array\<int, string\>, surclassements\: array\<int, int\>, qualifications\: array\<int, int\>, guardian_id\: int\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/MemberService.php
+
+		-
+			message: '#^Offset ''roles'' on array\{first_name\: string, last_name\: string, dob\: string, email\: string\|null, roles\: array\<int, string\>, surclassements\: array\<int, int\>, qualifications\: array\<int, int\>, guardian_id\: int\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/MemberService.php
+
+		-
+			message: '#^Offset ''surclassements'' on array\{first_name\: string, last_name\: string, dob\: string, email\: string\|null, roles\: array\<int, string\>, surclassements\: array\<int, int\>, qualifications\: array\<int, int\>, guardian_id\: int\|null\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/MemberService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>max_per_week" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/QuotaService.php
+
+		-
+			message: '#^Right side of && is always true\.$#'
+			identifier: booleanAnd.rightAlwaysTrue
+			count: 1
+			path: app/Services/RegistrationService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Session\:\:\$participants\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/StatsService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Session\:\:\$participating_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/StatsService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$categories\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/StatsService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$coaches\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/StatsService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$discipline_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/StatsService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/StatsService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{title\: string, date\: Illuminate\\Support\\Carbon\|null, fill\: int\}, Closure\(App\\Models\\Session\)\: array\{title\: string, date\: Illuminate\\Support\\Carbon\|null, fill\: int\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/StatsService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{title\: string, date\: Illuminate\\Support\\Carbon\|null, participants\: mixed\}, Closure\(App\\Models\\Session\)\: array\{title\: string, date\: Illuminate\\Support\\Carbon\|null, participants\: mixed\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/StatsService.php
+
+		-
+			message: '#^Parameter \#1 \$groupBy of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:groupBy\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: non\-falsy\-string\)\|list\<Closure\|string\>\|string, Closure\(App\\Models\\AuditLog\)\: non\-falsy\-string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/StatsService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>label" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/StatsService.php
+
+		-
+			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/TemplateGenerationService.php
+
+		-
+			message: '#^Parameter \#2 \$start of method App\\Services\\TemplateGenerationService\:\:occurrences\(\) expects Illuminate\\Support\\Carbon, Carbon\\Carbon given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/TemplateGenerationService.php
+
+		-
+			message: '#^Parameter \#3 \$end of method App\\Services\\TemplateGenerationService\:\:occurrences\(\) expects Illuminate\\Support\\Carbon, Carbon\\Carbon given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/TemplateGenerationService.php
+
+		-
+			message: '#^Call to an undefined method DOMNode\:\:getAttribute\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Support/Markup.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Qualification\:\:\$pivot\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Support/QualificationDisplay.php
+
+		-
+			message: '#^Method App\\Support\\QualificationDisplay\:\:aggregate\(\) should return Illuminate\\Support\\Collection\<int, array\{id\: int, label\: string, code\: string\|null, holders\: array\<int, array\{name\: string, status\: array\}\>, worst\: string\}\> but returns Illuminate\\Support\\Collection\<int, array\{id\: int, label\: string, code\: string\|null, holders\: non\-empty\-list\<array\{name\: string, status\: array\{status\: string, cls\: string, expires_at\: Illuminate\\Support\\Carbon\|null\}\}\>, worst\: string\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/QualificationDisplay.php

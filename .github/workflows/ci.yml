@@ -1,0 +1,84 @@
+name: CI
+
+# Rejoue la porte de qualité du projet (`composer check` : pint + phpstan niveau 5 +
+# cohérence du schéma + suite de tests) sur chaque poussée et chaque pull request.
+# C'est la même commande que celle documentée dans CONTRIBUTING.md : ce qui passe en
+# local passe ici, et inversement — pas de porte de qualité à deux vitesses.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Une PR poussée trois fois de suite n'occupe pas trois runners.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualite:
+    name: Porte de qualité
+    runs-on: ubuntu-latest
+
+    services:
+      # Les tests tournent sur MariaDB/InnoDB, jamais SQLite : le moteur doit reproduire
+      # les verrous de ligne (FOR UPDATE) sur lesquels repose la sérialisation des
+      # inscriptions. Cf. le commentaire de phpunit.xml.
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: cluboclock_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DB_CONNECTION: mariadb
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: cluboclock_test
+      DB_USERNAME: root
+      DB_PASSWORD: root
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          # gd est requis par composer.json (vignettes du logo de club) ; le client
+          # mariadb sert à Laravel pour charger le dump de schéma au début de `migrate`
+          # et à `schema:check-drift`.
+          extensions: pdo_mysql, mbstring, openssl, bcmath, intl, fileinfo, zip, gd
+          tools: composer:v2
+          coverage: none
+
+      - name: Installer le client MariaDB
+        run: sudo apt-get update && sudo apt-get install -y mariadb-client
+
+      - name: Cache des dépendances Composer
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Installer les dépendances
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Préparer l'environnement
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Porte de qualité
+        run: composer check

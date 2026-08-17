@@ -1,0 +1,56 @@
+name: 💡 Proposer une évolution
+description: Suggérer une fonctionnalité ou une amélioration
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci pour cette proposition.
+
+        Le périmètre du projet est cadré par le [PRD](../blob/main/doc/PRD.md), qui distingue le
+        périmètre V1 (§3.1) de ce qui en est **explicitement exclu** (§3.2). Certaines exclusions
+        sont délibérées : pas de multi-tenant, pas d'application native, pas de stockage de
+        téléphone ni de certificat médical (minimisation RGPD).
+
+        Mieux vaut en discuter ici **avant** d'écrire du code.
+
+  - type: textarea
+    id: probleme
+    attributes:
+      label: Quel problème cherches-tu à résoudre ?
+      description: Décris la situation vécue plutôt que la solution — c'est souvent là que se trouve la meilleure réponse.
+      placeholder: "Dans mon club, quand… il faut… ce qui pose problème parce que…"
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solution envisagée
+      description: Ce que tu imagines, si tu as une idée précise.
+
+  - type: dropdown
+    id: role
+    attributes:
+      label: Qui en bénéficierait ?
+      multiple: true
+      options:
+        - Athlètes
+        - Coachs
+        - Admins
+        - Parents (garants)
+    validations:
+      required: true
+
+  - type: textarea
+    id: contexte
+    attributes:
+      label: Contexte de ton club
+      description: Discipline, taille, particularités d'organisation. Ça aide à juger si le besoin est général ou spécifique.
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: Je suis prêt·e à travailler sur cette fonctionnalité

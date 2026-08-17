@@ -1,0 +1,989 @@
+/* Club'O'Clock — feuille de style applicative.
+   Design system porté tel quel depuis le handoff design.
+   Ordre : tokens de marque d'abord, puis couche composants. */
+@import './club-tokens.css';
+@import './club-app.css';
+
+/* Reset hôte : le design suppose un hôte plein écran (proto = .pa height:100%).
+   Sans ça, body garde sa marge par défaut (bordure blanche) et height:100% s'effondre. */
+html, body { height: 100%; margin: 0; }
+body { background: var(--paper); color: var(--fg); font-family: var(--font-sans); }
+
+/* Anti-zoom PWA (demande produit). touch-action:manipulation coupe le zoom double-tap iOS
+   (et le délai de clic 300ms) sans désactiver le scroll ni le pincer natif du navigateur ;
+   le pincer et le zoom auto au focus sont, eux, coupés par le viewport (maximum-scale=1 +
+   user-scalable=no, cf. layout). En complément, sur mobile on force les champs de saisie à
+   ≥16px : iOS zoome au focus d'un input dont la police est < 16px, même avec user-scalable=no
+   sur certaines versions. Le design garde ses 15px sur desktop (le zoom au focus n'existe pas). */
+body { touch-action: manipulation; }
+@media (max-width: 768px) {
+    .input, .field, .bare-input, .ifield-input, textarea, select { font-size: 16px; }
+}
+
+/* Alpine : masque les éléments x-cloak (onglets non actifs) avant hydratation. */
+[x-cloak] { display: none !important; }
+
+/* Bascule auth mobile / desktop (porté de AuthMobile vs AuthDesktop, breakpoint proto 880px).
+   Les deux coquilles sont dans le DOM ; une seule s'affiche. */
+.auth-mobile { display: none; }
+@media (max-width: 880px) {
+    .auth-dk { display: none; }
+    .auth-mobile {
+        display: flex; flex-direction: column;
+        min-height: 100%; width: 100%; overflow-x: hidden;
+        background: var(--bg-deep);
+    }
+    /* Le fondu pousse, la sheet blanche remonte par-dessus (margin-top négatif du design). */
+    .auth-mobile .auth-hero { flex: 0 0 auto; }
+    .auth-mobile .auth-sheet { width: 100%; }
+}
+
+/* Toggle méthode de connexion en CSS pur (radios cachés → seg actif + pane visible).
+   Radios + .auth-seg + .pane-* sont tous siblings dans .auth-method. */
+.auth-method-radio { position: absolute; opacity: 0; pointer-events: none; }
+.pane-magic, .pane-pwd { display: none; }
+/* Sélecteurs par suffixe d'id (les coquilles mobile/desktop coexistent, scope = mo-/dk-). */
+[id$="-magic"]:checked ~ .pane-magic { display: flex; }
+[id$="-pwd"]:checked ~ .pane-pwd { display: flex; }
+/* Segment actif : le label dont le radio est coché prend le style .seg-item.on du design. */
+[id$="-magic"]:checked ~ .auth-seg .seg-magic,
+[id$="-pwd"]:checked ~ .auth-seg .seg-pwd {
+    background: var(--paper); color: var(--ink); font-weight: 700; box-shadow: var(--shadow-xs);
+}
+/* Comptes de l'instance de démonstration (OS7), sous l'avertissement de l'écran de connexion.
+   Rendus seulement si DEMO_MODE est actif — invisibles sur une instance de club. La liste doit
+   rester lisible au pouce : une ligne par compte, l'email cliquable en premier (c'est la cible),
+   le rôle et la précision ensuite, qui passent à la ligne sur écran étroit. */
+.demo-accounts { margin-bottom: var(--space-4); }
+.demo-list { list-style: none; margin: var(--space-2) 0 var(--space-3); padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.demo-item { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); font-size: var(--text-sm); }
+/* Bouton et non lien : il ne navigue pas, il remplit un champ. Styles remis à plat pour qu'il
+   se lise comme le lien qu'il imite, sans hériter du bouton du design system. */
+.demo-mail {
+    font-family: var(--font-mono); font-size: var(--text-sm); color: var(--link);
+    background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline;
+}
+.demo-mail:hover { color: var(--link-hover); }
+.demo-role { font-weight: 700; color: var(--fg-soft); }
+.demo-note { min-width: 0; }
+
+/* Rappel permanent de l'instance de démonstration (OS7), posé en pastille de coin.
+   z-index 1140 : AU-DESSUS des cartes Leaflet (panes 400-700, contrôles ~1000) pour rester
+   lisible sur les écrans parcours, mais SOUS la topbar et la botnav (1150), qui ne doivent
+   jamais être masquées.
+
+   DESKTOP UNIQUEMENT (cf. la règle de masquage sous 768px plus bas) : sur mobile, la pastille
+   flottante recouvrait la première ligne de contenu sous la topbar — nav semaine du planning,
+   carte d'identité du profil. Elle y est remplacée par .demo-badge-bar, posée DANS la barre. */
+.demo-badge {
+    position: fixed; z-index: 1140;
+    /* Desktop : coin bas-droit. Le bas-gauche est occupé par la sidebar, et s'en écarter
+       supposerait de recopier sa largeur (220px, club-app.css) en dur ici. */
+    right: var(--space-4); bottom: var(--space-4);
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-pill);
+    background: var(--warning-bg); border: 1px solid var(--warning-border);
+    color: var(--warning-text); font-size: var(--text-xs); line-height: 1;
+    box-shadow: var(--shadow-md);
+    /* Purement informatif : ne doit jamais intercepter un geste destiné au contenu. */
+    pointer-events: none;
+}
+.demo-badge .ic { flex: 0 0 auto; }
+
+/* Variante « dans la barre » (mobile) — rendue par <x-topbar>, avant les actions.
+   Contrepartie de la pastille flottante : elle occupe le chrome au lieu de flotter dessus,
+   donc elle ne peut RIEN recouvrir. Masquée sur desktop, où la topbar verte n'existe pas. */
+.demo-badge-bar { display: none; }
+@media (max-width: 768px) {
+    .demo-badge { display: none; }
+    .demo-badge-bar {
+        display: inline-flex; align-items: center; gap: 4px;
+        /* Ne cède jamais devant un titre long (nom de parcours, nom complet) : c'est le titre
+           (flex:1, ellipsis) qui se réduit. */
+        flex: 0 0 auto;
+        padding: 3px var(--space-2);
+        border-radius: var(--radius-pill);
+        /* Sur le vert de la barre : voile clair + texte blanc, comme les autres éléments du
+           chrome (.topbar .iconbtn) — le jaune de --warning-bg y jurerait. */
+        background: var(--surface-on-dark); color: var(--fg-on-dark);
+        font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap;
+        pointer-events: none;
+    }
+    .demo-badge-bar .ic { flex: 0 0 auto; }
+    /* La pastille prend de la largeur dans une barre déjà chargée (retour + titre + actions +
+       cloche). Sans min-width:0, un flex item ne descend pas sous la taille de son contenu : un
+       titre long (nom de parcours, nom complet) comprimerait la pastille ou déborderait — en
+       silence, la barre étant en overflow:hidden. On rend donc le titre compressible et tronqué,
+       mais SEULEMENT quand la pastille est là : hors démo, la barre garde son rendu d'origine. */
+    .topbar:has(.demo-badge-bar) > .f1 { min-width: 0; }
+    .topbar:has(.demo-badge-bar) .topbar-title,
+    .topbar:has(.demo-badge-bar) .topbar-sub {
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+}
+
+/* Shell applicatif (authentifié) — sidebar desktop (dk-side, design) + botnav mobile.
+   dk-side / dk-navitem / botnav / pa-logo / avatar / eyebrow / divider sont définis
+   dans club-app.css (design). Ici : assemblage layout + responsive + compléments. */
+.app-layout { display: flex; min-height: 100dvh; }
+.dk-side-logo { padding: 2px 6px 10px; }
+.dk-side-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.dk-navitem.is-disabled { opacity: 0.45; cursor: default; }
+.dk-user { padding: 6px; }
+.dk-user-meta { min-width: 0; text-align: left; display: flex; flex-direction: column; }
+.dk-user-name { font-weight: 700; font-size: 13px; }
+.app-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.app-main { padding: var(--sp-5, 1.25rem) var(--sp-6, 1.5rem); max-width: 1100px; width: 100%; }
+
+/* Bottom nav : mobile uniquement ; sidebar : desktop uniquement. */
+.botnav { display: none; }
+@media (max-width: 768px) {
+    /* Shell mobile : une seule colonne. La sidebar desktop disparaît, la botnav
+       est ancrée en bas (fixed), pas un item flex de la rangée .app-layout
+       (sinon elle s'affiche en colonne à droite et mange la largeur). */
+    .app-layout { display: block; }
+    .dk-side { display: none; }
+    /* Mobile : la pastille passe EN HAUT, sous la topbar fixe. Le bas est déjà un empilement
+       chargé — botnav, plus les barres pleine largeur posées dessus (barre de vue du planning,
+       actions de fiche, toutes à bottom: --botnav-top) : s'y ajouter les recouvrirait. */
+    .demo-badge { top: calc(var(--topbar-total) + var(--space-2)); bottom: auto; right: var(--space-3); }
+    .botnav {
+        display: flex;
+        /* z-index 1150 (comme la topbar) : AU-DESSUS des cartes Leaflet (panes 400-700, contrôles
+           ~1000) — sinon la carte du bloc Lieu d'une fiche séance passe devant la botnav au scroll ;
+           SOUS le scrim des dialogs (1200) pour qu'une modale la recouvre. */
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 1150;
+        /* Hauteur TOTALE forcée = --botnav-h (contenu, hors safe-area) + --botnav-pb
+           (safe-area). border-box + height rend cette valeur EXACTE : les barres
+           posées dessus (bottom: --botnav-top) et la réserve de scroll s'y ancrent
+           sans deviner l'empilement des paddings. Le padding-top d'origine (6px) est
+           écrasé par align-items:center → le contenu reste centré dans --botnav-h. */
+        box-sizing: border-box;
+        height: calc(var(--botnav-h) + var(--botnav-pb));
+        align-items: center;
+        /* Safe-area iOS : max(8px, safe-area) écarte les labels de la barre home SANS
+           additionner un 8px fixe à la safe-area (ce qui creusait un vide de ~42px). */
+        padding-top: 0; padding-bottom: var(--botnav-pb);
+    }
+    /* place pour la botnav fixe (+ safe-area du bas en PWA standalone iOS) */
+    .app-main { padding-bottom: var(--botnav-reserve); }
+}
+
+/* =========================================================================
+   TOPBAR MOBILE FIXE — en-tête vert collé en haut, fond derrière la safe-area.
+   Variante fixe + verte de .appbar (club-app.css). Mobile uniquement : sur
+   desktop, la sidebar (.dk-side) + les topbars internes (.dk-topbar) restent
+   la seule chrome. Chaque écran met SON contenu d'en-tête dans une .topbar et
+   réserve --topbar-total en haut de sa zone de scroll (cf. blocs par écran).
+   ========================================================================= */
+.topbar { display: none; }
+@media (max-width: 768px) {
+    .topbar {
+        display: flex; align-items: center; gap: 12px;
+        /* z-index 1150 : AU-DESSUS des cartes Leaflet (panes 400-700, contrôles ~1000) et de la
+           barre d'action fiche (1100), sinon la carte du bloc Lieu passe devant la barre fixe au
+           scroll ; SOUS le scrim des dialogs (1200) pour qu'une modale la recouvre normalement. */
+        position: fixed; left: 0; right: 0; top: 0; z-index: 1150;
+        box-sizing: border-box;
+        /* Le padding-top réserve la safe-area : le FOND passe derrière l'heure iOS,
+           le CONTENU (titre, chevron) reste dessous. Même réglage que le home
+           (calc(env(safe-area-inset-top) + socle)), validé sur iPhone. */
+        padding: calc(var(--topbar-st) + 8px) 16px 8px;
+        min-height: var(--topbar-total);
+        /* Dégradé horizontal de marque. */
+        background: var(--grad-topbar); color: var(--fg-on-dark);
+        overflow: hidden;
+    }
+    /* Logo du club en filigrane à droite (plan open source OS2 : générique — logo custom ou
+       logo neutre par défaut, cf. --club-logo-url injecté par partials.club-palette — au lieu
+       de la fleur hibiscus figée du design d'origine). Sous le contenu (z-index). */
+    .topbar::before {
+        content: ""; position: absolute; right: -30px; top: 50%; z-index: 0;
+        width: 150px; height: 150px; transform: translateY(-50%) rotate(-12deg);
+        background: var(--club-logo-url) no-repeat center / contain;
+        filter: brightness(0) invert(1); opacity: 0.12; pointer-events: none;
+    }
+    /* Le contenu (retour, titre, cloche) passe au-dessus du filigrane. */
+    .topbar > * { position: relative; z-index: 1; }
+    /* Titre + sous-titre en clair sur le vert (pendant de .appbar-title/-sub). */
+    .topbar-title { font-family: var(--font-display); font-weight: 800; text-transform: uppercase;
+        font-size: 22px; line-height: 0.95; letter-spacing: -0.01em; color: var(--fg-on-dark); }
+    .topbar-sub { font-size: 12px; color: var(--brand-100); margin-top: 2px; }
+    .topbar-spacer { flex: 1; }
+    /* Boutons-icône (retour, réglages) : clairs sur le vert. */
+    .topbar .iconbtn { color: var(--fg-on-dark); }
+    .topbar .iconbtn:hover { color: var(--paper); background: var(--surface-on-dark); }
+}
+
+/* --- Planning (J1) — porté du proto (dk-topbar-plan, grille hebdo) --- */
+/* Planning + fiche sont full-bleed (dk-topbar/dk-body internes) : annule le padding de .app-main. */
+.app-main:has(.planning-screen),
+.app-main:has(.fiche-screen),
+.app-main:has(.form-screen),
+.app-main:has(.home-screen),
+/* Alertes / Profil / Enfants : full-bleed comme les autres écrans à shell interne
+   (dk-topbar/dk-body en desktop, topbar verte fixe + scroll propre en mobile). Sans ça,
+   le padding de .app-main insérait un liseré autour et désalignait la topbar fixe. */
+.app-main:has(.alerts-screen),
+.app-main:has(.profil-screen),
+.app-main:has(.children-screen) { padding: 0; max-width: none; }
+.planning-screen { display: flex; flex-direction: column; min-height: 100%; }
+.planning-screen .dk-body { padding: 0; }
+/* Topbar planning en 2 lignes empilées. */
+.dk-topbar-plan { flex-direction: column; align-items: stretch; gap: 14px; }
+/* Ligne 1 : date/nav à gauche · sélecteur de vue à droite. */
+.dk-plan-row1 { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+/* Ligne 2 : filtres + checkbox. */
+.dk-plan-row2 { flex-wrap: wrap; }
+.dk-plan-filters { flex-wrap: wrap; }
+.planning-mine { display: flex; align-items: center; gap: 0.4rem; font-size: var(--text-sm); white-space: nowrap; }
+.planning-empty { color: var(--fg-muted); padding: var(--space-6) var(--space-4); text-align: center; }
+.plan-pad { padding: var(--space-6); }
+
+/* coquilles : desktop / mobile bascule à 768px */
+.planning-mobile { display: none; }
+
+/* === Vue Semaine — grille 7 colonnes (desktop, proto PlanningDesktop) === */
+.wk-grid-dk { display: grid; grid-template-columns: repeat(7, 1fr); flex: 1; min-height: 0; }
+.wk-col-dk { display: flex; flex-direction: column; min-width: 0; border-right: var(--border-thin) solid var(--divider); }
+.wk-col-dk:last-child { border-right: none; }
+.wk-colhead-dk {
+    text-align: center; padding: 12px 8px; border-bottom: var(--border-thin) solid var(--border);
+    background: var(--paper); position: sticky; top: 0; z-index: 1;
+}
+.wk-colhead-dk.is-today { background: var(--accent-50); }
+.wk-colbody-dk { padding: 8px; display: flex; flex-direction: column; gap: 7px; }
+
+/* === Coquille mobile — filtres + weeknav + liste/jour + segment bas === */
+.plan-filterrow {
+    padding: 10px var(--space-4); border-bottom: var(--border-thin) solid var(--divider);
+    overflow-x: auto; background: var(--paper);
+}
+/* TEMPORAIRE : masque la barre de filtres de type de séance sur mobile (demande produit).
+   Réversible — retirer cette règle + la classe is-hidden-temp dans planning.blade.php. */
+@media (max-width: 768px) { .plan-filterrow.is-hidden-temp { display: none; } }
+.plan-weeknav {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-bottom: var(--border-thin) solid var(--divider);
+    background: var(--paper);
+}
+/* Bandeau de contexte enfant en tête du planning mobile (le sélecteur a migré en bas) :
+   inséré juste sous la topbar, on lui donne des marges pour ne pas coller aux bords. */
+.planning-mobile > .subj-banner.is-inline { margin: 12px var(--space-4) 0; }
+/* Modèle d'ancrage bas unique (mobile). La hauteur de la botnav est FORCÉE (cf.
+   .botnav height plus haut) → ces valeurs sont exactes par construction, pas devinées.
+   --botnav-h  : hauteur du contenu de la botnav, HORS safe-area (forcée sur .botnav).
+   --botnav-pb : padding-bottom réel = max(8px, safe-area). Sur barre home iPhone =
+                 safe-area ; ancien iPhone = 8px. Jamais additionné à un 8px fixe.
+   --botnav-top: hauteur TOTALE de la botnav = où s'arrêtent les barres posées dessus.
+   --viewbar-h : hauteur de la barre de vue (padding 10/10 + segment ~26). */
+:root {
+    --botnav-h: 56px;
+    --botnav-pb: max(8px, env(safe-area-inset-bottom));
+    --botnav-top: calc(var(--botnav-h) + var(--botnav-pb));
+    /* Réserve basse « confortable » sous la botnav (contenu à défilement simple : profil, enfants,
+       infos). Source unique — remplace les copies littérales de calc(5rem + env(safe-area…)). */
+    --botnav-reserve: calc(5rem + env(safe-area-inset-bottom));
+    /* La barre de vue peut porter les pastilles-sujet (avatars 28px) → ~52px de haut ; on
+       dimensionne la réserve de scroll dessus, la variante sans sujet a juste un peu plus d'air. */
+    --viewbar-h: 52px;
+    /* Topbar mobile fixe — pendant symétrique de la botnav (haut).
+       --topbar-h  : hauteur du contenu de la barre, HORS safe-area.
+       --topbar-st : safe-area iOS (heure/Dynamic Island). 0 hors PWA standalone.
+       --topbar-total : hauteur TOTALE = où commence le contenu qui scrolle dessous. */
+    --topbar-h: 52px;
+    --topbar-st: env(safe-area-inset-top);
+    --topbar-total: calc(var(--topbar-h) + var(--topbar-st));
+    /* Hauteur de la barre d'action collante de la fiche (S'inscrire…) : padding 12+12 + bouton ~44.
+       Sert à réserver le scroll sous elle (elle est fixe au-dessus de la botnav). */
+    --fiche-actions-h: 68px;
+}
+/* Réserve = viewbar + botnav totale + une marge de respiration (16px) pour que le bas
+   de la dernière carte ne colle pas aux barres fixes. Sans la réserve, la dernière
+   séance passe sous les barres. */
+.plan-scroll-m { flex: 1; min-height: 0; overflow-y: auto; background: var(--bg-alt); padding-bottom: calc(var(--botnav-top) + var(--viewbar-h) + 16px); }
+/* Quand le bandeau enfant est dans la barre du bas (§4.2), celle-ci est plus haute
+   (~44px de plus) : on augmente la réserve de scroll pour que la dernière carte ne passe
+   pas dessous. Actif seulement quand un enfant est sélectionné (cf. .has-child-banner). */
+.planning-mobile.has-child-banner .plan-scroll-m { padding-bottom: calc(var(--botnav-top) + var(--viewbar-h) + 44px + 16px); }
+.plan-dayhead-m {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px var(--space-4) 6px; position: sticky; top: 0; z-index: 2; background: var(--bg-alt);
+}
+.plan-daylist-m { padding: 0 var(--space-4); display: flex; flex-direction: column; gap: 8px; }
+/* Barre de vue : posée AU-DESSUS de la botnav globale fixe (proto).
+   Son bas s'arrête pile au sommet de la botnav (bottom = hauteur botnav + safe-area) : elle ne la
+   chevauche pas, leur ordre z-index est donc sans effet visuel. Le planning n'a pas de carte
+   Leaflet → pas besoin de la monter comme la topbar/botnav (1150). */
+.plan-viewbar-m {
+    position: fixed; left: 0; right: 0; bottom: var(--botnav-top); z-index: 49;
+    padding: 10px; border-top: var(--border-thin) solid var(--border);
+    background: var(--paper); display: flex; flex-direction: column; gap: 8px;
+}
+/* Rangée pastilles + segment. Sans garant : centrée. Avec garant : pastilles à gauche,
+   segment à droite (space-between). */
+.plan-viewbar-row { display: flex; align-items: center; justify-content: center; }
+.plan-viewbar-m.has-subj .plan-viewbar-row { justify-content: space-between; gap: 10px; }
+/* Bandeau « Tu agis pour X » posé DANS la barre du bas, au-dessus de la rangée : compact,
+   sans la marge haute du is-inline générique (le gap du conteneur suffit). */
+.plan-viewbar-m .subj-banner.is-inline { margin: 0; }
+/* Sélecteur de sujet compact : rangée d'avatars cliquables, sans libellé (le titre reste en
+   aria-label/title). L'avatar actif est cerclé + net, les autres atténués → repère discret. */
+.plan-subj-m { display: flex; align-items: center; gap: 6px; flex: 0 1 auto; min-width: 0; }
+.plan-subj-pill {
+    display: inline-flex; padding: 2px; border: 0; background: none; cursor: pointer;
+    border-radius: var(--radius-pill); line-height: 0;
+    box-shadow: 0 0 0 2px transparent; transition: box-shadow var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+}
+.plan-subj-pill .avatar { width: 28px; height: 28px; font-size: 11px; flex: 0 0 auto; }
+/* Inactif : atténué. Actif : opacité pleine + anneau encre (repère du sujet courant). */
+.plan-subj-pill:not(.on) { opacity: 0.5; }
+.plan-subj-pill:not(.on):hover { opacity: 0.8; }
+.plan-subj-pill.on { opacity: 1; box-shadow: 0 0 0 2px var(--ink); }
+.plan-subj-pill:disabled { cursor: default; }
+
+/* === Vue Mois — grille calendaire ===
+   Mobile : pastilles dans une cellule carrée (fidèle au proto PlanMonth).
+   Desktop : mini-cartes de séance, la cellule s'affranchit du carré. */
+.plan-month { padding: var(--space-4); }
+.plan-month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+/* Ligne semaine = col n° semaine (fixe) + grille 7 jours (flex:1).
+   La grille des jours reste isolée → les cellules gardent leur carré en mobile. */
+.plan-month-row { display: flex; align-items: stretch; gap: 5px; margin-bottom: 5px; }
+.plan-month-row .f1 { flex: 1; min-width: 0; }
+.plan-month-wnum-head { width: 30px; flex: 0 0 auto; }
+.plan-month-wnum {
+    width: 30px; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: none; padding: 0; cursor: pointer; font-family: inherit;
+    font-size: 10px; font-weight: 700; color: var(--fg-muted);
+    border-radius: var(--radius-sm); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.plan-month-wnum:hover { background: var(--accent-50); color: var(--accent-700); }
+.plan-month-dow { margin-bottom: 4px; }
+/* Cellule = <div> (les mini-cartes desktop sont des <a>, interdits dans un <button>).
+   Desktop : hauteur libre pour loger les mini-cartes. Mobile : carré, cf. media query. */
+.plan-month-cell {
+    min-height: 112px; border: var(--border-thin) solid var(--divider); border-radius: var(--radius-sm);
+    background: var(--paper); padding: 4px; position: relative; text-align: left;
+    /* flex colonne ancrée en haut-gauche : le n° du jour reste collé en haut,
+       même avec la pastille apéro (sinon le user-agent recentre). */
+    display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start;
+    text-decoration: none; color: inherit; font-family: inherit; min-width: 0;
+}
+.plan-month-cell .num { line-height: 1; }
+.plan-month-cell.is-today { border-color: var(--accent); background: var(--accent-50); }
+.plan-month-cell.is-out { opacity: 0.3; }
+/* Numéro du jour : <button> (→ vue Jour) quand le jour porte des séances, <div> inerte sinon —
+   seule zone cliquable de la cellule en desktop. */
+.plan-month-daynum {
+    background: none; border: none; padding: 1px 3px; margin: -1px -3px 2px;
+    font-family: inherit; font-size: 13px; color: inherit; line-height: 1;
+    border-radius: var(--radius-xs); position: relative; z-index: 1;
+}
+button.plan-month-daynum { cursor: pointer; }
+button.plan-month-daynum:hover { background: var(--accent-50); color: var(--accent-700); }
+
+/* Chope apéro de la cellule (mobile) : en desktop chaque mini-carte porte la sienne. */
+.plan-month-apero { display: none; position: absolute; top: 3px; right: 3px; }
+
+/* Desktop : mini-cartes empilées (<x-session-card variant="pill">). */
+.plan-month-pills {
+    display: flex; flex-direction: column; gap: 3px;
+    width: 100%; min-width: 0; position: relative; z-index: 1;
+}
+.plan-month-more { font-size: 10px; font-weight: 700; color: var(--fg-muted); }
+.plan-month-more-btn {
+    background: none; border: none; padding: 1px 2px; cursor: pointer;
+    font-family: inherit; text-align: left; border-radius: var(--radius-xs);
+}
+.plan-month-more-btn:hover { color: var(--accent-700); background: var(--accent-50); }
+
+/* Pastilles rondes (type de séance) en bas de la cellule, centrées — mobile uniquement. */
+.plan-month-dots {
+    display: none;
+    position: absolute; bottom: 5px; left: 4px; right: 4px;
+    gap: 3px; justify-content: center; flex-wrap: wrap; align-items: center;
+}
+/* `color` porte la couleur de discipline pour que le dot creux (box-shadow inset avec
+   currentColor) la reprenne — posé ici seulement, sans toucher .dot-* (partagé produit). */
+.plan-month-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto; position: relative;
+}
+.plan-month-dot.dot-swim { color: var(--swim); }
+.plan-month-dot.dot-bike { color: var(--bike); }
+.plan-month-dot.dot-run { color: var(--run); }
+.plan-month-dot.dot-prep { color: var(--prep); }
+.plan-month-dot.dot-event { color: var(--event); }
+/* Le dégradé de .dot-competition ne peut pas être « creusé » par currentColor → repli hibiscus. */
+.plan-month-dot.dot-competition { color: var(--accent); }
+/* Plein = le sujet participe (état par défaut du .dot, rien à faire).
+   Creux = séance ouverte sans inscription. */
+.plan-month-dot.is-free { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+/* Liste d'attente = creux + noyau central. */
+.plan-month-dot.is-wait { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+.plan-month-dot.is-wait::after {
+    content: ''; position: absolute; inset: 2px; border-radius: 50%; background: currentColor;
+}
+/* Séance annulée : atténuée + toujours creuse (elle ne compte plus comme une participation),
+   cohérent avec .scard-cancelled. Se cumule avec l'état d'inscription. */
+.plan-month-dot.is-cancelled {
+    opacity: 0.4; background: transparent; box-shadow: inset 0 0 0 1.5px currentColor;
+}
+.plan-month-dot.is-cancelled::after { display: none; }
+/* Légende des états : pastilles neutres (gris prep), classe dédiée pour ne pas être confondues
+   avec les pastilles de séance (ni en CSS, ni dans les assertions de test). */
+.plan-month-legend-dot { color: var(--prep); position: relative; }
+.plan-month-legend-dot.is-free,
+.plan-month-legend-dot.is-wait { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+.plan-month-legend-dot.is-wait::after {
+    content: ''; position: absolute; inset: 2.5px; border-radius: 50%; background: currentColor;
+}
+
+/* Zone de tap plein-cellule (mobile) → vue Jour ; masquée en desktop (les mini-cartes
+   et le numéro portent les clics). */
+.plan-month-cell-tap {
+    display: none; position: absolute; inset: 0; z-index: 0;
+    background: none; border: none; padding: 0; cursor: pointer;
+    border-radius: var(--radius-sm);
+}
+
+@media (max-width: 768px) {
+    /* Retour au carré du proto PlanMonth : mini-cartes masquées, pastilles seules. */
+    .plan-month-cell { aspect-ratio: 1; min-height: 0; cursor: pointer; }
+    /* Un jour sans séance n'a pas de zone de tap → pas de curseur cliquable non plus. */
+    .plan-month-cell.is-empty { cursor: default; }
+    .plan-month-pills { display: none; }
+    .plan-month-dots { display: flex; }
+    .plan-month-cell-tap { display: block; }
+    .plan-month-apero { display: block; }
+    /* Le numéro redevient purement décoratif : c'est la zone de tap qui capte le clic. */
+    .plan-month-daynum { pointer-events: none; }
+}
+
+/* === Vue Jour — timeline horaire (proto PlanDay) === */
+.plan-day { padding: var(--space-4); }
+.plan-day-timeline { position: relative; padding-left: 44px; }
+.plan-day-hour { position: absolute; left: 44px; right: 0; border-top: var(--border-thin) solid var(--divider); }
+.plan-day-hourlabel { position: absolute; left: -44px; top: -8px; font-size: 11px; }
+.plan-day-event {
+    position: absolute; left: 48px; right: 4px; padding: 8px 10px;
+    border-radius: var(--radius-sm); text-decoration: none; color: inherit;
+}
+
+@media (max-width: 768px) {
+    .planning-desktop { display: none; }
+    /* Le scroll du planning est INTERNE à .plan-scroll-m (flex:1 + overflow).
+       Pour qu'un enfant flex:1 puisse scroller, TOUS ses ancêtres doivent avoir une
+       hauteur BORNÉE (height, pas min-height) — sinon la page entière scrolle et les
+       barres fixes (viewbar, botnav) recouvrent le bas, dernier item inatteignable.
+       On borne donc la chaîne au viewport (100dvh) en mode planning mobile. */
+    .app-layout:has(.planning-screen) { height: 100dvh; min-height: 0; }
+    .app-content:has(.planning-screen) { height: 100%; min-height: 0; }
+    .app-main:has(.planning-screen) { height: 100%; min-height: 0; overflow: hidden; }
+    .planning-screen { height: 100%; min-height: 0; }
+    /* padding-top = place pour la topbar verte fixe. box-sizing:border-box (global) → la barre
+       occupe --topbar-total en haut, les enfants flex (filtres, weeknav, scroll interne) suivent
+       dessous ; le scroll interne de .plan-scroll-m (flex:1) reste borné. */
+    .planning-mobile { display: flex; flex-direction: column; height: 100%; min-height: 0; padding-top: var(--topbar-total); }
+}
+
+/* === Cartes séance (composant <x-session-card>) — porté de ui.jsx SessionRow ===
+   .scard + liseré discipline vivent dans club-app.css ; ici les 3 variantes. */
+.scard-cancelled { opacity: 0.55; }
+a.scard { text-decoration: none; color: inherit; }
+
+/* variante row : ligne horizontale (home, agenda, semaine mobile) */
+.scard-row { display: flex; gap: 12px; padding: 12px; align-items: center; }
+.scard-row-date { width: 40px; text-align: center; flex: 0 0 auto; }
+.scard-row-title {
+    font-weight: 700; font-size: 15px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+
+/* variante week : carte verticale (colonne planning desktop) — entièrement cliquable */
+.scard-week { display: block; padding: 8px 9px; text-align: left; position: relative; }
+.scard-week-title { font-weight: 700; font-size: 12.5px; margin-top: 2px; line-height: 1.15; padding-right: 18px; }
+
+/* variante pill : mini-carte (cellule calendrier mois) */
+.scard-pill {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 4px 6px; border-left-width: 3px;
+}
+.scard-pill-title {
+    font-weight: 700; font-size: var(--text-xs); line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* --- Fiche séance (J1) — porté de screen-fiche.jsx (grille 1.5fr/1fr) --- */
+.fiche-screen .dk-body { padding: 24px 26px; }
+.fiche-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; max-width: 1000px; margin: 0 auto; }
+.fiche-col { display: flex; flex-direction: column; gap: 20px; }
+.fiche-side { display: flex; flex-direction: column; gap: 16px; }
+.fiche-hero { border-radius: var(--radius-lg, 14px); padding: 20px 22px; }
+.fiche-infos { display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1rem; margin: 0; }
+.fiche-infos dt { font-weight: 600; color: var(--fg-soft, #555); }
+.fiche-infos dd { margin: 0; }
+.reg-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.reg-item { display: flex; align-items: center; gap: 10px; }
+.reg-rank { width: 18px; text-align: center; font-variant-numeric: tabular-nums; color: var(--fg-muted, #999); font-size: 13px; }
+.reg-name { font-size: 14px; }
+
+/* Coquille mobile : appbar + hero + tabs + barre collante (proto TrainingFicheMobile) */
+.fiche-mobile { display: none; }
+.fiche-head-m { padding: 16px 16px 14px; border-bottom: var(--border-thin) solid var(--border); }
+.fiche-scroll-m { padding: var(--space-4); background: var(--bg-alt); min-height: 40vh; }
+/* Barre d'action collante, posée AU-DESSUS de la bottom-nav globale (fiche = sous-écran). */
+.fiche-actions-m {
+    display: flex;
+    gap: 10px;
+    position: fixed;
+    left: 0; right: 0; bottom: var(--botnav-top);
+    /* > contrôles Leaflet (zoom z=1000) : sans ça la carte du bloc Lieu chevauche la barre fixe. */
+    z-index: 1100;
+    padding: 12px var(--space-4);
+    border-top: var(--border-thin) solid var(--border);
+    background: var(--paper);
+}
+
+/* Dialogs au-dessus des cartes Leaflet. Le proto fige .scrim à z-index:40, mais les panes Leaflet
+   montent à 400-700 et les contrôles à ~1000 → un dialog ouvert par-dessus une fiche/un formulaire
+   portant une carte (bloc Lieu, GPX, sélecteur d'inscription) passerait DESSOUS la carte. On aligne
+   le scrim sur la convention « > contrôles Leaflet » déjà utilisée par la barre d'action fixe. */
+/* position:fixed (le proto le fige à absolute car chaque écran vivait dans un cadre « device » ;
+   en app plein écran, absolute cale le scrim sur son conteneur → le dialog s'ouvre en haut de page
+   et il faut scroller. fixed le recentre sur le viewport quel que soit le scroll). */
+.scrim { position: fixed; z-index: 1200; }
+
+/* Largeur des modales sur desktop. Le proto calait toutes les .dialog à 380px (pensé mobile) ;
+   sur grand écran ça laisse beaucoup de vide. On relève la base à 460px (aligné sur les width
+   explicites déjà passés aux dialogs calibrés, 420-480) et l'éditeur de débrief — qui porte le
+   WYSIWYG — à 760px pour du texte long confortable. La prop `width` inline (x-dialog) prime
+   toujours : les dialogs déjà calibrés gardent leur valeur. Pas de media query : sur mobile,
+   width:100% + padding du scrim (18px) bornent déjà la largeur sous ces max-width. */
+.dialog { max-width: 460px; }
+/* max-width explicite : .debrief-dialog porte aussi la classe .dialog, dont le max-width plafonnerait
+   sinon la largeur voulue. height (pas juste max-height) : sinon la modale se contracte sur un débrief
+   court ; on la fige haute et la zone WYSIWYG (flex:1) absorbe l'espace. */
+.debrief-dialog { width: min(760px, 94vw); max-width: 760px; height: min(760px, 88vh); }
+
+/* Chaîne flex jusqu'au WYSIWYG : la modale a une hauteur fixe, mais le wrapper du champ et le .card
+   du composant WYSIWYG (partagé) ne sont pas flex → la zone d'édition restait à son min-height. On
+   étire body → .wysiwyg → zone TipTap pour que le champ occupe toute la hauteur disponible. Ciblé sur
+   le contexte débrief : les autres usages de <x-wysiwyg> (séance, agenda) ne sont pas concernés. */
+.debrief-editor-body { padding: 14px 18px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.debrief-editor-body > .wysiwyg { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.debrief-editor-body > .wysiwyg > .wys-area { flex: 1; }
+
+/* Carte GPX (Leaflet) : conteneur du tracé + bouton plein écran en overlay. */
+.gpx-map { height: 400px; border: 1px solid var(--hair); border-radius: var(--radius-md); overflow: hidden; }
+
+/* Bornes kilométriques du tracé (divIcon Leaflet), au même pas que les graduations du profil
+   altimétrique. Fond opaque + liseré blanc : la pastille doit rester lisible aussi bien sur les
+   tuiles claires (champs, zones urbaines) que par-dessus le tracé rouge qu'elle jouxte.
+   Le wrapper neutralise le style par défaut de .leaflet-div-icon (fond blanc + bordure). */
+.gpx-kmdot-wrap { background: none; border: none; }
+.gpx-kmdot {
+    display: flex; align-items: center; justify-content: center;
+    width: 26px; height: 16px; border-radius: 8px;
+    background: var(--ink); color: var(--paper);
+    border: 1.5px solid var(--paper);
+    font-size: 9px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+/* Départ / arrivée : même gabarit que les bornes km (cohérence de lecture), distingués par la
+   couleur. Le magenta plutôt qu'un rouge : le tracé lui-même est rouge (#d4282e), une pastille
+   rouge s'y fondrait. Sur un parcours en boucle, une seule pastille « D/A » — départ et arrivée y
+   sont à moins de 250 m et deux marqueurs superposés n'apprendraient rien. */
+.gpx-kmdot.is-start { background: var(--brand); }
+.gpx-kmdot.is-end { background: var(--accent); }
+.gpx-kmdot.is-loop { background: var(--graphite); }
+/* Carte « lieu » (Leaflet, un marqueur) : formulaire Lieux + bloc Lieu de la fiche séance. */
+.loc-map { height: 220px; border: 1px solid var(--hair); border-radius: var(--radius-md); overflow: hidden; }
+.fiche-loc-map { height: 260px; }
+/* Verrou d'interaction de la carte lieu : conteneur relatif pour poser le voile + le bouton. */
+.loc-map-wrap { position: relative; }
+/* Voile cliquable quand la carte est verrouillée : couvre la carte, capte le tap pour déverrouiller.
+   Fond quasi transparent → l'aperçu reste visible ; le curseur et le pill signalent l'action. */
+.loc-map-veil {
+    position: absolute; inset: 0; z-index: 1000; /* > contrôles Leaflet (z 800), < topbar (1150) */
+    display: flex; align-items: center; justify-content: center;
+    border: 0; border-radius: var(--radius-md); cursor: pointer;
+    background: rgba(10, 10, 10, 0.04); transition: background var(--dur-fast);
+}
+.loc-map-veil:hover { background: rgba(10, 10, 10, 0.10); }
+.loc-map-veil-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 13px; border-radius: var(--radius-pill);
+    background: rgba(10, 10, 10, 0.72); color: var(--paper);
+    font-size: 12.5px; font-weight: 600; backdrop-filter: blur(2px);
+    box-shadow: var(--shadow-sm);
+}
+/* Bouton re-verrouiller (carte déverrouillée) : même facture que le plein-écran GPX. */
+.loc-map-lockbtn {
+    position: absolute; top: 10px; right: 10px; z-index: 1000;
+    width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+    background: var(--paper); color: var(--fg-soft); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); box-shadow: var(--shadow-xs); cursor: pointer;
+    transition: color var(--dur-fast), background var(--dur-fast);
+}
+.loc-map-lockbtn:hover { color: var(--ink); background: var(--bg-alt); }
+.loc-map-lockbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gpx-fsbtn {
+    position: absolute; top: 10px; right: 10px; z-index: 1000; /* > contrôles Leaflet (z 800) */
+    width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+    background: var(--paper); color: var(--fg-soft); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); box-shadow: var(--shadow-xs); cursor: pointer;
+    transition: color var(--dur-fast), background var(--dur-fast);
+}
+.gpx-fsbtn:hover { color: var(--ink); background: var(--bg-alt); }
+.gpx-fsbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Verrou d'une carte de tracé : même bouton que .loc-map-lockbtn, mais DÉCALÉ à gauche du bouton
+   plein écran, qui occupe déjà right:10px. 34 px de large + 8 px de gouttière. */
+.gpx-lockbtn { right: 52px; }
+/* En plein écran : le wrapper occupe tout l'écran, la carte le remplit, on retire le cadre arrondi.
+   Le voile de verrouillage est retiré par x-show (locked passe à false), pas par le CSS. */
+.gpx-fswrap:fullscreen { background: var(--paper); }
+.gpx-fswrap:fullscreen .gpx-map { height: 100%; border: none; border-radius: 0; }
+
+/* ── Carte d'ensemble de la bibliothèque (J10.C bis) ──
+   Plus haute que .gpx-map : elle affiche N tracés répartis sur tout le département, là où une fiche
+   n'en cadre qu'un. Verrou d'interaction repris tel quel (.loc-map-veil / .loc-map-lockbtn) : 62vh
+   captureraient tout le scroll de la page, filtres compris, qui restent au-dessus de la carte. */
+.routes-map-wrap { position: relative; }
+.routes-map { height: 62vh; min-height: 320px; border: 1px solid var(--hair); border-radius: var(--radius-md); overflow: hidden; }
+/* Voile d'état (chargement / vide / échec) : couvre la carte sans la démonter, pour que Leaflet
+   garde ses tuiles et son cadrage entre deux jeux de filtres. */
+.routes-map-veil {
+    position: absolute; inset: 0; z-index: 1000; /* > contrôles Leaflet (z 800) */
+    display: flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-md); background: color-mix(in srgb, var(--paper) 82%, transparent);
+    backdrop-filter: blur(1px); pointer-events: none;
+}
+/* Popup d'un tracé : contenu construit en DOM par gpxRoutesMap, donc hors portée du CSS scopé Blade. */
+.routes-pop { font-size: 13px; line-height: 1.45; }
+.routes-pop strong { display: block; font-weight: 700; font-size: 13.5px; }
+.routes-pop-meta { color: var(--fg-muted); font-size: 12px; margin-top: 2px; }
+.routes-pop-link { display: inline-block; margin-top: 7px; font-weight: 600; color: var(--accent); }
+
+@media (max-width: 768px) {
+    /* Sur mobile, 62vh laisserait la carte sous la ligne de flottaison une fois les filtres déroulés.
+       On la borne plus court : le pincement pour zoomer reste possible, la carte est atteignable. */
+    .routes-map { height: 54vh; min-height: 280px; }
+}
+
+@media (max-width: 768px) {
+    /* bascule coquilles */
+    .fiche-desktop { display: none; }
+    /* padding-top = place pour la topbar verte fixe (Alertes + Fiche partagent .fiche-mobile). */
+    /* Réserve basse = botnav totale (safe-area incluse) + barre d'action fiche (fixe AU-DESSUS de la
+       botnav) + une marge. L'ancienne valeur fixe (130px) ignorait env(safe-area-inset-bottom) :
+       sur iPhone à encoche, la barre d'action masquait la fin du contenu (dernier chip coupé,
+       impossible de scroller dessous). --fiche-actions-h ≈ padding 24 + bouton ~44. */
+    .fiche-mobile { display: block; padding-top: var(--topbar-total); padding-bottom: calc(var(--botnav-top) + var(--fiche-actions-h) + 12px); }
+    .fiche-grid { grid-template-columns: 1fr; }
+    .fiche-screen .dk-body { padding: 16px; }
+
+    /* --- Fiche mobile : mini-barre fixe + héros fondu (modèle accueil) ---
+       La fiche n'utilise PAS la réserve --topbar-total de .fiche-mobile : le héros fondu
+       (.fiche-head-m) remonte DERRIÈRE la mini-barre fixe et réserve lui-même la safe-area,
+       exactement comme .home-hero-m. On annule donc le padding-top partagé (gardé pour Alertes). */
+    /* padding-top:0 = le héros fondu gère lui-même la safe-area (cf. plus haut).
+       Réserve basse (place pour la barre d'action fixe) portée sur la zone de scroll GRISE, pas sur
+       .fiche-mobile (blanche) : sinon le vide sous le dernier bloc apparaissait en bande blanche
+       entre le contenu gris et la barre S'inscrire. On neutralise donc la réserve blanche héritée
+       (partagée avec Alertes) et on la remet sur .fiche-scroll-m pour une continuité de fond. */
+    .fiche-screen .fiche-mobile { padding-top: 0; padding-bottom: 0; }
+    .fiche-screen .fiche-scroll-m {
+        padding-bottom: calc(var(--botnav-top) + var(--fiche-actions-h) + 12px);
+    }
+    /* La mini-barre fiche n'a pas sa propre fleur (le héros fondu en porte une, cf. ::before). */
+    .topbar-fiche::before { display: none; }
+    /* Héros fondu : même dégradé horizontal que la topbar → jonction invisible sous la mini-barre.
+       Réserve la safe-area + le socle de la barre (comme .home-hero-m), texte clair sur le vert.
+       Filigrane générique (logo du club, cf. .topbar::before). */
+    .fiche-screen .fiche-head-m {
+        position: relative; overflow: hidden;
+        padding: calc(var(--topbar-total) + 6px) 16px 18px;
+        background: var(--grad-topbar); color: var(--paper);
+        border-bottom: none;
+    }
+    /* Logo du club en filigrane à droite (reprise de .topbar::before). Ancré par le HAUT juste
+       sous la mini-barre fixe (comme .home-hero-m ci-dessous), pas centré : sinon son sommet,
+       masqué par la barre, apparaît coupé net en tête du héros. */
+    .fiche-screen .fiche-head-m::before {
+        content: ""; position: absolute; right: -30px; top: calc(var(--topbar-total) + 6px); z-index: 0;
+        width: 170px; height: 170px; transform: rotate(-12deg);
+        background: var(--club-logo-url) no-repeat center / contain;
+        filter: brightness(0) invert(1); opacity: 0.12; pointer-events: none;
+    }
+    /* Le contenu (badge, titre, chips) passe au-dessus du filigrane. */
+    .fiche-screen .fiche-head-m > * { position: relative; z-index: 1; }
+    /* Éditer (staff) : icône seule à droite du titre, dans le héros vert. Pas de fond ni bordure —
+       même registre que les icônes claires de la topbar (retour, cloche) pour rester uniforme.
+       align-self:start = calée sur la ligne du titre, pas centrée sur le badge. */
+    .fiche-screen .fiche-head-m .fiche-edit-m {
+        flex: 0 0 auto; align-self: flex-start;
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 38px; height: 38px; text-decoration: none;
+        /* Neutralise le soulignement global des <a> (club-tokens.css:241 : border-bottom
+           currentColor) qui, en blanc sur le vert, formait un trait sous l'icône. */
+        border-bottom: none;
+        color: var(--paper);
+    }
+    .fiche-screen .fiche-head-m .fiche-edit-m:hover { color: var(--brand-100); }
+}
+
+/* --- Accueil (J1) — porté de screen-home.jsx --- */
+.home-screen .dk-body { padding: 24px 26px; }
+.home-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; max-width: 1040px; margin: 0 auto; }
+.home-col { display: flex; flex-direction: column; }
+.home-side { display: flex; flex-direction: column; gap: 16px; }
+.home-hero {
+    position: relative; overflow: hidden; display: block; text-decoration: none;
+    border-radius: var(--radius-lg, 14px); padding: 24px 26px; min-height: 200px;
+}
+.home-hero-body { position: relative; z-index: 1; }
+.home-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+
+/* Bascule mobile / desktop (porté de HomeAthlete vs HomeDesktop). */
+.home-mobile { display: none; }
+@media (max-width: 768px) {
+    .home-grid { grid-template-columns: 1fr; }
+    .home-cards { grid-template-columns: 1fr; }
+    .home-screen .dk-body { padding: 16px; }
+
+    .home-desktop { display: none; }
+    .home-mobile { display: block; }
+    /* Héros fondu plein : englobe logo, titre, carte vedette (proto HomeAthlete).
+       Le proto utilisait 50px de haut pour dégager la barre de statut opaque.
+       La barre de statut iOS est désormais translucide (elle recouvre le contenu) :
+       on réserve donc l'inset réel (safe-area-inset-top) + un petit socle, au lieu
+       d'un 50px fixe qui s'additionnait à la barre et creusait un vide au-dessus du logo. */
+    /* La topbar verte fixe (logo+cloche) couvre la safe-area et occupe --topbar-total en haut.
+       Le fondu réserve donc cette hauteur puis un petit socle : la salutation démarre sous la
+       barre, sans redonder la safe-area (déjà consommée par la topbar fixe).
+       Fond = MÊME dégradé horizontal que la topbar (--grad-topbar) : topbar + héros balaient
+       la même largeur d'écran gauche→droite → le dégradé est continu, la jonction disparaît. */
+    .home-hero-m { padding: calc(var(--topbar-total) + 6px) 18px 22px; background: var(--grad-topbar); }
+    /* Topbar du home : le fondu juste dessous porte déjà SON filigrane (.fondu::before). On garde
+       le même dégradé que les autres topbars pour l'uniformité, mais on masque le filigrane de la
+       topbar ici (sinon deux logos se chevaucheraient au sommet du héros). */
+    .topbar-home::before { display: none; }
+    /* Le filigrane du héros démarre SOUS la topbar fixe (sinon son haut, à top:-20px hérité de
+       .fondu::before, est rogné par la barre qui recouvre le sommet du fondu). On le cale juste
+       sous --topbar-total. */
+    .home-hero-m::before { top: calc(var(--topbar-total) + 6px); }
+    /* Carte « prochaine séance » : carte FONCÉE sur le héros vert (comme avant, quand le fondu
+       virait à l'ink en bas). Le fond est maintenant vert horizontal → on porte le foncé sur la
+       carte elle-même (ink translucide) pour qu'elle se détache et garde son contraste. */
+    .home-featured {
+        display: block; width: 100%; text-align: left; text-decoration: none;
+        margin-top: 18px; padding: 16px; color: var(--paper);
+        background: rgba(10, 10, 10, 0.62); border: 1px solid var(--border-on-dark);
+        border-radius: var(--radius-lg); backdrop-filter: blur(6px);
+    }
+    /* Réserve en bas pour la botnav fixe (~58px) + safe-area iOS : sans ça le dernier
+       bloc (« Mes quotas ») passe sous la barre de navigation et n'est pas atteignable.
+       Le home est full-bleed (padding de .app-main annulé), il porte donc sa propre réserve. */
+    .home-body-m {
+        padding: 16px 16px var(--botnav-reserve);
+        display: flex; flex-direction: column; gap: 18px;
+    }
+}
+
+/* Les pages d'info portent `form-screen` : elles héritent du chrome mobile de .form-screen
+   (topbar fixe, dk-topbar masqué, réserve haute) — pas de bloc dédié nécessaire. */
+
+/* --- Formulaire création/édition (J1) — porté de screen-creation.jsx --- */
+.form-screen .dk-body { padding: var(--space-6) var(--space-6); }
+/* grille 2 colonnes (proto CreationDesktop : 1.5fr / 1fr, max 1000, centrée) */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 28px;
+    max-width: 1000px;
+    margin: 0 auto;
+    align-items: start;
+}
+.form-main { display: flex; flex-direction: column; gap: 18px; }
+.form-side { display: flex; flex-direction: column; gap: var(--space-4); }
+.form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-row-title { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+.form-screen .input, .form-screen textarea.input { width: 100%; }
+
+/* Cartes « type » (3 colonnes, bordure ink quand sélectionnée) */
+.kind-cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.kind-card {
+    padding: 14px 6px;
+    text-align: center;
+    border: var(--border-thin) solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--paper);
+    color: var(--info);
+    cursor: pointer;
+    transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+.kind-card .ic { margin: 0 auto 6px; }
+.kind-card-l { font-size: var(--text-sm); font-weight: 500; color: var(--fg); }
+.kind-card-sub { font-size: var(--text-xs); margin-top: 4px; }
+.kind-card.is-active {
+    border-width: var(--border-thick);
+    border-color: var(--ink);
+    background: var(--slate-50);
+}
+.kind-card.is-active .kind-card-l { font-weight: 700; }
+
+/* --- Modèles de génération (J5) — porté de screen-modele-create.jsx + AdminModeles --- */
+/* Formulaire modèle : grille 1.5fr / 1fr (proto AdminModeleCreate, max 1040 centrée) */
+.tpl-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 28px;
+    max-width: 1040px;
+    margin: 0 auto;
+    align-items: start;
+}
+.tpl-main { display: flex; flex-direction: column; gap: 20px; }
+.tpl-side { display: flex; flex-direction: column; gap: 18px; }
+.tpl-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+/* Liste modèles : 1fr / 1.4fr (proto AdminModeles, max 1000 centrée) */
+.tpl-list-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 18px;
+    max-width: 1000px;
+    margin: 0 auto;
+    align-items: start;
+}
+/* Carte modèle sélectionnée dans la liste (bordure ink épaisse, comme kind-card.is-active) */
+.tpl-list-grid .card.is-selected {
+    border-width: var(--border-thick);
+    border-color: var(--ink);
+}
+
+/* --- Paramètres + catalogues (J6.1) — porté de AdminParametres + screen-catalogues --- */
+/* Paramètres : 2 colonnes (identité / catalogues), bandeaux saison en pleine largeur. */
+.settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    max-width: 1000px;
+    margin: 0 auto;
+    align-items: start;
+}
+.settings-span2 { grid-column: 1 / -1; }
+/* Rangée icône + bloc (eyebrow/titre + texte) + action. L'icône s'aligne sur la
+   PREMIÈRE ligne (titre), pas au centre du bloc : un center flex flotte trop haut
+   sur 1–2 lignes et trop bas sur les blocs longs. Action centrée verticalement. */
+.notice-row { display: flex; gap: 14px; align-items: flex-start; }
+.notice-row > .ic:first-child { flex: 0 0 auto; align-self: flex-start; margin-top: 6px; }
+.notice-row > .btn { flex: 0 0 auto; align-self: center; margin-left: auto; }
+/* Catalogue : colonne unique centrée, liste de lignes. */
+.cat-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 760px;
+    margin: 0 auto;
+}
+
+/* --- Adhérents (J6.2) — porté de screen-adherent-create.jsx + screen-adherent.jsx --- */
+/* Création + fiche : 2 colonnes 1.45fr / 1fr (proto), max 1080 centrée, aperçu/accès collant. */
+.mc-create-grid, .mc-show-grid {
+    display: grid;
+    grid-template-columns: 1.45fr 1fr;
+    gap: 18px;
+    max-width: 1080px;
+    margin: 0 auto;
+    align-items: start;
+}
+
+/* Barre d'action collante (mobile uniquement — desktop a Publier dans la topbar) */
+.form-actions { display: none; }
+
+@media (max-width: 880px) {
+    .tpl-grid, .tpl-list-grid { grid-template-columns: 1fr; gap: 18px; }
+    .tpl-row2 { grid-template-columns: 1fr; }
+    .settings-grid { grid-template-columns: 1fr; }
+    .mc-create-grid, .mc-show-grid { grid-template-columns: 1fr; gap: 14px; }
+}
+
+@media (max-width: 880px) {
+    .form-grid { grid-template-columns: 1fr; gap: 18px; }
+    .form-screen .dk-body { padding: var(--space-4); }
+    .form-row2, .form-row-title { grid-template-columns: 1fr; }
+}
+/* La bascule topbar → barre collante suit la botnav (shell mobile, 768px), PAS le repli des
+   grilles (880px) : la barre est ancrée 58px au-dessus du bas (hauteur botnav) — entre 769 et
+   880px la botnav n'existe pas, la barre flotterait et le Publier topbar aurait disparu. */
+@media (max-width: 768px) {
+    /* Sur mobile, la topbar verte fixe remplace le dk-topbar (qui scrollait sous la status bar iOS). */
+    .form-screen .dk-topbar { display: none; }
+    /* Réserve haut = sous la topbar fixe ; bas = barre collante (~58px) + botnav réelle (safe-area). */
+    .form-screen .dk-body {
+        padding-top: calc(var(--topbar-total) + var(--space-4));
+        padding-bottom: calc(var(--botnav-top) + 58px + 12px);
+    }
+    /* le bouton Publier de la topbar disparaît au profit de la barre collante */
+    .form-screen .dk-topbar .btn-primary { display: none; }
+    .form-actions {
+        display: flex;
+        gap: 10px;
+        position: fixed;
+        left: 0; right: 0;
+        /* Ancrée juste au-dessus de la botnav réelle (hauteur + safe-area), pas un 58px en dur
+           qui la ferait chevaucher la botnav sur iPhone. z-index > botnav (1150), < scrim (1200). */
+        bottom: var(--botnav-top);
+        z-index: 1150;
+        padding: 12px var(--space-4);
+        border-top: var(--border-thin) solid var(--border);
+        background: var(--paper);
+    }
+}
+
+/* --- Profil (J8.4) — porté de screen-profil.jsx (Profil mobile + ProfilDesktop) --- */
+.profil-screen { height: 100%; }
+.profil-screen .dk-body { height: calc(100% - 73px); }
+/* Desktop : sous-nav vertical (200px) + contenu, sous la topbar. */
+.profil-dk-split { display: flex; height: 100%; }
+.profil-dk-nav {
+    width: 200px; flex: 0 0 auto; border-right: 1px solid var(--hair);
+    padding: 16px; display: flex; flex-direction: column; gap: 4px;
+}
+.profil-dk-content { flex: 1; overflow-y: auto; padding: 24px; }
+
+/* Bascule mobile / desktop (proto Profil vs ProfilDesktop). */
+.profil-mobile { display: none; }
+@media (max-width: 768px) {
+    .profil-desktop { display: none; }
+    /* padding-top = place pour la topbar verte fixe. */
+    .profil-mobile { display: block; padding-top: var(--topbar-total); padding-bottom: var(--botnav-reserve); }
+}
+
+/* ── « Mes enfants » (screen-parent.jsx) : bascule coquilles mobile/desktop ── */
+.children-mobile { display: none; }
+@media (max-width: 768px) {
+    .children-desktop { display: none; }
+    /* padding-top = topbar verte fixe ; padding-bottom = botnav fixe (l'écran est full-bleed,
+       le padding-bottom de .app-main ne s'applique plus). */
+    .children-mobile { display: block; padding-top: var(--topbar-total); padding-bottom: var(--botnav-reserve); }
+    .children-screen .dk-body { padding: 16px; }
+}
+.children-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+@media (max-width: 1100px) {
+    .children-grid { grid-template-columns: 1fr; }
+}
+
+/* === Footer de dialogue (.dialog-foot) : boutons empilés sur mobile étroit ===
+   En desktop, les boutons du footer sont en ligne, justifiés à droite (club-app.css).
+   Sur mobile, deux CTA longs (ex. « Sauvegarder en silence » + « Oui — push + email »)
+   débordent hors de la modale. On les empile pleine largeur. column-reverse : partout
+   dans le code, l'action secondaire (ghost) est en 1er dans le DOM et l'action principale
+   en 2nd → l'inversion remonte l'action principale en haut de la pile (convention mobile),
+   sans toucher au markup ni à l'ordre desktop. */
+@media (max-width: 768px) {
+    .dialog-foot { flex-direction: column-reverse; align-items: stretch; }
+    .dialog-foot .btn { width: 100%; justify-content: center; }
+}
