@@ -649,7 +649,10 @@ et compromis ops **assumés et documentés** plutôt qu'ignorés.
 
 ---
 
-## 12. Plan du futur guide d'installation (`doc/INSTALL.md`, à rédiger)
+## 12. Plan du guide d'installation
+
+> Le guide existe depuis : **[INSTALL.md](INSTALL.md)**. Cette section conserve le plan tel qu'il
+> avait été arrêté, et n'en suit pas la numérotation courante.
 
 - **Prérequis club** : hébergement PHP/MySQL UE, **client Google OAuth** propre au club, **compte
   fournisseur email UE**, **compte OpenRunner Pro**.
