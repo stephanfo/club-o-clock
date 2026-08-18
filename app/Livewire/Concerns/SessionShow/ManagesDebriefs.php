@@ -26,7 +26,12 @@ trait ManagesDebriefs
     {
         if ($id === null) {
             // Garde « rédiger » : participant + compétition commencée + pas de débrief existant.
+            // Atteignable sur état périmé (second onglet resté ouvert) : on le dit, sinon le bouton
+            // paraît mort. Le refresh fait disparaître le bouton devenu caduc.
             if (! $this->canWriteDebrief()) {
+                session()->flash('warn', "Rédaction impossible : la séance ou ton inscription a changé depuis l'ouverture de la page.");
+                $this->refreshSession();
+
                 return;
             }
             $this->debriefId = null;

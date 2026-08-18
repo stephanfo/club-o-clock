@@ -232,6 +232,10 @@
                 @endcan
             @elseif ($started)
                 <div class="meta f1" style="font-size:var(--text-xs);align-self:center">Séance commencée — inscriptions closes.</div>
+            @elseif ($iAmCoachHere && ! auth()->user()?->hasRole('athlete'))
+                {{-- Coach-pur encadrant : aucune action d'inscription possible (§2). Sans ce repli la
+                     barre fixe resterait affichée vide (bordure + padding). --}}
+                <div class="meta f1" style="font-size:var(--text-xs);align-self:center">Tu encadres cette séance.</div>
             @else
                 @include('livewire.partials.enroll-actions', ['variant' => 'mobile'])
             @endif

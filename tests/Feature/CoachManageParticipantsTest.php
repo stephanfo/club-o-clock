@@ -231,6 +231,45 @@ class CoachManageParticipantsTest extends TestCase
         $this->assertNull(Registration::where('session_id', $s->id)->where('user_id', $c1->id)->first());
     }
 
+    // Voie SELF (bloc « Mon inscription » de enroll-actions) : distincte de la voie tiers
+    // testée ci-dessous, qui porte sur l'onglet Encadrement. Un coach-pur encadrant ne doit pas
+    // se voir proposer « Je participe » — la bascule échouerait en NOT_AN_ATHLETE (§2).
+    public function test_self_participate_button_hidden_for_pure_coach(): void
+    {
+        $s = $this->makeSession();
+        $pureCoach = User::factory()->coach()->create();
+        $s->coaches()->attach($pureCoach->id);
+
+        Livewire::actingAs($pureCoach)->test(SessionShow::class, ['session' => $s])
+            ->assertDontSeeHtml('flipToAthlete('.$pureCoach->id.')');
+    }
+
+    // Contrôle positif appairé du test précédent : le cas nominal (rôles cumulés) doit, lui,
+    // continuer d'offrir la bascule.
+    public function test_self_participate_button_visible_for_dual_coach(): void
+    {
+        $s = $this->makeSession();
+        $dualCoach = User::factory()->athleteCoach()->create();
+        $s->coaches()->attach($dualCoach->id);
+
+        Livewire::actingAs($dualCoach)->test(SessionShow::class, ['session' => $s])
+            ->assertSeeHtml('flipToAthlete('.$dualCoach->id.')');
+    }
+
+    // Défense en profondeur : même appelée directement, la bascule ne doit pas ouvrir un dialog
+    // que la validation refuserait de toute façon.
+    public function test_flip_to_athlete_does_not_open_dialog_for_pure_coach(): void
+    {
+        $s = $this->makeSession();
+        $pureCoach = User::factory()->coach()->create();
+        $other = User::factory()->coach()->create();
+        $s->coaches()->attach([$pureCoach->id, $other->id]);
+
+        Livewire::actingAs($pureCoach)->test(SessionShow::class, ['session' => $s])
+            ->call('flipToAthlete', $pureCoach->id)
+            ->assertSet('flipConfirm', null);
+    }
+
     public function test_flip_button_hidden_for_pure_coach(): void
     {
         $s = $this->makeSession();
@@ -242,6 +281,34 @@ class CoachManageParticipantsTest extends TestCase
         Livewire::actingAs($admin)->test(SessionShow::class, ['session' => $s])
             ->assertDontSeeHtml('flipToAthlete('.$pureCoach->id.')')
             ->assertSeeHtml('flipToAthlete('.$dualCoach->id.')');
+    }
+
+    // ── Retrait d'un inscrit : fermé une fois la séance commencée (§4.9.7) ──
+
+    // La désinscription est refusée par RegistrationService une fois la séance commencée : la
+    // corbeille ne doit donc plus être offerte au staff, sinon elle est morte sur toute séance passée.
+    public function test_remove_button_hidden_once_session_started(): void
+    {
+        $s = $this->makeSession();
+        $coach = User::factory()->coach()->create();
+        $athlete = $this->athlete();
+        app(RegistrationService::class)->register($s, $athlete, $athlete);
+        $s->forceFill(['start_at' => Carbon::now()->subHour()])->save();
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s->fresh()])
+            ->assertDontSeeHtml('wire:click="removeAthlete('.$athlete->id.')"');
+    }
+
+    // Contrôle positif appairé : sur une séance à venir, la corbeille reste offerte.
+    public function test_remove_button_visible_before_session_starts(): void
+    {
+        $s = $this->makeSession();
+        $coach = User::factory()->coach()->create();
+        $athlete = $this->athlete();
+        app(RegistrationService::class)->register($s, $athlete, $athlete);
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s])
+            ->assertSeeHtml('wire:click="removeAthlete('.$athlete->id.')"');
     }
 
     // ── Policy ──

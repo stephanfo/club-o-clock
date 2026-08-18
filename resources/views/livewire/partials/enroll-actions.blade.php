@@ -5,8 +5,11 @@
 @php($subjName = $subjName ?? null)
 
 {{-- Bascule de rôle pour SOI sur une séance training (§4.11.5 cas 1/2), porté de SelfRoleToggle.
-     Visible quand je suis encadrant ici : « Je participe » déclenche le dialog de bascule. --}}
-@if (($iAmCoachHere ?? false) && $session->kind === 'training' && ! $session->isCancelled())
+     Visible quand je suis encadrant ici : « Je participe » déclenche le dialog de bascule.
+     Réservé à qui a le rôle athlète (§2) : un coach-pur n'a pas d'existence athlète à activer,
+     la bascule échouerait en NOT_AN_ATHLETE. Même garde qu'en voie tiers (fiche-encadrement). --}}
+@if (($iAmCoachHere ?? false) && auth()->user()?->hasRole('athlete')
+     && $session->kind === 'training' && ! $session->isCancelled())
     <div style="margin-bottom:12px;{{ ($variant ?? 'mobile') === 'mobile' ? 'flex:1' : '' }}">
         <div class="eyebrow" style="margin-bottom:6px">Mon inscription</div>
         <div class="flex g6">

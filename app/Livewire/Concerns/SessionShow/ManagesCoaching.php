@@ -96,6 +96,15 @@ trait ManagesCoaching
         $this->authorize('unregisterCoach', $this->session);
         $target = User::findOrFail($userId);
 
+        // §2 : un coach-pur n'a pas de rôle athlète à activer. On refuse AVANT d'ouvrir le dialog,
+        // sinon la modale s'ouvre pour rien et le refus n'arrive qu'à la validation.
+        if (! $target->hasRole('athlete')) {
+            session()->flash('warn', $this->translateRegError(RegistrationService::NOT_AN_ATHLETE));
+            $this->flipConfirm = null;
+
+            return;
+        }
+
         if (! $confirm) {
             $this->flipConfirm = [
                 'dir' => 'to_athlete',

@@ -37,6 +37,19 @@ class DebriefUiTest extends TestCase
         return $u;
     }
 
+    // Le refus de rédaction doit se voir : sans flash, le bouton « Rédiger » paraît simplement mort
+    // (cas atteignable sur état périmé — débrief déjà publié depuis un autre onglet).
+    public function test_open_debrief_refused_flashes_warning(): void
+    {
+        $s = $this->competition();
+        $outsider = User::factory()->create(['roles' => ['athlete']]); // ne participe pas
+
+        Livewire::actingAs($outsider)->test(SessionShow::class, ['session' => $s])
+            ->call('openDebrief')
+            ->assertSet('debriefOpen', false)
+            ->assertSee('Rédaction impossible', escape: false);
+    }
+
     public function test_participant_publishes_via_editor(): void
     {
         $s = $this->competition();
