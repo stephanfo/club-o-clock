@@ -53,8 +53,8 @@ class ClubPaletteContrastTest extends TestCase
     public function test_every_emitted_foreground_meets_wcag_aa(): void
     {
         $colors = [
-            '#4338CA', '#F59E0B', '#0891B2',   // la palette signalée
-            '#69bf2d', '#e4027d', '#3c69bb',   // la palette neutre par défaut
+            '#4338CA', '#F59E0B', '#0891B2',   // la palette neutre par défaut
+            '#69bf2d', '#e4027d', '#3c69bb',   // une palette claire à l'opposé (vert/rose/bleu)
             '#000000', '#ffffff',              // extrêmes
             '#808080', '#7f7f7f',              // gris médians : le pire cas pour un choix binaire
             '#ff0000', '#00ff00', '#0000ff',

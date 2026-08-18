@@ -23,34 +23,34 @@
      ===================================================================== */
 
   /* — Brand (couleur principale — signature, énergie, départ, dynamisme) — */
-  --brand-50:  #ecf9df;
-  --brand-100: #d6f1bb;
-  --brand-200: #b6e687;
-  --brand-300: #93d854;
-  --brand-400: #7ccb3c;
-  --brand:     #69bf2d;  /* couleur principale */
-  --brand-600: #56a624;
-  --brand-700: #43821a;
-  --brand-800: #305c14;
-  --brand-900: #1d3a0d;
+  --brand-50:  #f0effb;
+  --brand-100: #d9d7f4;
+  --brand-200: #b4afea;
+  --brand-300: #8e88df;
+  --brand-400: #6960d5;
+  --brand:     #4338ca;  /* couleur principale */
+  --brand-600: #3930ac;
+  --brand-700: #2f278d;
+  --brand-800: #221c65;
+  --brand-900: #14113d;
 
   /* — Accent (couleur secondaire vive — mise en avant, alerte douce) — */
-  --accent-50:  #fde6f1;
-  --accent-100: #fbb6d8;
-  --accent-200: #f47bb8;
-  --accent-300: #ed3f96;
-  --accent:     #e4027d;   /* accent principal */
-  --accent-600: #c5006c;
-  --accent-700: #9c0055;
+  --accent-50:  #fef7eb;
+  --accent-100: #fdecce;
+  --accent-200: #fbd89d;
+  --accent-300: #f9c56d;
+  --accent:     #f59e0b;   /* accent principal */
+  --accent-600: #d08609;
+  --accent-700: #ac6f08;
 
   /* — Info (couleur tertiaire — liens, natation/eau) — */
-  --info-50:  #e7eef9;
-  --info-100: #c3d3ee;
-  --info-200: #91afde;
-  --info-300: #5e8bce;
-  --info:     #3c69bb;     /* info principal */
-  --info-600: #2d52a0;
-  --info-700: #213d7a;
+  --info-50:  #ebf6f9;
+  --info-100: #cee9f0;
+  --info-200: #9cd3e0;
+  --info-300: #6bbdd1;
+  --info:     #0891b2;     /* info principal */
+  --info-600: #077b97;
+  --info-700: #06667d;
 
   /* — Noir & Gris (encrage, profondeur, fondu) — */
   --ink:        #0a0a0a;    /* noir profond, jamais 100% pur */
@@ -77,16 +77,16 @@
   --fg-soft:     var(--slate-700);
   --fg-muted:    var(--slate-500);
   --fg-on-dark:       var(--paper);
-  --fg-on-dark-soft:  rgba(255,255,255,0.85); /* corps sur fondu vert→noir (héros) */
+  --fg-on-dark-soft:  rgba(255,255,255,0.85); /* corps sur fondu marque→noir (héros) */
   --fg-on-dark-faint: rgba(255,255,255,0.6);  /* méta/légende sur fondu */
   /* Texte posé SUR un aplat de la couleur principale (bouton primaire, pastille discipline).
-     Noir par défaut, car la palette neutre livrée est un vert lumineux. Un club qui choisit une
-     teinte sombre (bleu nuit, indigo…) reçoit automatiquement du blanc ici : App\Support\ClubPalette
+     Blanc par défaut, car la palette neutre livrée est un indigo soutenu. Un club qui choisit une
+     teinte claire (ambre, vert lumineux…) reçoit automatiquement du noir ici : App\Support\ClubPalette
      recalcule ce token depuis la luminance de la couleur saisie et le surcharge. Ne PAS figer une
      couleur en dur dans les composants — passer par ce token, sinon la personnalisation casse. */
-  --fg-on-brand: var(--ink);      /* vert lumineux livré → encre noire */
-  --fg-on-accent: var(--paper);   /* rose soutenu → blanc */
-  --fg-on-info: var(--paper);     /* bleu moyen → blanc */
+  --fg-on-brand: var(--paper);    /* indigo soutenu → blanc */
+  --fg-on-accent: var(--ink);     /* ambre clair → encre noire */
+  --fg-on-info: var(--ink);       /* cyan clair → encre noire */
   --fg-on-primary: var(--fg-on-brand);  /* alias : « couleur principale » = --brand */
   --fg-on-green: var(--fg-on-primary);  /* alias historique (design system d'origine) */
   /* Surfaces « glass » posées sur le fondu (carte vedette home, chips héros). */
@@ -125,7 +125,7 @@
   --grad-fondu:        linear-gradient(180deg, var(--brand) 0%, var(--bg-deep) 100%);
   --grad-fondu-soft:   linear-gradient(180deg, var(--brand) 0%, var(--ink) 75%);
   --grad-fondu-radial: radial-gradient(120% 80% at 50% 0%, var(--brand) 0%, var(--ink) 70%);
-  /* Topbar + héros home : dégradé HORIZONTAL dans les tons de marque — un vert→ink vertical
+  /* Topbar + héros home : dégradé HORIZONTAL dans les tons de marque — un marque→ink vertical
      (grad-fondu) ne « descend » pas sur ~52px et rend quasi uni. Ici il balaie la largeur.
      Angle EXACT 90deg (to right) : à 90° le dégradé est indépendant du ratio de la boîte,
      donc topbar (courte) et héros (haut), tous deux pleine largeur, s'alignent PARFAITEMENT au
@@ -206,8 +206,11 @@
   --shadow-sm: 0 1px 2px rgba(10,10,10,0.08), 0 0 0 1px rgba(10,10,10,0.04);
   --shadow-md: 0 4px 14px rgba(10,10,10,0.10), 0 1px 2px rgba(10,10,10,0.06);
   --shadow-lg: 0 12px 30px rgba(10,10,10,0.14), 0 2px 6px rgba(10,10,10,0.06);
-  --shadow-green: 0 8px 24px rgba(105,191,45,0.30);
-  --shadow-pink:  0 8px 24px rgba(228,2,125,0.28);
+  /* Ombres colorées des boutons : dérivées des tokens de marque, jamais figées — sinon un club
+     qui personnalise sa palette (ou le simple changement de palette par défaut) garde une ombre
+     de l'ancienne teinte sous un bouton de la nouvelle. Noms historiques du design d'origine. */
+  --shadow-green: 0 8px 24px color-mix(in srgb, var(--brand) 30%, transparent);
+  --shadow-pink:  0 8px 24px color-mix(in srgb, var(--accent) 28%, transparent);
   --inset-line:   inset 0 -1px 0 rgba(10,10,10,0.08);
 
   /* =====================================================================
