@@ -83,6 +83,10 @@ export default defineConfig({
   themeConfig: {
     logo: '/assets/favicon.svg',
     siteTitle: "Club'O'Clock",
+    // Même raison que « Accueil » dans nav : le titre de la barre pointe vers la vitrine, qui
+    // n'est pas une page VitePress. Sans `target: '_self'`, le routeur SPA l'intercepte et
+    // affiche une 404 au lieu de la page d'accueil.
+    logoLink: { link: '/', target: '_self' },
 
     search: {
       provider: 'local',
@@ -110,7 +114,12 @@ export default defineConfig({
     outline: { level: [2, 3], label: 'Sur cette page' },
 
     nav: [
-      { text: 'Accueil', link: '/' },
+      // `target: '_self'` est INDISPENSABLE : la racine n'est pas une page VitePress mais la
+      // vitrine statique (site/index.html, qui écrase l'index de VitePress au montage — cf.
+      // build-local.sh). Sans lui, le routeur SPA intercepte le clic et cherche le payload JS
+      // de la route « / », qui n'existe pas : l'utilisateur tombe sur une 404. Avec, le lien
+      // provoque une vraie navigation du navigateur, seule façon d'atteindre la vitrine.
+      { text: 'Accueil', link: '/', target: '_self' },
       { text: 'Documentation', link: '/doc/' },
       { text: 'Démo', link: 'https://demo.cluboclock.ratelet.fr/' },
       { text: 'GitHub', link: 'https://github.com/stephanfo/club-o-clock' },
