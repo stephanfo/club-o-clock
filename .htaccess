@@ -40,7 +40,17 @@
 # est indépendant des RewriteRule ci-dessus : on exclut « livewire » directement
 # dans le motif via un négatif look-ahead, sinon /vendor/livewire/ tombe en 404.
 RedirectMatch 404 (?i)/\.(env|git|gitignore|gitattributes|editorconfig|npmrc)
-RedirectMatch 404 (?i)/(app|bootstrap|config|database|resources|routes|storage|tests|node_modules|doc|design)(/|$)
+RedirectMatch 404 (?i)/(app|bootstrap|config|database|resources|routes|tests|node_modules|doc|design)(/|$)
+# ⚠ Exception jumelle de /vendor/livewire/ : `storage` désigne DEUX choses. Le dossier
+# storage/ du dépôt (logs, cache, sessions, GPX) ne doit JAMAIS être servi, mais /storage/ en
+# URL est le lien symbolique public/storage → storage/app/public, par lequel transite le LOGO
+# DU CLUB. Sans ce look-ahead, le logo répond 404 alors que fichier et lien sont corrects.
+#
+# ⚠ LISTE BLANCHE, à tenir à jour : seul `logos/` est exposé, car c'est aujourd'hui le seul
+# contenu du disque `public` (cf. ClubBrandingService ; les traces GPX vivent sur le disque
+# `local`, hors webroot, servies par une route PHP authentifiée). Tout nouveau dossier public
+# devra être AJOUTÉ ici — sinon il répondra 404 sans autre explication.
+RedirectMatch 404 (?i)/storage/(?!logos/)
 RedirectMatch 404 (?i)/vendor/(?!livewire/)
 RedirectMatch 404 (?i)/(artisan|composer\.(json|lock)|package(-lock)?\.json|phpunit\.xml|vite\.config\.js|README\.md|CLAUDE\.md)$
 

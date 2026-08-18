@@ -378,21 +378,58 @@ rsync -az --delete public/build/ <user>@<ssh-host>:<docroot>/public/build/
 composer install --no-dev --optimize-autoloader   # si vendor/ a changé
 php artisan migrate:status                        # repère les migrations « Pending »
 php artisan migrate --force                       # ⚠ obligatoire dès qu'une est en attente
-php artisan storage:link                          # ⚠ une fois — sans lui, le logo du club est en 404
+[ -e public/storage ] || { rm -f public/storage; ln -s ../storage/app/public public/storage; }  # ⚠ lien RELATIF
 php artisan vendor:publish --tag=livewire:assets --force
 php artisan optimize:clear                        # purge les caches de l'ancien code
 php artisan config:cache && php artisan route:cache && php artisan view:cache
 ```
 
 > Rien à migrer ? `migrate --force` est un no-op sans risque : le lancer systématiquement coûte
-> moins cher qu'une 500 pour une migration oubliée. Idem pour `storage:link`, qui ne fait rien si
-> le lien existe déjà.
+> moins cher qu'une 500 pour une migration oubliée. Idem pour la ligne du lien `public/storage`,
+> qui ne fait rien s'il existe déjà.
 
-> ⚠️ **`storage:link` n'est pas rejoué par `git push`.** Le lien `public/storage → storage/app/public`
-> n'est pas versionné (il est créé sur le serveur). Sans lui, l'upload du logo dans « Paramètres du
+> ℹ️ **Pourquoi `ln -s` et non `php artisan storage:link` ?** La commande Artisan crée un lien
+> **absolu**, que certains hébergements mutualisés refusent de suivre (403, cf. note plus bas).
+> Le lien relatif ci-dessus reste dans l'arborescence du site et fonctionne partout. Sur un
+> hébergement sans cette contrainte, `php artisan storage:link` convient tout aussi bien.
+
+> ⚠️ **Le lien `public/storage` n'est pas déployé par `git push`.** Il n'est pas versionné (il est
+> créé sur le serveur, cf. la ligne `ln -s` ci-dessus). Sans lui, l'upload du logo dans « Paramètres du
 > club » réussit, mais l'image répond **404** partout où elle s'affiche : lockup de connexion,
 > aperçu admin, filigrane de la topbar. Symptôme trompeur — l'enregistrement est confirmé, seule
 > l'image manque.
+
+> ⚠️ **Logo en 404 alors que le lien et le fichier sont corrects ?** Vérifier le `.htaccess`
+> **racine** (docroot sur la racine du dépôt). Sa règle défensive `RedirectMatch 404` liste les
+> dossiers de sources à ne jamais servir, dont `storage` — or ce mot désigne deux choses :
+> le dossier `storage/` du dépôt (logs, cache, GPX hors webroot), à bloquer, et l'URL
+> `/storage/` du lien symbolique, par laquelle transite le logo. `RedirectMatch` (mod_alias)
+> teste l'URL indépendamment des `RewriteRule`, donc il intercepte les deux. La règle doit
+> porter un look-ahead négatif — `RedirectMatch 404 (?i)/storage/(?!logos/)` — exactement comme
+> `/vendor/(?!livewire/)`. Diagnostic : `ls -la public/storage` et `namei -l` sont bons, mais
+> l'URL répond 404 y compris en contournant la réécriture par `/public/storage/…`.
+>
+> Cette règle est une **liste blanche** : seul `logos/` est exposé. Les traces GPX ne sont pas
+> concernées (disque `local`, hors webroot, servies par une route PHP authentifiée), mais tout
+> futur dossier public devra y être ajouté, sous peine du même 404 silencieux.
+
+> ⚠️ **Logo en 403 (et non 404) ?** C'est l'obstacle suivant, distinct : Apache atteint le
+> fichier mais refuse de suivre le lien symbolique `public/storage`, qui pointe **hors** de
+> l'arborescence du site. Signature : droits et `namei -l` corrects de bout en bout, réponse 403,
+> et dans le log d'erreur `AH00037: Symbolic link not allowed or link target not accessible`.
+>
+> Le correctif est de rendre le lien **relatif**, pour qu'il ne sorte plus du site :
+>
+> ```bash
+> cd <racine>/public && rm storage && ln -s ../storage/app/public storage
+> ls -la storage        # doit afficher : storage -> ../storage/app/public
+> ```
+>
+> (`php artisan storage:link --relative` fait la même chose, mais exige le paquet
+> `symfony/filesystem`, absent des dépendances — `ln -s` ne demande rien.)
+>
+> Le lien relatif suffit : inutile de toucher aux `Options` de `public/.htaccess` (vérifié sur
+> OVH mutualisé — `+SymLinksIfOwnerMatch` n'était pas nécessaire une fois le lien relatif en place).
 
 Deux pièges spécifiques au mutualisé, à vérifier **une fois** :
 
@@ -470,8 +507,9 @@ les liens de connexion transitent par email.
 
 **Stockage.** Les traces GPX et pièces jointes vivent **hors webroot** et sont servies par un
 contrôleur PHP : rien à exposer. Le **logo du club** fait exception — c'est un asset public, servi
-via le lien `public/storage` que crée `php artisan storage:link`. Sans ce lien, le logo répond 404
-partout (voir §5.3). Dans les deux cas, `storage/app` est à **inclure dans les sauvegardes**.
+via le lien `public/storage` (créé sur le serveur — le préférer **relatif**, cf. §5.3). Sans ce
+lien, le logo répond 404 partout. Dans les deux cas, `storage/app` est à **inclure dans les
+sauvegardes**.
 
 ---
 
