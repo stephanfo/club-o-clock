@@ -1,0 +1,24 @@
+/* Manrope, auto-hébergée.
+   ----------------------------------------------------------------------------
+   La déclaration est RÉÉCRITE ici plutôt que copiée depuis club-tokens.css :
+   dans l'application le chemin est absolu (`/fonts/…`), servi par Laravel
+   depuis public/. Sur ce site, le fichier est monté dans /assets/.
+
+   Copier la déclaration telle quelle serait le bug le plus discret de ce
+   déploiement : la police ne chargerait pas, le site retomberait sur la
+   fallback système, et rien ne signalerait l'erreur. La vérification est dans
+   site/build-local.sh.
+
+   Le .woff2 est copié depuis public/fonts/ au moment de l'assemblage — il n'est
+   pas versionné ici (cf. .gitignore), pour ne pas dupliquer un binaire dont
+   l'application est la source de vérité.
+
+   SIL Open Font License. Aucun appel réseau vers Google Fonts : c'est une
+   exigence du projet, qui traite des données de mineurs. */
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/assets/manrope-latin-variable.woff2') format('woff2-variations');
+}

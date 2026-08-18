@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 657.6 88.0" role="img" aria-labelledby="logo-blanc-title">
+  <title id="logo-blanc-title">Club&#39;O&#39;Clock</title>
+  <!--
+    Logotype. Le mot est VECTORISÉ (Manrope 800 converti en tracés) : un <text> dépendrait d'une
+    police que le contexte de rendu n'a pas toujours — favicon, aperçu de partage, impression —
+    et retomberait en Times, ce qui détruirait le logo.
+
+    Le O isolé entre les deux apostrophes n'est pas dessiné : sa chasse est réservée et un cadran
+    prend sa place. C'est le seul point de couleur, donc ce qui fait la marque.
+
+    Apostrophes : U+0027 (droite), jamais U+2019 — un nom de marque doit survivre à un
+    copier-coller en terminal ou en JSON.
+
+    Le groupe des glyphes porte l'échelle ET le retournement de l'axe Y (les polices ont Y vers
+    le haut, SVG vers le bas). Les translations internes restent donc en unités de police.
+  -->
+  <defs>
+    <linearGradient id="cadran" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(8.0 80.00) scale(0.050000 -0.050000)" fill="#ffffff">
+    <path transform="translate(0 0)" d="M758 -30Q542 -30 385.5 64.0Q229 158 144.5 327.0Q60 496 60 720Q60 944 144.5 1113.0Q229 1282 385.5 1376.0Q542 1470 758 1470Q1006 1470 1174.5 1347.0Q1343 1224 1412 1014L1138 938Q1098 1069 1003.0 1141.5Q908 1214 758 1214Q621 1214 529.5 1153.0Q438 1092 392.0 981.0Q346 870 346 720Q346 570 392.0 459.0Q438 348 529.5 287.0Q621 226 758 226Q908 226 1003.0 299.0Q1098 372 1138 502L1412 426Q1343 216 1174.5 93.0Q1006 -30 758 -30Z"/>
+    <path transform="translate(1492 0)" d="M160 0V1470H432V0Z"/>
+    <path transform="translate(2084 0)" d="M542 -32Q415 -32 335.0 11.0Q255 54 210.5 120.0Q166 186 147.0 257.5Q128 329 124.0 388.0Q120 447 120 474V1080H396V570Q396 533 400.0 475.5Q404 418 425.0 360.0Q446 302 493.5 263.0Q541 224 628 224Q663 224 703.0 235.0Q743 246 778.0 277.5Q813 309 835.5 370.5Q858 432 858 532L1014 458Q1014 330 962.0 218.0Q910 106 805.5 37.0Q701 -32 542 -32ZM892 0V358H858V1080H1132V0Z"/>
+    <path transform="translate(3356 0)" d="M670 -30Q509 -30 401.0 45.0Q293 120 238.5 249.0Q184 378 184 540Q184 702 238.0 831.0Q292 960 397.0 1035.0Q502 1110 656 1110Q811 1110 926.0 1036.0Q1041 962 1104.5 833.5Q1168 705 1168 540Q1168 378 1105.5 249.0Q1043 120 931.0 45.0Q819 -30 670 -30ZM138 0V1440H412V740H378V0ZM626 212Q714 212 770.0 256.0Q826 300 853.0 374.5Q880 449 880 540Q880 630 852.0 704.5Q824 779 765.5 823.5Q707 868 616 868Q531 868 478.5 827.0Q426 786 402.0 712.0Q378 638 378 540Q378 442 402.0 368.0Q426 294 480.5 253.0Q535 212 626 212Z"/>
+    <path transform="translate(4604 0)" d="M120 1080V1440H392V1080Z"/>
+    <path transform="translate(6672 0)" d="M120 1080V1440H392V1080Z"/>
+    <path transform="translate(7224 0)" d="M758 -30Q542 -30 385.5 64.0Q229 158 144.5 327.0Q60 496 60 720Q60 944 144.5 1113.0Q229 1282 385.5 1376.0Q542 1470 758 1470Q1006 1470 1174.5 1347.0Q1343 1224 1412 1014L1138 938Q1098 1069 1003.0 1141.5Q908 1214 758 1214Q621 1214 529.5 1153.0Q438 1092 392.0 981.0Q346 870 346 720Q346 570 392.0 459.0Q438 348 529.5 287.0Q621 226 758 226Q908 226 1003.0 299.0Q1098 372 1138 502L1412 426Q1343 216 1174.5 93.0Q1006 -30 758 -30Z"/>
+    <path transform="translate(8716 0)" d="M160 0V1470H432V0Z"/>
+    <path transform="translate(9308 0)" d="M626 -30Q463 -30 340.0 43.0Q217 116 148.5 244.5Q80 373 80 540Q80 709 150.0 837.5Q220 966 343.0 1038.0Q466 1110 626 1110Q789 1110 912.5 1037.0Q1036 964 1105.0 835.5Q1174 707 1174 540Q1174 372 1104.5 243.5Q1035 115 911.5 42.5Q788 -30 626 -30ZM626 224Q757 224 821.5 312.5Q886 401 886 540Q886 684 820.5 770.0Q755 856 626 856Q537 856 480.0 816.0Q423 776 395.5 705.0Q368 634 368 540Q368 395 433.5 309.5Q499 224 626 224Z"/>
+    <path transform="translate(10562 0)" d="M616 -30Q448 -30 328.0 45.0Q208 120 144.0 249.0Q80 378 80 540Q80 704 146.5 833.0Q213 962 334.0 1036.0Q455 1110 620 1110Q811 1110 940.5 1013.5Q1070 917 1106 750L834 678Q810 762 750.5 809.0Q691 856 616 856Q530 856 475.0 814.5Q420 773 394.0 701.5Q368 630 368 540Q368 399 430.5 311.5Q493 224 616 224Q708 224 756.0 266.0Q804 308 828 386L1106 328Q1060 156 932.0 63.0Q804 -30 616 -30Z"/>
+    <path transform="translate(11728 0)" d="M138 0 140 1440H416V560L782 1080H1118L728 540L1144 0H790L416 520V0Z"/>
+  </g>
+
+  <circle cx="303.70" cy="44.00" r="31.50" fill="none" stroke="url(#cadran)" stroke-width="9.0"/>
+
+  <g stroke="url(#cadran)" stroke-width="2.6" stroke-linecap="round" opacity="0.65">
+    
+<line x1="303.70" y1="15.00" x2="303.70" y2="19.50"/>    <line x1="332.70" y1="44.00" x2="328.20" y2="44.00"/>    <line x1="303.70" y1="73.00" x2="303.70" y2="68.50"/>    <line x1="274.70" y1="44.00" x2="279.20" y2="44.00"/>
+  </g>
+
+  <g stroke="#ffffff" stroke-linecap="round">
+    <line x1="303.70" y1="44.00" x2="290.61" y2="36.44" stroke-width="5.5"/>
+    <line x1="303.70" y1="44.00" x2="322.41" y2="33.20" stroke-width="4.5"/>
+  </g>
+  <circle cx="303.70" cy="44.00" r="3.6" fill="#ffffff"/>
+</svg>

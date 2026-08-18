@@ -7,16 +7,9 @@ premier démarrage réel avec ton club.
 > `.env`. Il n'y a pas de multi-tenant : pas de compte à créer chez qui que ce soit, pas de données
 > partagées entre clubs. Tu es propriétaire de ton installation.
 
-**Sommaire**
-
-1. [Prérequis](#1-prérequis)
-2. [Installation locale](#2-installation-locale)
-3. [Configuration](#3-configuration) — [email](#31-email-obligatoire-en-production) · [Google OAuth](#32-google-oauth-optionnel) · [push](#33-notifications-push-optionnel)
-4. [Premier démarrage — checklist club](#4-premier-démarrage--checklist-club)
-5. [Déploiement A — hébergement mutualisé](#5-déploiement-a--hébergement-mutualisé-ovh-pro-et-similaires)
-6. [Déploiement B — VPS / serveur dédié](#6-déploiement-b--vps--serveur-dédié)
-7. [Maintenance & sauvegardes](#7-maintenance--sauvegardes)
-8. [Dépannage](#8-dépannage)
+**Ce guide couvre** : prérequis · installation locale · configuration (email, Google OAuth,
+notifications push) · premier démarrage · déploiement sur mutualisé puis sur VPS · instance de
+démonstration · flux réseau sortants · maintenance · dépannage.
 
 ---
 
@@ -349,7 +342,7 @@ l'arbre en désélectionnant ces dossiers.
 > 🚨 **`public/build/` est le piège de cette voie.** Il est **gitignoré** et hashé : il faut le
 > transférer **à chaque changement front**, et **supprimer d'abord le dossier distant**, sinon les
 > anciens bundles s'accumulent indéfiniment. Un `public/build/` périmé ne provoque **aucune erreur** :
-> le site s'affiche, mais avec l'ancien CSS/JS. Cf. §8, « le code est déployé mais le style ne suit
+> le site s'affiche, mais avec l'ancien CSS/JS. Cf. §10, « le code est déployé mais le style ne suit
 > pas ».
 
 #### Voie B — Git (si l'hébergeur expose un dépôt)
@@ -409,7 +402,7 @@ Deux pièges spécifiques au mutualisé, à vérifier **une fois** :
 > serveur** — sinon Laravel parle le mauvais dialecte.
 >
 > ⚠️ **Asset Livewire en statique.** `vendor:publish --tag=livewire:assets` est **obligatoire** :
-> servi par une route PHP, `livewire.min.js` casse le framing HTTP/2 de certains hébergeurs (§8).
+> servi par une route PHP, `livewire.min.js` casse le framing HTTP/2 de certains hébergeurs (§10).
 
 ### 5.4 Le cron (indispensable)
 
@@ -482,7 +475,7 @@ partout (voir §5.3). Dans les deux cas, `storage/app` est à **inclure dans les
 
 ---
 
-## 6 bis. Instance de démonstration (facultatif)
+## 7. Instance de démonstration (facultatif)
 
 > Cette section ne concerne **pas** un club qui déploie l'application pour ses adhérents. Elle
 > décrit comment monter une **vitrine publique** — celle du projet, ou la tienne pour faire
@@ -560,7 +553,27 @@ php artisan demo:reset   # à la demande ; refuse si DEMO_MODE n'est pas actif
 
 ---
 
-## 7. Maintenance & sauvegardes
+## 8. Flux réseau sortants (pour les mentions légales)
+
+Pour rédiger sa page mentions légales / confidentialité (une trame est fournie sur
+`/mentions-legales`), chaque club doit savoir quels services tiers son instance contacte. Voici
+l'inventaire complet — tous UE ou sans flux de données personnelles identifiables :
+
+| Service | Déclenché quand | Donnée transmise | UE / clé |
+|---|---|---|---|
+| **Open-Meteo** | Rafraîchissement météo (cron, J+16) pour chaque lieu de séance | Coordonnées GPS du lieu (pas de donnée personnelle) | UE, gratuit, sans clé |
+| **Nominatim / OpenStreetMap** | Un admin saisit ou modifie l'adresse d'un `Location` | Texte de l'adresse saisie | UE, gratuit, sans clé, 1 req/s (mis en cache) |
+| **Email transactionnel** (Brevo par défaut, Scaleway TEM en alternative) | Notification, lien de connexion (magic link), invitation | Email + nom du destinataire, contenu du message | UE, clé API |
+| **Web Push (VAPID)** | Notification poussée à un appareil abonné | Payload chiffré vers l'endpoint du navigateur (Chrome/Firefox/Apple selon appareil) | Protocole standard, pas de service commercial intermédiaire côté club |
+| **Google OAuth** (optionnel) | Connexion via le bouton « Google », si activé | Email + identité du compte Google de l'utilisateur | **Hors UE** (Google) — désactivable en laissant `GOOGLE_CLIENT_ID` vide |
+| **OpenRunner Pro** (optionnel) | Affichage d'un parcours ayant un embed OpenRunner configuré | Chargement d'un iframe depuis OpenRunner | Self-hosting du club requis (cf. PRD) |
+
+Pas d'analytics, pas de traqueur, pas de CDN tiers. Les polices web (Manrope) sont
+**auto-hébergées** : aucun appel à Google Fonts.
+
+---
+
+## 9. Maintenance & sauvegardes
 
 **Ce qu'il faut sauvegarder** — deux choses seulement :
 
@@ -595,7 +608,7 @@ composer check                     # pint + phpstan + tests (avant contribution)
 
 ---
 
-## 8. Dépannage
+## 10. Dépannage
 
 ### Les notifications ne partent pas
 
@@ -689,7 +702,7 @@ L'email prend le relais.
 
 ## Aller plus loin
 
-- **[README](../README.md)** — présentation, architecture, flux réseau sortants
+- **[README](https://github.com/stephanfo/club-o-clock/blob/main/README.md)** — présentation, architecture, flux réseau sortants
 - **[COMPTES_DEMO.md](COMPTES_DEMO.md)** — comptes et scénarios du jeu de démonstration
 - **[CONTRIBUTING.md](../CONTRIBUTING.md)** — contribuer au projet
 - **[SECURITY.md](../SECURITY.md)** — signaler une vulnérabilité

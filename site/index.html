@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Club'O'Clock — le planning d'entraînement de ton club</title>
+<meta name="description" content="Application web libre de gestion du planning d'entraînement pour club sportif associatif : inscriptions, liste d'attente, quotas, tutelle parentale et notifications. Une instance par club, tes données restent chez toi.">
+
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+<meta name="theme-color" content="#4338CA">
+
+<!-- Les métadonnées de partage exigent des URL absolues : un chemin relatif ne serait pas
+     résolu par les robots de LinkedIn, Slack ou Mastodon. -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://cluboclock.ratelet.fr/">
+<meta property="og:title" content="Club'O'Clock — le planning d'entraînement de ton club">
+<meta property="og:description" content="Inscriptions, liste d'attente, quotas et tutelle parentale. Libre, auto-hébergé, RGPD par construction.">
+<meta property="og:image" content="https://cluboclock.ratelet.fr/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="fr_FR">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preload" as="font" type="font/woff2" crossorigin href="/assets/manrope-latin-variable.woff2">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<a class="skip" href="#contenu">Aller au contenu</a>
+
+<header class="topbar">
+  <!--
+    Menu sans JavaScript : une case à cocher visuellement masquée porte l'état ouvert/fermé,
+    et le label lui sert de bouton. Fonctionne partout, y compris si le script ne charge pas,
+    et reste accessible au clavier — la case est focusable et se coche à la barre d'espace.
+  -->
+  <input type="checkbox" id="menu" class="menu-state">
+  <div class="topbar-in">
+    <a class="brand" href="/" aria-label="Club'O'Clock, accueil"><img src="/assets/logo-blanc.svg" alt="Club'O'Clock"></a>
+
+    <label for="menu" class="burger" aria-label="Ouvrir le menu">
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+    </label>
+
+    <nav>
+      <a href="#fonctionnalites">Fonctionnalités</a>
+      <a href="#apercu">Aperçu</a>
+      <a href="/doc/">Documentation</a>
+      <a href="https://github.com/stephanfo/club-o-clock">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="contenu">
+
+  <section class="hero">
+    <div class="wrap">
+      <p class="tagline">Nage, pédale, cavale… fini le planning infernal&nbsp;!</p>
+      <h1>Le planning d'entraînement de ton club.</h1>
+      <p class="lead">
+        Sans le tableur partagé ni le fil de discussion interminable. Les adhérents voient les
+        séances et s'inscrivent depuis leur téléphone&nbsp;; les coachs savent qui vient&nbsp;; les
+        places limitées se gèrent toutes seules, liste d'attente comprise.
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="https://demo.cluboclock.ratelet.fr/">Essayer la démo</a>
+        <a class="btn btn-ghost" href="/doc/INSTALL">Installer pour mon club</a>
+      </div>
+      <p class="hero-note">
+        Application installable (PWA) pour club sportif associatif de 50 à 150 adhérents,
+        administré par des bénévoles.
+      </p>
+    </div>
+  </section>
+
+  <section class="alt">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Ce que ça résout</span>
+        <h2>Les questions qui reviennent chaque semaine</h2>
+        <p>
+          Six problèmes que tout bureau de club connaît, et ce que l'application en fait.
+        </p>
+      </div>
+
+      <div class="solves">
+        <div class="solve">
+          <span class="tick" aria-hidden="true">✓</span>
+          <div>
+            <p class="q">« Qui vient à la séance de mercredi&nbsp;? »</p>
+            <p class="a">Inscriptions en ligne, <b>liste des présents à jour</b> en temps réel.</p>
+          </div>
+        </div>
+        <div class="solve">
+          <span class="tick" aria-hidden="true">✓</span>
+          <div>
+            <p class="q">Une place se libère la veille.</p>
+            <p class="a"><b>Liste d'attente</b> avec promotion automatique et notification.</p>
+          </div>
+        </div>
+        <div class="solve">
+          <span class="tick" aria-hidden="true">✓</span>
+          <div>
+            <p class="q">Le créneau piscine est limité à 24.</p>
+            <p class="a"><b>Capacité</b> par séance, et <b>quotas</b> par période.</p>
+          </div>
+        </div>
+        <div class="solve">
+          <span class="tick" aria-hidden="true">✓</span>
+          <div>
+            <p class="q">Une séance est annulée à 18&nbsp;h.</p>
+            <p class="a"><b>Notification</b> email et push web à tous les inscrits.</p>
+          </div>
+        </div>
+        <div class="solve">
+          <span class="tick" aria-hidden="true">✓</span>
+          <div>
+            <p class="q">Les mineurs et leurs parents.</p>
+            <p class="a"><b>Tutelle parentale</b> : le parent inscrit son enfant et reçoit ses notifications.</p>
+          </div>
+        </div>
+        <div class="solve">
+          <span class="tick" aria-hidden="true">✓</span>
+          <div>
+            <p class="q">Recréer la semaine type chaque saison.</p>
+            <p class="a"><b>Modèles de séance</b> qui génèrent le planning.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="fonctionnalites">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Ce qui le distingue</span>
+        <h2>Un logiciel qui appartient au club</h2>
+        <p>
+          Pas un service auquel on s'abonne : une application que le club installe, possède et
+          personnalise.
+        </p>
+      </div>
+
+      <div class="feats">
+        <article class="feat">
+          <div class="ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </div>
+          <h3>Tes données restent chez toi</h3>
+          <p>
+            Une instance par club, sur ton hébergement. Pas de SaaS, pas d'abonnement, pas de tiers
+            qui exploite le fichier de tes adhérents.
+          </p>
+        </article>
+
+        <article class="feat">
+          <div class="ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>
+            </svg>
+          </div>
+          <h3>RGPD par construction</h3>
+          <p>
+            Ni numéro de téléphone, ni certificat médical, ni numéro de licence. Aucun service non
+            européen dans le chemin critique, polices auto-hébergées, aucun traqueur.
+          </p>
+        </article>
+
+        <article class="feat">
+          <div class="ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13 2 3 14h9l-1 8 10-12h-9z"/>
+            </svg>
+          </div>
+          <h3>Ça tourne sur un mutualisé</h3>
+          <p>
+            À quelques euros par mois. Ni Docker, ni serveur Node, ni WebSocket : du PHP et un cron.
+          </p>
+        </article>
+
+        <article class="feat">
+          <div class="ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="13.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="14" r="2.5"/>
+              <circle cx="8.5" cy="7.5" r="2.5"/><circle cx="6.5" cy="14" r="2.5"/>
+              <path d="M12 22c4 0 3-2 3-3s-1-2-3-2-3 1-3 2 -1 3 3 3z"/>
+            </svg>
+          </div>
+          <h3>C'est le club de l'utilisateur</h3>
+          <p>
+            Nom, logo, baseline et palette de couleurs se règlent depuis l'administration. Pas
+            besoin de toucher au code.
+          </p>
+        </article>
+
+        <article class="feat">
+          <div class="ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/>
+            </svg>
+          </div>
+          <h3>Installable comme une app</h3>
+          <p>
+            Sur l'écran d'accueil du téléphone, sans passer par un store. Notifications push
+            comprises.
+          </p>
+        </article>
+
+        <article class="feat">
+          <div class="ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3v18M5 7h14M6 7l-3 7h6zM18 7l-3 7h6z"/>
+            </svg>
+          </div>
+          <h3>Libre, sous AGPL-3.0</h3>
+          <p>
+            Utilisable, modifiable, et qui le reste. Quiconque déploie une version modifiée doit
+            en publier le code — c'est ce que garantit l'AGPL.
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="apercu" class="alt">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">À quoi ça ressemble</span>
+        <h2>L'adhérent est sur son téléphone, le bureau sur son ordinateur</h2>
+        <p>L'application est conçue pour les deux.</p>
+      </div>
+
+      <div class="shots">
+        <div class="shot">
+          <figure>
+            <img src="/img/planning-semaine.png" width="320" height="691" loading="lazy"
+                 alt="Planning hebdomadaire sur mobile : séances par jour, une séance annulée, une autre en liste d'attente">
+            <figcaption>
+              <b>Le planning de la semaine</b>
+              <span>Les séances, leur lieu et leur remplissage. Une annulation, une liste d'attente
+                et « tu participes » se lisent d'un coup d'œil.</span>
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="shot">
+          <figure>
+            <img src="/img/seance-parcours.png" width="320" height="691" loading="lazy"
+                 alt="Fiche de séance sur mobile : onglet Parcours affichant le tracé GPX et ses bornes kilométriques">
+            <figcaption>
+              <b>La fiche de séance</b>
+              <span>Infos, encadrement, inscrits et parcours : le tracé GPX s'affiche directement,
+                avec son profil altimétrique et ses bornes.</span>
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="shot">
+          <figure>
+            <img src="/img/mes-enfants.png" width="320" height="691" loading="lazy"
+                 alt="Écran Mes enfants : deux enfants mineurs, l'un sans compte propre, l'autre avec le sien">
+            <figcaption>
+              <b>La tutelle parentale</b>
+              <span>Un parent gère ses enfants depuis son propre compte — y compris quand l'un a
+                déjà le sien et l'autre non, avec le bon routage des notifications.</span>
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="shot wide">
+          <figure>
+            <img src="/img/admin-adherents.png" width="620" height="511" loading="lazy"
+                 alt="Administration des adhérents sur ordinateur : compteurs, filtres, rôles et statuts d'accès">
+            <figcaption>
+              <b>L'administration, côté bureau</b>
+              <span>Adhérents, rôles cumulables, modèles de séance, journaux d'audit et file
+                d'envois : le bureau garde la main sur tout. Ces écrans sont conçus pour un
+                ordinateur — c'est là que le club travaille.</span>
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+
+      <p style="margin-top: var(--space-12); text-align: center;">
+        <a class="btn btn-outline" href="/doc/CAPTURES">Voir tous les écrans</a>
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="demo">
+        <h2>Essayer sans rien installer</h2>
+        <p>
+          Les identifiants sont affichés sur l'écran de connexion, un clic les remplit. Données
+          entièrement fictives, remises à zéro chaque nuit : n'hésite pas à tout casser.
+        </p>
+        <a class="btn btn-primary" href="https://demo.cluboclock.ratelet.fr/">Ouvrir la démo</a>
+        <p class="fine">
+          Aucun email ni notification ne peut sortir de cette instance — c'est verrouillé côté
+          serveur, pas simplement désactivé. Teste les invitations et les annulations sans crainte.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="alt">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Installer</span>
+        <h2>Quelques commandes, et le club a son instance</h2>
+        <p>
+          Il n'y a pas d'inscription publique : le premier administrateur se crée en ligne de
+          commande, et c'est lui qui invite le reste du club.
+        </p>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <h3>Déposer le code</h3>
+          <p>Sur un hébergement mutualisé PHP 8.3 avec MySQL ou MariaDB. Par SFTP, ou par Git si
+            l'hébergeur le propose.</p>
+        </div>
+        <div class="step">
+          <h3>Configurer</h3>
+          <p>Le fichier <code>.env</code>, la base de données, l'envoi d'email, et un cron
+            <b>chaque minute</b> — c'est lui qui cadence les notifications et la météo.</p>
+        </div>
+        <div class="step">
+          <h3>Créer le premier compte</h3>
+          <p>Une commande, et le bureau prend la main sur le reste depuis l'interface.</p>
+        </div>
+      </div>
+
+      <div class="codeblock">
+        <span class="p">$</span> git clone https://github.com/stephanfo/club-o-clock.git<br>
+        <span class="p">$</span> composer setup <span class="c"># dépendances, .env, clé, migrations, assets</span><br>
+        <span class="p">$</span> php artisan db:seed <span class="c"># catalogues — indispensable, même en production</span><br>
+        <span class="p">$</span> php artisan storage:link <span class="c"># sans lui, le logo du club est en 404</span><br>
+        <span class="p">$</span> php artisan club:create-admin <span class="c"># le seul point d'entrée d'une base vide</span>
+      </div>
+
+      <p style="margin-top: var(--space-8);">
+        <a class="btn btn-outline" href="/doc/INSTALL">Guide d'installation complet</a>
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <img src="/assets/logo-blanc.svg" alt="Club'O'Clock">
+        <p style="max-width: 42ch;">
+          Le planning d'entraînement des clubs sportifs associatifs. Libre, auto-hébergé, et
+          conçu pour être administré par des bénévoles.
+        </p>
+      </div>
+      <div>
+        <h4>Documentation</h4>
+        <ul>
+          <li><a href="/doc/">Vue d'ensemble</a></li>
+          <li><a href="/doc/INSTALL">Installation</a></li>
+          <li><a href="/doc/PRD">Spécification produit</a></li>
+          <li><a href="/doc/CADRAGE_TECHNIQUE">Cadrage technique</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Projet</h4>
+        <ul>
+          <li><a href="https://github.com/stephanfo/club-o-clock">Code source</a></li>
+          <li><a href="/CONTRIBUTING">Contribuer</a></li>
+          <li><a href="/SECURITY">Sécurité</a></li>
+          <li><a href="/CHANGELOG">Versions</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      Publié sous licence <a href="https://github.com/stephanfo/club-o-clock/blob/main/LICENSE">AGPL-3.0</a>.
+      Une instance par club — tes données restent chez toi.
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

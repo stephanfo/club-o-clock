@@ -1,0 +1,97 @@
+name: Site & documentation
+
+# Publie la vitrine et la documentation sur GitHub Pages (https://cluboclock.ratelet.fr).
+#
+# Volontairement SÉPARÉ de ci.yml. Les deux portes sont orthogonales : un lien mort dans la
+# documentation ne casse pas `composer check`, et un test PHP en échec n'invalide pas une
+# correction de doc. Les coupler bloquerait l'une derrière l'autre sans rien garantir de plus.
+# Ce workflow a sa propre porte de qualité — le build échoue sur lien mort (`ignoreDeadLinks`),
+# et site/build-local.sh vérifie ensuite que rien ne manque à l'arrivée.
+#
+# L'assemblage n'est pas réécrit ici : le job appelle site/build-local.sh, le même script que
+# celui utilisé en local. C'est ce qui garantit que « ça marche chez moi » vaut aussi en CI.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'doc/**'
+      - 'site/**'
+      - 'CONTRIBUTING.md'
+      - 'SECURITY.md'
+      - 'CHANGELOG.md'
+      - 'public/fonts/**'          # la police est copiée dans le site à l'assemblage
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/pages.yml'
+  pull_request:
+    paths:
+      - 'doc/**'
+      - 'site/**'
+      - 'CONTRIBUTING.md'
+      - 'SECURITY.md'
+      - 'CHANGELOG.md'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Groupe distinct de celui de ci.yml, donc aucune interférence entre les deux workflows.
+  group: pages
+  # `false`, à l'inverse de ci.yml : annuler un déploiement Pages en vol peut laisser le site
+  # dans un état incohérent. Mieux vaut laisser finir.
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Construire le site
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # `lastUpdated` lit la date du dernier commit de chaque page : sans l'historique
+          # complet, toutes les pages porteraient la date du checkout.
+          fetch-depth: 0
+
+      - name: Installer Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      # Le même script qu'en local : build de la documentation, copie de la police et des
+      # captures, montage de _site/, puis vérifications (police servie sur /assets/, captures
+      # présentes, Inter absente). Il sort en erreur si l'assemblage est incomplet.
+      - name: Assembler le site
+        run: ./site/build-local.sh
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: Déployer sur GitHub Pages
+    needs: build
+    # Sur une pull request, on construit sans publier : une PR qui casse un lien devient rouge
+    # sans pour autant pouvoir modifier le site en ligne.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    # Les permissions d'écriture sont portées par ce seul job, jamais par le workflow : le job
+    # `build` tourne sur les PR de contributeurs extérieurs et n'a besoin que de lecture.
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
