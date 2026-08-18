@@ -108,6 +108,27 @@ class TemplateUiTest extends TestCase
         $this->assertSame(4, Session::where('source_template_id', $tpl->id)->count());
     }
 
+    // Double-tap sur « Générer & enregistrer » : sans wire:loading le second clic partait avant
+    // le retour du premier, et generate() créant les Session sans déduplication, la plage était
+    // générée deux fois. Les séances en double sont persistantes (§4.8).
+    public function test_double_tap_on_generate_does_not_duplicate_sessions(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $disc = $this->discipline();
+        $tpl = SessionTemplate::factory()->create([
+            'created_by' => $admin->id, 'day_of_week' => 1, 'discipline_id' => $disc->id,
+            'generation_start_date' => '2026-09-01', 'generation_end_date' => '2026-09-30',
+        ]);
+
+        // Deux appels consécutifs, comme un double-tap sur le mutualisé.
+        Livewire::actingAs($admin)->test(TemplateList::class)
+            ->call('generate', $tpl->id)
+            ->call('generate', $tpl->id);
+
+        // 4 lundis en septembre 2026 : la seconde passe ne doit rien ajouter.
+        $this->assertSame(4, Session::where('source_template_id', $tpl->id)->count());
+    }
+
     public function test_archive_and_reactivate(): void
     {
         $admin = User::factory()->admin()->create();

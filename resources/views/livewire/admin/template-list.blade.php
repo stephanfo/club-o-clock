@@ -113,7 +113,7 @@
                         <a href="{{ route('admin.templates.edit', $selected) }}" class="btn btn-ghost btn-sm" wire:navigate>
                             <x-icon name="edit" :size="14" /> Éditer
                         </a>
-                        <button type="button" wire:click="generate({{ $selected->id }})" class="btn btn-primary btn-sm">Générer &amp; enregistrer</button>
+                        <button type="button" wire:click="generate({{ $selected->id }})" wire:loading.attr="disabled" wire:target="generate" class="btn btn-primary btn-sm">Générer &amp; enregistrer</button>
                     </div>
                 </div>
             @endif
@@ -141,7 +141,7 @@
 
             <x-slot:footer>
                 <button type="button" class="btn btn-ghost" wire:click="closeRelaunch">Annuler</button>
-                <button type="button" class="btn btn-primary" wire:click="relaunch" @disabled($this->relaunchCount === 0)>
+                <button type="button" class="btn btn-primary" wire:click="relaunch" wire:loading.attr="disabled" wire:target="relaunch" @disabled($this->relaunchCount === 0)>
                     <x-icon name="repeat" :size="15" /> Relancer · {{ $this->relaunchCount }} séances
                 </button>
             </x-slot:footer>
