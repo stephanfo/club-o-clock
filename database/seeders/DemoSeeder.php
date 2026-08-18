@@ -57,8 +57,12 @@ class DemoSeeder extends Seeder
         // --- Identité du club de démonstration (§4.17) ---
         // Le seed d'INSTALLATION (DatabaseSeeder) laisse volontairement les réglages neutres :
         // « Club », logo par défaut, palette livrée. C'est le jeu de DÉMO qui pose une identité,
-        // pour montrer ce que donne un club personnalisé — même chemin qu'un admin réel passant
-        // par Paramètres du club, aux mêmes colonnes près.
+        // par le même chemin qu'un admin réel passant par Paramètres du club, aux mêmes colonnes
+        // près : ce qui est démontré, c'est que les colonnes sont bien prises en compte.
+        // Les couleurs ci-dessous reprennent volontairement la palette par défaut du dépôt
+        // (club-tokens.css / ClubPalette::DEFAULTS) : la démo doit ressembler à une installation
+        // neuve, pas afficher une identité que le déployeur ne retrouverait pas chez lui. Les
+        // garder ÉCRITES EN BASE reste utile — c'est ce qui exerce réellement la surcharge CSS.
         // Écrit SEULEMENT si l'identité est encore neutre : le seeder est rejouable (le reste est
         // additif/firstOrCreate) et sert aussi sur des instances de démo ou de recette où un admin
         // a pu personnaliser nom et palette. Les écraser en silence à chaque re-run serait une

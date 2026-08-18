@@ -33,9 +33,9 @@ class ClubPalette
      * @var array<string, string>
      */
     public const DEFAULTS = [
-        'primary_color' => '#69bf2d',
-        'accent_color' => '#e4027d',
-        'info_color' => '#3c69bb',
+        'primary_color' => '#4338ca',
+        'accent_color' => '#f59e0b',
+        'info_color' => '#0891b2',
     ];
 
     /**
