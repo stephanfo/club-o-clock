@@ -17,6 +17,17 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   y est couvert de bout en bout : bouton actif et désactivé, promotion effective, `AuditLog` émis.
   Volontairement **hors de `composer check`** : la porte de qualité reste PHPUnit.
   Voir [`tests/E2E/README.md`](tests/E2E/README.md).
+- **Supervision du traitement automatique** : l'écran des envois indique si le cron tourne encore.
+  Sans lui, une tâche planifiée interrompue (quota d'hébergement, chemin PHP changé, crontab perdue
+  au transfert) laissait les notifications s'accumuler sans qu'aucun signe ne l'annonce — le premier
+  symptôme étant un adhérent non prévenu d'une annulation. Trois états : actif, interrompu depuis
+  plus de 15 minutes, jamais observé (installation neuve, sans alarme).
+- **Tests du club vide** : les écrans membre et administration sont vérifiés dans l'état d'un club
+  fraîchement installé — catalogues seedés, un seul administrateur, aucune séance ni adhérent.
+  C'est l'état que le développement ne rencontre jamais et que chaque club rencontre en premier.
+- **Procédure de restauration de sauvegarde** ([`doc/INSTALL.md`](doc/INSTALL.md) §9.1), à répéter
+  avant la mise en production : restauration dans une base séparée, contrôle des clés étrangères et
+  des index, vérification qu'aucune migration n'est en attente.
 
 ### Corrigé
 
