@@ -243,12 +243,17 @@
                                     {{-- Sans date de naissance, la dérivation §4.5 ne peut rien produire :
                                          parler d'âge ici serait trompeur (cas des comptes coach-pur). --}}
                                     <span class="meta">Aucune date de naissance saisie — catégorie non déterminable.</span>
-                                @elseif ($derivedCat)
-                                    {{-- Incohérence : l'âge est couvert par une catégorie active, mais aucun
-                                         rattachement principal n'existe. Le pivot est périmé (dob modifiée hors
-                                         MemberService, ou rattachement jamais fait) — à signaler, pas à confondre
-                                         avec un trou de barème. Réparable en réenregistrant la date de naissance. --}}
+                                @elseif ($derivedCat && $u->hasRole('athlete'))
+                                    {{-- Incohérence, mais SEULEMENT pour un athlète : l'âge est couvert par une
+                                         catégorie active alors qu'aucun rattachement principal n'existe (pivot
+                                         périmé, ou jamais posé). Un coach-pur avec une dob n'a pas vocation à
+                                         porter une catégorie — sans la garde de rôle, l'avertissement serait un
+                                         faux positif sur tous les encadrants non-athlètes. --}}
                                     <span class="meta" style="color:var(--warning-text)">Catégorie « {{ $derivedCat->label }} » attendue mais non rattachée — réenregistre la date de naissance pour corriger.</span>
+                                @elseif (! $u->hasRole('athlete'))
+                                    {{-- Non-athlète (coach-pur, parent-pur) : la catégorie d'âge ne s'applique
+                                         pas à ce compte, ce n'est ni une anomalie ni un trou de barème. --}}
+                                    <span class="meta">Compte sans rôle athlète — la catégorie d'âge ne s'applique pas.</span>
                                 @else
                                     <span class="meta">Aucune catégorie active ne couvre cet âge — compte sans catégorie (contacte le catalogue).</span>
                                 @endif

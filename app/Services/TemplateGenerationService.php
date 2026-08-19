@@ -85,8 +85,15 @@ class TemplateGenerationService
                 // Sans ça, deux générations de la même plage (double-tap, page rejouée, second
                 // onglet) dupliquent durablement les séances. La relance sur une NOUVELLE plage
                 // n'est pas concernée : ses dates n'existent pas encore.
+                //
+                // On compare le JOUR local, pas l'instant exact : une séance que le bureau a
+                // décalée (créneau de piscine changé) reste l'occurrence de ce jour-là et ne doit
+                // pas être régénérée à son horaire d'origine. La borne est calculée en UTC, car
+                // start_at y est stocké.
+                $dayStart = $startAt->copy()->startOfDay()->utc();
+                $dayEnd = $startAt->copy()->endOfDay()->utc();
                 $already = Session::where('source_template_id', $template->id)
-                    ->where('start_at', $startAt->copy()->utc())
+                    ->whereBetween('start_at', [$dayStart, $dayEnd])
                     ->exists();
 
                 if ($already) {

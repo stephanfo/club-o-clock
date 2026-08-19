@@ -39,6 +39,23 @@
                 ? 'suspended'
                 : (! $subj->hasActiveCategory() ? 'no_category' : 'category_mismatch'));
     }
+    // Éligibilité de MOI, indépendante du sujet consulté (§4.2) : la bascule de rôle agit sur
+    // auth()->user(), jamais sur l'enfant sélectionné. Sans ça, un parent coach+athlète perdait
+    // « Je participe » dès qu'il consultait un enfant non inscriptible.
+    $meCanEnroll = $me && $subj && $me->id === $subj->id
+        ? $canEnroll
+        : ($me?->can('enroll', [$session, $me]) ?? false);
+
+    // Motif de blocage me concernant, pour le bloc encadrant (même logique que $enrollBlockReason).
+    $meBlockReason = null;
+    if (! $meCanEnroll && $me) {
+        $meBlockReason = ! $me->hasRole('athlete')
+            ? 'not_athlete'
+            : ($me->athlete_access_suspended
+                ? 'suspended'
+                : (! $me->hasActiveCategory() ? 'no_category' : 'category_mismatch'));
+    }
+
     $myWlPos = null;
     if ($myStatus === 'waitlist') {
         $pos = $wlCap->search(fn ($r) => $r->user_id === $subj->id); // $wlCap est déjà trié FIFO + réindexé

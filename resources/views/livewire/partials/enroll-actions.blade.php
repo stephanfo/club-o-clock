@@ -8,10 +8,12 @@
      Visible quand je suis encadrant ici : « Je participe » déclenche le dialog de bascule.
      Réservé à qui a le rôle athlète (§2) : un coach-pur n'a pas d'existence athlète à activer,
      la bascule échouerait en NOT_AN_ATHLETE. Même garde qu'en voie tiers (fiche-encadrement).
-     Conditionné en plus à $canEnroll : la bascule se termine par un register(), elle hérite donc
-     des mêmes gardes que l'inscription directe (§4.5 catégorie, §4.4 suspension). Sans ça elle
-     échouait en CATEGORY_MISMATCH / SUSPENDED APRÈS confirmation — bouton apparemment mort. --}}
-@if (($iAmCoachHere ?? false) && auth()->user()?->hasRole('athlete') && ($canEnroll ?? false)
+     Conditionné en plus à $meCanEnroll : la bascule finit par un register() sur auth()->user(),
+     elle hérite donc des mêmes gardes que l'inscription directe (§4.5 catégorie, §4.4 suspension)
+     — sans quoi elle échouait APRÈS confirmation, bouton apparemment mort. Bien $meCanEnroll et
+     non $canEnroll, qui porte sur le SUJET consulté : en voie parent → enfant (§4.2), l'éligibilité
+     de l'enfant n'a rien à voir avec ma propre bascule. --}}
+@if (($iAmCoachHere ?? false) && auth()->user()?->hasRole('athlete') && ($meCanEnroll ?? false)
      && $session->kind === 'training' && ! $session->isCancelled())
     {{-- Plus de marge basse : le bloc finit sur le segment, et la barre fixe mobile a déjà son
          propre padding — la marge s'y ajoutait et mangeait de la hauteur pour rien. --}}
@@ -66,8 +68,10 @@
         @else
             <div class="meta {{ ($variant ?? 'mobile') === 'desktop' ? '' : 'f1' }}" style="font-size:var(--text-xs);align-self:center">Tu encadres cette séance.</div>
         @endif
-    @elseif (! ($canEnroll ?? false))
-        @include('livewire.partials.enroll-block-reason')
+    @elseif (! ($meCanEnroll ?? false))
+        {{-- Motif de MA situation (meCanEnroll/meBlockReason) : ce bloc explique pourquoi MA
+             bascule est fermée, pas pourquoi l'enfant consulté ne peut pas s'inscrire. --}}
+        @include('livewire.partials.enroll-block-reason', ['enrollBlockReason' => $meBlockReason ?? null, 'subjName' => null])
         @if ($canLeaveCoaching)
             <button wire:click="unregisterCoach({{ auth()->id() }})" wire:loading.attr="disabled" wire:target="unregisterCoach"
                     class="btn btn-ghost {{ ($variant ?? 'mobile') === 'desktop' ? 'btn-block' : 'f1' }}"

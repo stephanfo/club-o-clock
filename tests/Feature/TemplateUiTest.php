@@ -129,6 +129,28 @@ class TemplateUiTest extends TestCase
         $this->assertSame(4, Session::where('source_template_id', $tpl->id)->count());
     }
 
+    // Revue de code — l'idempotence comparait l'instant EXACT : une séance décalée par le bureau
+    // (créneau de piscine changé) ne correspondait plus à son créneau d'origine et y était
+    // recréée. On compare désormais le jour local.
+    public function test_regenerating_does_not_duplicate_a_rescheduled_session(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $tpl = SessionTemplate::factory()->create([
+            'created_by' => $admin->id, 'day_of_week' => 1,
+            'generation_start_date' => '2026-09-01', 'generation_end_date' => '2026-09-30',
+        ]);
+        app(TemplateGenerationService::class)->generate($tpl, $admin);
+
+        // Le bureau décale une séance d'une heure.
+        $moved = Session::where('source_template_id', $tpl->id)->orderBy('start_at')->first();
+        $moved->forceFill(['start_at' => $moved->start_at->copy()->addHour()])->save();
+
+        app(TemplateGenerationService::class)->generate($tpl, $admin);
+
+        // Toujours 4 lundis : la séance déplacée reste l'occurrence de son jour.
+        $this->assertSame(4, Session::where('source_template_id', $tpl->id)->count());
+    }
+
     public function test_archive_and_reactivate(): void
     {
         $admin = User::factory()->admin()->create();

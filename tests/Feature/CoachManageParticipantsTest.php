@@ -10,6 +10,7 @@ use App\Models\Session;
 use App\Models\User;
 use App\Services\CoachRegistrationService;
 use App\Services\RegistrationService;
+use App\Support\SubjectContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
@@ -358,6 +359,40 @@ class CoachManageParticipantsTest extends TestCase
 
         Livewire::actingAs($pureCoach)->test(SessionShow::class, ['session' => $s->fresh()])
             ->assertDontSeeHtml('wire:click="unregisterCoach('.$pureCoach->id.')"');
+    }
+
+    // Revue de code — la bascule agit sur auth()->user(), jamais sur l'enfant consulté (§4.2).
+    // Elle avait été conditionnée à $canEnroll, calculé pour le SUJET : un parent coach+athlète
+    // parfaitement éligible perdait « Je participe » dès qu'il sélectionnait un enfant bloqué.
+    public function test_flip_stays_visible_when_a_blocked_child_is_the_subject(): void
+    {
+        $s = $this->makeSession();
+        $parent = $this->categorize(User::factory()->athleteCoach()->create());
+        $s->coaches()->attach([$parent->id, User::factory()->coach()->create()->id]);
+        // Enfant SANS catégorie : non inscriptible sur cette séance.
+        $child = User::factory()->create([
+            'guardian_id' => $parent->id, 'is_minor' => true, 'roles' => ['athlete'],
+        ]);
+
+        SubjectContext::set($parent, $child->id);
+
+        Livewire::actingAs($parent)->test(SessionShow::class, ['session' => $s])
+            ->assertSee('Je participe');
+    }
+
+    // Revue de code — $flipConfirm null + LAST_COACH_NEEDS_CONFIRM auto-vivifiait un tableau à une
+    // seule clé, et la vue déréférençait ['user_id'] : erreur 500 au rendu du dialog.
+    public function test_flip_with_confirm_but_no_open_dialog_does_not_crash(): void
+    {
+        $s = $this->makeSession();
+        $dual = $this->categorize(User::factory()->athleteCoach()->create());
+        $s->coaches()->attach($dual->id); // seul coach → LAST_COACH_NEEDS_CONFIRM
+
+        Livewire::actingAs($dual)->test(SessionShow::class, ['session' => $s])
+            ->call('flipToAthlete', $dual->id, true)   // confirm sans dialog ouvert
+            ->assertSet('flipConfirm.user_id', $dual->id)
+            ->assertSet('flipConfirm.last_coach', true)
+            ->assertOk(); // le rendu du dialog ne doit pas planter
     }
 
     // ── Coach-pur hors encadrement : motif dédié + CTA d'inscription coach (§2, §4.11.2) ──

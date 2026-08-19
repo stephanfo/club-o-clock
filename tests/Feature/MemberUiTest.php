@@ -76,7 +76,14 @@ class MemberUiTest extends TestCase
             ->assertSee('attendue mais non rattachée', escape: false)
             ->assertDontSee('Aucune catégorie active ne couvre cet âge', escape: false);
 
-        // 3. Vrai trou de barème : aucune catégorie active ne couvre cet âge → message d'origine.
+        // 3. Coach-pur AVEC dob : état parfaitement normal, surtout pas une incohérence à signaler.
+        $coachPur = User::factory()->create(['dob' => '1980-03-14', 'roles' => ['coach']]);
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $coachPur])
+            ->assertDontSee('attendue mais non rattachée', escape: false)
+            ->assertDontSee('Aucune catégorie active ne couvre cet âge', escape: false)
+            ->assertSee('Compte sans rôle athlète', escape: false);
+
+        // 4. Vrai trou de barème : aucune catégorie active ne couvre cet âge → message d'origine.
         $horsBareme = User::factory()->create(['dob' => '2020-01-01', 'roles' => ['athlete']]);
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $horsBareme])
             ->assertSee('Aucune catégorie active ne couvre cet âge', escape: false);
