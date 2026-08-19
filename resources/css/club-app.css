@@ -280,6 +280,13 @@ button.chip { font-family: var(--font-sans); }
 .seg-item:hover { color: var(--ink); }
 .seg-item.on { background: var(--paper); color: var(--ink); font-weight: 700; box-shadow: var(--shadow-xs); }
 
+/* Bascule de rôle sur la fiche séance (§4.11.5) : segmenté pleine largeur, où le segment actif
+   est un état (<span>) et non un bouton — seul « Je participe » est actionnable. */
+.seg-roles { display: flex; width: 100%; }
+.seg-roles .seg-item { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.seg-roles span.seg-item { cursor: default; }
+.seg-roles span.seg-item:hover { color: var(--ink); }
+
 /* =========================================================================
    FORM CONTROLS
    ========================================================================= */

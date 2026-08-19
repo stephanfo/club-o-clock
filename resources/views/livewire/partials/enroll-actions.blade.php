@@ -15,9 +15,14 @@
      && $session->kind === 'training' && ! $session->isCancelled())
     <div style="margin-bottom:12px;{{ ($variant ?? 'mobile') === 'mobile' ? 'flex:1' : '' }}">
         <div class="eyebrow" style="margin-bottom:6px">Mon inscription</div>
-        <div class="flex g6">
-            <button class="btn btn-dark f1" style="cursor:default" aria-pressed="true"><x-icon name="whistle" :size="14" /> J’encadre</button>
-            <button class="btn btn-ghost f1" wire:click="flipToAthlete({{ auth()->id() }})">Je participe</button>
+        {{-- Contrôle segmenté (seg/seg-item) plutôt que deux boutons : « J'encadre » est un ÉTAT,
+             pas une action — rendu en <span>, il ne peut plus être pris pour un bouton cliquable.
+             Seul « Je participe » est actionnable, et la forme segmentée dit « voici mon rôle,
+             voici l'autre » sans avoir à le lire dans le texte d'aide. --}}
+        <div class="seg seg-roles" role="group" aria-label="Mon rôle sur cette séance">
+            <span class="seg-item on" aria-current="true"><x-icon name="whistle" :size="14" /> J’encadre</span>
+            <button type="button" class="seg-item" wire:click="flipToAthlete({{ auth()->id() }})"
+                    wire:loading.attr="disabled" wire:target="flipToAthlete">Je participe</button>
         </div>
         <div class="meta" style="font-size:11.5px;margin-top:6px;line-height:1.4">Tu encadres cette séance. Participer comme athlète demande une confirmation (place &amp; quota) et te retire de l’encadrement — un seul rôle par séance.</div>
     </div>
