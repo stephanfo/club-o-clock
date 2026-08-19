@@ -1,0 +1,18 @@
+<?php
+
+use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Support\Facades\DB;
+
+require __DIR__.'/../../vendor/autoload.php';
+$app = require __DIR__.'/../../bootstrap/app.php';
+$app->make(Kernel::class)->bootstrap();
+
+// Garde-fou : requêtes brutes de vérification — local uniquement.
+if (! app()->environment('local')) {
+    fwrite(STDERR, "refus : harnais E2E réservé à APP_ENV=local\n");
+    exit(1);
+}
+$rows = DB::select($argv[1]);
+foreach ($rows as $row) {
+    echo implode(' | ', (array) $row), PHP_EOL;
+}

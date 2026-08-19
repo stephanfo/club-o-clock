@@ -46,3 +46,6 @@ Thumbs.db
 
 # Outillage local Claude Code (propre à la machine, jamais distribué)
 .claude/
+
+# Captures du harnais E2E (artefacts locaux)
+/tests/E2E/shots/
