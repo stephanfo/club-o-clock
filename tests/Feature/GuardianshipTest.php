@@ -197,16 +197,95 @@ class GuardianshipTest extends TestCase
             ->where('user_id', $parent->id)->count());
     }
 
-    public function test_sever_p1_ward_without_email_gets_push_only(): void
+    // Revue de code — la rupture d'un P1 laissait un User sans garant ET sans moyen de connexion
+    // (ni l'enfant, sans credential, ni le parent, détaché). Le refus vaut pour TOUS les acteurs,
+    // admin compris : canSever ne l'appliquait qu'à l'enfant lui-même.
+    public function test_sever_refused_on_p1_ward_without_own_account(): void
     {
         [$parent, $child] = $this->family(); // P1 : enfant sans email
         $admin = User::factory()->admin()->create();
 
-        app(GuardianshipService::class)->sever($child, $admin);
+        try {
+            app(GuardianshipService::class)->sever($child, $admin);
+            $this->fail('Attendu : refus de rompre la tutelle d\'un P1.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('compte propre', $e->getMessage());
+        }
 
-        // L'enfant sans adresse n'a que le push ; le garant a push + email.
-        $this->assertSame(['push'], NotificationOutbox::where('user_id', $child->id)
-            ->pluck('channel')->all());
-        $this->assertSame(2, NotificationOutbox::where('user_id', $parent->id)->count());
+        // Rien n'a bougé : lien intact, aucune trace, aucune notif émise.
+        $this->assertSame($parent->id, $child->fresh()->guardian_id);
+        $this->assertDatabaseMissing('audit_logs', [
+            'action' => 'guardianship_severed', 'target_id' => $child->id,
+        ]);
+        $this->assertSame(0, NotificationOutbox::where('type', 'guardianship_severed')->count());
+    }
+
+    // Contrôle positif apparié : une fois l'enfant autonomisé (P1 → P2), la rupture redevient
+    // possible — la garde vise la phase, pas le pupille. Sans ce test, le refus ci-dessus passerait
+    // même si sever() refusait TOUT.
+    public function test_sever_allowed_once_ward_has_own_account(): void
+    {
+        [, $child] = $this->family(); // P1
+        $admin = User::factory()->admin()->create();
+
+        app(GuardianshipService::class)->invite($child, $admin, 'ado@example.test'); // P1 → P2
+        app(GuardianshipService::class)->sever($child->fresh(), $admin);
+
+        $this->assertNull($child->fresh()->guardian_id);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'guardianship_severed', 'target_id' => $child->id,
+        ]);
+    }
+
+    // Contre-garde : un pupille DEVENU MAJEUR en gardant son garant n'a plus accès à invite()
+    // (qui exige un mineur). Étendre le refus à lui le rendrait définitivement captif — soit le
+    // défaut même qu'on corrige. Pour lui, la rupture est la sortie prévue.
+    public function test_sever_allowed_on_adult_ward_without_email(): void
+    {
+        [, $ward] = $this->family(); // sans email
+        $ward->forceFill(['is_minor' => false])->save();
+        $admin = User::factory()->admin()->create();
+
+        app(GuardianshipService::class)->sever($ward->fresh(), $admin);
+
+        $this->assertNull($ward->fresh()->guardian_id);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'guardianship_severed', 'target_id' => $ward->id,
+        ]);
+    }
+
+    // L'écran admin ne doit pas proposer un geste que le service refuse (motif récurrent de la
+    // branche). Le bouton disparaît en P1 et l'orientation vers l'autonomisation est visible.
+    public function test_member_show_hides_sever_button_for_p1_ward(): void
+    {
+        [, $p1] = $this->family();          // P1 : sans email
+        [, $p2] = $this->family('ado2@example.test'); // P2 : contrôle positif
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $p1])
+            ->assertDontSeeHtml('wire:click="$set(\'confirmingSever\', true)"')
+            ->assertSee('Inviter à activer son compte'); // le geste attendu en P1 est bien offert
+
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $p2])
+            ->assertSeeHtml('wire:click="$set(\'confirmingSever\', true)"');
+
+        // Majeur sans email : le bouton reste, c'est sa seule sortie.
+        $p1->forceFill(['is_minor' => false])->save();
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $p1->fresh()])
+            ->assertSeeHtml('wire:click="$set(\'confirmingSever\', true)"');
+    }
+
+    // Défense en profondeur : même en forçant l'appel Livewire (état périmé, second onglet),
+    // le refus remonte en flash plutôt qu'en erreur 500.
+    public function test_member_show_sever_on_p1_flashes_refusal(): void
+    {
+        [$parent, $p1] = $this->family();
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $p1])
+            ->call('severGuardianship')
+            ->assertSee('compte propre', escape: false);
+
+        $this->assertSame($parent->id, $p1->fresh()->guardian_id);
     }
 }

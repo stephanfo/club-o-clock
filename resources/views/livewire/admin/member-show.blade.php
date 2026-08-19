@@ -117,7 +117,13 @@
                                     <x-banner kind="info" style="margin-top:12px"><div>Compte autonome (<b>P2</b>) — l'enfant se connecte et s'inscrit lui-même ; le parent garant reçoit les notifs en parallèle et peut agir.</div></x-banner>
                                 @endif
 
-                                {{-- P2 → P3 : rupture du lien de tutelle (§4.2.2) --}}
+                                {{-- P2 → P3 : rupture du lien de tutelle (§4.2.2).
+                                     Masqué pour un P1 MINEUR : sever() le refuse (il resterait sans
+                                     garant ET sans accès) — le geste attendu est l'autonomisation,
+                                     offerte juste au-dessus. Un pupille majeur sans email garde le
+                                     bouton : invite() ne s'applique plus à lui, la rupture est sa
+                                     seule sortie (cf. le bandeau « majeur » ci-dessus). --}}
+                                @if ($u->email || ! $u->is_minor)
                                 <hr class="divider" style="margin:14px 0">
                                 @if ($confirmingSever)
                                     <x-banner kind="warn"><div>Rompre le lien de tutelle : le parent ne recevra plus les notifs, ne verra plus l'historique et ne pourra plus agir. Action manuelle, tracée. Confirmer ?</div></x-banner>
@@ -129,6 +135,7 @@
                                     <button type="button" class="btn btn-ghost btn-block" wire:click="$set('confirmingSever', true)">
                                         <x-icon name="x" :size="15" /> Rompre le lien de tutelle (P3)
                                     </button>
+                                @endif
                                 @endif
                             </div>
                         @elseif ($u->is_minor && ! $u->anonymized_at)
