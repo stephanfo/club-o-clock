@@ -29,16 +29,7 @@
     $canEnroll = $me?->can('enroll', [$session, $subj]) ?? false;
     // Motif de blocage (§4.4 suspension, §4.5 catégorie) pour afficher le bon message à l'athlète.
     // Ignoré si $canEnroll ou si déjà inscrit (le grandfathering rend canEnroll vrai de toute façon).
-    $enrollBlockReason = null;
-    if (! $canEnroll && $subj) {
-        // L'absence de rôle athlète (§2) prime : un coach-pur n'a pas de catégorie et n'en aura
-        // jamais — lui dire « contacte l'admin » l'enverrait vers une démarche sans issue.
-        $enrollBlockReason = ! $subj->hasRole('athlete')
-            ? 'not_athlete'
-            : ($subj->athlete_access_suspended
-                ? 'suspended'
-                : (! $subj->hasActiveCategory() ? 'no_category' : 'category_mismatch'));
-    }
+    $enrollBlockReason = ! $canEnroll && $subj ? $subj->enrollBlockReason() : null;
     // Éligibilité de MOI, indépendante du sujet consulté (§4.2) : la bascule de rôle agit sur
     // auth()->user(), jamais sur l'enfant sélectionné. Sans ça, un parent coach+athlète perdait
     // « Je participe » dès qu'il consultait un enfant non inscriptible.
@@ -46,15 +37,8 @@
         ? $canEnroll
         : ($me?->can('enroll', [$session, $me]) ?? false);
 
-    // Motif de blocage me concernant, pour le bloc encadrant (même logique que $enrollBlockReason).
-    $meBlockReason = null;
-    if (! $meCanEnroll && $me) {
-        $meBlockReason = ! $me->hasRole('athlete')
-            ? 'not_athlete'
-            : ($me->athlete_access_suspended
-                ? 'suspended'
-                : (! $me->hasActiveCategory() ? 'no_category' : 'category_mismatch'));
-    }
+    // Motif de blocage me concernant, pour le bloc encadrant (même logique, sujet = moi).
+    $meBlockReason = ! $meCanEnroll && $me ? $me->enrollBlockReason() : null;
 
     $myWlPos = null;
     if ($myStatus === 'waitlist') {

@@ -1,8 +1,13 @@
 {{-- Actions d'inscription athlète (§4.9, §4.10), partagées fiche mobile / desktop.
      Reçoit : $myStatus, $isFull, $canEnroll, $hasConflict, $confirmingQuota, $variant,
      et le sujet consulté ($subjName — parent → enfant, §4.2). --}}
-@php($block = ($variant ?? 'mobile') === 'desktop' ? 'btn-block' : 'f1')
+@php($isDesktop = ($variant ?? 'mobile') === 'desktop')
+@php($block = $isDesktop ? 'btn-block' : 'f1')
 @php($subjName = $subjName ?? null)
+{{-- Quitter l'encadrement : une seule définition pour les trois points d'appel (segment, coach-pur,
+     coach-athlète bloqué) — trois gardes rédigées séparément divergeaient au premier changement. --}}
+@php($canLeaveCoaching = ($canManageCoaches ?? false) && $session->kind === 'training'
+    && ! $session->isCancelled() && ! $session->hasStarted())
 
 {{-- Bascule de rôle pour SOI sur une séance training (§4.11.5 cas 1/2), porté de SelfRoleToggle.
      Visible quand je suis encadrant ici : « Je participe » déclenche le dialog de bascule.
@@ -17,11 +22,11 @@
      && $session->kind === 'training' && ! $session->isCancelled())
     {{-- Plus de marge basse : le bloc finit sur le segment, et la barre fixe mobile a déjà son
          propre padding — la marge s'y ajoutait et mangeait de la hauteur pour rien. --}}
-    <div style="{{ ($variant ?? 'mobile') === 'mobile' ? 'flex:1' : 'margin-bottom:12px' }}">
+    <div style="{{ ! $isDesktop ? 'flex:1' : 'margin-bottom:12px' }}">
         {{-- Titre en desktop seulement : la colonne enchaîne sur la section « Gestion » (son propre
              eyebrow), il sépare deux groupes. Dans la barre fixe mobile il n'y a rien à séparer —
              aucun autre état de cette barre n'est titré, et le segment se lit seul. --}}
-        @if (($variant ?? 'mobile') === 'desktop')
+        @if ($isDesktop)
             <div class="eyebrow" style="margin-bottom:6px">Mon inscription</div>
         @endif
         {{-- Contrôle segmenté (seg/seg-item) plutôt que deux boutons : « J'encadre » est un ÉTAT,
@@ -32,7 +37,10 @@
              l'énonce déjà avant toute action — le répéter en permanence coûtait quatre lignes sur
              la barre mobile, qui masquaient le bas de la page. --}}
         <div class="seg seg-roles" role="group" aria-label="Mon rôle sur cette séance">
-            <span class="seg-item on" aria-current="true"><x-icon name="whistle" :size="14" /> J’encadre</span>
+            {{-- État, pas action : un <span> ne peut pas être pris pour un bouton cliquable.
+                 aria-disabled plutôt qu'aria-current (réservé à la navigation) — le lecteur
+                 d'écran annonce un élément présent mais non actionnable. --}}
+            <span class="seg-item on" aria-disabled="true"><x-icon name="whistle" :size="14" /> J’encadre</span>
             <button type="button" class="seg-item" wire:click="flipToAthlete({{ auth()->id() }})"
                     wire:loading.attr="disabled" wire:target="flipToAthlete">Je participe</button>
         </div>
@@ -41,7 +49,7 @@
         {{-- canManageCoaches (coach OU admin) est le bon signal ici, contrairement au CTA
              d'inscription : la policy unregisterCoach demande exactement ça, et la personne est
              déjà encadrante — aucune garde de rôle ne peut la refuser. --}}
-        @if (($canManageCoaches ?? false) && ! $session->hasStarted() && ! $session->isCancelled())
+        @if ($canLeaveCoaching)
             <button wire:click="unregisterCoach({{ auth()->id() }})" wire:loading.attr="disabled" wire:target="unregisterCoach"
                     class="auth-link" style="margin-top:8px">Me retirer de l’encadrement</button>
         @endif
@@ -53,8 +61,6 @@
      fermée (pas le rôle athlète, ou inscription bloquée §4.4/§4.5), on affiche le motif plutôt
      que rien : masquer le bouton sans explication laisserait une zone muette (PRD §4.5 l.281). --}}
 @if ($iAmCoachHere ?? false)
-    @php($canLeaveCoaching = ($canManageCoaches ?? false) && $session->kind === 'training'
-        && ! $session->isCancelled() && ! $session->hasStarted())
     @if (! auth()->user()?->hasRole('athlete'))
         {{-- Coach-pur encadrant : pas d'inscription athlète possible, mais le retrait de
              l'encadrement lui est offert ici — symétrique de « M'inscrire comme coach ». Il n'était
@@ -62,11 +68,11 @@
              garde serveur restent ceux de unregisterCoach. --}}
         @if ($canLeaveCoaching)
             <button wire:click="unregisterCoach({{ auth()->id() }})" wire:loading.attr="disabled" wire:target="unregisterCoach"
-                    class="btn btn-ghost {{ ($variant ?? 'mobile') === 'desktop' ? 'btn-block' : 'f1' }}">
+                    class="btn btn-ghost {{ $block }}">
                 <x-icon name="user-minus" :size="15" /> Me retirer de l’encadrement
             </button>
         @else
-            <div class="meta {{ ($variant ?? 'mobile') === 'desktop' ? '' : 'f1' }}" style="font-size:var(--text-xs);align-self:center">Tu encadres cette séance.</div>
+            <div class="meta {{ $isDesktop ? '' : 'f1' }}" style="font-size:var(--text-xs);align-self:center">Tu encadres cette séance.</div>
         @endif
     @elseif (! ($meCanEnroll ?? false))
         {{-- Motif de MA situation (meCanEnroll/meBlockReason) : ce bloc explique pourquoi MA
@@ -74,8 +80,8 @@
         @include('livewire.partials.enroll-block-reason', ['enrollBlockReason' => $meBlockReason ?? null, 'subjName' => null])
         @if ($canLeaveCoaching)
             <button wire:click="unregisterCoach({{ auth()->id() }})" wire:loading.attr="disabled" wire:target="unregisterCoach"
-                    class="btn btn-ghost {{ ($variant ?? 'mobile') === 'desktop' ? 'btn-block' : 'f1' }}"
-                    @if (($variant ?? 'mobile') === 'desktop') style="margin-top:var(--space-2)" @endif>
+                    class="btn btn-ghost {{ $block }}"
+                    @if ($isDesktop) style="margin-top:var(--space-2)" @endif>
                 <x-icon name="user-minus" :size="15" /> Me retirer de l’encadrement
             </button>
         @endif

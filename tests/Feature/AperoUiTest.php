@@ -56,7 +56,10 @@ class AperoUiTest extends TestCase
         // Un coach modérateur : plus de « Retirer ce flag ».
         $coach = User::factory()->coach()->create();
         Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s->fresh()])
-            ->assertDontSeeHtml('wire:click="unflagApero('.$u->id.')"');
+            ->assertDontSeeHtml('wire:click="unflagApero('.$u->id.')"')
+            // Contrôle positif : le flag est toujours AFFICHÉ (c'est le bouton de retrait qui
+            // disparaît, pas l'information). Sans ça, un rendu vide ferait passer le test.
+            ->assertSee($u->first_name, escape: false);
     }
 
     // Contrôle positif appairé : avant le début, les deux voies de retrait restent offertes.

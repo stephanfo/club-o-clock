@@ -202,6 +202,29 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Pourquoi l'inscription de cet utilisateur est-elle bloquée ? (§4.4 suspension, §4.5 catégorie)
+     *
+     * Ne décide PAS du blocage — c'est la policy `enroll` qui tranche. Cette méthode qualifie un
+     * refus déjà constaté, pour afficher le bon message plutôt qu'une zone muette (PRD §4.5 l.281).
+     * L'absence de rôle athlète (§2) prime : un coach-pur n'a pas de catégorie et n'en aura jamais,
+     * lui dire « contacte l'admin » l'enverrait vers une démarche sans issue.
+     *
+     * @return 'not_athlete'|'suspended'|'no_category'|'category_mismatch'
+     */
+    public function enrollBlockReason(): string
+    {
+        if (! $this->hasRole('athlete')) {
+            return 'not_athlete';
+        }
+
+        if ($this->athlete_access_suspended) {
+            return 'suspended';
+        }
+
+        return $this->hasActiveCategory() ? 'category_mismatch' : 'no_category';
+    }
+
+    /**
      * Séances où cet utilisateur est inscrit comme encadrant (coaches[], §4.11).
      *
      * @return BelongsToMany<Session, $this>

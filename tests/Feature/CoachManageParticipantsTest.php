@@ -242,7 +242,9 @@ class CoachManageParticipantsTest extends TestCase
         $s->coaches()->attach($pureCoach->id);
 
         Livewire::actingAs($pureCoach)->test(SessionShow::class, ['session' => $s])
-            ->assertDontSeeHtml('flipToAthlete('.$pureCoach->id.')');
+            ->assertDontSeeHtml('flipToAthlete('.$pureCoach->id.')')
+            // Contrôle positif : sans lui, ce refus passerait aussi sur une page vide.
+            ->assertSee('Me retirer de l’encadrement', escape: false);
     }
 
     // Contrôle positif appairé du test précédent : le cas nominal (rôles cumulés) doit, lui,
@@ -358,7 +360,9 @@ class CoachManageParticipantsTest extends TestCase
         $s->forceFill(['start_at' => Carbon::now()->subHour()])->save();
 
         Livewire::actingAs($pureCoach)->test(SessionShow::class, ['session' => $s->fresh()])
-            ->assertDontSeeHtml('wire:click="unregisterCoach('.$pureCoach->id.')"');
+            ->assertDontSeeHtml('wire:click="unregisterCoach('.$pureCoach->id.')"')
+            // Contrôle positif : la fiche a bien rendu, et c'est le motif « commencée » qui s'affiche.
+            ->assertSee('Séance commencée — inscriptions closes.', escape: false);
     }
 
     // Revue de code — la bascule agit sur auth()->user(), jamais sur l'enfant consulté (§4.2).
@@ -419,7 +423,11 @@ class CoachManageParticipantsTest extends TestCase
 
         Livewire::actingAs($pureCoach)->test(SessionShow::class, ['session' => $s->fresh()])
             ->assertDontSeeHtml('wire:click="registerCoachSelf"')
-            ->assertDontSee('Aucune catégorie attribuée à ton compte', escape: false);
+            ->assertDontSee('Aucune catégorie attribuée à ton compte', escape: false)
+            // Contrôle positif : sans lui, ces deux refus passeraient aussi sur une page vide
+            // ou une erreur de rendu. C'est le motif « séance commencée » qui prend la main,
+            // celui de l'inscription étant fermé pour tout le monde à ce stade.
+            ->assertSee('Séance commencée — inscriptions closes.', escape: false);
     }
 
     // ── Coach-athlète SANS catégorie active (§4.5) : la bascule aboutit à un register(), elle
@@ -439,7 +447,10 @@ class CoachManageParticipantsTest extends TestCase
 
         Livewire::actingAs($dual)->test(SessionShow::class, ['session' => $s])
             ->assertDontSee('Je participe')
-            ->assertDontSee('Mon inscription');
+            ->assertDontSee('Mon inscription')
+            // Contrôle positif : le motif §4.5 remplace le bouton — on ne laisse pas un vide,
+            // et le test ne peut plus passer sur une page non rendue.
+            ->assertSee('Aucune catégorie attribuée à ton compte', escape: false);
     }
 
     // Masquer le bouton ne suffit pas : sans message on remplace un bouton trompeur par un
@@ -528,7 +539,10 @@ class CoachManageParticipantsTest extends TestCase
         $s->forceFill(['start_at' => Carbon::now()->subHour()])->save();
 
         Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s->fresh()])
-            ->assertDontSeeHtml('wire:click="removeAthlete('.$athlete->id.')"');
+            ->assertDontSeeHtml('wire:click="removeAthlete('.$athlete->id.')"')
+            // Contrôle positif : l'inscrit figure bien dans la liste — c'est le BOUTON qui manque,
+            // pas la page. Sans ça, le test passerait sur un rendu vide.
+            ->assertSee($athlete->first_name, escape: false);
     }
 
     // Contrôle positif appairé : sur une séance à venir, la corbeille reste offerte.
@@ -603,5 +617,34 @@ class CoachManageParticipantsTest extends TestCase
         app(RegistrationService::class)->register($s, $athlete, $athlete);
 
         $this->assertSame(0, NotificationOutbox::where('type', 'enrolled_by_coach')->count());
+    }
+    // ── enrollBlockReason() : les 4 motifs, la règle vit dans le modèle (§4.4/§4.5) ──
+
+    // La priorité compte : un coach-pur n'a NI rôle athlète NI catégorie. Si l'ordre des tests
+    // s'inversait, il recevrait « contacte l'admin » — une démarche sans issue (§2).
+    public function test_enroll_block_reason_prioritises_missing_athlete_role(): void
+    {
+        $pureCoach = User::factory()->coach()->create();
+
+        $this->assertFalse($pureCoach->hasActiveCategory()); // les deux causes sont réunies
+        $this->assertSame('not_athlete', $pureCoach->enrollBlockReason());
+    }
+
+    public function test_enroll_block_reason_flags_suspension_before_category(): void
+    {
+        $suspended = $this->categorize(User::factory()->create(['athlete_access_suspended' => true]));
+
+        $this->assertTrue($suspended->hasActiveCategory()); // la catégorie est OK, c'est la suspension
+        $this->assertSame('suspended', $suspended->enrollBlockReason());
+    }
+
+    public function test_enroll_block_reason_distinguishes_no_category_from_mismatch(): void
+    {
+        $sansCategorie = User::factory()->create();
+        $this->assertSame('no_category', $sansCategorie->fresh()->enrollBlockReason());
+
+        // Catégorie rattachée mais séance non ciblée → mismatch, message différent.
+        $avecCategorie = $this->categorize(User::factory()->create());
+        $this->assertSame('category_mismatch', $avecCategorie->enrollBlockReason());
     }
 }
