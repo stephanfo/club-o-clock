@@ -234,6 +234,16 @@
                                 <label class="field-label">Principale · dérivée de l'âge</label>
                                 @if ($primary)
                                     <div class="flex ac g8"><span class="chip chip-ink">{{ $primary->label }}</span><span class="chip chip-sm chip-line flex ac g4"><x-icon name="lock" :size="11" /> auto</span></div>
+                                @elseif ($u->dob === null)
+                                    {{-- Sans date de naissance, la dérivation §4.5 ne peut rien produire :
+                                         parler d'âge ici serait trompeur (cas des comptes coach-pur). --}}
+                                    <span class="meta">Aucune date de naissance saisie — catégorie non déterminable.</span>
+                                @elseif ($derivedCat)
+                                    {{-- Incohérence : l'âge est couvert par une catégorie active, mais aucun
+                                         rattachement principal n'existe. Le pivot est périmé (dob modifiée hors
+                                         MemberService, ou rattachement jamais fait) — à signaler, pas à confondre
+                                         avec un trou de barème. Réparable en réenregistrant la date de naissance. --}}
+                                    <span class="meta" style="color:var(--warning-text)">Catégorie « {{ $derivedCat->label }} » attendue mais non rattachée — réenregistre la date de naissance pour corriger.</span>
                                 @else
                                     <span class="meta">Aucune catégorie active ne couvre cet âge — compte sans catégorie (contacte le catalogue).</span>
                                 @endif

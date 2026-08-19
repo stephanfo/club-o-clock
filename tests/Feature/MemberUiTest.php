@@ -56,6 +56,32 @@ class MemberUiTest extends TestCase
         $this->assertContains('coach', $member->fresh()->roles);
     }
 
+    // C3 — « Aucune catégorie active ne couvre cet âge » s'affichait dès que la catégorie principale
+    // était absente, y compris sans date de naissance (le libellé parle d'âge) et sur un pivot
+    // périmé. Trois causes distinctes, trois messages.
+    public function test_show_distinguishes_the_three_causes_of_a_missing_category(): void
+    {
+        $admin = User::factory()->admin()->create();
+        Category::create(['label' => 'Master', 'age_min' => 40, 'age_max' => 120, 'sort_order' => 1]);
+
+        // 1. Pas de date de naissance : ne rien dire de l'âge.
+        $sansDob = User::factory()->create(['dob' => null, 'roles' => ['coach']]);
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $sansDob])
+            ->assertSee('Aucune date de naissance saisie', escape: false)
+            ->assertDontSee('Aucune catégorie active ne couvre cet âge', escape: false);
+
+        // 2. Pivot périmé : l'âge EST couvert, mais rien n'est rattaché (cas mathieu@demo.club).
+        $pivotPerime = User::factory()->create(['dob' => '1986-03-14', 'roles' => ['athlete']]);
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $pivotPerime])
+            ->assertSee('attendue mais non rattachée', escape: false)
+            ->assertDontSee('Aucune catégorie active ne couvre cet âge', escape: false);
+
+        // 3. Vrai trou de barème : aucune catégorie active ne couvre cet âge → message d'origine.
+        $horsBareme = User::factory()->create(['dob' => '2020-01-01', 'roles' => ['athlete']]);
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $horsBareme])
+            ->assertSee('Aucune catégorie active ne couvre cet âge', escape: false);
+    }
+
     public function test_show_edit_dob_recomputes_primary_category_and_keeps_surclassement(): void
     {
         $admin = User::factory()->admin()->create();
