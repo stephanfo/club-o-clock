@@ -29,6 +29,20 @@ composer check
 
 Une correction de bug apporte **un test qui échouait avant**. Une fonctionnalité apporte les tests de son comportement, **y compris les refus** (qui n'a *pas* le droit de faire quoi).
 
+### Tests navigateur (E2E) — hors `composer check`
+
+`composer check` ne voit ni le rendu ni les clics. Un harnais **Playwright** ([tests/E2E/](tests/E2E/), conventions dans son [README](tests/E2E/README.md)) rejoue les parcours dans un vrai navigateur : il clique, attend Livewire, vérifie l'état **en base** et prend des captures aux deux formats.
+
+```bash
+php artisan serve                             # prérequis : serveur + jeu de démo seedé
+node tests/E2E/run.mjs                        # 16 scénarios non destructifs
+node tests/E2E/destructif.mjs --oui-je-sais   # RGPD, tutelle, bascule de saison — reconstruit la base
+```
+
+**Ne pas l'ajouter à `composer check`** (serveur + base + navigateur requis : la porte deviendrait fragile). La référence de non-régression reste PHPUnit.
+
+Quand une modification touche l'UI, **lancer le harnais et regarder les captures** — c'est le seul moyen de voir ce qu'un test textuel ne montre pas (bloc vide, contraste, débordement). Deux règles d'écriture : apparier toute assertion négative à un **contrôle positif** (« X est absent » ne vaut rien sur une liste vide), et **restaurer l'état** modifié.
+
 ## Fidélité au design system (NON NÉGOCIABLE)
 
 Le design system existe : tout écran doit lui être fidèle.

@@ -7,6 +7,27 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ## [Non publié]
 
+### Ajouté
+
+- **Tests navigateur (E2E)** : harnais Playwright rejouant 19 scénarios dans un vrai navigateur —
+  clics, attente des mises à jour Livewire, vérification en base et captures aux formats mobile et
+  desktop. Couvre les gardes d'inscription, la bascule de rôle coach/athlète, la tutelle parentale,
+  le cloisonnement admin, et — derrière un drapeau explicite — les parcours destructifs (RGPD,
+  rupture de tutelle, bascule de saison). Volontairement **hors de `composer check`** : la porte de
+  qualité reste PHPUnit. Voir [`tests/E2E/README.md`](tests/E2E/README.md).
+
+### Corrigé
+
+- Fiche séance : le bloc « Je participe » d'un coach-athlète ignorait les gardes de catégorie et de
+  suspension, laissant une action que le serveur refusait systématiquement. Le motif du refus est
+  désormais affiché à la place du bouton, sur mobile comme sur desktop.
+- Fiche séance : un parent consultant une séance pour son enfant perdait ses propres actions
+  d'inscription.
+- Fiche adhérent : un coach sans date de naissance déclenchait un avertissement de catégorie
+  trompeur.
+- Modèles de séances : une séance déplacée par le bureau était recréée à son horaire d'origine lors
+  d'une régénération.
+
 ## [1.0.0] — 2026-08-17
 
 Première version publique. Application complète de gestion du planning d'entraînement pour club
