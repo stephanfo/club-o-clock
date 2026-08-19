@@ -270,6 +270,63 @@ class CoachManageParticipantsTest extends TestCase
             ->assertSet('flipConfirm', null);
     }
 
+    // ── Retrait de l'encadrement depuis la barre d'action (§4.11.2) ──
+
+    // Le retrait n'était atteignable que par l'icône de l'onglet Encadrement : asymétrique, alors
+    // que l'inscription coach, elle, est offerte dans la barre d'action.
+    public function test_coaching_member_can_leave_from_the_action_bar(): void
+    {
+        $s = $this->makeSession();
+        $pureCoach = User::factory()->coach()->create();
+        $s->coaches()->attach([$pureCoach->id, User::factory()->coach()->create()->id]);
+
+        Livewire::actingAs($pureCoach)->test(SessionShow::class, ['session' => $s])
+            ->assertSeeHtml('wire:click="unregisterCoach('.$pureCoach->id.')"')
+            ->call('unregisterCoach', $pureCoach->id);
+
+        $this->assertFalse($s->coaches()->whereKey($pureCoach->id)->exists());
+    }
+
+    // Contrôle positif appairé : une fois la séance commencée, l'encadrement est figé
+    // (CoachRegistrationService::guardOpen) — le bouton ne doit plus être offert.
+    public function test_leave_coaching_button_hidden_once_session_started(): void
+    {
+        $s = $this->makeSession();
+        $pureCoach = User::factory()->coach()->create();
+        $s->coaches()->attach([$pureCoach->id, User::factory()->coach()->create()->id]);
+        $s->forceFill(['start_at' => Carbon::now()->subHour()])->save();
+
+        Livewire::actingAs($pureCoach)->test(SessionShow::class, ['session' => $s->fresh()])
+            ->assertDontSeeHtml('wire:click="unregisterCoach('.$pureCoach->id.')"');
+    }
+
+    // ── Coach-pur hors encadrement : motif dédié + CTA d'inscription coach (§2, §4.11.2) ──
+
+    // Un coach-pur n'a pas de catégorie et n'en aura jamais : lui afficher « Aucune catégorie
+    // attribuée — contacte l'admin » l'envoyait vers une démarche sans issue.
+    public function test_pure_coach_not_coaching_sees_coach_cta_not_category_message(): void
+    {
+        $s = $this->makeSession();
+        $pureCoach = User::factory()->coach()->create(); // n'encadre PAS cette séance
+
+        Livewire::actingAs($pureCoach)->test(SessionShow::class, ['session' => $s])
+            ->assertDontSee('Aucune catégorie attribuée à ton compte', escape: false)
+            ->assertSeeHtml('wire:click="registerCoachSelf"');
+    }
+
+    // Le CTA suit les mêmes gardes que « M'inscrire comme coach » de l'onglet Encadrement :
+    // sur une séance commencée, l'inscription coach est fermée — on retombe sur le message.
+    public function test_pure_coach_sees_message_when_coach_registration_is_closed(): void
+    {
+        $s = $this->makeSession();
+        $s->forceFill(['start_at' => Carbon::now()->subHour()])->save();
+        $pureCoach = User::factory()->coach()->create();
+
+        Livewire::actingAs($pureCoach)->test(SessionShow::class, ['session' => $s->fresh()])
+            ->assertDontSeeHtml('wire:click="registerCoachSelf"')
+            ->assertDontSee('Aucune catégorie attribuée à ton compte', escape: false);
+    }
+
     // ── Coach-athlète SANS catégorie active (§4.5) : la bascule aboutit à un register(), elle
     // hérite donc des mêmes gardes que l'inscription directe. Cas réel : catégorie archivée, ou
     // dob hors barème — le PRD §4.5 l.281 impose un message explicite, pas un bouton mort.

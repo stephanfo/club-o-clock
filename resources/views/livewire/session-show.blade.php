@@ -31,9 +31,13 @@
     // Ignoré si $canEnroll ou si déjà inscrit (le grandfathering rend canEnroll vrai de toute façon).
     $enrollBlockReason = null;
     if (! $canEnroll && $subj) {
-        $enrollBlockReason = $subj->athlete_access_suspended
-            ? 'suspended'
-            : (! $subj->hasActiveCategory() ? 'no_category' : 'category_mismatch');
+        // L'absence de rôle athlète (§2) prime : un coach-pur n'a pas de catégorie et n'en aura
+        // jamais — lui dire « contacte l'admin » l'enverrait vers une démarche sans issue.
+        $enrollBlockReason = ! $subj->hasRole('athlete')
+            ? 'not_athlete'
+            : ($subj->athlete_access_suspended
+                ? 'suspended'
+                : (! $subj->hasActiveCategory() ? 'no_category' : 'category_mismatch'));
     }
     $myWlPos = null;
     if ($myStatus === 'waitlist') {

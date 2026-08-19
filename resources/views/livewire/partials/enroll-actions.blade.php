@@ -34,6 +34,12 @@
             <button type="button" class="seg-item" wire:click="flipToAthlete({{ auth()->id() }})"
                     wire:loading.attr="disabled" wire:target="flipToAthlete">Je participe</button>
         </div>
+        {{-- Quitter la séance sans y participer : le segment ne couvre que le choix ENTRE les deux
+             rôles, pas le retrait pur. Discret (lien) pour ne pas concurrencer la bascule. --}}
+        @if (($canManageCoaches ?? false) && ! $session->hasStarted())
+            <button wire:click="unregisterCoach({{ auth()->id() }})" wire:loading.attr="disabled" wire:target="unregisterCoach"
+                    class="auth-link" style="margin-top:8px">Me retirer de l’encadrement</button>
+        @endif
     </div>
 @endif
 
@@ -42,10 +48,30 @@
      fermée (pas le rôle athlète, ou inscription bloquée §4.4/§4.5), on affiche le motif plutôt
      que rien : masquer le bouton sans explication laisserait une zone muette (PRD §4.5 l.281). --}}
 @if ($iAmCoachHere ?? false)
+    @php($canLeaveCoaching = ($canManageCoaches ?? false) && $session->kind === 'training'
+        && ! $session->isCancelled() && ! $session->hasStarted())
     @if (! auth()->user()?->hasRole('athlete'))
-        <div class="meta {{ ($variant ?? 'mobile') === 'desktop' ? '' : 'f1' }}" style="font-size:var(--text-xs);align-self:center">Tu encadres cette séance.</div>
+        {{-- Coach-pur encadrant : pas d'inscription athlète possible, mais le retrait de
+             l'encadrement lui est offert ici — symétrique de « M'inscrire comme coach ». Il n'était
+             atteignable que par l'icône de l'onglet Encadrement. Le dialog « dernier coach » et la
+             garde serveur restent ceux de unregisterCoach. --}}
+        @if ($canLeaveCoaching)
+            <button wire:click="unregisterCoach({{ auth()->id() }})" wire:loading.attr="disabled" wire:target="unregisterCoach"
+                    class="btn btn-ghost {{ ($variant ?? 'mobile') === 'desktop' ? 'btn-block' : 'f1' }}">
+                <x-icon name="user-minus" :size="15" /> Me retirer de l’encadrement
+            </button>
+        @else
+            <div class="meta {{ ($variant ?? 'mobile') === 'desktop' ? '' : 'f1' }}" style="font-size:var(--text-xs);align-self:center">Tu encadres cette séance.</div>
+        @endif
     @elseif (! ($canEnroll ?? false))
         @include('livewire.partials.enroll-block-reason')
+        @if ($canLeaveCoaching)
+            <button wire:click="unregisterCoach({{ auth()->id() }})" wire:loading.attr="disabled" wire:target="unregisterCoach"
+                    class="btn btn-ghost {{ ($variant ?? 'mobile') === 'desktop' ? 'btn-block' : 'f1' }}"
+                    @if (($variant ?? 'mobile') === 'desktop') style="margin-top:var(--space-2)" @endif>
+                <x-icon name="user-minus" :size="15" /> Me retirer de l’encadrement
+            </button>
+        @endif
     @endif
 @elseif ($myStatus === 'participating')
     <button wire:key="enr-act-unenroll-{{ $session->id }}" wire:click="unenroll" wire:loading.attr="disabled" wire:target="unenroll"
