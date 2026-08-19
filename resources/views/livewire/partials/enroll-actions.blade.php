@@ -16,7 +16,12 @@
     {{-- Plus de marge basse : le bloc finit sur le segment, et la barre fixe mobile a déjà son
          propre padding — la marge s'y ajoutait et mangeait de la hauteur pour rien. --}}
     <div style="{{ ($variant ?? 'mobile') === 'mobile' ? 'flex:1' : 'margin-bottom:12px' }}">
-        <div class="eyebrow" style="margin-bottom:6px">Mon inscription</div>
+        {{-- Titre en desktop seulement : la colonne enchaîne sur la section « Gestion » (son propre
+             eyebrow), il sépare deux groupes. Dans la barre fixe mobile il n'y a rien à séparer —
+             aucun autre état de cette barre n'est titré, et le segment se lit seul. --}}
+        @if (($variant ?? 'mobile') === 'desktop')
+            <div class="eyebrow" style="margin-bottom:6px">Mon inscription</div>
+        @endif
         {{-- Contrôle segmenté (seg/seg-item) plutôt que deux boutons : « J'encadre » est un ÉTAT,
              pas une action — rendu en <span>, il ne peut plus être pris pour un bouton cliquable.
              Seul « Je participe » est actionnable, et la forme segmentée dit « voici mon rôle,
