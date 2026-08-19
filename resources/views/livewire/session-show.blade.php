@@ -232,11 +232,9 @@
                 @endcan
             @elseif ($started)
                 <div class="meta f1" style="font-size:var(--text-xs);align-self:center">Séance commencée — inscriptions closes.</div>
-            @elseif ($iAmCoachHere && ! auth()->user()?->hasRole('athlete'))
-                {{-- Coach-pur encadrant : aucune action d'inscription possible (§2). Sans ce repli la
-                     barre fixe resterait affichée vide (bordure + padding). --}}
-                <div class="meta f1" style="font-size:var(--text-xs);align-self:center">Tu encadres cette séance.</div>
             @else
+                {{-- Le partial porte lui-même le repli encadrant (coach-pur, ou inscription bloquée
+                     §4.4/§4.5) : sans texte, cette barre `position: fixed` s'afficherait vide. --}}
                 @include('livewire.partials.enroll-actions', ['variant' => 'mobile'])
             @endif
         </div>

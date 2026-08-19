@@ -105,6 +105,18 @@ trait ManagesCoaching
             return;
         }
 
+        // §4.5 : la bascule se termine par un register(), qui refuse une cible sans catégorie active
+        // couvrant la séance. Refus AVANT le dialog, pour la même raison.
+        // Réservé à l'AUTO-bascule : RegistrationService épargne le staff de cette garde ($byStaff,
+        // §4.9.7) — un coach/admin bascule qui il veut. Bloquer ici casserait le cas 3 (tiers).
+        if ($target->id === auth()->id()
+            && ! ($target->hasActiveCategory() && $target->isTargetedBy($this->session))) {
+            session()->flash('warn', $this->translateRegError(RegistrationService::CATEGORY_MISMATCH));
+            $this->flipConfirm = null;
+
+            return;
+        }
+
         if (! $confirm) {
             $this->flipConfirm = [
                 'dir' => 'to_athlete',

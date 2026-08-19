@@ -270,6 +270,86 @@ class CoachManageParticipantsTest extends TestCase
             ->assertSet('flipConfirm', null);
     }
 
+    // ── Coach-athlète SANS catégorie active (§4.5) : la bascule aboutit à un register(), elle
+    // hérite donc des mêmes gardes que l'inscription directe. Cas réel : catégorie archivée, ou
+    // dob hors barème — le PRD §4.5 l.281 impose un message explicite, pas un bouton mort.
+
+    // Reproduction du bug : le bloc « Je participe » ignorait $canEnroll.
+    // On cible le bouton SELF par son libellé : l'icône de bascule tierce (onglet Encadrement)
+    // rend le même wire:click et doit, elle, rester offerte au staff (cf. test $byStaff plus bas).
+    public function test_self_participate_button_hidden_without_active_category(): void
+    {
+        $s = $this->makeSession();
+        $dual = User::factory()->athleteCoach()->create(); // volontairement PAS categorize()
+        $s->coaches()->attach($dual->id);
+
+        $this->assertFalse($dual->hasActiveCategory()); // pré-requis du scénario
+
+        Livewire::actingAs($dual)->test(SessionShow::class, ['session' => $s])
+            ->assertDontSee('Je participe')
+            ->assertDontSee('Mon inscription');
+    }
+
+    // Masquer le bouton ne suffit pas : sans message on remplace un bouton trompeur par un
+    // silence. Le motif §4.5 doit s'afficher (même libellé que la voie athlète normale).
+    public function test_self_participate_message_shown_without_active_category(): void
+    {
+        $s = $this->makeSession();
+        $dual = User::factory()->athleteCoach()->create();
+        $s->coaches()->attach($dual->id);
+
+        Livewire::actingAs($dual)->test(SessionShow::class, ['session' => $s])
+            ->assertSee('Aucune catégorie attribuée à ton compte', escape: false);
+    }
+
+    // Contrôle positif appairé : avec une catégorie couvrante, la bascule reste offerte.
+    public function test_self_participate_button_visible_with_active_category(): void
+    {
+        $s = $this->makeSession();
+        $dual = $this->categorize(User::factory()->athleteCoach()->create());
+        $s->coaches()->attach($dual->id);
+
+        Livewire::actingAs($dual)->test(SessionShow::class, ['session' => $s])
+            ->assertSee('Je participe')
+            ->assertSeeHtml('flipToAthlete('.$dual->id.')');
+    }
+
+    // Défense en profondeur : la modale ne s'ouvre pas pour une auto-bascule qui échouera.
+    public function test_flip_to_athlete_does_not_open_dialog_without_category(): void
+    {
+        $s = $this->makeSession();
+        $dual = User::factory()->athleteCoach()->create();
+        $other = User::factory()->coach()->create();
+        $s->coaches()->attach([$dual->id, $other->id]);
+
+        Livewire::actingAs($dual)->test(SessionShow::class, ['session' => $s])
+            ->call('flipToAthlete', $dual->id)
+            ->assertSet('flipConfirm', null)
+            ->assertSee('Inscription impossible', escape: false);
+    }
+
+    // Garde-fou de non-régression : RegistrationService épargne le staff de la garde catégorielle
+    // ($byStaff, §4.9.7). La garde UI ne doit donc PAS bloquer la bascule d'un tiers par un admin.
+    public function test_staff_can_still_flip_a_third_party_without_category(): void
+    {
+        $s = $this->makeSession();
+        $admin = User::factory()->admin()->create();
+        $dual = User::factory()->athleteCoach()->create(); // sans catégorie
+        $other = User::factory()->coach()->create();
+        $s->coaches()->attach([$dual->id, $other->id]);
+
+        Livewire::actingAs($admin)->test(SessionShow::class, ['session' => $s])
+            ->call('flipToAthlete', $dual->id)
+            ->assertSet('flipConfirm.dir', 'to_athlete')   // le dialog s'ouvre bien
+            ->call('flipToAthlete', $dual->id, true)
+            ->assertSet('flipConfirm', null);
+
+        // La bascule staff a abouti malgré l'absence de catégorie.
+        $this->assertFalse($s->coaches()->whereKey($dual->id)->exists());
+        $this->assertSame('participating', $dual->registrations()
+            ->where('session_id', $s->id)->first()->status);
+    }
+
     public function test_flip_button_hidden_for_pure_coach(): void
     {
         $s = $this->makeSession();
