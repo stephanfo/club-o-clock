@@ -1,11 +1,20 @@
-import { launch, session, fiche, Scenario, MOBILE, DESKTOP } from './lib.mjs';
+import { launch, session, fiche, sql, seance, Scenario, MOBILE, DESKTOP } from './lib.mjs';
 
 const browser = await launch();
 const s = new Scenario('S6 · Point de rupture 768px — mobile vs desktop');
 
+// Cible dérivée : le segment de rôle (enroll-actions.blade.php) n'apparaît que si Mathieu ENCADRE
+// la séance, qu'elle est future, non annulée, de type training, et qu'elle cible une de ses
+// catégories actives. Un id en dur rendait S6 rouge dès que la séance visée avait commencé.
+const mathieu = sql("SELECT id FROM users WHERE email='mathieu@demo.club'");
+const cible = seance(`kind='training' AND cancelled_at IS NULL AND start_at > NOW()
+    AND EXISTS (SELECT 1 FROM session_coach sc WHERE sc.session_id=sessions.id AND sc.user_id=${mathieu})
+    AND EXISTS (SELECT 1 FROM session_category sc2 JOIN user_category uc ON uc.category_id=sc2.category_id
+                WHERE sc2.session_id=sessions.id AND uc.user_id=${mathieu})`);
+
 for (const [nom, vp] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   const { ctx, page } = await session(browser, 'mathieu@demo.club', vp);
-  await fiche(page, 8);
+  await fiche(page, cible);
 
   const mVis = await page.locator('.fiche-mobile').first().isVisible().catch(() => false);
   const dVis = await page.locator('.fiche-desktop').first().isVisible().catch(() => false);

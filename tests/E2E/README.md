@@ -79,8 +79,38 @@ des requêtes brutes. Les deux **refusent de s'exécuter si `APP_ENV != local`**
 | D2 | Tutelle | rupture P2 + `AuditLog guardianship_severed` | §6 |
 | D3 | Bascule de saison | double validation, suspension de masse, réactivation, nouvelle année | §8.8 |
 
+## Cibles dérivées, jamais d'id en dur
+
+Les séances du jeu de démo sont placées **relativement à `now()`**, mais leur position par rapport à
+l'instant du run dépend du **jour et de l'heure** : la natation du mercredi 18h15 est future si l'on
+seede un lundi, déjà commencée si l'on lance la suite le mercredi soir — **y compris juste après un
+`db:seed`**. Les ids, eux, dépendent de l'ordre d'insertion.
+
+Coder `fiche(page, 8)` rendait donc un scénario vert ou rouge selon le moment du run, et pire :
+S10 pointait une séance qui n'était plus annulée, et passait quand même sur un faux positif.
+
+**Règle du harnais** : une séance se sélectionne par ses **propriétés**, via `seance(where)` ou
+`seanceFuture(where)` de [`lib.mjs`](lib.mjs) — « la prochaine séance annulée », « une séance saturée
+que Noah peut rejoindre », « une séance dont la file quota est non vide ». Le helper **lève** si
+aucune ne convient, ce qui transforme une précondition disparue en erreur explicite plutôt qu'en
+assertion trompeuse. Il en va de même pour les utilisateurs : `SELECT id FROM users WHERE email=…`,
+jamais `user_id=5`.
+
+## État de la base
+
 Les scénarios **restaurent l'état** qu'ils modifient (S1 remet Mathieu encadrant, S8 restaure la
-waitlist de Marie, S17 remet Camille en file quota et purge l'`AuditLog` qu'il a produit).
+waitlist de Marie, S17 remet le promu en file quota et purge l'`AuditLog` qu'il a produit).
+
+> **Une interruption casse la restauration.** Si un scénario plante (timeout Playwright, précondition
+> absente), le code de remise en état qui suit ne s'exécute pas et la base garde l'état modifié — le
+> run suivant part alors d'un état faussé. En cas de doute, repartir d'une base propre :
+>
+> ```bash
+> php artisan migrate:fresh --seed --seeder=CatalogSeeder && php artisan db:seed --class=DemoSeeder
+> ```
+>
+> (~15 s). Ne **pas** faire un simple `db:seed` sur une base existante : `DemoSeeder` est additif sur
+> les séances et les dupliquerait.
 
 > **Mécanismes A et B non automatisés en E2E, délibérément.** Ce sont des effets de bord serveur
 > (promotion automatique sur place libérée, libération du propre quota) : ils ne se déclenchent par

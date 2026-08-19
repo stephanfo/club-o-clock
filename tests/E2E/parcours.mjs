@@ -1,6 +1,6 @@
 // Scénarios complémentaires — parcours critiques et cas limites (PLAN_TESTS.md §1 à §8).
 // NON destructifs : chaque scénario restaure ce qu'il modifie. Voir destructif.mjs pour le reste.
-import { launch, session, fiche, sql, barreMobile, Scenario, MOBILE, DESKTOP, BASE } from './lib.mjs';
+import { launch, session, fiche, sql, seance, seanceFuture, barreMobile, Scenario, MOBILE, DESKTOP, BASE } from './lib.mjs';
 
 const browser = await launch();
 const tous = [];
@@ -29,16 +29,39 @@ const tous = [];
   const s = new Scenario('S8 · Quota NAT (1/sem) — dialog de dépassement');
   const { ctx, page } = await session(browser, 'marie@demo.club', MOBILE);
 
-  // Marie participe déjà à la natation du 19/08 (séance 8). La séance 36 est une
-  // 2ᵉ natation de la même semaine → quota atteint.
-  const dejaNat = sql("SELECT COUNT(*) n FROM registrations r JOIN sessions s ON s.id=r.session_id WHERE r.user_id=(SELECT id FROM users WHERE email='marie@demo.club') AND s.id=8 AND r.status='participating'");
-  s.check('prérequis : 1 natation déjà validée', dejaNat === '1', `n=${dejaNat}`);
+  // Cible dérivée, pas codée en dur : il faut une séance FUTURE portant le même tag de quota
+  // qu'une séance à laquelle Marie participe déjà DANS LA MÊME SEMAINE — c'est cette collision qui
+  // déclenche le dialog. L'ancienne version pointait les ids 8 et 36, dont la position dans la
+  // semaine dépend du jour du seed.
+  const marie = sql("SELECT id FROM users WHERE email='marie@demo.club'");
+  const cible = seance(`kind='training' AND cancelled_at IS NULL AND start_at > NOW()
+      AND quota_tag_id IS NOT NULL
+      -- Marie doit pouvoir s'y inscrire : la séance cible une de ses catégories actives (§4.5),
+      -- sinon le bouton n'apparaît pas du tout et ce n'est plus le quota qu'on teste.
+      AND EXISTS (SELECT 1 FROM session_category sc JOIN user_category uc ON uc.category_id=sc.category_id
+                  WHERE sc.session_id=sessions.id AND uc.user_id=${marie})
+      -- ... et son quota est déjà consommé cette semaine-là sur le même tag par une AUTRE séance.
+      -- Le « s2.id <> sessions.id » est essentiel : sans lui, une séance à laquelle Marie participe
+      -- déjà se sélectionne elle-même, le scénario supprime son inscription juste après, et le
+      -- quota redevient libre — plus de dialog, l'inscription passe directement.
+      AND EXISTS (
+        SELECT 1 FROM registrations r2 JOIN sessions s2 ON s2.id = r2.session_id
+        WHERE r2.user_id = ${marie} AND r2.status = 'participating'
+          AND s2.id <> sessions.id
+          AND s2.quota_tag_id = sessions.quota_tag_id
+          AND YEARWEEK(s2.start_at, 3) = YEARWEEK(sessions.start_at, 3))`);
 
-  // On retire sa waitlist sur 36 pour tester l'inscription à froid.
-  const avant = sql("SELECT status FROM registrations WHERE session_id=36 AND user_id=(SELECT id FROM users WHERE email='marie@demo.club')");
-  sql("DELETE FROM registrations WHERE session_id=36 AND user_id=(SELECT id FROM users WHERE email='marie@demo.club')");
+  const dejaNat = sql(`SELECT COUNT(*) n FROM registrations r JOIN sessions s ON s.id=r.session_id
+      WHERE r.user_id=${marie} AND r.status='participating'
+        AND s.quota_tag_id=(SELECT quota_tag_id FROM sessions WHERE id=${cible})
+        AND YEARWEEK(s.start_at,3)=(SELECT YEARWEEK(start_at,3) FROM sessions WHERE id=${cible})`);
+  s.check('prérequis : quota déjà consommé cette semaine-là', Number(dejaNat) >= 1, `n=${dejaNat}`);
 
-  await fiche(page, 36);
+  // On retire son éventuelle inscription sur la cible pour tester à froid.
+  const avant = sql(`SELECT status FROM registrations WHERE session_id=${cible} AND user_id=${marie}`);
+  sql(`DELETE FROM registrations WHERE session_id=${cible} AND user_id=${marie}`);
+
+  await fiche(page, cible);
   const btn = page.getByRole('button', { name: /s'inscrire|liste d'attente/i }).first();
   s.check('action d\'inscription proposée', await btn.isVisible().catch(() => false));
   await btn.click();
@@ -55,12 +78,12 @@ const tous = [];
     const annuler = dlg.getByRole('button', { name: /annuler/i }).first();
     if (await annuler.count()) { await annuler.click(); await page.waitForTimeout(800); }
   }
-  const apresAnnul = sql("SELECT COUNT(*) n FROM registrations WHERE session_id=36 AND user_id=(SELECT id FROM users WHERE email='marie@demo.club')");
+  const apresAnnul = sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${cible} AND user_id=${marie}`);
   s.check('annulation : aucune inscription créée', apresAnnul === '0', `n=${apresAnnul}`);
 
   // Remise en état : on restaure la waitlist d'origine.
-  if (avant) sql(`INSERT INTO registrations (session_id, user_id, status, registered_at, created_at, updated_at) SELECT 36, id, '${avant}', NOW(), NOW(), NOW() FROM users WHERE email='marie@demo.club'`);
-  const restaure = sql("SELECT status FROM registrations WHERE session_id=36 AND user_id=(SELECT id FROM users WHERE email='marie@demo.club')");
+  if (avant) sql(`INSERT INTO registrations (session_id, user_id, status, registered_at, created_at, updated_at) VALUES (${cible}, ${marie}, '${avant}', NOW(), NOW(), NOW())`);
+  const restaure = sql(`SELECT status FROM registrations WHERE session_id=${cible} AND user_id=${marie}`);
   s.check('état restauré', restaure === avant, `${restaure || 'aucun'} (attendu ${avant || 'aucun'})`);
 
   tous.push(s.report());
@@ -88,9 +111,13 @@ const tous = [];
 
 // ── S10 · Séance annulée : bandeau, aucune action (PRD §4.7) ──────────
 {
-  const s = new Scenario('S10 · Séance annulée (15) — bandeau et gel des actions');
+  // Cible dérivée : la séance annulée du jeu de démo n'a pas d'id stable (l'ancienne version
+  // pointait la 15, qui n'est plus annulée sur une base fraîche — le scénario passait alors sur un
+  // faux positif, « annul » matchant un autre mot de la page).
+  const annulee = seance('cancelled_at IS NOT NULL AND start_at > NOW()');
+  const s = new Scenario(`S10 · Séance annulée (${annulee}) — bandeau et gel des actions`);
   const { ctx, page } = await session(browser, 'marie@demo.club', MOBILE);
-  await fiche(page, 15);
+  await fiche(page, annulee);
   const txt = (await page.locator('body').innerText()).toLowerCase();
   s.check('bandeau d\'annulation présent', /annul/i.test(txt));
   const barre = await barreMobile(page);
@@ -102,9 +129,14 @@ const tous = [];
 
 // ── S11 · Séance passée : inscriptions closes (PRD §4.9) ──────────────
 {
-  const s = new Scenario('S11 · Séance passée (71) — inscriptions closes, débrief ouvert');
+  // Compétition PASSÉE à laquelle Marie a participé (l'onglet Débriefs suppose une compétition).
+  const marie11 = Number(sql("SELECT id FROM users WHERE email='marie@demo.club'"));
+  const passee = seance(`kind='competition' AND cancelled_at IS NULL AND start_at < NOW()
+      AND EXISTS (SELECT 1 FROM registrations r WHERE r.session_id=sessions.id
+                  AND r.user_id=${marie11} AND r.status='participating')`, 'start_at DESC');
+  const s = new Scenario(`S11 · Séance passée (${passee}) — inscriptions closes, débrief ouvert`);
   const { ctx, page } = await session(browser, 'marie@demo.club', MOBILE);
-  await fiche(page, 71);
+  await fiche(page, passee);
   const barre = await barreMobile(page);
   s.check('mention « commencée »', /commencée|close/i.test(barre || ''), barre?.slice(0, 60));
   const txt = await page.locator('body').innerText();
@@ -115,14 +147,15 @@ const tous = [];
 
 // ── S12 · Parent pur : agit pour l'enfant, pas pour lui (PRD §4.2) ────
 {
-  const s = new Scenario('S12 · Olivier (parent pur, aucun rôle) — séance 8');
+  const cible12 = seanceFuture(); // séance à venir : le refus doit porter sur le RÔLE, pas sur l'heure
+  const s = new Scenario(`S12 · Olivier (parent pur, aucun rôle) — séance ${cible12}`);
   const { ctx, page } = await session(browser, 'olivier@demo.club', MOBILE);
 
   await page.goto(`${BASE}/enfants`, { waitUntil: 'networkidle' });
   const enfants = await page.locator('body').innerText();
   s.check('accède à « Mes enfants »', /théo|theo/i.test(enfants));
 
-  await fiche(page, 8);
+  await fiche(page, cible12);
   const barre = await barreMobile(page);
   s.check('ne peut pas s\'inscrire lui-même', /n'est pas athlète|pas athlète/i.test(barre || ''), barre?.slice(0, 60));
   await s.shot(page, 's12-parent-pur');
@@ -164,9 +197,15 @@ const tous = [];
 
 // ── S15 · Suspendu invisible dans le picker coach (PLAN_TESTS §2/§3.4) ─
 {
-  const s = new Scenario('S15 · Kevin (suspendu) absent du sélecteur « Inscrire un athlète »');
+  // Séance future encadrée par Vincent : le bouton « Inscrire un athlète » n'existe que sur une
+  // séance non commencée dont il est staff. Dernier id en dur du harnais, il pointait une séance
+  // déjà commencée selon l'heure du run.
+  const vincent = Number(sql("SELECT id FROM users WHERE email='vincent@demo.club'"));
+  const s15 = seance(`kind='training' AND cancelled_at IS NULL AND start_at > NOW()
+      AND EXISTS (SELECT 1 FROM session_coach sc WHERE sc.session_id=sessions.id AND sc.user_id=${vincent})`);
+  const s = new Scenario(`S15 · Kevin (suspendu) absent du sélecteur « Inscrire un athlète » (séance ${s15})`);
   const { ctx, page } = await session(browser, 'vincent@demo.club', DESKTOP);
-  await fiche(page, 8);
+  await fiche(page, s15);
   const btn = page.getByRole('button', { name: /inscrire un athlète/i }).first();
   s.check('bouton « Inscrire un athlète » présent', await btn.isVisible().catch(() => false));
   await btn.click();
@@ -182,7 +221,7 @@ const tous = [];
           sql("SELECT athlete_access_suspended s FROM users WHERE email='kevin@demo.club'") === '1');
   s.check('contrôle positif : un athlète éligible est proposé', noms.some(n => /camille/i.test(n)));
   // Les déjà-inscrits doivent aussi être exclus (§4.9.7).
-  const inscrits = sql("SELECT CONCAT(u.first_name,' ',u.last_name) n FROM registrations r JOIN users u ON u.id=r.user_id WHERE r.session_id=8 AND r.status='participating'").split('\n').filter(Boolean);
+  const inscrits = sql(`SELECT CONCAT(u.first_name,' ',u.last_name) n FROM registrations r JOIN users u ON u.id=r.user_id WHERE r.session_id=${s15} AND r.status='participating'`).split('\n').filter(Boolean);
   s.check('déjà-inscrits exclus du sélecteur',
           inscrits.every(i => !noms.some(n => n.includes(i))), inscrits.join(', '));
   await s.shot(page, 's15-picker');
@@ -192,16 +231,23 @@ const tous = [];
 
 // ── S16 · Liste d'attente sur séance pleine (PRD §4.9) ────────────────
 {
-  const s = new Scenario('S16 · Séance pleine (29) — rejoindre puis quitter la file');
-  // Noah (Cadets) est éligible à la séance jeunes et non inscrit.
-  const cap = sql("SELECT capacity c FROM sessions WHERE id=29");
-  const pris = sql("SELECT COUNT(*) n FROM registrations WHERE session_id=29 AND status='participating'");
-  s.check('prérequis : séance saturée', cap === pris, `${pris}/${cap}`);
-  const avant = sql("SELECT COUNT(*) n FROM registrations WHERE session_id=29 AND user_id=(SELECT id FROM users WHERE email='noah.faure@demo.club')");
+  // Séance dérivée : future, SATURÉE, ciblant une catégorie de Noah, et où il n'est pas inscrit.
+  const noah = Number(sql("SELECT id FROM users WHERE email='noah.faure@demo.club'"));
+  const pleine = seance(`kind='training' AND cancelled_at IS NULL AND start_at > NOW() AND capacity IS NOT NULL
+      AND (SELECT COUNT(*) FROM registrations r WHERE r.session_id=sessions.id AND r.status='participating') >= capacity
+      AND EXISTS (SELECT 1 FROM session_category k JOIN user_category uc ON uc.category_id=k.category_id
+                  WHERE k.session_id=sessions.id AND uc.user_id=${noah})
+      AND NOT EXISTS (SELECT 1 FROM registrations r2 WHERE r2.session_id=sessions.id AND r2.user_id=${noah})`);
+
+  const s = new Scenario(`S16 · Séance pleine (${pleine}) — rejoindre puis quitter la file`);
+  const cap = sql(`SELECT capacity c FROM sessions WHERE id=${pleine}`);
+  const pris = sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${pleine} AND status='participating'`);
+  s.check('prérequis : séance saturée', Number(pris) >= Number(cap), `${pris}/${cap}`);
+  const avant = sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${pleine} AND user_id=${noah}`);
   s.check('prérequis : Noah non inscrit', avant === '0');
 
   const { ctx, page } = await session(browser, 'noah.faure@demo.club', MOBILE);
-  await fiche(page, 29);
+  await fiche(page, pleine);
   const txt = await page.locator('body').innerText();
   s.check('séance annoncée complète', /complet/i.test(txt));
 
@@ -211,13 +257,13 @@ const tous = [];
   await btn.click();
   await page.waitForTimeout(1500);
 
-  const statut = sql("SELECT status FROM registrations WHERE session_id=29 AND user_id=(SELECT id FROM users WHERE email='noah.faure@demo.club')");
+  const statut = sql(`SELECT status FROM registrations WHERE session_id=${pleine} AND user_id=${noah}`);
   s.check('inscrit en liste d\'attente (pas participant)', statut === 'waitlist', `statut=${statut || 'aucun'}`);
 
   // Remise en état.
-  sql("DELETE FROM registrations WHERE session_id=29 AND user_id=(SELECT id FROM users WHERE email='noah.faure@demo.club')");
+  sql(`DELETE FROM registrations WHERE session_id=${pleine} AND user_id=${noah}`);
   s.check('état restauré',
-         sql("SELECT COUNT(*) n FROM registrations WHERE session_id=29 AND user_id=(SELECT id FROM users WHERE email='noah.faure@demo.club')") === '0');
+         sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${pleine} AND user_id=${noah}`) === '0');
   tous.push(s.report());
   await ctx.close();
 }
@@ -238,46 +284,61 @@ async function ongletMobile(page, nom) {
 // ── S17 · Mécanisme C — déblocage coach de la file quota (PRD §4.10.4) ─
 // Le bouton « Remplir avec la file quota » est rendu DEUX fois (mobile l.198, desktop l.352) :
 // on vérifie les deux, sinon une dérive de l'un passerait inaperçue. Contrôle négatif apparié
-// sur la séance 29, dont la file « séance pleine » non vide doit désactiver le bouton.
+// sur une séance dont la file « séance pleine » non vide doit désactiver le bouton.
 {
   const s = new Scenario('S17 · Mécanisme C — remplir avec la file quota');
 
   // Préconditions de $canFillQuota (session-show.blade.php:54) : file capacity vide + places libres.
-  const wq = sql("SELECT COUNT(*) n FROM registrations WHERE session_id=37 AND status='waitlist' AND waitlist_reason='quota_exceeded'");
-  const wcap = sql("SELECT COUNT(*) n FROM registrations WHERE session_id=37 AND status='waitlist' AND waitlist_reason='capacity'");
-  s.check('prérequis : 1 athlète en file quota sur la séance 37', wq === '1', `n=${wq}`);
+  // Cible dérivée : séance future avec file quota NON vide, file capacity VIDE et des places libres
+  // — les préconditions exactes de $canFillQuota (session-show.blade.php:54).
+  const sq = seance(`kind='training' AND cancelled_at IS NULL AND start_at > NOW()
+      AND EXISTS (SELECT 1 FROM registrations r WHERE r.session_id=sessions.id
+                  AND r.status='waitlist' AND r.waitlist_reason='quota_exceeded')
+      AND NOT EXISTS (SELECT 1 FROM registrations r2 WHERE r2.session_id=sessions.id
+                      AND r2.status='waitlist' AND r2.waitlist_reason='capacity')
+      AND (capacity IS NULL OR capacity > (SELECT COUNT(*) FROM registrations r3
+                      WHERE r3.session_id=sessions.id AND r3.status='participating'))`);
+
+  const wq = sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${sq} AND status='waitlist' AND waitlist_reason='quota_exceeded'`);
+  const wcap = sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${sq} AND status='waitlist' AND waitlist_reason='capacity'`);
+  s.check(`prérequis : file quota non vide (séance ${sq})`, Number(wq) >= 1, `n=${wq}`);
   s.check('prérequis : file « séance pleine » vide', wcap === '0', `n=${wcap}`);
 
-  const promu = sql("SELECT u.email FROM registrations r JOIN users u ON u.id=r.user_id WHERE r.session_id=37 AND r.waitlist_reason='quota_exceeded'");
-  const prenom = sql("SELECT u.first_name FROM registrations r JOIN users u ON u.id=r.user_id WHERE r.session_id=37 AND r.waitlist_reason='quota_exceeded'");
+  const promu = sql(`SELECT u.email FROM registrations r JOIN users u ON u.id=r.user_id WHERE r.session_id=${sq} AND r.waitlist_reason='quota_exceeded' ORDER BY r.registered_at LIMIT 1`);
+  const prenom = sql(`SELECT u.first_name FROM registrations r JOIN users u ON u.id=r.user_id WHERE r.session_id=${sq} AND r.waitlist_reason='quota_exceeded' ORDER BY r.registered_at LIMIT 1`);
+  const coachSq = sql(`SELECT u.email FROM session_coach sc JOIN users u ON u.id=sc.user_id WHERE sc.session_id=${sq} LIMIT 1`) || 'admin@demo.club';
 
   // — Contrôle négatif : file « séance pleine » NON vide → bouton rendu mais désactivé —
-  // La séance 29 (6/6, 3 en file capacity) n'a pas de file quota : sans en fabriquer une, le bloc
-  // ne serait pas rendu du tout et l'assertion ne prouverait rien. On l'ajoute puis on la retire.
+  // Une séance saturée n'a pas forcément de file quota : sans en fabriquer une, le bloc ne serait
+  // pas rendu du tout et l'assertion ne prouverait rien. On l'ajoute puis on la retire.
   {
-    const cobaye = sql("SELECT id FROM users WHERE email='camille@demo.club'");
-    sql(`INSERT INTO registrations (session_id, user_id, status, waitlist_reason, registered_at, created_at, updated_at) VALUES (29, ${cobaye}, 'waitlist', 'quota_exceeded', NOW(), NOW(), NOW())`);
+    const bloquee = seance(`kind='training' AND cancelled_at IS NULL AND start_at > NOW()
+        AND EXISTS (SELECT 1 FROM registrations r WHERE r.session_id=sessions.id
+                    AND r.status='waitlist' AND r.waitlist_reason='capacity')`);
+    const coachBl = sql(`SELECT u.email FROM session_coach sc JOIN users u ON u.id=sc.user_id WHERE sc.session_id=${bloquee} LIMIT 1`) || 'admin@demo.club';
+    const cobaye = sql(`SELECT id FROM users WHERE id NOT IN (SELECT user_id FROM registrations WHERE session_id=${bloquee}) AND JSON_CONTAINS(roles, '"athlete"') LIMIT 1`);
+    sql(`INSERT INTO registrations (session_id, user_id, status, waitlist_reason, registered_at, created_at, updated_at) VALUES (${bloquee}, ${cobaye}, 'waitlist', 'quota_exceeded', NOW(), NOW(), NOW())`);
 
-    const { ctx, page } = await session(browser, 'karine@demo.club', DESKTOP);
-    await fiche(page, 29);
+    const { ctx, page } = await session(browser, coachBl, DESKTOP);
+    await fiche(page, bloquee);
     const txt = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
     const btn29 = page.locator('.fiche-desktop button[wire\\:click="fillQuota"]').first();
-    s.check('séance 29 : le bouton quota est rendu', await btn29.count() > 0);
+    s.check('contrôle négatif : bouton quota rendu', await btn29.count() > 0);
     const cls = (await btn29.getAttribute('class')) || '';
-    s.check('séance 29 : bouton DÉSACTIVÉ (file « séance pleine » non vide)', cls.includes('is-disabled'), cls);
-    s.check('séance 29 : bouton non cliquable (attribut disabled)', await btn29.isDisabled().catch(() => false));
-    s.check('séance 29 : la condition est expliquée à l\'écran', /séance pleine .{0,10} est vide/i.test(txt), txt.slice(0, 0));
+    s.check('contrôle négatif : bouton DÉSACTIVÉ (file « séance pleine » non vide)', cls.includes('is-disabled'), cls);
+    s.check('contrôle négatif : bouton non cliquable (attribut disabled)', await btn29.isDisabled().catch(() => false));
+    s.check('contrôle négatif : la condition est expliquée à l\'écran', /séance pleine .{0,10} est vide/i.test(txt), txt.slice(0, 0));
     await s.shot(page, 's17-quota-desactive');
     await ctx.close();
 
-    sql(`DELETE FROM registrations WHERE session_id=29 AND user_id=${cobaye}`);
-    s.check('séance 29 : état restauré',
-            sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=29 AND user_id=${cobaye}`) === '0');
+    sql(`DELETE FROM registrations WHERE session_id=${bloquee} AND user_id=${cobaye}`);
+    s.check('contrôle négatif : état restauré',
+            sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${bloquee} AND user_id=${cobaye}`) === '0');
   }
 
   // — Cas positif, DESKTOP : le bouton est actif et la promotion s'exécute —
-  const { ctx, page } = await session(browser, 'karine@demo.club', DESKTOP);
-  await fiche(page, 37);
+  const { ctx, page } = await session(browser, coachSq, DESKTOP);
+  await fiche(page, sq);
 
   const bodyAvant = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
   s.check('bloc « Quota dépassé » affiché', /quota dépassé/i.test(bodyAvant));
@@ -296,12 +357,12 @@ async function ongletMobile(page, nom) {
   await page.waitForTimeout(1800);
 
   // Effet en base : promotion tracée (promoted_by = le coach qui a cliqué).
-  const apres = sql("SELECT status FROM registrations WHERE session_id=37 AND user_id=(SELECT id FROM users WHERE email='" + promu + "')");
+  const apres = sql(`SELECT status FROM registrations WHERE session_id=${sq} AND user_id=(SELECT id FROM users WHERE email='${promu}')`);
   s.check('athlète promu en participating', apres === 'participating', `statut=${apres}`);
-  const by = sql("SELECT promoted_by FROM registrations WHERE session_id=37 AND user_id=(SELECT id FROM users WHERE email='" + promu + "')");
-  const karine = sql("SELECT id FROM users WHERE email='karine@demo.club'");
+  const by = sql(`SELECT promoted_by FROM registrations WHERE session_id=${sq} AND user_id=(SELECT id FROM users WHERE email='${promu}')`);
+  const karine = sql(`SELECT id FROM users WHERE email='${coachSq}'`);
   s.check('promotion attribuée au coach (promoted_by)', by === karine, `${by} (attendu ${karine})`);
-  const audit = sql("SELECT COUNT(*) n FROM audit_logs WHERE action='promote_quota_exceeded' AND session_id=37");
+  const audit = sql(`SELECT COUNT(*) n FROM audit_logs WHERE action='promote_quota_exceeded' AND session_id=${sq}`);
   s.check('AuditLog promote_quota_exceeded émis', Number(audit) >= 1, `n=${audit}`);
 
   // Effet à l'écran : le flash annonce la promotion, et l'athlète a changé de bloc.
@@ -317,14 +378,14 @@ async function ongletMobile(page, nom) {
   await ctx.close();
 
   // — Remise en état, puis vérification du rendu MOBILE sur l'état restauré —
-  sql("UPDATE registrations SET status='waitlist', waitlist_reason='quota_exceeded', promoted_at=NULL, promoted_by=NULL WHERE session_id=37 AND user_id=(SELECT id FROM users WHERE email='" + promu + "')");
-  sql("DELETE FROM audit_logs WHERE action='promote_quota_exceeded' AND session_id=37");
-  const restaure = sql("SELECT CONCAT(status,'/',IFNULL(waitlist_reason,'-'),'/',IFNULL(promoted_by,'-')) v FROM registrations WHERE session_id=37 AND user_id=(SELECT id FROM users WHERE email='" + promu + "')");
+  sql(`UPDATE registrations SET status='waitlist', waitlist_reason='quota_exceeded', promoted_at=NULL, promoted_by=NULL WHERE session_id=${sq} AND user_id=(SELECT id FROM users WHERE email='${promu}')`);
+  sql(`DELETE FROM audit_logs WHERE action='promote_quota_exceeded' AND session_id=${sq}`);
+  const restaure = sql(`SELECT CONCAT(status,'/',IFNULL(waitlist_reason,'-'),'/',IFNULL(promoted_by,'-')) v FROM registrations WHERE session_id=${sq} AND user_id=(SELECT id FROM users WHERE email='${promu}')`);
   s.check('état restauré', restaure === 'waitlist/quota_exceeded/-', restaure);
 
   {
-    const { ctx, page } = await session(browser, 'karine@demo.club', MOBILE);
-    await fiche(page, 37);
+    const { ctx, page } = await session(browser, coachSq, MOBILE);
+    await fiche(page, sq);
     s.check('onglet Waitlist ouvert (mobile)', await ongletMobile(page, 'waitlist'));
     const btnM = page.locator('.fiche-mobile button[wire\\:click="fillQuota"]').first();
     s.check('bouton présent aussi en mobile', await btnM.count() > 0);
@@ -340,7 +401,7 @@ async function ongletMobile(page, nom) {
   // — Refus : un athlète simple ne peut pas déclencher le mécanisme C —
   {
     const { ctx, page } = await session(browser, 'marie@demo.club', DESKTOP);
-    await fiche(page, 37);
+    await fiche(page, sq);
     const n = await page.locator('button[wire\\:click="fillQuota"]').count();
     s.check('athlète simple : aucun bouton de déblocage', n === 0, `n=${n}`);
     await ctx.close();

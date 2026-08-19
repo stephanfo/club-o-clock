@@ -41,6 +41,8 @@ node tests/E2E/destructif.mjs --oui-je-sais   # RGPD, tutelle, bascule de saison
 
 **Ne pas l'ajouter à `composer check`** (serveur + base + navigateur requis : la porte deviendrait fragile). La référence de non-régression reste PHPUnit.
 
+**Jamais d'id de séance en dur dans un scénario.** Le jeu de démo est relatif à `now()`, mais la position d'une séance par rapport à l'instant du run dépend du jour et de l'heure — un id figé rend le scénario vert ou rouge selon le moment. Sélectionner par les propriétés via `seance(where)` / `seanceFuture(where)` de [tests/E2E/lib.mjs](tests/E2E/lib.mjs). Idem pour les comptes : par email, jamais par `user_id`.
+
 Quand une modification touche l'UI, **lancer le harnais et regarder les captures** — c'est le seul moyen de voir ce qu'un test textuel ne montre pas (bloc vide, contraste, débordement). Deux règles d'écriture : apparier toute assertion négative à un **contrôle positif** (« X est absent » ne vaut rien sur une liste vide), et **restaurer l'état** modifié.
 
 ## Fidélité au design system (NON NÉGOCIABLE)
