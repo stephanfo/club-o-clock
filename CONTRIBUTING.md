@@ -88,6 +88,24 @@ vendor/bin/phpstan analyse --memory-limit=1G     # analyse statique
 composer test                                    # tests
 ```
 
+### Tests navigateur (E2E) — hors porte de qualité
+
+`composer check` couvre la logique serveur, pas le rendu. Un harnais **Playwright** rejoue les
+parcours critiques dans un vrai navigateur : il clique, attend les mises à jour Livewire, vérifie
+l'état en base et prend des captures aux deux formats.
+
+```bash
+php artisan serve                 # prérequis : serveur + base de démo seedée
+node tests/E2E/run.mjs            # suites non destructives
+```
+
+Il est **volontairement hors** de `composer check` : il exige un serveur, une base seedée et un
+navigateur — l'y intégrer rendrait la porte de qualité fragile pour de mauvaises raisons. La
+référence de non-régression reste PHPUnit. Détails et conventions d'écriture :
+[tests/E2E/README.md](tests/E2E/README.md).
+
+Playwright est en `devDependencies` : jamais installé ni exécuté sur l'hébergement mutualisé.
+
 ### Attentes sur le code
 
 - **Des tests.** Toute correction de bug apporte un test qui échouait avant. Toute fonctionnalité
