@@ -76,14 +76,15 @@ des requêtes brutes. Les deux **refusent de s'exécuter si `APP_ENV != local`**
 | S16 | Séance pleine | file d'attente rejointe, statut `waitlist` | §1.4 |
 | D1 | RGPD | suppression refusée pour un garant de P1 | §8.4 |
 | D2 | Tutelle | rupture P2 + `AuditLog guardianship_severed` | §6 |
+| D3 | Bascule de saison | double validation, suspension de masse, réactivation, nouvelle année | §8.8 |
 
 Les scénarios **restaurent l'état** qu'ils modifient (S1 remet Mathieu encadrant, S8 restaure la
 waitlist de Marie).
 
 ## Ce qui reste en test manuel
 
-PWA / offline / push (§9), import CSV (§8.3), export XLSX (§8.6), bascule de saison (§8.8),
-et l'appréciation visuelle fine — un test vérifie qu'un élément est là, pas qu'il est beau.
+PWA / offline / push (§9), import CSV (§8.3), export XLSX (§8.6), et l'appréciation visuelle fine
+— un test vérifie qu'un élément est là, pas qu'il est réussi.
 
 ## Écrire un scénario
 

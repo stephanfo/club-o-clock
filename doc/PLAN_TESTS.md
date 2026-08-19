@@ -28,12 +28,12 @@
 > ```
 > Les points marqués **`[auto:Sn]`** ci-dessous sont couverts par un scénario ; le testeur humain
 > peut s'y limiter à un contrôle visuel. Tout le reste demande un passage manuel — notamment
-> PWA/offline/push (§9), import CSV (§8.3), export XLSX (§8.6) et la bascule de saison (§8.8).
+> PWA/offline/push (§9), import CSV (§8.3) et export XLSX (§8.6).
 >
 > **Consignes générales**
 > - Tester chaque parcours **sur mobile ET sur desktop** (la mise en page diffère, les fonctions sont identiques).
 > - Cocher `[x]` quand le résultat attendu est constaté ; sinon noter l'écart (capture d'écran bienvenue).
-> - ⚠️ Le parcours **Admin §8.8 (bascule de saison)** modifie tous les comptes : le faire **en dernier**, puis recharger le seed.
+> - ⚠️ Le parcours **Admin §8.8 (bascule de saison)** modifie tous les comptes : le faire **en dernier**, puis recharger le seed. Il est aussi couvert par `destructif.mjs` (D3), qui reconstruit la base ensuite.
 > - En environnement de démo, les emails partent dans les logs (`storage/logs/laravel.log`) et le push
 >   nécessite les clés VAPID (voir §9). Les notifications restent visibles dans **Alertes** et **Admin → Envois**.
 
@@ -245,9 +245,9 @@
 - [ ] `[auto:S13]` **Contrôle d'accès** : un coach n'accède pas à `/admin/infos` (403 ou masquage) — seule l'édition membre `/infos` lui est ouverte.
 
 ### 8.8 ⚠️ Bascule de saison (PRD §4.4) — À FAIRE EN DERNIER
-- [ ] Déclencher la **suspension de masse** → tous les athlètes passent « accès suspendu », leurs inscriptions **futures** sont annulées (promotions déclenchées), coachs/admins conservent leurs rôles.
-- [ ] **Réactiver individuellement** un athlète → il peut se réinscrire.
-- [ ] Nouvelle année sportive : recalcul des catégories (les surclassements sont réinitialisables via l'action dédiée).
+- [ ] `[auto:D3]` Déclencher la **suspension de masse** → tous les athlètes passent « accès suspendu », leurs inscriptions **futures** sont annulées (promotions déclenchées), coachs/admins conservent leurs rôles.
+- [ ] `[auto:D3]` **Réactiver individuellement** un athlète → il peut se réinscrire.
+- [ ] `[auto:D3]` Nouvelle année sportive : recalcul des catégories (les surclassements sont réinitialisables via l'action dédiée).
 - [ ] **Recharger le seed** après ce test.
 
 ---
