@@ -13,18 +13,22 @@
      échouait en CATEGORY_MISMATCH / SUSPENDED APRÈS confirmation — bouton apparemment mort. --}}
 @if (($iAmCoachHere ?? false) && auth()->user()?->hasRole('athlete') && ($canEnroll ?? false)
      && $session->kind === 'training' && ! $session->isCancelled())
-    <div style="margin-bottom:12px;{{ ($variant ?? 'mobile') === 'mobile' ? 'flex:1' : '' }}">
+    {{-- Plus de marge basse : le bloc finit sur le segment, et la barre fixe mobile a déjà son
+         propre padding — la marge s'y ajoutait et mangeait de la hauteur pour rien. --}}
+    <div style="{{ ($variant ?? 'mobile') === 'mobile' ? 'flex:1' : 'margin-bottom:12px' }}">
         <div class="eyebrow" style="margin-bottom:6px">Mon inscription</div>
         {{-- Contrôle segmenté (seg/seg-item) plutôt que deux boutons : « J'encadre » est un ÉTAT,
              pas une action — rendu en <span>, il ne peut plus être pris pour un bouton cliquable.
              Seul « Je participe » est actionnable, et la forme segmentée dit « voici mon rôle,
-             voici l'autre » sans avoir à le lire dans le texte d'aide. --}}
+             voici l'autre » sans avoir à le lire dans le texte d'aide.
+             Pas de texte de conséquence sous le contrôle : le dialog de bascule (coach-dialogs)
+             l'énonce déjà avant toute action — le répéter en permanence coûtait quatre lignes sur
+             la barre mobile, qui masquaient le bas de la page. --}}
         <div class="seg seg-roles" role="group" aria-label="Mon rôle sur cette séance">
             <span class="seg-item on" aria-current="true"><x-icon name="whistle" :size="14" /> J’encadre</span>
             <button type="button" class="seg-item" wire:click="flipToAthlete({{ auth()->id() }})"
                     wire:loading.attr="disabled" wire:target="flipToAthlete">Je participe</button>
         </div>
-        <div class="meta" style="font-size:11.5px;margin-top:6px;line-height:1.4">Tu encadres cette séance. Participer comme athlète demande une confirmation (place &amp; quota) et te retire de l’encadrement — un seul rôle par séance.</div>
     </div>
 @endif
 
