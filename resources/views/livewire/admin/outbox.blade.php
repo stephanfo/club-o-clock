@@ -17,7 +17,16 @@
     <div class="dk-topbar">
         <div class="f1">
             <div class="dsp" style="font-size:24px">Envois sortants</div>
-            <div class="meta">file de notifications · push + email</div>
+            {{-- L'état sain se dit ici, en sourdine : un bandeau permanent pousserait les filtres
+                 vers le bas à chaque visite pour ne rien apprendre. Les états anormaux, eux, prennent
+                 un bandeau pleine largeur sous la topbar. --}}
+            <div class="meta">
+                file de notifications · push + email
+                @if ($scheduler['state'] === 'ok')
+                    · traitement automatique actif
+                    ({{ $scheduler['age'] }})
+                @endif
+            </div>
         </div>
         <div class="flex g8 ac">
             <button type="button" wire:click="pushAllPending" class="btn btn-ghost btn-sm" wire:loading.attr="disabled">
@@ -30,6 +39,40 @@
     </div>
 
     <div class="dk-body">
+        {{-- ═══ Supervision du traitement automatique (cron, INSTALL §5.4) ═══
+             Tout l'envoi différé dépend d'un cron unique appelant `schedule:run`. S'il meurt (quota
+             mutualisé, chemin PHP changé, crontab perdue au transfert), les lignes s'accumulent en
+             « en attente » et RIEN ne le signale : le premier symptôme est un adhérent non prévenu
+             d'une annulation. Ce bandeau rend la panne visible là où l'admin vient déjà quand il
+             doute d'un envoi.
+             Trois états — jamais d'alerte sur une installation neuve (« unknown »). --}}
+        @if ($scheduler['state'] === 'stale')
+            <div class="banner banner-danger" style="margin-bottom:14px">
+                <x-icon name="alert-triangle" class="ic" :size="18" />
+                <div>
+                    <strong>Traitement automatique interrompu.</strong>
+                    Dernier passage {{ $scheduler['last']->copy()->setTimezone($tz)->format('d/m/Y H:i') }}
+                    ({{ $scheduler['age'] }}),
+                    alors qu'un passage est attendu toutes les 5 minutes.
+                    <div style="margin-top:4px">
+                        Les notifications ne partent plus. Vérifier la tâche planifiée (cron) sur
+                        l'hébergement — voir <em>INSTALL §5.4</em>. En attendant, le bouton
+                        « Pousser tous les en attente » ci-dessus envoie la file manuellement.
+                    </div>
+                </div>
+            </div>
+        @elseif ($scheduler['state'] === 'unknown')
+            <div class="banner banner-info" style="margin-bottom:14px">
+                <x-icon name="info" class="ic" :size="18" />
+                <div>
+                    <strong>Traitement automatique jamais observé.</strong>
+                    Normal sur une installation récente : le voyant s'allumera au premier passage du
+                    cron (moins de 5 minutes). S'il reste ainsi, la tâche planifiée n'est pas en
+                    place — voir <em>INSTALL §5.4</em>.
+                </div>
+            </div>
+        @endif
+
         {{-- ═══ Filtres (§4.15.6) ═══ --}}
         <div class="flex g8 ac wrap" style="margin-bottom:14px">
             <x-segmented :items="[['v'=>'','l'=>'Tous'],['v'=>'pending','l'=>'En attente'],['v'=>'sent','l'=>'Envoyées'],['v'=>'failed','l'=>'En échec'],['v'=>'cancelled','l'=>'Annulées']]"
