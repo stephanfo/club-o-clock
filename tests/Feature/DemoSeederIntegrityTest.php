@@ -90,6 +90,31 @@ class DemoSeederIntegrityTest extends TestCase
      * au visiteur un identifiant qui ne connecte à rien — l'échec le plus coûteux d'une démo, dès
      * le premier geste. Le test relie enfin la vitrine aux données.
      */
+    /**
+     * Tout athlète du jeu de démo ayant une date de naissance doit porter sa catégorie principale
+     * dérivée (§4.5). Sans elle, hasActiveCategory() est faux et le compte ne peut s'inscrire à
+     * AUCUNE séance : la fiche propose des actions que le serveur refuse (CATEGORY_MISMATCH).
+     * Constaté sur mathieu@demo.club (coach+athlète), créé hors de la boucle des athlètes, ainsi
+     * que sur florence/brigitte/gilles/daniel. Formulé génériquement pour couvrir les ajouts futurs.
+     */
+    public function test_tout_athlete_avec_une_dob_porte_sa_categorie_principale(): void
+    {
+        $this->seed(CatalogSeeder::class);
+        $this->seed(DemoSeeder::class);
+
+        $sansCategorie = User::query()
+            ->whereNotNull('dob')
+            ->with('categories')
+            ->get()
+            ->filter(fn (User $u) => $u->hasRole('athlete') && $u->primaryCategory() === null)
+            ->map(fn (User $u) => $u->email ?? $u->fullName())
+            ->values()
+            ->all();
+
+        $this->assertSame([], $sansCategorie,
+            'Athlètes de démo sans catégorie principale : '.implode(', ', $sansCategorie));
+    }
+
     public function test_les_comptes_proposes_a_la_connexion_existent_tous(): void
     {
         $this->seed(CatalogSeeder::class);
