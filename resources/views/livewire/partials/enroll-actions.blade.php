@@ -36,7 +36,10 @@
         </div>
         {{-- Quitter la séance sans y participer : le segment ne couvre que le choix ENTRE les deux
              rôles, pas le retrait pur. Discret (lien) pour ne pas concurrencer la bascule. --}}
-        @if (($canManageCoaches ?? false) && ! $session->hasStarted())
+        {{-- canManageCoaches (coach OU admin) est le bon signal ici, contrairement au CTA
+             d'inscription : la policy unregisterCoach demande exactement ça, et la personne est
+             déjà encadrante — aucune garde de rôle ne peut la refuser. --}}
+        @if (($canManageCoaches ?? false) && ! $session->hasStarted() && ! $session->isCancelled())
             <button wire:click="unregisterCoach({{ auth()->id() }})" wire:loading.attr="disabled" wire:target="unregisterCoach"
                     class="auth-link" style="margin-top:8px">Me retirer de l’encadrement</button>
         @endif

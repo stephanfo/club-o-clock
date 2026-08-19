@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Livewire\Admin\MemberList;
 use App\Livewire\Admin\MemberShow;
 use App\Livewire\Home;
+use App\Livewire\Profil;
 use App\Models\AuditLog;
 use App\Models\AuthIdentity;
 use App\Models\ClubSettings;
@@ -73,6 +74,32 @@ class MemberDeletionTest extends TestCase
             'actor_id' => $admin->id,
             'target_id' => $member->id,
         ]);
+    }
+
+    // MemberService::requestDeletion a DEUX gardes bloquantes (dernier admin, garant d'un P1) ;
+    // l'écran Profil ne pré-emptait que la première. Le garant traversait toute la modale de
+    // conséquences irréversibles pour finir en refus.
+    public function test_profil_warns_a_p1_guardian_instead_of_offering_deletion(): void
+    {
+        $parent = User::factory()->create(['roles' => ['athlete']]);
+        User::factory()->create([
+            'guardian_id' => $parent->id, 'is_minor' => true, 'email' => null, 'password' => null,
+        ]);
+
+        Livewire::actingAs($parent)->test(Profil::class)
+            ->set('tab', 'connexion') // la « Zone danger » vit dans l'onglet Connexion
+            ->assertDontSeeHtml('wire:click="confirmDeleteAccount"')
+            ->assertSee("garant·e d'un mineur sans compte propre", escape: false);
+    }
+
+    // Contrôle positif appairé : sans pupille P1, la suppression reste offerte.
+    public function test_profil_offers_deletion_without_a_p1_ward(): void
+    {
+        $member = User::factory()->create(['roles' => ['athlete']]);
+
+        Livewire::actingAs($member)->test(Profil::class)
+            ->set('tab', 'connexion')
+            ->assertSeeHtml('wire:click="confirmDeleteAccount"');
     }
 
     public function test_request_deletion_is_idempotent(): void

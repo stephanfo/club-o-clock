@@ -105,6 +105,15 @@ trait ManagesCoaching
             return;
         }
 
+        // §4.4 : accès athlète suspendu — register() refuse MÊME par le bureau (pas d'exemption
+        // $byStaff, contrairement à la catégorie), donc la garde vaut aussi en voie tiers.
+        if ($target->athlete_access_suspended) {
+            session()->flash('warn', $this->translateRegError(RegistrationService::SUSPENDED));
+            $this->flipConfirm = null;
+
+            return;
+        }
+
         // §4.5 : la bascule se termine par un register(), qui refuse une cible sans catégorie active
         // couvrant la séance. Refus AVANT le dialog, pour la même raison.
         // Réservé à l'AUTO-bascule : RegistrationService épargne le staff de cette garde ($byStaff,

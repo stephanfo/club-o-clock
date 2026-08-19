@@ -74,6 +74,32 @@ class GuardianshipTest extends TestCase
         app(GuardianshipService::class)->invite($adult, $admin, 'x@example.test');
     }
 
+    // Un pupille devenu MAJEUR garde son garant (MemberService::updateDob) : invite() le refuse,
+    // le bouton « Accès autonome » ne doit donc plus être offert — ni au parent, ni à l'admin.
+    // Le rôle coach n'entre pas en jeu ici : c'est la tutelle, pas l'encadrement.
+    public function test_autonomy_cta_hidden_for_a_major_ward(): void
+    {
+        [$parent, $child] = $this->family();
+        $child->forceFill(['is_minor' => false, 'email' => null])->save();
+        $admin = User::factory()->admin()->create();
+
+        // Fiche admin : bandeau explicatif, plus de formulaire d'invitation.
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $child->fresh()])
+            ->assertDontSeeHtml('wire:click="inviteWard"')
+            ->assertSee('est <b>majeur</b>', escape: false);
+    }
+
+    // Contrôle positif appairé : tant que le pupille est mineur, l'autonomisation reste offerte.
+    public function test_autonomy_cta_visible_for_a_minor_ward(): void
+    {
+        [$parent, $child] = $this->family();
+        $child->forceFill(['email' => null])->save(); // is_minor reste true
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $child->fresh()])
+            ->assertSeeHtml('wire:click="inviteWard"');
+    }
+
     public function test_invite_invalidates_previous_pending(): void
     {
         [, $child] = $this->family('enfant@example.test');

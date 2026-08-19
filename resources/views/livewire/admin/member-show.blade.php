@@ -100,7 +100,12 @@
                                 <div class="flex ac jb"><span class="sect-title">Tutelle</span><x-icon name="shield" :size="16" class="muted" /></div>
                                 <div class="meta flex ac g4" style="margin-top:12px"><x-icon name="shield" :size="13" style="color:var(--info)" /> Parent garant · <b>{{ $u->guardian->fullName() }}</b></div>
 
-                                @unless ($u->email)
+                                @if (! $u->email && ! $u->is_minor)
+                                    {{-- Devenu majeur en gardant son garant (MemberService::updateDob) :
+                                         GuardianshipService::invite refuse — l'autonomisation ne vaut que
+                                         pour un mineur. Le geste attendu est la rupture de tutelle. --}}
+                                    <x-banner kind="warn" style="margin-top:12px"><div>Ce pupille est <b>majeur</b> : l'ouverture d'un compte autonome ne s'applique plus. Romps le lien de tutelle pour le rendre indépendant.</div></x-banner>
+                                @elseif (! $u->email)
                                     {{-- P1 → P2 : ouverture du compte autonome (§4.2.1) --}}
                                     <div class="meta" style="margin-top:12px;line-height:1.5">Ouvre le compte autonome de l'enfant : saisis son email — l'email doit appartenir à l'enfant. Une invitation d'activation lui sera envoyée ; le lien de tutelle est conservé.</div>
                                     <div class="ifield" style="margin-top:10px"><x-icon name="mail" :size="15" class="muted" /><input class="ifield-input" type="email" wire:model="wardEmail" placeholder="email de l'enfant"></div>
@@ -110,7 +115,7 @@
                                     </button>
                                 @else
                                     <x-banner kind="info" style="margin-top:12px"><div>Compte autonome (<b>P2</b>) — l'enfant se connecte et s'inscrit lui-même ; le parent garant reçoit les notifs en parallèle et peut agir.</div></x-banner>
-                                @endunless
+                                @endif
 
                                 {{-- P2 → P3 : rupture du lien de tutelle (§4.2.2) --}}
                                 <hr class="divider" style="margin:14px 0">

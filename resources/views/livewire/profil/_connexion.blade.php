@@ -89,6 +89,10 @@
             <div class="meta" style="font-size:13px;margin-top:4px;line-height:1.5">Une demande est envoyée à l'admin. La suppression intervient après un délai minimum de 7 jours et la validation d'un admin.</div>
             @if ($lastAdmin)
                 <x-banner kind="warn" style="margin-top:12px">Tu es le dernier administrateur actif du club. Transfère le rôle admin à un autre membre avant de pouvoir demander la suppression.</x-banner>
+            @elseif (($p1Wards ?? 0) > 0)
+                {{-- Seconde garde de MemberService::requestDeletion (§4.2) : sans ça, le bouton
+                     ouvrait toute la modale de conséquences pour finir en refus. --}}
+                <x-banner kind="warn" style="margin-top:12px">Tu es garant·e d'un mineur sans compte propre. Autonomise l'enfant ou rattache-le à un autre garant avant de pouvoir demander la suppression.</x-banner>
             @else
                 <button type="button" wire:click="confirmDeleteAccount" class="btn btn-danger btn-sm" style="margin-top:12px">
                     <x-icon name="trash" :size="15" /> Supprimer mon compte

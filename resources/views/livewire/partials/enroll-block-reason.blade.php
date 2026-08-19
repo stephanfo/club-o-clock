@@ -4,11 +4,13 @@
 @php($reason = $enrollBlockReason ?? 'suspended')
 {{-- Coach-pur (§2) : l'inscription athlète ne le concerne pas, mais l'encadrement si — on propose
      le geste utile plutôt qu'un simple constat. Mêmes conditions que « M'inscrire comme coach » de
-     l'onglet Encadrement : séance training ouverte, et pas déjà encadrant.
+     l'onglet Encadrement : rôle coach RÉEL (canManageCoaches vaut aussi pour un admin-pur, que
+     CoachRegistrationService::register refuse — « n'a pas le rôle coach »), training ouvert, et
+     pas déjà encadrant.
      ! $subjName : en voie parent → enfant, le sujet est l'enfant alors que registerCoachSelf
      agirait sur le parent — on s'en tient au message dans ce cas. --}}
 @if ($reason === 'not_athlete' && ! $subjName
-     && ($canManageCoaches ?? false) && ! ($iAmCoachHere ?? false)
+     && auth()->user()?->hasRole('coach') && ! ($iAmCoachHere ?? false)
      && $session->kind === 'training' && ! $session->isCancelled() && ! $session->hasStarted())
     <button wire:click="registerCoachSelf" wire:loading.attr="disabled" wire:target="registerCoachSelf"
             class="btn btn-dark {{ ($variant ?? 'mobile') === 'desktop' ? 'btn-block' : 'f1' }}">

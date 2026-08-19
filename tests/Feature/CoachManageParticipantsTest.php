@@ -270,6 +270,66 @@ class CoachManageParticipantsTest extends TestCase
             ->assertSet('flipConfirm', null);
     }
 
+    // Un ADMIN-PUR n'a pas le rôle coach : CoachRegistrationService::register le refuse
+    // (« Cet utilisateur n'a pas le rôle coach. »). canManageCoaches valant coach OU admin, le CTA
+    // lui était proposé — et l'échec était silencieux.
+    public function test_pure_admin_is_not_offered_to_register_as_coach(): void
+    {
+        $s = $this->makeSession();
+        $admin = User::factory()->admin()->create(); // roles = ['admin'] seulement
+        $s->coaches()->attach(User::factory()->coach()->create()->id);
+
+        Livewire::actingAs($admin)->test(SessionShow::class, ['session' => $s])
+            ->assertDontSeeHtml('wire:click="registerCoachSelf"');
+
+        $this->assertFalse($s->coaches()->whereKey($admin->id)->exists());
+    }
+
+    // Contrôle positif appairé : un coach-pur, lui, doit toujours se voir proposer le CTA.
+    public function test_pure_coach_is_offered_to_register_as_coach(): void
+    {
+        $s = $this->makeSession();
+        $coach = User::factory()->coach()->create();
+        $s->coaches()->attach(User::factory()->coach()->create()->id);
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s])
+            ->assertSeeHtml('wire:click="registerCoachSelf"');
+    }
+
+    // Accès athlète suspendu (§4.4) : register() refuse MÊME par le bureau — la bascule d'un tiers
+    // suspendu ouvrait tout le dialog de conséquences pour finir en refus. Le picker « Inscrire un
+    // athlète » excluait déjà les suspendus : l'onglet Encadrement était asymétrique.
+    public function test_flip_button_hidden_for_a_suspended_coach_athlete(): void
+    {
+        $s = $this->makeSession();
+        $admin = User::factory()->admin()->create();
+        $suspended = $this->categorize(User::factory()->athleteCoach()->create());
+        $suspended->forceFill(['athlete_access_suspended' => true])->save();
+        $ok = $this->categorize(User::factory()->athleteCoach()->create());
+        $s->coaches()->attach([$suspended->id, $ok->id]);
+
+        Livewire::actingAs($admin)->test(SessionShow::class, ['session' => $s])
+            ->assertDontSeeHtml('flipToAthlete('.$suspended->id.')')
+            ->assertSeeHtml('flipToAthlete('.$ok->id.')'); // contrôle positif appairé
+    }
+
+    // Défense en profondeur : même appelée directement, la bascule d'un suspendu n'ouvre pas le dialog.
+    public function test_flip_to_athlete_does_not_open_dialog_for_a_suspended_target(): void
+    {
+        $s = $this->makeSession();
+        $admin = User::factory()->admin()->create();
+        $suspended = $this->categorize(User::factory()->athleteCoach()->create());
+        $suspended->forceFill(['athlete_access_suspended' => true])->save();
+        $s->coaches()->attach([$suspended->id, User::factory()->coach()->create()->id]);
+
+        Livewire::actingAs($admin)->test(SessionShow::class, ['session' => $s])
+            ->call('flipToAthlete', $suspended->id)
+            ->assertSet('flipConfirm', null)
+            ->assertSee('suspendu', escape: false);
+
+        $this->assertTrue($s->coaches()->whereKey($suspended->id)->exists());
+    }
+
     // ── Retrait de l'encadrement depuis la barre d'action (§4.11.2) ──
 
     // Le retrait n'était atteignable que par l'icône de l'onglet Encadrement : asymétrique, alors
