@@ -140,7 +140,7 @@
 - [ ] Inscrire un athlète **sous quota** → participant + **notification à l'athlète** (Envois : `enrolled_by_coach`).
 - [ ] Inscrire un athlète **au-dessus du quota** → dialog : (a) **file quota** ou (b) **override** avec motif → badge « override » sur l'inscrit, trace en Journal d'audit.
 - [ ] **Retirer** un inscrit d'une séance pleine → le 1ᵉʳ de la file « capacité » est promu (FIFO).
-- [ ] **Débloquer le quota** (mécanisme C) : sur une séance avec file « quota » et des places → bouton de déblocage → promus, AuditLog par athlète. Refusé tant que la file « capacité » n'est pas vide.
+- [ ] `[auto:S17]` **Débloquer le quota** (mécanisme C) : sur une séance avec file « quota » et des places → bouton de déblocage → promus, AuditLog par athlète. Refusé tant que la file « capacité » n'est pas vide.
 - [ ] **Augmenter la capacité** d'une séance pleine avec file → promotions FIFO automatiques.
 
 ### 3.5 Encadrement (PRD §4.11)

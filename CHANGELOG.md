@@ -9,12 +9,14 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Ajouté
 
-- **Tests navigateur (E2E)** : harnais Playwright rejouant 19 scénarios dans un vrai navigateur —
+- **Tests navigateur (E2E)** : harnais Playwright rejouant 20 scénarios dans un vrai navigateur —
   clics, attente des mises à jour Livewire, vérification en base et captures aux formats mobile et
   desktop. Couvre les gardes d'inscription, la bascule de rôle coach/athlète, la tutelle parentale,
   le cloisonnement admin, et — derrière un drapeau explicite — les parcours destructifs (RGPD,
-  rupture de tutelle, bascule de saison). Volontairement **hors de `composer check`** : la porte de
-  qualité reste PHPUnit. Voir [`tests/E2E/README.md`](tests/E2E/README.md).
+  rupture de tutelle, bascule de saison). Le déblocage coach de la file quota (mécanisme C, §4.10.4)
+  y est couvert de bout en bout : bouton actif et désactivé, promotion effective, `AuditLog` émis.
+  Volontairement **hors de `composer check`** : la porte de qualité reste PHPUnit.
+  Voir [`tests/E2E/README.md`](tests/E2E/README.md).
 
 ### Corrigé
 

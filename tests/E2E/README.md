@@ -30,7 +30,7 @@ npx playwright install chromium            # une seule fois
 node tests/E2E/run.mjs          # les 3 suites non destructives (verdict agrégé)
 
 node tests/E2E/scenarios.mjs    # S1–S5   gardes d'inscription et bascule de rôle
-node tests/E2E/parcours.mjs     # S7–S16  parcours métier et cloisonnement
+node tests/E2E/parcours.mjs     # S7–S17  parcours métier et cloisonnement
 node tests/E2E/responsive.mjs   # S6      bascule mobile/desktop
 ```
 
@@ -74,12 +74,20 @@ des requêtes brutes. Les deux **refusent de s'exécuter si `APP_ENV != local`**
 | S14 | Écrans admin | rendus et non vides pour l'admin | §8.6 |
 | S15 | Sélecteur d'athlètes | suspendu et déjà-inscrits exclus | §2, §3.4 |
 | S16 | Séance pleine | file d'attente rejointe, statut `waitlist` | §1.4 |
+| S17 | Quota — mécanisme C | déblocage coach : bouton actif/désactivé, promotion, `AuditLog` | §1.4, §3.4 |
 | D1 | RGPD | suppression refusée pour un garant de P1 | §8.4 |
 | D2 | Tutelle | rupture P2 + `AuditLog guardianship_severed` | §6 |
 | D3 | Bascule de saison | double validation, suspension de masse, réactivation, nouvelle année | §8.8 |
 
 Les scénarios **restaurent l'état** qu'ils modifient (S1 remet Mathieu encadrant, S8 restaure la
-waitlist de Marie).
+waitlist de Marie, S17 remet Camille en file quota et purge l'`AuditLog` qu'il a produit).
+
+> **Mécanismes A et B non automatisés en E2E, délibérément.** Ce sont des effets de bord serveur
+> (promotion automatique sur place libérée, libération du propre quota) : ils ne se déclenchent par
+> aucun geste dédié et leur effet porte souvent sur *un autre* utilisateur ou *une autre* séance. Les
+> rejouer au navigateur reviendrait à réécrire `QuotaTest` / `RegistrationNotificationTest` en
+> beaucoup plus lent, sans rien observer de plus. **C** est automatisé parce qu'il est le seul des
+> trois à être un geste d'interface (un bouton, deux états, deux rendus).
 
 ## Ce qui reste en test manuel
 

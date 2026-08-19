@@ -35,7 +35,7 @@ Une correction de bug apporte **un test qui échouait avant**. Une fonctionnalit
 
 ```bash
 php artisan serve                             # prérequis : serveur + jeu de démo seedé
-node tests/E2E/run.mjs                        # 16 scénarios non destructifs
+node tests/E2E/run.mjs                        # 17 scénarios non destructifs
 node tests/E2E/destructif.mjs --oui-je-sais   # RGPD, tutelle, bascule de saison — reconstruit la base
 ```
 
