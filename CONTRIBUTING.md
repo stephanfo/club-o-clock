@@ -102,7 +102,7 @@ node tests/E2E/run.mjs            # suites non destructives
 Il est **volontairement hors** de `composer check` : il exige un serveur, une base seedée et un
 navigateur — l'y intégrer rendrait la porte de qualité fragile pour de mauvaises raisons. La
 référence de non-régression reste PHPUnit. Détails et conventions d'écriture :
-[tests/E2E/README.md](tests/E2E/README.md).
+[tests/E2E/README.md](https://github.com/stephanfo/club-o-clock/blob/main/tests/E2E/README.md).
 
 Playwright est en `devDependencies` : jamais installé ni exécuté sur l'hébergement mutualisé.
 

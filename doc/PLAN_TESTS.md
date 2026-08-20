@@ -21,7 +21,7 @@
 > Toutes les dates du jeu de démo sont relatives au jour du seed.
 >
 > **Une partie de ce plan est automatisée.** Le harnais E2E (Playwright) rejoue en navigateur les
-> parcours critiques et les cas limites — voir [tests/E2E/README.md](../tests/E2E/README.md) :
+> parcours critiques et les cas limites — voir [tests/E2E/README.md](https://github.com/stephanfo/club-o-clock/blob/main/tests/E2E/README.md) :
 > ```bash
 > node tests/E2E/run.mjs                       # suites non destructives
 > node tests/E2E/destructif.mjs --oui-je-sais  # RGPD + rupture de tutelle, puis reconstruction

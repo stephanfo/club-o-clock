@@ -16,7 +16,7 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   rupture de tutelle, bascule de saison). Le déblocage coach de la file quota (mécanisme C, §4.10.4)
   y est couvert de bout en bout : bouton actif et désactivé, promotion effective, `AuditLog` émis.
   Volontairement **hors de `composer check`** : la porte de qualité reste PHPUnit.
-  Voir [`tests/E2E/README.md`](tests/E2E/README.md).
+  Voir [`tests/E2E/README.md`](https://github.com/stephanfo/club-o-clock/blob/main/tests/E2E/README.md).
 - **Supervision du traitement automatique** : l'écran des envois indique si le cron tourne encore.
   Sans lui, une tâche planifiée interrompue (quota d'hébergement, chemin PHP changé, crontab perdue
   au transfert) laissait les notifications s'accumuler sans qu'aucun signe ne l'annonce — le premier

@@ -21,7 +21,7 @@ démonstration · flux réseau sortants · maintenance · dépannage.
 | **MariaDB** ou **MySQL** | MariaDB ≥ 10.6 · MySQL ≥ 8.0 | Moteur **InnoDB** |
 | **Composer** | ≥ 2 | Dépendances PHP |
 | **Node.js + npm** | ≥ 20 | **Build des assets uniquement** — pas nécessaire sur le serveur (cf. §5) |
-| **Chromium (Playwright)** | — | **Tests navigateur en local uniquement**, optionnel : `npx playwright install chromium` (cf. [`tests/E2E/README.md`](../tests/E2E/README.md)) |
+| **Chromium (Playwright)** | — | **Tests navigateur en local uniquement**, optionnel : `npx playwright install chromium` (cf. [`tests/E2E/README.md`](https://github.com/stephanfo/club-o-clock/blob/main/tests/E2E/README.md)) |
 
 **Services externes** — tous optionnels sauf l'email :
 
