@@ -81,6 +81,18 @@ class GuardianshipService
     /**
      * P2 → P3 (§4.2.2) : rompt le lien de tutelle. Effet immédiat — lien supprimé, AuditLog +
      * notif guardianship_severed unique aux deux destinataires. Idempotent si déjà rompu.
+     *
+     * Refus sur un pupille MINEUR en P1 : la transition part de P2 (§4.2 — le pupille a déjà un
+     * compte propre). Rompre un P1 laisserait un User sans garant ET sans moyen de connexion —
+     * plus personne ne pourrait agir dessus, ni l'enfant (aucun credential), ni le parent (détaché).
+     * Même raisonnement que canSever pour l'enfant lui-même, et que MemberService::requestDeletion
+     * (« ce compte est garant d'un mineur sans compte propre »). Le geste attendu est
+     * l'autonomisation (invite, P1 → P2), puis la rupture.
+     *
+     * La garde est bornée aux MINEURS à dessein : un pupille devenu majeur en gardant son garant
+     * (MemberService::updateDob) n'a plus accès à invite(), qui exige un mineur. L'étendre à lui le
+     * rendrait définitivement captif — soit exactement le défaut qu'on corrige. Pour lui, la rupture
+     * EST la sortie prévue (cf. le bandeau « Ce pupille est majeur » sur la fiche adhérent).
      */
     public function sever(User $ward, User $actor): void
     {
@@ -90,6 +102,13 @@ class GuardianshipService
         DB::transaction(function () use ($ward, $actor, &$guardian, &$severed) {
             if ($ward->guardian_id === null) {
                 return;
+            }
+
+            if ($ward->email === null && $ward->is_minor) {
+                throw new RuntimeException(
+                    'Ce pupille n\'a pas de compte propre (P1) : ouvre-lui d\'abord un compte autonome, '
+                    .'sinon il resterait sans garant et sans accès.'
+                );
             }
 
             // Capture du garant AVANT de couper : après l'update, la relation est vide et le fan-out

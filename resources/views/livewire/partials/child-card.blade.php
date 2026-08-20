@@ -47,9 +47,16 @@
         <div class="sect-head" style="margin-top:16px"><span class="sect-title">Lien de tutelle</span></div>
         <div class="flex ac jb g8">
             <span class="meta" style="font-size:12.5px;line-height:1.4">Phase {{ $c['phase'] }} · {{ $c['phase'] === 'P1' ? 'tu agis en son nom' : 'enfant + parent destinataires' }}</span>
-            @if ($c['phase'] === 'P1')
+            {{-- L'autonomisation exige un mineur (GuardianshipService::invite) : un pupille devenu
+                 majeur garde son garant (MemberService::updateDob), le bouton mènerait au refus.
+                 Le geste pertinent devient « Rompre la tutelle ». --}}
+            @if ($c['phase'] === 'P1' && $w->is_minor)
                 <button class="btn btn-ghost btn-sm" style="flex:0 0 auto" wire:click="openInvite({{ $w->id }})">
                     <x-icon name="user-plus" :size="14" /> Accès autonome
+                </button>
+            @elseif ($c['phase'] === 'P1')
+                <button class="btn btn-ghost btn-sm" style="flex:0 0 auto" wire:click="openSever({{ $w->id }})">
+                    <x-icon name="log-out" :size="14" /> Rompre la tutelle
                 </button>
             @else
                 <button class="btn btn-ghost btn-sm" style="flex:0 0 auto" wire:click="openSever({{ $w->id }})">

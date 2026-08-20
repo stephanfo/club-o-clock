@@ -213,13 +213,22 @@ class MemberShow extends Component
         }
     }
 
-    /** P2 → P3 : rompt le lien de tutelle après confirmation. */
+    /**
+     * P2 → P3 : rompt le lien de tutelle après confirmation. Le refus P1 remonte en flash : le
+     * bouton est masqué dans ce cas, mais l'appel reste atteignable sur état périmé (second onglet,
+     * page rejouée) — sans capture, l'admin verrait une 500.
+     */
     public function severGuardianship(GuardianshipService $service): void
     {
-        $service->sever($this->user, auth()->user());
+        try {
+            $service->sever($this->user, auth()->user());
+            session()->flash('status', 'Lien de tutelle rompu — l\'athlète est désormais autonome (P3).');
+        } catch (RuntimeException $e) {
+            session()->flash('warn', $e->getMessage());
+        }
+
         $this->confirmingSever = false;
         $this->user->refresh();
-        session()->flash('status', 'Lien de tutelle rompu — l\'athlète est désormais autonome (P3).');
     }
 
     /** Garant sélectionné pour rattacher un mineur sans tutelle (geste de rattrapage admin). */

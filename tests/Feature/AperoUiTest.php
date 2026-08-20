@@ -38,6 +38,45 @@ class AperoUiTest extends TestCase
         return $u;
     }
 
+    // ── Fenêtre de (dé)flag : figée au début de la séance (§4.14.3) ──
+
+    // AperoService::guardWindow refuse le retrait après start_at : les deux boutons de retrait
+    // (le sien, et celui de modération coach) ne doivent plus être offerts sur une séance commencée.
+    public function test_unflag_buttons_hidden_once_session_started(): void
+    {
+        $s = $this->makeSession();
+        $u = $this->participant($s);
+        app(AperoService::class)->flag($s, $u);
+        $s->forceFill(['start_at' => Carbon::now()->subHour()])->save();
+
+        // Le payeur lui-même : plus de « Je ne l'offre plus ».
+        Livewire::actingAs($u)->test(SessionShow::class, ['session' => $s->fresh()])
+            ->assertDontSeeHtml('wire:click="unflagApero('.$u->id.')"');
+
+        // Un coach modérateur : plus de « Retirer ce flag ».
+        $coach = User::factory()->coach()->create();
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s->fresh()])
+            ->assertDontSeeHtml('wire:click="unflagApero('.$u->id.')"')
+            // Contrôle positif : le flag est toujours AFFICHÉ (c'est le bouton de retrait qui
+            // disparaît, pas l'information). Sans ça, un rendu vide ferait passer le test.
+            ->assertSee($u->first_name, escape: false);
+    }
+
+    // Contrôle positif appairé : avant le début, les deux voies de retrait restent offertes.
+    public function test_unflag_buttons_visible_before_session_starts(): void
+    {
+        $s = $this->makeSession();
+        $u = $this->participant($s);
+        app(AperoService::class)->flag($s, $u);
+
+        Livewire::actingAs($u)->test(SessionShow::class, ['session' => $s])
+            ->assertSeeHtml('wire:click="unflagApero('.$u->id.')"');
+
+        $coach = User::factory()->coach()->create();
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s])
+            ->assertSeeHtml('wire:click="unflagApero('.$u->id.')"');
+    }
+
     public function test_participant_offers_apero_with_motif(): void
     {
         $s = $this->makeSession();

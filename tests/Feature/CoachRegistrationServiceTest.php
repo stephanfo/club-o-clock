@@ -235,6 +235,39 @@ class CoachRegistrationServiceTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['action' => 'role_changed', 'target_id' => $c1->id, 'motif' => 'coach_to_athlete']);
     }
 
+    // C1 — la bascule est aussi un retrait d'encadrement : elle doit apparaître au journal
+    // d'activité, comme unregister(). Symétrique de flipToCoach, qui émet bien coach_registered.
+    public function test_flip_coach_to_athlete_logs_coach_unregistered(): void
+    {
+        $s = $this->makeSession(capacity: 5);
+        $c1 = $this->categorize(User::factory()->athleteCoach()->create());
+        $c2 = User::factory()->coach()->create();
+        $s->coaches()->attach([$c1->id, $c2->id]);
+
+        $this->service()->flipToAthlete($s, $c1, $c1);
+
+        $this->assertDatabaseHas('activity_logs', [
+            'action' => 'coach_unregistered',
+            'user_id' => $c1->id,
+            'session_id' => $s->id,
+        ]);
+    }
+
+    // C2 — l'encadrement est une notion training (§4.11) : la bascule s'aligne sur register() et
+    // flipToCoach, qui refusent déjà les autres kind.
+    public function test_flip_coach_to_athlete_refused_on_competition(): void
+    {
+        $s = $this->makeSession(capacity: 5);
+        $s->forceFill(['kind' => 'competition'])->save();
+        $c1 = $this->categorize(User::factory()->athleteCoach()->create());
+        $c2 = User::factory()->coach()->create();
+        $s->coaches()->attach([$c1->id, $c2->id]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage("L'inscription coach ne s'applique qu'aux entraînements.");
+        $this->service()->flipToAthlete($s->fresh(), $c1, $c1);
+    }
+
     public function test_flip_last_coach_to_athlete_requires_confirmation(): void
     {
         $s = $this->makeSession(capacity: 5);

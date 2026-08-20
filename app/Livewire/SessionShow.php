@@ -179,6 +179,9 @@ class SessionShow extends Component
             'iAmAperoPayer' => $me !== null && $aperoPayers->contains('user_id', $me->id),
             // Le bouton « J'offre » n'apparaît qu'aux inscrits actifs, séance ouverte (§4.14.1/.3).
             'canFlagApero' => $iParticipate && ! $this->session->hasStarted() && ! $this->session->isCancelled(),
+            // Le retrait suit la même fenêtre (AperoService::guardWindow), sans la condition
+            // d'inscription : il vaut aussi pour la modération coach/admin (§4.14.3).
+            'canUnflagApero' => ! $this->session->hasStarted() && ! $this->session->isCancelled(),
             // Encadrement (§4.11.4) : qualifs agrégées dédupliquées sur les coachs inscrits.
             'aggregatedQualifs' => QualificationDisplay::aggregate($this->session->coaches),
             // Le viewer (coach/admin) peut gérer l'encadrement, et l'est-il déjà lui-même ?

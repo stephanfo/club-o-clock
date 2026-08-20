@@ -100,7 +100,12 @@
                                 <div class="flex ac jb"><span class="sect-title">Tutelle</span><x-icon name="shield" :size="16" class="muted" /></div>
                                 <div class="meta flex ac g4" style="margin-top:12px"><x-icon name="shield" :size="13" style="color:var(--info)" /> Parent garant · <b>{{ $u->guardian->fullName() }}</b></div>
 
-                                @unless ($u->email)
+                                @if (! $u->email && ! $u->is_minor)
+                                    {{-- Devenu majeur en gardant son garant (MemberService::updateDob) :
+                                         GuardianshipService::invite refuse — l'autonomisation ne vaut que
+                                         pour un mineur. Le geste attendu est la rupture de tutelle. --}}
+                                    <x-banner kind="warn" style="margin-top:12px"><div>Ce pupille est <b>majeur</b> : l'ouverture d'un compte autonome ne s'applique plus. Romps le lien de tutelle pour le rendre indépendant.</div></x-banner>
+                                @elseif (! $u->email)
                                     {{-- P1 → P2 : ouverture du compte autonome (§4.2.1) --}}
                                     <div class="meta" style="margin-top:12px;line-height:1.5">Ouvre le compte autonome de l'enfant : saisis son email — l'email doit appartenir à l'enfant. Une invitation d'activation lui sera envoyée ; le lien de tutelle est conservé.</div>
                                     <div class="ifield" style="margin-top:10px"><x-icon name="mail" :size="15" class="muted" /><input class="ifield-input" type="email" wire:model="wardEmail" placeholder="email de l'enfant"></div>
@@ -110,9 +115,15 @@
                                     </button>
                                 @else
                                     <x-banner kind="info" style="margin-top:12px"><div>Compte autonome (<b>P2</b>) — l'enfant se connecte et s'inscrit lui-même ; le parent garant reçoit les notifs en parallèle et peut agir.</div></x-banner>
-                                @endunless
+                                @endif
 
-                                {{-- P2 → P3 : rupture du lien de tutelle (§4.2.2) --}}
+                                {{-- P2 → P3 : rupture du lien de tutelle (§4.2.2).
+                                     Masqué pour un P1 MINEUR : sever() le refuse (il resterait sans
+                                     garant ET sans accès) — le geste attendu est l'autonomisation,
+                                     offerte juste au-dessus. Un pupille majeur sans email garde le
+                                     bouton : invite() ne s'applique plus à lui, la rupture est sa
+                                     seule sortie (cf. le bandeau « majeur » ci-dessus). --}}
+                                @if ($u->email || ! $u->is_minor)
                                 <hr class="divider" style="margin:14px 0">
                                 @if ($confirmingSever)
                                     <x-banner kind="warn"><div>Rompre le lien de tutelle : le parent ne recevra plus les notifs, ne verra plus l'historique et ne pourra plus agir. Action manuelle, tracée. Confirmer ?</div></x-banner>
@@ -124,6 +135,7 @@
                                     <button type="button" class="btn btn-ghost btn-block" wire:click="$set('confirmingSever', true)">
                                         <x-icon name="x" :size="15" /> Rompre le lien de tutelle (P3)
                                     </button>
+                                @endif
                                 @endif
                             </div>
                         @elseif ($u->is_minor && ! $u->anonymized_at)
@@ -234,6 +246,21 @@
                                 <label class="field-label">Principale · dérivée de l'âge</label>
                                 @if ($primary)
                                     <div class="flex ac g8"><span class="chip chip-ink">{{ $primary->label }}</span><span class="chip chip-sm chip-line flex ac g4"><x-icon name="lock" :size="11" /> auto</span></div>
+                                @elseif ($u->dob === null)
+                                    {{-- Sans date de naissance, la dérivation §4.5 ne peut rien produire :
+                                         parler d'âge ici serait trompeur (cas des comptes coach-pur). --}}
+                                    <span class="meta">Aucune date de naissance saisie — catégorie non déterminable.</span>
+                                @elseif ($derivedCat && $u->hasRole('athlete'))
+                                    {{-- Incohérence, mais SEULEMENT pour un athlète : l'âge est couvert par une
+                                         catégorie active alors qu'aucun rattachement principal n'existe (pivot
+                                         périmé, ou jamais posé). Un coach-pur avec une dob n'a pas vocation à
+                                         porter une catégorie — sans la garde de rôle, l'avertissement serait un
+                                         faux positif sur tous les encadrants non-athlètes. --}}
+                                    <span class="meta" style="color:var(--warning-text)">Catégorie « {{ $derivedCat->label }} » attendue mais non rattachée — réenregistre la date de naissance pour corriger.</span>
+                                @elseif (! $u->hasRole('athlete'))
+                                    {{-- Non-athlète (coach-pur, parent-pur) : la catégorie d'âge ne s'applique
+                                         pas à ce compte, ce n'est ni une anomalie ni un trou de barème. --}}
+                                    <span class="meta">Compte sans rôle athlète — la catégorie d'âge ne s'applique pas.</span>
                                 @else
                                     <span class="meta">Aucune catégorie active ne couvre cet âge — compte sans catégorie (contacte le catalogue).</span>
                                 @endif

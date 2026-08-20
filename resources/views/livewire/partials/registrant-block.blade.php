@@ -21,8 +21,10 @@
                     @if (($isStaff ?? false) && $reg->override_by)
                         <span class="chip chip-sm chip-ink" @if ($reg->override_reason) title="{{ $reg->override_reason }}" @endif>override</span>
                     @endif
-                    {{-- Retrait d'un athlète par le bureau (§4.9.7) — inscrits + waitlist. --}}
-                    @if (($isStaff ?? false) && ! empty($removeMethod ?? null))
+                    {{-- Retrait d'un athlète par le bureau (§4.9.7) — inscrits + waitlist.
+                         Fermé dès que la séance a commencé ou est annulée (garde RegistrationService),
+                         d'où $canEnrollOther plutôt que $isStaff : le badge override, lui, reste lisible. --}}
+                    @if (($canEnrollOther ?? false) && ! empty($removeMethod ?? null))
                         <button type="button" class="iconbtn" style="margin-left:auto"
                                 wire:click="{{ $removeMethod }}({{ $reg->user_id }})"
                                 wire:confirm="Retirer {{ $label }} de la séance ?" title="Retirer" aria-label="Retirer {{ $label }}">

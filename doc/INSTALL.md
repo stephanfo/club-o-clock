@@ -21,6 +21,7 @@ démonstration · flux réseau sortants · maintenance · dépannage.
 | **MariaDB** ou **MySQL** | MariaDB ≥ 10.6 · MySQL ≥ 8.0 | Moteur **InnoDB** |
 | **Composer** | ≥ 2 | Dépendances PHP |
 | **Node.js + npm** | ≥ 20 | **Build des assets uniquement** — pas nécessaire sur le serveur (cf. §5) |
+| **Chromium (Playwright)** | — | **Tests navigateur en local uniquement**, optionnel : `npx playwright install chromium` (cf. [`tests/E2E/README.md`](https://github.com/stephanfo/club-o-clock/blob/main/tests/E2E/README.md)) |
 
 **Services externes** — tous optionnels sauf l'email :
 
@@ -454,6 +455,22 @@ C'est lui qui cadence **toutes** les tâches internes : drain des notifications 
 jamais** — elles s'accumulent silencieusement dans l'outbox. Un cron plus espacé décale ou rate ces
 créneaux.
 
+**Vérifier qu'il tourne** — l'écran **Admin → Envois** affiche l'état du traitement automatique :
+
+| Ce qui s'affiche | Signification | Quoi faire |
+|---|---|---|
+| « traitement automatique actif » (sous le titre) | Le cron est passé il y a moins de 15 min | Rien |
+| Bandeau rouge « **Traitement automatique interrompu** » | Aucun passage depuis 15 min ou plus | Le cron ne tourne plus : vérifier la ligne dans le manager, le chemin de `php` et celui d'`artisan` |
+| Bandeau bleu « **jamais observé** » | Aucun passage n'a encore été enregistré | Normal pendant les 5 premières minutes après l'installation. Persistant → le cron n'a jamais été mis en place |
+
+Cette surveillance est passive et sans coût : chaque passage du drain laisse un horodatage, et
+l'écran en déduit l'état. Un `php artisan cache:clear` remet le voyant à « jamais observé » sans que
+ce soit une panne — il se rallume au passage suivant.
+
+> **Pourquoi un voyant plutôt que de regarder la file** : une file vide ne prouve rien. Elle peut
+> signifier « tout est parti » comme « le cron est mort et il n'y avait rien à envoyer ». C'est
+> précisément le cas où la panne reste invisible jusqu'à la première annulation non notifiée.
+
 ---
 
 ## 6. Déploiement B — VPS / serveur dédié
@@ -631,6 +648,62 @@ tar czf storage-$(date +%F).tar.gz storage/app
 > l'incident courant. Prévoir en plus un **export froid mensuel téléchargé hors hébergeur** — une
 > sauvegarde qui vit uniquement chez le fournisseur ne protège pas de la perte du compte.
 
+### 9.1 Répétition de restauration — à faire **avant** la mise en production
+
+Une sauvegarde jamais restaurée n'est pas une sauvegarde, c'est une hypothèse. La restauration se
+répète **une fois à vide**, pendant que la base ne contient encore que des données de démonstration :
+le jour d'un incident réel, le geste est déjà connu et le doute porte sur l'incident, pas sur l'outil.
+
+Le principe : restaurer dans une base **neuve et séparée**, jamais par-dessus la base de production.
+
+```bash
+# 1. Sauvegarder (identique à la commande ci-dessus)
+mysqldump -u <user> -p <base> > sauvegarde-$(date +%F).sql
+
+# 2. Créer une base de restauration DISTINCTE
+mysql -u <user> -p -e "CREATE DATABASE <base>_restore CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+# 3. Restaurer dedans
+mysql -u <user> -p <base>_restore < sauvegarde-$(date +%F).sql
+
+# 4. Vérifier que l'application démarre dessus — aucune migration ne doit être en attente
+DB_DATABASE=<base>_restore php artisan migrate:status
+
+# 5. Supprimer la base de répétition
+mysql -u <user> -p -e "DROP DATABASE <base>_restore;"
+```
+
+**Ce qu'il faut contrôler à l'étape 4**, au-delà du fait que les tables sont là :
+
+| Contrôle | Requête | Attendu |
+|---|---|---|
+| Clés étrangères | `SELECT COUNT(*) FROM information_schema.table_constraints WHERE constraint_schema='<base>_restore' AND constraint_type='FOREIGN KEY';` | identique à la source |
+| Index | `SELECT COUNT(DISTINCT table_name,index_name) FROM information_schema.statistics WHERE table_schema='<base>_restore';` | identique à la source |
+| Moteur | `SELECT DISTINCT engine FROM information_schema.tables WHERE table_schema='<base>_restore';` | `InnoDB` partout |
+| Migrations | `php artisan migrate:status` | aucune ligne `Pending` |
+
+Les clés étrangères sont le contrôle qui compte : un dump produit avec de mauvaises options restaure
+des données d'apparence correcte **sans les contraintes**, et le défaut ne se voit qu'au premier
+enregistrement incohérent, des semaines plus tard.
+
+> **Ne jamais mettre le mot de passe dans la ligne de commande** (`-p<motdepasse>`) : il se retrouve
+> dans l'historique du shell et dans la liste des processus, visible des autres comptes du serveur.
+> Utiliser `-p` seul (saisie interactive), ou un fichier d'options en `chmod 600` :
+>
+> ```bash
+> printf '[client]\nuser=<user>\npassword=<motdepasse>\n' > ~/.my-restore.cnf && chmod 600 ~/.my-restore.cnf
+> mysql --defaults-extra-file=~/.my-restore.cnf <base>_restore < sauvegarde.sql
+> rm ~/.my-restore.cnf
+> ```
+
+**Répétition effectuée sur le jeu de démonstration** (40 adhérents, 74 séances, 89 inscriptions) :
+dump de 257 Ko en ~1 s, restauration en < 1 s, 38 tables / 55 clés étrangères / 117 index identiques,
+aucune migration en attente, et lecture applicative vérifiée (rôles, relations, calcul de quota).
+Sur un club réel, l'ordre de grandeur reste la seconde — ce n'est pas une opération à redouter.
+
+**Ne pas oublier `storage/app/`** : la base restaurée référence des fichiers (logo, parcours GPX) qui
+n'y sont pas. Une restauration complète, c'est la base **et** l'archive `storage`.
+
 **Mise à jour** : `git pull` puis la checklist du §5.3 (ou §6). Consulter le
 [CHANGELOG](../CHANGELOG.md) avant, en particulier pour les notes de version majeure.
 
@@ -654,7 +727,7 @@ Le symptôme le plus fréquent, et presque toujours l'une de ces trois causes :
 
 | Vérifier | Commande / indice |
 |---|---|
-| **Le cron tourne** | Admin → Envois : les messages restent-ils « en attente » ? Tester `php artisan notifications:drain` à la main |
+| **Le cron tourne** | Admin → Envois : un bandeau rouge « Traitement automatique interrompu » répond directement (§5.4). Sinon, tester `php artisan notifications:drain` à la main |
 | **`NOTIF_EMAIL_DRIVER` est renseigné** | Vide → tout est marqué « livré » sans qu'aucun email ne parte (§3.1) |
 | **`MAIL_MAILER` ≠ `log`** | En `log`, les emails vont dans `storage/logs/laravel.log` |
 

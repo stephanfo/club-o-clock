@@ -20,10 +20,20 @@
 > ```
 > Toutes les dates du jeu de démo sont relatives au jour du seed.
 >
+> **Une partie de ce plan est automatisée.** Le harnais E2E (Playwright) rejoue en navigateur les
+> parcours critiques et les cas limites — voir [tests/E2E/README.md](https://github.com/stephanfo/club-o-clock/blob/main/tests/E2E/README.md) :
+> ```bash
+> node tests/E2E/run.mjs                       # suites non destructives
+> node tests/E2E/destructif.mjs --oui-je-sais  # RGPD + rupture de tutelle, puis reconstruction
+> ```
+> Les points marqués **`[auto:Sn]`** ci-dessous sont couverts par un scénario ; le testeur humain
+> peut s'y limiter à un contrôle visuel. Tout le reste demande un passage manuel — notamment
+> PWA/offline/push (§9), import CSV (§8.3) et export XLSX (§8.6).
+>
 > **Consignes générales**
 > - Tester chaque parcours **sur mobile ET sur desktop** (la mise en page diffère, les fonctions sont identiques).
 > - Cocher `[x]` quand le résultat attendu est constaté ; sinon noter l'écart (capture d'écran bienvenue).
-> - ⚠️ Le parcours **Admin §8.8 (bascule de saison)** modifie tous les comptes : le faire **en dernier**, puis recharger le seed.
+> - ⚠️ Le parcours **Admin §8.8 (bascule de saison)** modifie tous les comptes : le faire **en dernier**, puis recharger le seed. Il est aussi couvert par `destructif.mjs` (D3), qui reconstruit la base ensuite.
 > - En environnement de démo, les emails partent dans les logs (`storage/logs/laravel.log`) et le push
 >   nécessite les clés VAPID (voir §9). Les notifications restent visibles dans **Alertes** et **Admin → Envois**.
 
@@ -49,16 +59,16 @@
 - [ ] Filtres : Tout / Natation / Vélo / Course / Compét. + case « Mes inscriptions ».
 - [ ] Vue Mois : pastilles par discipline, clic sur un jour → vue Jour, clic sur « `S<n>` » → vue Semaine.
 - [ ] La séance **annulée** (Course à pied jeudi) apparaît barrée/grisée avec chip « Annulée ».
-- [ ] **Filtrage par catégorie (§4.5)** : Marie (Adulte) voit les séances **adultes** (Natation du mercredi et du samedi 10:45, Cuisses du dimanche) et les séances **ouvertes à tous** (Vélo piste du mardi, PPG du vendredi), mais **PAS** les séances réservées aux jeunes (« Natation samedi matin — jeunes », « Enchaînement — jeunes » du dimanche). Contre-épreuve avec un mineur autonome (`enzo@demo.club`, Cadets) : il voit les séances jeunes + tout-public, **pas** les séances adultes.
+- [ ] `[auto:S9]` **Filtrage par catégorie (§4.5)** : Marie (Adulte) voit les séances **adultes** (Natation du mercredi et du samedi 10:45, Cuisses du dimanche) et les séances **ouvertes à tous** (Vélo piste du mardi, PPG du vendredi), mais **PAS** les séances réservées aux jeunes (« Natation samedi matin — jeunes », « Enchaînement — jeunes » du dimanche). Contre-épreuve avec un mineur autonome (`enzo@demo.club`, Cadets) : il voit les séances jeunes + tout-public, **pas** les séances adultes.
 
 ### 1.4 Inscription / désinscription (PRD §4.9)
 - [ ] S'inscrire sur une séance future avec des places → chip « Tu participes » immédiat (bouton `+` planning mobile ou fiche).
 - [ ] Se désinscrire → confirmation demandée, chip disparaît.
-- [ ] **Séance pleine** : sur « Natation samedi matin — jeunes » (capacité 6, saturée) → bouton « Rejoindre la liste d'attente » → statut « En liste d'attente · `<rang>` ».
-- [ ] **Quota** : Marie a 1 natation cette semaine (quota NAT = 1/sem). S'inscrire à une **2ᵉ natation de la même semaine** → dialog « Quota atteint » ; confirmer → waitlist « quota ». Annuler → aucune inscription.
+- [ ] `[auto:S16]` **Séance pleine** : sur « Natation samedi matin — jeunes » (capacité 6, saturée) → bouton « Rejoindre la liste d'attente » → statut « En liste d'attente · `<rang>` ».
+- [ ] `[auto:S8]` **Quota** : Marie a 1 natation cette semaine (quota NAT = 1/sem). S'inscrire à une **2ᵉ natation de la même semaine** → dialog « Quota atteint » ; confirmer → waitlist « quota ». Annuler → aucune inscription.
 - [ ] **Conflit horaire** : s'inscrire à une séance qui chevauche une inscription existante → alerte non bloquante (confirmation), l'inscription reste possible.
-- [ ] **Séance commencée / passée** : aucun bouton d'inscription ni de désinscription.
-- [ ] **Garde catégorielle (§4.5)** : une séance réservée aux jeunes (« Enchaînement — jeunes ») **ne propose aucun bouton d'inscription** à Marie (Adulte), et une tentative forcée est refusée (« cette séance ne cible pas ta catégorie »). Symétriquement, un mineur autonome (`enzo@demo.club`) ne peut pas s'inscrire à une Natation adultes. Une séance **sans ciblage** (ouverte à tous) reste inscriptible par tous.
+- [ ] `[auto:S11]` **Séance commencée / passée** : aucun bouton d'inscription ni de désinscription.
+- [ ] `[auto:S2,S9]` **Garde catégorielle (§4.5)** : une séance réservée aux jeunes (« Enchaînement — jeunes ») **ne propose aucun bouton d'inscription** à Marie (Adulte), et une tentative forcée est refusée (« cette séance ne cible pas ta catégorie »). Symétriquement, un mineur autonome (`enzo@demo.club`) ne peut pas s'inscrire à une Natation adultes. Une séance **sans ciblage** (ouverte à tous) reste inscriptible par tous.
 - [ ] **Libération de place** : se désinscrire d'une séance pleine où quelqu'un attend → le 1ᵉʳ de la file passe automatiquement « participant » (vérifiable en se connectant avec lui, ou dans Admin → Envois : notification de promotion).
 
 ### 1.5 Fiche séance (PRD §4.7, §4.12, §4.13)
@@ -69,7 +79,7 @@
 - [ ] **Parcours** : sur un « Vélo — Cuisses » du dimanche → onglet Parcours présent (l'embed OpenRunner utilise un code factice en démo, la carte ne s'affiche donc pas ; la **bibliothèque GPX**, elle, affiche de vraies traces). Sur « Sortie trail nature » → lieu en texte libre, pas de carte ni météo.
 - [ ] **Météo** : sur une séance < 16 jours avec lieu géocodé → prévision affichée ; au-delà → « trop loin ».
 - [ ] **Ciblage (§4.5)** : panneau « Ciblage » listant les catégories visées en chips (triées) ; une séance sans ciblage n'affiche pas ce panneau (ou indique « ouverte à toutes les catégories »).
-- [ ] La séance **annulée** affiche le bandeau « Séance annulée », aucune action d'inscription.
+- [ ] `[auto:S10]` La séance **annulée** affiche le bandeau « Séance annulée », aucune action d'inscription.
 
 ### 1.6 Apéro (PRD §4.14)
 - [ ] Sur une séance où Marie **participe** (future) : bouton « J'offre l'apéro » + motif (max 140).
@@ -93,7 +103,7 @@
 - [ ] **Demande de suppression de compte** → message « demande envoyée » ; un bandeau propose l'**annulation** pendant 7 jours ; annuler.
 
 ### 1.10 Pages d'information (PRD §4.19)
-- [ ] Menu **Infos** : Marie (athlète) voit **exactement 2 notes** — les 2 codes promo (« Sport Attitude » et « Aquagliss ») destinés à **tous**. Elle ne voit **ni** le code portail piscine (coachs) **ni** la fiche identifiants extranet (admin).
+- [ ] `[auto:S7]` Menu **Infos** : Marie (athlète) voit **exactement 2 notes** — les 2 codes promo (« Sport Attitude » et « Aquagliss ») destinés à **tous**. Elle ne voit **ni** le code portail piscine (coachs) **ni** la fiche identifiants extranet (admin).
 - [ ] Contenu enrichi (gras, listes, liens) rendu proprement ; la note épinglée « Sport Attitude » remonte aussi en **bannière d'accueil** (§1.2) et l'ancre depuis la bannière ouvre la bonne note.
 - [ ] Aucun bouton d'édition/création côté athlète (lecture seule).
 
@@ -102,8 +112,8 @@
 ## 2. Parcours Athlète suspendu — `kevin@demo.club`
 
 - [ ] Connexion possible (le compte est actif).
-- [ ] Planning/fiches consultables, mais **aucune inscription possible** : message « accès aux inscriptions suspendu — contacte le bureau ».
-- [ ] Kévin n'apparaît **pas** dans le sélecteur « Inscrire un athlète » d'un coach (voir §3.4).
+- [ ] `[auto:S3]` Planning/fiches consultables, mais **aucune inscription possible** : message « accès aux inscriptions suspendu — contacte le bureau ».
+- [ ] `[auto:S15]` Kévin n'apparaît **pas** dans le sélecteur « Inscrire un athlète » d'un coach (voir §3.4).
 
 ---
 
@@ -126,21 +136,21 @@
 - [ ] Téléverser un **GPX ≤ 5 Mo** → tracé sur fond OSM + bouton téléchargement.
 
 ### 3.4 Gestion des inscrits (PRD §4.9.7)
-- [ ] Fiche → Inscrits → **« Inscrire un athlète »** : le picker liste les athlètes actifs **sans Kévin (suspendu)**, sans les déjà-inscrits, sans les encadrants ; recherche par nom OK.
+- [ ] `[auto:S15]` Fiche → Inscrits → **« Inscrire un athlète »** : le picker liste les athlètes actifs **sans Kévin (suspendu)**, sans les déjà-inscrits, sans les encadrants ; recherche par nom OK.
 - [ ] Inscrire un athlète **sous quota** → participant + **notification à l'athlète** (Envois : `enrolled_by_coach`).
 - [ ] Inscrire un athlète **au-dessus du quota** → dialog : (a) **file quota** ou (b) **override** avec motif → badge « override » sur l'inscrit, trace en Journal d'audit.
 - [ ] **Retirer** un inscrit d'une séance pleine → le 1ᵉʳ de la file « capacité » est promu (FIFO).
-- [ ] **Débloquer le quota** (mécanisme C) : sur une séance avec file « quota » et des places → bouton de déblocage → promus, AuditLog par athlète. Refusé tant que la file « capacité » n'est pas vide.
+- [ ] `[auto:S17]` **Débloquer le quota** (mécanisme C) : sur une séance avec file « quota » et des places → bouton de déblocage → promus, AuditLog par athlète. Refusé tant que la file « capacité » n'est pas vide.
 - [ ] **Augmenter la capacité** d'une séance pleine avec file → promotions FIFO automatiques.
 
 ### 3.5 Encadrement (PRD §4.11)
 - [ ] S'inscrire comme **encadrant** sur une séance ; ses qualifications (BF2, PSC1 expirée) s'agrègent sur la fiche.
 - [ ] Inscrire un **autre coach** comme encadrant (voie 3).
 - [ ] Retirer le **dernier coach** d'une séance → confirmation explicite « séance sans encadrement ».
-- [ ] Un encadrant inscrit **athlète** sur la même séance : impossible sans **bascule** ; « Je participe » ouvre le dialog de bascule (place + quota revalidés).
+- [ ] `[auto:S1]` Un encadrant inscrit **athlète** sur la même séance : impossible sans **bascule** ; « Je participe » ouvre le dialog de bascule (place + quota revalidés).
 
 ### 3.6 Pages d'information (PRD §4.19)
-- [ ] Menu **Infos** : Vincent (coach) voit **3 notes** — les 2 codes promo (tous) **plus** le code de portail piscine réservé aux **coachs**. Il ne voit **pas** la fiche identifiants extranet (admin seul). Toujours en lecture seule (pas d'édition).
+- [ ] `[auto:S7]` Menu **Infos** : Vincent (coach) voit **3 notes** — les 2 codes promo (tous) **plus** le code de portail piscine réservé aux **coachs**. Il ne voit **pas** la fiche identifiants extranet (admin seul). Toujours en lecture seule (pas d'édition).
 
 ---
 
@@ -148,7 +158,7 @@
 
 - [ ] Les deux tiers de navigation apparaissent (athlète + coach).
 - [ ] Mathieu s'inscrit comme **athlète** à une séance, et **encadre** une autre : les deux chips « Tu participes » / « Tu encadres » cohabitent sur des séances différentes.
-- [ ] Sur une même séance : jamais les deux rôles à la fois (bascule obligatoire, §3.5).
+- [ ] `[auto:S1]` Sur une même séance : jamais les deux rôles à la fois (bascule obligatoire, §3.5).
 
 ---
 
@@ -172,7 +182,7 @@
 - [ ] Sélecteur à **3 pilules** : Moi / Jade / Noah.
 - [ ] Sandrine s'inscrit **pour elle-même** (sujet « Moi ») ; puis bascule sur **Jade** et l'inscrit ; puis sur **Noah** — trois inscriptions distinctes, chacune au bon nom.
 - [ ] « Mes enfants » : deux cartes (Jade P1 avec « Accès autonome », Noah P2 avec « Rompre la tutelle »). Noah affiche **Cadets** + surclassement **Juniors** sur sa fiche adhérent (visible côté admin).
-- [ ] **Rompre la tutelle** de Noah → dialog de confirmation → Noah disparaît de « Mes enfants » et du sélecteur ; notification aux **deux** ; Noah (P3) reste connecté et autonome. *(Recharger le seed ensuite si besoin de rejouer.)*
+- [ ] `[auto:D2]` **Rompre la tutelle** de Noah → dialog de confirmation → Noah disparaît de « Mes enfants » et du sélecteur ; notification aux **deux** ; Noah (P3) reste connecté et autonome. *(Recharger le seed ensuite si besoin de rejouer.)*
 
 ---
 
@@ -180,7 +190,7 @@
 
 - [ ] Théo se connecte avec **son propre compte** et s'inscrit **lui-même** à une séance.
 - [ ] Les notifications de Théo arrivent **en double** : à Théo ET à Olivier (vérifier dans Admin → Envois : deux destinataires pour le même événement).
-- [ ] **Olivier = parent pur** (aucun rôle) : il se connecte, voit Théo dans **« Mes enfants »**, peut l'inscrire/désinscrire via le sélecteur — mais **ne peut pas s'inscrire lui-même** (tentative → message « pas le rôle athlète »).
+- [ ] `[auto:S12]` **Olivier = parent pur** (aucun rôle) : il se connecte, voit Théo dans **« Mes enfants »**, peut l'inscrire/désinscrire via le sélecteur — mais **ne peut pas s'inscrire lui-même** (tentative → message « pas le rôle athlète »).
 - [ ] Olivier ne peut **pas** modifier les préférences de notification de Théo.
 
 ---
@@ -211,7 +221,7 @@
 - [ ] Bandeau Accueil : **1 compte éligible** (Daniel). Page Adhérents → filtre suppressions : Gilles (tampon en cours, annulable) + Daniel (éligible).
 - [ ] Tenter de confirmer la suppression de **Gilles** → refusée (J+7 non écoulé) ; **annuler** sa demande.
 - [ ] Confirmer la suppression de **Daniel** (saisie du nom + double validation) → compte **anonymisé** (ligne conservée, PII effacées), `AuditLog account_deleted`, ses débriefs éventuels restent (texte conservé, auteur anonymisé).
-- [ ] **Garant avec pupille P1** : tenter la suppression de `florence@demo.club` (garante de Lucie P1) → **refusée** avec message explicite (autonomiser ou reparenter l'enfant d'abord).
+- [ ] `[auto:D1]` **Garant avec pupille P1** : tenter la suppression de `florence@demo.club` (garante de Lucie P1) → **refusée** avec message explicite (autonomiser ou reparenter l'enfant d'abord).
 - [ ] **Garant avec pupille P2 seulement** : demander la suppression de `olivier@demo.club` → acceptée ; à la confirmation (après J+7, ou en base pour tester), la **tutelle de Théo est rompue automatiquement** (AuditLog `guardianship_severed`, notification aux deux) — Théo passe P3, sa fiche ne pointe plus un « Compte supprimé ». *(Recharger le seed ensuite.)*
 - [ ] **Parent désactivé** : un compte en tampon de suppression (`is_active=false`) ne reçoit **plus** les notifications de ses enfants (routage filtré) ; si un P1 n'a plus aucun destinataire joignable, l'événement est tracé dans les logs applicatifs.
 
@@ -223,21 +233,21 @@
 
 ### 8.6 Dashboard, journaux, envois (PRD §4.16, §4.18, §4.15.6)
 - [ ] Dashboard : stats de remplissage, activité coachs, compteur « séances futures sans coach » ; **export XLSX** téléchargeable et ouvrable.
-- [ ] Journaux : **Audit** (overrides, suppressions, tutelle…) et **Activité** (inscriptions…) séparés, filtrables, exportables ; accessibles à l'admin seul (vérifier 403 avec un coach).
+- [ ] `[auto:S13,S14]` Journaux : **Audit** (overrides, suppressions, tutelle…) et **Activité** (inscriptions…) séparés, filtrables, exportables ; accessibles à l'admin seul (vérifier 403 avec un coach).
 - [ ] **Envois** : lignes `sent` et `pending` (seed), filtres par statut/canal ; **annuler** une ligne pending ; **rejouer** une ligne échouée ; déclencher un envoi manuel.
 
 ### 8.7 Pages d'information (PRD §4.19)
-- [ ] **Admin → Pages d'info** : les **4 notes** seedées sont listées (2 « tous », 1 « coachs », 1 « admin »), avec leur niveau de visibilité et l'état épinglé.
+- [ ] `[auto:S7]` **Admin → Pages d'info** : les **4 notes** seedées sont listées (2 « tous », 1 « coachs », 1 « admin »), avec leur niveau de visibilité et l'état épinglé.
 - [ ] **Créer** une note (titre, contenu WYSIWYG, niveau de visibilité `tous`/`coachs`/`admin`, épinglage) → elle apparaît sur la page **Infos** aux seuls rôles concernés (recouper avec §1.10 athlète, §3.6 coach).
 - [ ] **Épingler** une note → elle remonte en **bannière d'accueil** pour les rôles qui la voient ; la dépingler → la bannière disparaît (le rang dans la liste n'en dépend pas).
 - [ ] **Réordonner** via ↑/↓ → l'ordre d'affichage change sur la page Infos ; les positions restent densifiées (pas de trou).
 - [ ] **Modifier** puis **archiver** une note → elle disparaît de la page Infos et des bannières ; le contenu HTML est nettoyé (Markup::clean — pas d'injection).
-- [ ] **Contrôle d'accès** : un coach n'accède pas à `/admin/infos` (403 ou masquage) — seule l'édition membre `/infos` lui est ouverte.
+- [ ] `[auto:S13]` **Contrôle d'accès** : un coach n'accède pas à `/admin/infos` (403 ou masquage) — seule l'édition membre `/infos` lui est ouverte.
 
 ### 8.8 ⚠️ Bascule de saison (PRD §4.4) — À FAIRE EN DERNIER
-- [ ] Déclencher la **suspension de masse** → tous les athlètes passent « accès suspendu », leurs inscriptions **futures** sont annulées (promotions déclenchées), coachs/admins conservent leurs rôles.
-- [ ] **Réactiver individuellement** un athlète → il peut se réinscrire.
-- [ ] Nouvelle année sportive : recalcul des catégories (les surclassements sont réinitialisables via l'action dédiée).
+- [ ] `[auto:D3]` Déclencher la **suspension de masse** → tous les athlètes passent « accès suspendu », leurs inscriptions **futures** sont annulées (promotions déclenchées), coachs/admins conservent leurs rôles.
+- [ ] `[auto:D3]` **Réactiver individuellement** un athlète → il peut se réinscrire.
+- [ ] `[auto:D3]` Nouvelle année sportive : recalcul des catégories (les surclassements sont réinitialisables via l'action dédiée).
 - [ ] **Recharger le seed** après ce test.
 
 ---

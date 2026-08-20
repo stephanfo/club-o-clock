@@ -29,12 +29,17 @@
     $canEnroll = $me?->can('enroll', [$session, $subj]) ?? false;
     // Motif de blocage (§4.4 suspension, §4.5 catégorie) pour afficher le bon message à l'athlète.
     // Ignoré si $canEnroll ou si déjà inscrit (le grandfathering rend canEnroll vrai de toute façon).
-    $enrollBlockReason = null;
-    if (! $canEnroll && $subj) {
-        $enrollBlockReason = $subj->athlete_access_suspended
-            ? 'suspended'
-            : (! $subj->hasActiveCategory() ? 'no_category' : 'category_mismatch');
-    }
+    $enrollBlockReason = ! $canEnroll && $subj ? $subj->enrollBlockReason() : null;
+    // Éligibilité de MOI, indépendante du sujet consulté (§4.2) : la bascule de rôle agit sur
+    // auth()->user(), jamais sur l'enfant sélectionné. Sans ça, un parent coach+athlète perdait
+    // « Je participe » dès qu'il consultait un enfant non inscriptible.
+    $meCanEnroll = $me && $subj && $me->id === $subj->id
+        ? $canEnroll
+        : ($me?->can('enroll', [$session, $me]) ?? false);
+
+    // Motif de blocage me concernant, pour le bloc encadrant (même logique, sujet = moi).
+    $meBlockReason = ! $meCanEnroll && $me ? $me->enrollBlockReason() : null;
+
     $myWlPos = null;
     if ($myStatus === 'waitlist') {
         $pos = $wlCap->search(fn ($r) => $r->user_id === $subj->id); // $wlCap est déjà trié FIFO + réindexé
@@ -233,6 +238,8 @@
             @elseif ($started)
                 <div class="meta f1" style="font-size:var(--text-xs);align-self:center">Séance commencée — inscriptions closes.</div>
             @else
+                {{-- Le partial porte lui-même le repli encadrant (coach-pur, ou inscription bloquée
+                     §4.4/§4.5) : sans texte, cette barre `position: fixed` s'afficherait vide. --}}
                 @include('livewire.partials.enroll-actions', ['variant' => 'mobile'])
             @endif
         </div>

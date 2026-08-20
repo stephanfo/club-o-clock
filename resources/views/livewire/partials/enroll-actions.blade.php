@@ -1,25 +1,91 @@
 {{-- Actions d'inscription athlète (§4.9, §4.10), partagées fiche mobile / desktop.
      Reçoit : $myStatus, $isFull, $canEnroll, $hasConflict, $confirmingQuota, $variant,
      et le sujet consulté ($subjName — parent → enfant, §4.2). --}}
-@php($block = ($variant ?? 'mobile') === 'desktop' ? 'btn-block' : 'f1')
+@php($isDesktop = ($variant ?? 'mobile') === 'desktop')
+@php($block = $isDesktop ? 'btn-block' : 'f1')
 @php($subjName = $subjName ?? null)
+{{-- Quitter l'encadrement : une seule définition pour les trois points d'appel (segment, coach-pur,
+     coach-athlète bloqué) — trois gardes rédigées séparément divergeaient au premier changement. --}}
+@php($canLeaveCoaching = ($canManageCoaches ?? false) && $session->kind === 'training'
+    && ! $session->isCancelled() && ! $session->hasStarted())
 
 {{-- Bascule de rôle pour SOI sur une séance training (§4.11.5 cas 1/2), porté de SelfRoleToggle.
-     Visible quand je suis encadrant ici : « Je participe » déclenche le dialog de bascule. --}}
-@if (($iAmCoachHere ?? false) && $session->kind === 'training' && ! $session->isCancelled())
-    <div style="margin-bottom:12px;{{ ($variant ?? 'mobile') === 'mobile' ? 'flex:1' : '' }}">
-        <div class="eyebrow" style="margin-bottom:6px">Mon inscription</div>
-        <div class="flex g6">
-            <button class="btn btn-dark f1" style="cursor:default" aria-pressed="true"><x-icon name="whistle" :size="14" /> J’encadre</button>
-            <button class="btn btn-ghost f1" wire:click="flipToAthlete({{ auth()->id() }})">Je participe</button>
+     Visible quand je suis encadrant ici : « Je participe » déclenche le dialog de bascule.
+     Réservé à qui a le rôle athlète (§2) : un coach-pur n'a pas d'existence athlète à activer,
+     la bascule échouerait en NOT_AN_ATHLETE. Même garde qu'en voie tiers (fiche-encadrement).
+     Conditionné en plus à $meCanEnroll : la bascule finit par un register() sur auth()->user(),
+     elle hérite donc des mêmes gardes que l'inscription directe (§4.5 catégorie, §4.4 suspension)
+     — sans quoi elle échouait APRÈS confirmation, bouton apparemment mort. Bien $meCanEnroll et
+     non $canEnroll, qui porte sur le SUJET consulté : en voie parent → enfant (§4.2), l'éligibilité
+     de l'enfant n'a rien à voir avec ma propre bascule. --}}
+@if (($iAmCoachHere ?? false) && auth()->user()?->hasRole('athlete') && ($meCanEnroll ?? false)
+     && $session->kind === 'training' && ! $session->isCancelled())
+    {{-- Plus de marge basse : le bloc finit sur le segment, et la barre fixe mobile a déjà son
+         propre padding — la marge s'y ajoutait et mangeait de la hauteur pour rien. --}}
+    <div style="{{ ! $isDesktop ? 'flex:1' : 'margin-bottom:12px' }}">
+        {{-- Titre en desktop seulement : la colonne enchaîne sur la section « Gestion » (son propre
+             eyebrow), il sépare deux groupes. Dans la barre fixe mobile il n'y a rien à séparer —
+             aucun autre état de cette barre n'est titré, et le segment se lit seul. --}}
+        @if ($isDesktop)
+            <div class="eyebrow" style="margin-bottom:6px">Mon inscription</div>
+        @endif
+        {{-- Contrôle segmenté (seg/seg-item) plutôt que deux boutons : « J'encadre » est un ÉTAT,
+             pas une action — rendu en <span>, il ne peut plus être pris pour un bouton cliquable.
+             Seul « Je participe » est actionnable, et la forme segmentée dit « voici mon rôle,
+             voici l'autre » sans avoir à le lire dans le texte d'aide.
+             Pas de texte de conséquence sous le contrôle : le dialog de bascule (coach-dialogs)
+             l'énonce déjà avant toute action — le répéter en permanence coûtait quatre lignes sur
+             la barre mobile, qui masquaient le bas de la page. --}}
+        <div class="seg seg-roles" role="group" aria-label="Mon rôle sur cette séance">
+            {{-- État, pas action : un <span> ne peut pas être pris pour un bouton cliquable.
+                 aria-disabled plutôt qu'aria-current (réservé à la navigation) — le lecteur
+                 d'écran annonce un élément présent mais non actionnable. --}}
+            <span class="seg-item on" aria-disabled="true"><x-icon name="whistle" :size="14" /> J’encadre</span>
+            <button type="button" class="seg-item" wire:click="flipToAthlete({{ auth()->id() }})"
+                    wire:loading.attr="disabled" wire:target="flipToAthlete">Je participe</button>
         </div>
-        <div class="meta" style="font-size:11.5px;margin-top:6px;line-height:1.4">Tu encadres cette séance. Participer comme athlète demande une confirmation (place &amp; quota) et te retire de l’encadrement — un seul rôle par séance.</div>
+        {{-- Quitter la séance sans y participer : le segment ne couvre que le choix ENTRE les deux
+             rôles, pas le retrait pur. Discret (lien) pour ne pas concurrencer la bascule. --}}
+        {{-- canManageCoaches (coach OU admin) est le bon signal ici, contrairement au CTA
+             d'inscription : la policy unregisterCoach demande exactement ça, et la personne est
+             déjà encadrante — aucune garde de rôle ne peut la refuser. --}}
+        @if ($canLeaveCoaching)
+            <button wire:click="unregisterCoach({{ auth()->id() }})" wire:loading.attr="disabled" wire:target="unregisterCoach"
+                    class="auth-link" style="margin-top:8px">Me retirer de l’encadrement</button>
+        @endif
     </div>
 @endif
 
 {{-- Un encadrant ici ne peut pas être athlète sur la même séance : la voie « Je participe »
-     ci-dessus (bascule §4.11.5) remplace les boutons d'inscription athlète. --}}
+     ci-dessus (bascule §4.11.5) remplace les boutons d'inscription athlète. Si cette voie est
+     fermée (pas le rôle athlète, ou inscription bloquée §4.4/§4.5), on affiche le motif plutôt
+     que rien : masquer le bouton sans explication laisserait une zone muette (PRD §4.5 l.281). --}}
 @if ($iAmCoachHere ?? false)
+    @if (! auth()->user()?->hasRole('athlete'))
+        {{-- Coach-pur encadrant : pas d'inscription athlète possible, mais le retrait de
+             l'encadrement lui est offert ici — symétrique de « M'inscrire comme coach ». Il n'était
+             atteignable que par l'icône de l'onglet Encadrement. Le dialog « dernier coach » et la
+             garde serveur restent ceux de unregisterCoach. --}}
+        @if ($canLeaveCoaching)
+            <button wire:click="unregisterCoach({{ auth()->id() }})" wire:loading.attr="disabled" wire:target="unregisterCoach"
+                    class="btn btn-ghost {{ $block }}">
+                <x-icon name="user-minus" :size="15" /> Me retirer de l’encadrement
+            </button>
+        @else
+            <div class="meta {{ $isDesktop ? '' : 'f1' }}" style="font-size:var(--text-xs);align-self:center">Tu encadres cette séance.</div>
+        @endif
+    @elseif (! ($meCanEnroll ?? false))
+        {{-- Motif de MA situation (meCanEnroll/meBlockReason) : ce bloc explique pourquoi MA
+             bascule est fermée, pas pourquoi l'enfant consulté ne peut pas s'inscrire. --}}
+        @include('livewire.partials.enroll-block-reason', ['enrollBlockReason' => $meBlockReason ?? null, 'subjName' => null])
+        @if ($canLeaveCoaching)
+            <button wire:click="unregisterCoach({{ auth()->id() }})" wire:loading.attr="disabled" wire:target="unregisterCoach"
+                    class="btn btn-ghost {{ $block }}"
+                    @if ($isDesktop) style="margin-top:var(--space-2)" @endif>
+                <x-icon name="user-minus" :size="15" /> Me retirer de l’encadrement
+            </button>
+        @endif
+    @endif
 @elseif ($myStatus === 'participating')
     <button wire:key="enr-act-unenroll-{{ $session->id }}" wire:click="unenroll" wire:loading.attr="disabled" wire:target="unenroll"
             wire:confirm="{{ $subjName ? "Désinscrire {$subjName} de cette séance ?" : 'Te désinscrire de cette séance ?' }}"
@@ -29,18 +95,7 @@
             wire:confirm="{{ $subjName ? "Retirer {$subjName} de la liste d'attente ?" : "Quitter la liste d'attente ?" }}"
             class="btn btn-ghost {{ $block }}">{{ $subjName ? "Retirer {$subjName} de la liste d'attente" : "Quitter la liste d'attente" }}</button>
 @elseif (! $canEnroll)
-    @php($reason = $enrollBlockReason ?? 'suspended')
-    <div class="meta {{ $variant === 'desktop' ? '' : 'f1' }}" style="font-size:var(--text-xs);align-self:center">
-        @if ($reason === 'no_category')
-            {{-- §4.5 : athlète sans catégorie active — inscription bloquée partout. --}}
-            {{ $subjName ? "Aucune catégorie attribuée au compte de {$subjName} — contacte l'admin." : 'Aucune catégorie attribuée à ton compte — contacte l\'admin.' }}
-        @elseif ($reason === 'category_mismatch')
-            {{-- §4.5 : la séance ne cible aucune des catégories de l'athlète. --}}
-            {{ $subjName ? "Cette séance ne concerne pas la catégorie de {$subjName}." : "Cette séance ne concerne pas ta catégorie." }}
-        @else
-            {{ $subjName ? "L'accès aux inscriptions de {$subjName} est suspendu — contacte le bureau." : 'Ton accès aux inscriptions est suspendu — contacte le bureau.' }}
-        @endif
-    </div>
+    @include('livewire.partials.enroll-block-reason')
 @elseif ($isFull)
     <button wire:key="enr-act-joinwl-{{ $session->id }}" wire:click="enroll" wire:loading.attr="disabled" wire:target="enroll"
             @if ($hasConflict) wire:confirm="{{ $subjName ? "{$subjName} est déjà inscrit·e à une séance qui chevauche ce créneau. Rejoindre quand même la liste d'attente ?" : "Tu es déjà inscrit·e à une séance qui chevauche ce créneau. Rejoindre quand même la liste d'attente ?" }}" @endif

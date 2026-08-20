@@ -8,6 +8,7 @@ use App\Models\NotificationOutbox;
 use App\Models\User;
 use App\Notifications\NotificationType;
 use App\Services\OutboxAdminService;
+use App\Services\SchedulerHeartbeatService;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -256,11 +257,16 @@ class Outbox extends Component
         $this->detailId = null;
     }
 
-    public function render(OutboxAdminService $service)
+    public function render(OutboxAdminService $service, SchedulerHeartbeatService $heartbeat)
     {
         $page = $service->page($this->filters(), $this->perPage);
 
         return view('livewire.admin.outbox', [
+            // Supervision du cron (INSTALL §5.4) : sans lui, les envois ne partent plus et rien ne
+            // le signale. L'écran des envois est l'endroit où l'admin vient quand il doute d'un
+            // envoi — c'est donc là que l'information doit se trouver.
+            'scheduler' => $heartbeat->status(),
+            'staleAfter' => SchedulerHeartbeatService::STALE_AFTER_MINUTES,
             'tz' => ClubSettings::current()->timezone,
             'rows' => $page['rows'],
             'total' => $page['total'],

@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Livewire\SessionShow;
 use App\Models\Qualification;
+use App\Models\Registration;
 use App\Models\Session;
 use App\Models\User;
+use App\Services\RegistrationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
@@ -26,6 +28,77 @@ class CoachUiTest extends TestCase
             'duration_min' => 90, 'capacity' => $capacity,
             'created_by' => User::factory()->coach()->create()->id,
         ])); // séance ciblant la catégorie ouverte (§4.5).
+    }
+
+    // ── Refus : un athlète simple ne gère pas l'encadrement (§4.11.2, SessionPolicy) ──
+
+    // Ces tests valent pour le COMPOSANT : les tests de policy vérifient la règle en isolation,
+    // mais pas que SessionShow l'invoque. Retirer un authorize() les ferait échouer.
+    public function test_plain_athlete_cannot_self_register_as_coach(): void
+    {
+        $s = $this->makeSession();
+        $athlete = $this->athlete();
+
+        Livewire::actingAs($athlete)->test(SessionShow::class, ['session' => $s])
+            ->call('registerCoachSelf')
+            ->assertForbidden();
+
+        $this->assertFalse($s->coaches()->whereKey($athlete->id)->exists());
+    }
+
+    public function test_plain_athlete_cannot_unregister_a_coach(): void
+    {
+        $s = $this->makeSession();
+        $coach = User::factory()->coach()->create();
+        $s->coaches()->attach($coach->id);
+        $athlete = $this->athlete();
+
+        Livewire::actingAs($athlete)->test(SessionShow::class, ['session' => $s])
+            ->call('unregisterCoach', $coach->id)
+            ->assertForbidden();
+
+        // L'encadrant est toujours en place.
+        $this->assertTrue($s->coaches()->whereKey($coach->id)->exists());
+    }
+
+    public function test_plain_athlete_cannot_open_coach_picker(): void
+    {
+        $s = $this->makeSession();
+
+        Livewire::actingAs($this->athlete())->test(SessionShow::class, ['session' => $s])
+            ->call('openCoachPicker')
+            ->assertForbidden();
+    }
+
+    // flipToCoach n'était appelée par aucun test : on couvre le refus ET le cas nominal.
+    public function test_plain_athlete_cannot_flip_someone_to_coach(): void
+    {
+        $s = $this->makeSession();
+        $target = User::factory()->athleteCoach()->create();
+        $athlete = $this->athlete();
+
+        Livewire::actingAs($athlete)->test(SessionShow::class, ['session' => $s])
+            ->call('flipToCoach', $target->id)
+            ->assertForbidden();
+    }
+
+    public function test_admin_flips_registered_athlete_to_coach(): void
+    {
+        $s = $this->makeSession();
+        $admin = User::factory()->admin()->create();
+        $dual = $this->categorize(User::factory()->athleteCoach()->create());
+        app(RegistrationService::class)->register($s, $dual, $dual);
+
+        Livewire::actingAs($admin)->test(SessionShow::class, ['session' => $s])
+            ->call('flipToCoach', $dual->id)                       // 1er appel : ouvre le dialog
+            ->assertSet('flipConfirm.dir', 'to_coach')
+            ->call('flipToCoach', $dual->id, true)                 // confirmation
+            ->assertSet('flipConfirm', null);
+
+        // Devenu encadrant, et son inscription athlète est retirée (exclusivité §4.11.5).
+        $this->assertTrue($s->coaches()->whereKey($dual->id)->exists());
+        $this->assertSame(0, Registration::where('session_id', $s->id)
+            ->where('user_id', $dual->id)->whereIn('status', ['participating', 'waitlist'])->count());
     }
 
     public function test_coach_self_registers_from_fiche(): void

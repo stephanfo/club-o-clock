@@ -70,7 +70,7 @@
             </div>
             <x-slot:footer>
                 <button type="button" class="btn btn-ghost" wire:click="cancelInvite">Annuler</button>
-                <button type="button" class="btn btn-primary" wire:click="sendInvite"><x-icon name="send" :size="14" /> Envoyer l'invitation</button>
+                <button type="button" class="btn btn-primary" wire:click="sendInvite" wire:loading.attr="disabled" wire:target="sendInvite"><x-icon name="send" :size="14" /> Envoyer l'invitation</button>
             </x-slot:footer>
         </x-dialog>
     @endif
@@ -87,7 +87,7 @@
             </x-banner>
             <x-slot:footer>
                 <button type="button" class="btn btn-ghost" wire:click="cancelSever">Annuler</button>
-                <button type="button" class="btn btn-danger" wire:click="confirmSever"><x-icon name="log-out" :size="14" /> Rompre la tutelle</button>
+                <button type="button" class="btn btn-danger" wire:click="confirmSever" wire:loading.attr="disabled" wire:target="confirmSever"><x-icon name="log-out" :size="14" /> Rompre la tutelle</button>
             </x-slot:footer>
         </x-dialog>
     @endif

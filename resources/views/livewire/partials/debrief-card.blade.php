@@ -22,9 +22,14 @@
         <div class="debrief-foot">
             @if ($archived)
                 <span class="meta" style="font-size:12px;margin-right:auto">Archivé par {{ $d->archiver?->fullName() ?? 'admin' }}</span>
+                {{-- Réactivation = DebriefPolicy::archive, admin STRICT (l'auteur n'est pas exempté,
+                     contrairement à update()). Inatteignable aujourd'hui — la section « Archivés »
+                     n'est rendue qu'aux admins — mais la garde doit être juste ici aussi. --}}
+                @if ($isAdmin)
                 <button type="button" class="btn btn-ghost btn-sm" wire:click="restoreDebrief({{ $d->id }})">
                     <x-icon name="rotate-ccw" :size="14" /> Réactiver
                 </button>
+                @endif
             @else
                 <span class="meta" style="font-size:12px;margin-right:auto">{{ $mine ? 'Visible par tous les membres du club' : 'Vue admin' }}</span>
                 <button type="button" class="btn btn-ghost btn-sm" wire:click="openDebrief({{ $d->id }})">

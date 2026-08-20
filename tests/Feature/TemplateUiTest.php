@@ -108,6 +108,49 @@ class TemplateUiTest extends TestCase
         $this->assertSame(4, Session::where('source_template_id', $tpl->id)->count());
     }
 
+    // Double-tap sur « Générer & enregistrer » : sans wire:loading le second clic partait avant
+    // le retour du premier, et generate() créant les Session sans déduplication, la plage était
+    // générée deux fois. Les séances en double sont persistantes (§4.8).
+    public function test_double_tap_on_generate_does_not_duplicate_sessions(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $disc = $this->discipline();
+        $tpl = SessionTemplate::factory()->create([
+            'created_by' => $admin->id, 'day_of_week' => 1, 'discipline_id' => $disc->id,
+            'generation_start_date' => '2026-09-01', 'generation_end_date' => '2026-09-30',
+        ]);
+
+        // Deux appels consécutifs, comme un double-tap sur le mutualisé.
+        Livewire::actingAs($admin)->test(TemplateList::class)
+            ->call('generate', $tpl->id)
+            ->call('generate', $tpl->id);
+
+        // 4 lundis en septembre 2026 : la seconde passe ne doit rien ajouter.
+        $this->assertSame(4, Session::where('source_template_id', $tpl->id)->count());
+    }
+
+    // Revue de code — l'idempotence comparait l'instant EXACT : une séance décalée par le bureau
+    // (créneau de piscine changé) ne correspondait plus à son créneau d'origine et y était
+    // recréée. On compare désormais le jour local.
+    public function test_regenerating_does_not_duplicate_a_rescheduled_session(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $tpl = SessionTemplate::factory()->create([
+            'created_by' => $admin->id, 'day_of_week' => 1,
+            'generation_start_date' => '2026-09-01', 'generation_end_date' => '2026-09-30',
+        ]);
+        app(TemplateGenerationService::class)->generate($tpl, $admin);
+
+        // Le bureau décale une séance d'une heure.
+        $moved = Session::where('source_template_id', $tpl->id)->orderBy('start_at')->first();
+        $moved->forceFill(['start_at' => $moved->start_at->copy()->addHour()])->save();
+
+        app(TemplateGenerationService::class)->generate($tpl, $admin);
+
+        // Toujours 4 lundis : la séance déplacée reste l'occurrence de son jour.
+        $this->assertSame(4, Session::where('source_template_id', $tpl->id)->count());
+    }
+
     public function test_archive_and_reactivate(): void
     {
         $admin = User::factory()->admin()->create();

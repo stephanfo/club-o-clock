@@ -26,6 +26,7 @@ use App\Support\AgeCategory;
 use App\Support\Markup;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
 
 // Seed de DÉMONSTRATION — club fictif « TEAM44 ».
@@ -97,7 +98,9 @@ class DemoSeeder extends Seeder
         );
 
         // --- Coaches ---
-        $vincent = User::firstOrCreate(
+        // updateOrCreate (pas firstOrCreate) : aligné sur les athlètes plus bas — un re-seed répare
+        // une base déjà seedée (dob/rôles manquants) sans exiger un migrate:fresh.
+        $vincent = User::updateOrCreate(
             ['email' => 'vincent@demo.club'],
             [
                 'first_name' => 'Vincent',
@@ -108,7 +111,7 @@ class DemoSeeder extends Seeder
                 'email_verified_at' => now(),
             ],
         );
-        $damien = User::firstOrCreate(
+        $damien = User::updateOrCreate(
             ['email' => 'damien@demo.club'],
             [
                 'first_name' => 'Damien',
@@ -119,7 +122,7 @@ class DemoSeeder extends Seeder
                 'email_verified_at' => now(),
             ],
         );
-        $karine = User::firstOrCreate(
+        $karine = User::updateOrCreate(
             ['email' => 'karine@demo.club'],
             [
                 'first_name' => 'Karine',
@@ -131,7 +134,7 @@ class DemoSeeder extends Seeder
             ],
         );
         // Mathieu : rôles cumulés coach + athlete (§5.1) — coache ET s'inscrit aux séances.
-        $mathieu = User::firstOrCreate(
+        $mathieu = User::updateOrCreate(
             ['email' => 'mathieu@demo.club'],
             [
                 'first_name' => 'Mathieu',
@@ -143,7 +146,7 @@ class DemoSeeder extends Seeder
                 'email_verified_at' => now(),
             ],
         );
-        $julien = User::firstOrCreate(
+        $julien = User::updateOrCreate(
             ['email' => 'julien@demo.club'],
             [
                 'first_name' => 'Julien',
@@ -154,7 +157,7 @@ class DemoSeeder extends Seeder
                 'email_verified_at' => now(),
             ],
         );
-        $nathalie = User::firstOrCreate(
+        $nathalie = User::updateOrCreate(
             ['email' => 'nathalie@demo.club'],
             [
                 'first_name' => 'Nathalie',
@@ -424,6 +427,12 @@ class DemoSeeder extends Seeder
             ['Kévin', 'Lambert', 'kevin@demo.club', '1994-10-12'],      // Adulte
         ];
         $activeCats = Category::query()->whereNull('archived_at')->get();
+
+        // Mathieu (coach + athlète, §5.1) est créé plus haut, hors de la boucle ci-dessous : sans ce
+        // rattachement il resterait sans catégorie active et ne pourrait s'inscrire nulle part —
+        // « Je participe » serait proposé puis refusé en CATEGORY_MISMATCH.
+        $this->attachPrimaryCategory($mathieu, $activeCats);
+
         foreach ($athDefs as [$fn, $ln, $email, $dob]) {
             // updateOrCreate (pas firstOrCreate) : corrige aussi les comptes démo déjà seedés sans dob.
             $athlete = User::updateOrCreate(
@@ -440,15 +449,7 @@ class DemoSeeder extends Seeder
                 ],
             );
 
-            // Rattache la catégorie principale dérivée (même logique que MemberService).
-            $primary = AgeCategory::derive(Carbon::parse($dob), null, $activeCats);
-            if ($primary !== null && ! $athlete->categories->contains($primary->id)) {
-                $athlete->categories()->syncWithoutDetaching([$primary->id => ['is_primary' => true]]);
-                // syncWithoutDetaching ne rafraîchit pas la relation en mémoire (le read ci-dessus
-                // l'a mise en cache vide) : on la recharge pour que isTargetedBy() voie la catégorie
-                // rattachée plus loin (bloc apéro CAP §4.5).
-                $athlete->load('categories');
-            }
+            $this->attachPrimaryCategory($athlete, $activeCats);
 
             $athletes[] = $athlete;
         }
@@ -482,6 +483,8 @@ class DemoSeeder extends Seeder
                 'email_verified_at' => now(),
             ],
         );
+
+        $this->attachPrimaryCategory($florence, $activeCats);
 
         // P1 : Lucie Garnier (Benjamins), aucun credential → guardian_id = Florence, email null.
         $lucie = User::updateOrCreate(
@@ -585,11 +588,7 @@ class DemoSeeder extends Seeder
 
         // Sandrine s'entraîne aussi → entre dans le pool d'inscriptions démo.
         // Catégorie principale dérivée comme tout athlète actif (elle est créée hors boucle $athDefs).
-        $sandrinePrimary = AgeCategory::derive(Carbon::parse($sandrine->dob), null, $activeCats);
-        if ($sandrinePrimary !== null && ! $sandrine->categories()->where('category_id', $sandrinePrimary->id)->exists()) {
-            $sandrine->categories()->syncWithoutDetaching([$sandrinePrimary->id => ['is_primary' => true]]);
-        }
-        $sandrine->load('categories'); // relation fraîche pour isTargetedBy() (bloc apéro CAP).
+        $this->attachPrimaryCategory($sandrine, $activeCats);
         $athletes->push($sandrine);
 
         // Mineur SANS garant NI credential (orphelin de tutelle) : Timéo Vidal. Cas P1 pur mais sans
@@ -611,11 +610,7 @@ class DemoSeeder extends Seeder
 
         // Catégorie principale dérivée pour tous les enfants + ajout au pool d'athlètes démo.
         foreach ([$lucie, $theoMercier, $jade, $noah, $timeo] as $child) {
-            $primary = AgeCategory::derive(Carbon::parse($child->dob), null, $activeCats);
-            if ($primary !== null && ! $child->categories()->where('category_id', $primary->id)->exists()) {
-                $child->categories()->syncWithoutDetaching([$primary->id => ['is_primary' => true]]);
-            }
-            $child->load('categories'); // relation fraîche pour isTargetedBy() (bloc apéro CAP).
+            $this->attachPrimaryCategory($child, $activeCats);
             $athletes->push($child);
         }
 
@@ -1023,7 +1018,7 @@ class DemoSeeder extends Seeder
         );
 
         // Compte DÉSACTIVÉ (is_active=false) : n'apparaît plus dans les pickers, login refusé.
-        User::updateOrCreate(
+        $brigitte = User::updateOrCreate(
             ['email' => 'brigitte@demo.club'],
             [
                 'first_name' => 'Brigitte', 'last_name' => 'Ancienne', 'dob' => '1971-03-05',
@@ -1031,6 +1026,8 @@ class DemoSeeder extends Seeder
                 'is_active' => false, 'email_verified_at' => now(),
             ],
         );
+
+        $this->attachPrimaryCategory($brigitte, $activeCats);
 
         // Suppressions RGPD (§4.3) : une demande DANS le tampon 7 j (annulable) et une ÉLIGIBLE
         // (tampon écoulé → bandeau admin sur l'accueil + filtre Adhérents).
@@ -1052,6 +1049,11 @@ class DemoSeeder extends Seeder
             ],
         );
         $daniel->forceFill(['deletion_requested_at' => $now->copy()->subDays(9)])->save();
+
+        // Ces trois comptes du pack testeurs sont des athlètes à part entière (dob + rôle) : ils
+        // doivent avoir leur catégorie, sinon leur fiche affiche « aucune catégorie » à tort.
+        $this->attachPrimaryCategory($gilles, $activeCats);
+        $this->attachPrimaryCategory($daniel, $activeCats);
 
         // ═══════════════ PACK CAS LIMITES ═══════════════
         // NB : « apéro parké » est déjà couvert par l'annulation ci-dessus (cascade §4.14.4).
@@ -1110,5 +1112,30 @@ class DemoSeeder extends Seeder
         // Bibliothèque de parcours (§4.20) — en dernier : rattache des traces aux séances vélo
         // qui viennent d'être générées.
         $this->call(GpxRouteSeeder::class);
+    }
+
+    /**
+     * Rattache la catégorie principale dérivée de la dob (§4.5), comme le fait MemberService pour
+     * tout compte créé par l'application. À appeler pour CHAQUE athlète du jeu de démo, y compris
+     * ceux créés hors de la boucle $athDefs : sans catégorie active, un compte ne peut s'inscrire
+     * à aucune séance (RegistrationService::CATEGORY_MISMATCH) — le compte paraît alors cassé.
+     *
+     * @param  Collection<int, Category>  $activeCats
+     */
+    private function attachPrimaryCategory(User $user, Collection $activeCats): void
+    {
+        if ($user->dob === null || ! $user->hasRole('athlete')) {
+            return; // un coach-pur ou un parent-pur n'a pas de catégorie (§2).
+        }
+
+        $primary = AgeCategory::derive(Carbon::parse($user->dob), null, $activeCats);
+        if ($primary !== null && ! $user->categories()->where('category_id', $primary->id)->exists()) {
+            $user->categories()->syncWithoutDetaching([$primary->id => ['is_primary' => true]]);
+        }
+
+        // syncWithoutDetaching ne rafraîchit pas la relation en mémoire (un read antérieur l'a mise
+        // en cache vide) : on la recharge pour que isTargetedBy() voie la catégorie rattachée plus
+        // loin (bloc apéro CAP §4.5).
+        $user->load('categories');
     }
 }

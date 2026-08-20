@@ -96,6 +96,36 @@ trait ManagesCoaching
         $this->authorize('unregisterCoach', $this->session);
         $target = User::findOrFail($userId);
 
+        // §2 : un coach-pur n'a pas de rôle athlète à activer. On refuse AVANT d'ouvrir le dialog,
+        // sinon la modale s'ouvre pour rien et le refus n'arrive qu'à la validation.
+        if (! $target->hasRole('athlete')) {
+            session()->flash('warn', $this->translateRegError(RegistrationService::NOT_AN_ATHLETE));
+            $this->flipConfirm = null;
+
+            return;
+        }
+
+        // §4.4 : accès athlète suspendu — register() refuse MÊME par le bureau (pas d'exemption
+        // $byStaff, contrairement à la catégorie), donc la garde vaut aussi en voie tiers.
+        if ($target->athlete_access_suspended) {
+            session()->flash('warn', $this->translateRegError(RegistrationService::SUSPENDED));
+            $this->flipConfirm = null;
+
+            return;
+        }
+
+        // §4.5 : la bascule se termine par un register(), qui refuse une cible sans catégorie active
+        // couvrant la séance. Refus AVANT le dialog, pour la même raison.
+        // Réservé à l'AUTO-bascule : RegistrationService épargne le staff de cette garde ($byStaff,
+        // §4.9.7) — un coach/admin bascule qui il veut. Bloquer ici casserait le cas 3 (tiers).
+        if ($target->id === auth()->id()
+            && ! ($target->hasActiveCategory() && $target->isTargetedBy($this->session))) {
+            session()->flash('warn', $this->translateRegError(RegistrationService::CATEGORY_MISMATCH));
+            $this->flipConfirm = null;
+
+            return;
+        }
+
         if (! $confirm) {
             $this->flipConfirm = [
                 'dir' => 'to_athlete',
@@ -111,6 +141,20 @@ trait ManagesCoaching
             $service->flipToAthlete($this->session, $target, auth()->user(), confirmLastCoach: $confirmLast, confirmQuota: $confirmQuota);
             $this->flipConfirm = null;
         } catch (RuntimeException $e) {
+            // Les deux branches de ré-ouverture écrivent DANS $flipConfirm : si le dialog n'a jamais
+            // été ouvert (appel direct avec $confirm=true), il vaut null et l'écriture créerait un
+            // tableau à une seule clé — la vue déréférencerait ['user_id'] et planterait. On le
+            // reconstruit complet dans ce cas.
+            if (in_array($e->getMessage(), [RegistrationService::QUOTA_NEEDS_CONFIRM, CoachRegistrationService::LAST_COACH_NEEDS_CONFIRM], true)
+                && ! is_array($this->flipConfirm)) {
+                $this->flipConfirm = [
+                    'dir' => 'to_athlete',
+                    'user_id' => $userId,
+                    'last_coach' => false,
+                    'need_quota' => false,
+                ];
+            }
+
             if ($e->getMessage() === RegistrationService::QUOTA_NEEDS_CONFIRM) {
                 // L'inscription athlète résultante déborde le quota → on redemande confirmation.
                 $this->flipConfirm['need_quota'] = true;

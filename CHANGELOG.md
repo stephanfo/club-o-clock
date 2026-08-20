@@ -7,6 +7,40 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ## [Non publié]
 
+### Ajouté
+
+- **Tests navigateur (E2E)** : harnais Playwright rejouant 20 scénarios dans un vrai navigateur —
+  clics, attente des mises à jour Livewire, vérification en base et captures aux formats mobile et
+  desktop. Couvre les gardes d'inscription, la bascule de rôle coach/athlète, la tutelle parentale,
+  le cloisonnement admin, et — derrière un drapeau explicite — les parcours destructifs (RGPD,
+  rupture de tutelle, bascule de saison). Le déblocage coach de la file quota (mécanisme C, §4.10.4)
+  y est couvert de bout en bout : bouton actif et désactivé, promotion effective, `AuditLog` émis.
+  Volontairement **hors de `composer check`** : la porte de qualité reste PHPUnit.
+  Voir [`tests/E2E/README.md`](https://github.com/stephanfo/club-o-clock/blob/main/tests/E2E/README.md).
+- **Supervision du traitement automatique** : l'écran des envois indique si le cron tourne encore.
+  Sans lui, une tâche planifiée interrompue (quota d'hébergement, chemin PHP changé, crontab perdue
+  au transfert) laissait les notifications s'accumuler sans qu'aucun signe ne l'annonce — le premier
+  symptôme étant un adhérent non prévenu d'une annulation. Trois états : actif, interrompu depuis
+  plus de 15 minutes, jamais observé (installation neuve, sans alarme).
+- **Tests du club vide** : les écrans membre et administration sont vérifiés dans l'état d'un club
+  fraîchement installé — catalogues seedés, un seul administrateur, aucune séance ni adhérent.
+  C'est l'état que le développement ne rencontre jamais et que chaque club rencontre en premier.
+- **Procédure de restauration de sauvegarde** ([`doc/INSTALL.md`](doc/INSTALL.md) §9.1), à répéter
+  avant la mise en production : restauration dans une base séparée, contrôle des clés étrangères et
+  des index, vérification qu'aucune migration n'est en attente.
+
+### Corrigé
+
+- Fiche séance : le bloc « Je participe » d'un coach-athlète ignorait les gardes de catégorie et de
+  suspension, laissant une action que le serveur refusait systématiquement. Le motif du refus est
+  désormais affiché à la place du bouton, sur mobile comme sur desktop.
+- Fiche séance : un parent consultant une séance pour son enfant perdait ses propres actions
+  d'inscription.
+- Fiche adhérent : un coach sans date de naissance déclenchait un avertissement de catégorie
+  trompeur.
+- Modèles de séances : une séance déplacée par le bureau était recréée à son horaire d'origine lors
+  d'une régénération.
+
 ## [1.0.0] — 2026-08-17
 
 Première version publique. Application complète de gestion du planning d'entraînement pour club

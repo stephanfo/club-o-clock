@@ -10,6 +10,7 @@ use App\Models\Session;
 use App\Models\User;
 use App\Services\CoachRegistrationService;
 use App\Services\RegistrationService;
+use App\Support\SubjectContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
@@ -231,6 +232,287 @@ class CoachManageParticipantsTest extends TestCase
         $this->assertNull(Registration::where('session_id', $s->id)->where('user_id', $c1->id)->first());
     }
 
+    // Voie SELF (bloc « Mon inscription » de enroll-actions) : distincte de la voie tiers
+    // testée ci-dessous, qui porte sur l'onglet Encadrement. Un coach-pur encadrant ne doit pas
+    // se voir proposer « Je participe » — la bascule échouerait en NOT_AN_ATHLETE (§2).
+    public function test_self_participate_button_hidden_for_pure_coach(): void
+    {
+        $s = $this->makeSession();
+        $pureCoach = User::factory()->coach()->create();
+        $s->coaches()->attach($pureCoach->id);
+
+        Livewire::actingAs($pureCoach)->test(SessionShow::class, ['session' => $s])
+            ->assertDontSeeHtml('flipToAthlete('.$pureCoach->id.')')
+            // Contrôle positif : sans lui, ce refus passerait aussi sur une page vide.
+            ->assertSee('Me retirer de l’encadrement', escape: false);
+    }
+
+    // Contrôle positif appairé du test précédent : le cas nominal (rôles cumulés) doit, lui,
+    // continuer d'offrir la bascule.
+    public function test_self_participate_button_visible_for_dual_coach(): void
+    {
+        $s = $this->makeSession();
+        $dualCoach = User::factory()->athleteCoach()->create();
+        $s->coaches()->attach($dualCoach->id);
+
+        Livewire::actingAs($dualCoach)->test(SessionShow::class, ['session' => $s])
+            ->assertSeeHtml('flipToAthlete('.$dualCoach->id.')');
+    }
+
+    // Défense en profondeur : même appelée directement, la bascule ne doit pas ouvrir un dialog
+    // que la validation refuserait de toute façon.
+    public function test_flip_to_athlete_does_not_open_dialog_for_pure_coach(): void
+    {
+        $s = $this->makeSession();
+        $pureCoach = User::factory()->coach()->create();
+        $other = User::factory()->coach()->create();
+        $s->coaches()->attach([$pureCoach->id, $other->id]);
+
+        Livewire::actingAs($pureCoach)->test(SessionShow::class, ['session' => $s])
+            ->call('flipToAthlete', $pureCoach->id)
+            ->assertSet('flipConfirm', null);
+    }
+
+    // Un ADMIN-PUR n'a pas le rôle coach : CoachRegistrationService::register le refuse
+    // (« Cet utilisateur n'a pas le rôle coach. »). canManageCoaches valant coach OU admin, le CTA
+    // lui était proposé — et l'échec était silencieux.
+    public function test_pure_admin_is_not_offered_to_register_as_coach(): void
+    {
+        $s = $this->makeSession();
+        $admin = User::factory()->admin()->create(); // roles = ['admin'] seulement
+        $s->coaches()->attach(User::factory()->coach()->create()->id);
+
+        Livewire::actingAs($admin)->test(SessionShow::class, ['session' => $s])
+            ->assertDontSeeHtml('wire:click="registerCoachSelf"');
+
+        $this->assertFalse($s->coaches()->whereKey($admin->id)->exists());
+    }
+
+    // Contrôle positif appairé : un coach-pur, lui, doit toujours se voir proposer le CTA.
+    public function test_pure_coach_is_offered_to_register_as_coach(): void
+    {
+        $s = $this->makeSession();
+        $coach = User::factory()->coach()->create();
+        $s->coaches()->attach(User::factory()->coach()->create()->id);
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s])
+            ->assertSeeHtml('wire:click="registerCoachSelf"');
+    }
+
+    // Accès athlète suspendu (§4.4) : register() refuse MÊME par le bureau — la bascule d'un tiers
+    // suspendu ouvrait tout le dialog de conséquences pour finir en refus. Le picker « Inscrire un
+    // athlète » excluait déjà les suspendus : l'onglet Encadrement était asymétrique.
+    public function test_flip_button_hidden_for_a_suspended_coach_athlete(): void
+    {
+        $s = $this->makeSession();
+        $admin = User::factory()->admin()->create();
+        $suspended = $this->categorize(User::factory()->athleteCoach()->create());
+        $suspended->forceFill(['athlete_access_suspended' => true])->save();
+        $ok = $this->categorize(User::factory()->athleteCoach()->create());
+        $s->coaches()->attach([$suspended->id, $ok->id]);
+
+        Livewire::actingAs($admin)->test(SessionShow::class, ['session' => $s])
+            ->assertDontSeeHtml('flipToAthlete('.$suspended->id.')')
+            ->assertSeeHtml('flipToAthlete('.$ok->id.')'); // contrôle positif appairé
+    }
+
+    // Défense en profondeur : même appelée directement, la bascule d'un suspendu n'ouvre pas le dialog.
+    public function test_flip_to_athlete_does_not_open_dialog_for_a_suspended_target(): void
+    {
+        $s = $this->makeSession();
+        $admin = User::factory()->admin()->create();
+        $suspended = $this->categorize(User::factory()->athleteCoach()->create());
+        $suspended->forceFill(['athlete_access_suspended' => true])->save();
+        $s->coaches()->attach([$suspended->id, User::factory()->coach()->create()->id]);
+
+        Livewire::actingAs($admin)->test(SessionShow::class, ['session' => $s])
+            ->call('flipToAthlete', $suspended->id)
+            ->assertSet('flipConfirm', null)
+            ->assertSee('suspendu', escape: false);
+
+        $this->assertTrue($s->coaches()->whereKey($suspended->id)->exists());
+    }
+
+    // ── Retrait de l'encadrement depuis la barre d'action (§4.11.2) ──
+
+    // Le retrait n'était atteignable que par l'icône de l'onglet Encadrement : asymétrique, alors
+    // que l'inscription coach, elle, est offerte dans la barre d'action.
+    public function test_coaching_member_can_leave_from_the_action_bar(): void
+    {
+        $s = $this->makeSession();
+        $pureCoach = User::factory()->coach()->create();
+        $s->coaches()->attach([$pureCoach->id, User::factory()->coach()->create()->id]);
+
+        Livewire::actingAs($pureCoach)->test(SessionShow::class, ['session' => $s])
+            ->assertSeeHtml('wire:click="unregisterCoach('.$pureCoach->id.')"')
+            ->call('unregisterCoach', $pureCoach->id);
+
+        $this->assertFalse($s->coaches()->whereKey($pureCoach->id)->exists());
+    }
+
+    // Contrôle positif appairé : une fois la séance commencée, l'encadrement est figé
+    // (CoachRegistrationService::guardOpen) — le bouton ne doit plus être offert.
+    public function test_leave_coaching_button_hidden_once_session_started(): void
+    {
+        $s = $this->makeSession();
+        $pureCoach = User::factory()->coach()->create();
+        $s->coaches()->attach([$pureCoach->id, User::factory()->coach()->create()->id]);
+        $s->forceFill(['start_at' => Carbon::now()->subHour()])->save();
+
+        Livewire::actingAs($pureCoach)->test(SessionShow::class, ['session' => $s->fresh()])
+            ->assertDontSeeHtml('wire:click="unregisterCoach('.$pureCoach->id.')"')
+            // Contrôle positif : la fiche a bien rendu, et c'est le motif « commencée » qui s'affiche.
+            ->assertSee('Séance commencée — inscriptions closes.', escape: false);
+    }
+
+    // Revue de code — la bascule agit sur auth()->user(), jamais sur l'enfant consulté (§4.2).
+    // Elle avait été conditionnée à $canEnroll, calculé pour le SUJET : un parent coach+athlète
+    // parfaitement éligible perdait « Je participe » dès qu'il sélectionnait un enfant bloqué.
+    public function test_flip_stays_visible_when_a_blocked_child_is_the_subject(): void
+    {
+        $s = $this->makeSession();
+        $parent = $this->categorize(User::factory()->athleteCoach()->create());
+        $s->coaches()->attach([$parent->id, User::factory()->coach()->create()->id]);
+        // Enfant SANS catégorie : non inscriptible sur cette séance.
+        $child = User::factory()->create([
+            'guardian_id' => $parent->id, 'is_minor' => true, 'roles' => ['athlete'],
+        ]);
+
+        SubjectContext::set($parent, $child->id);
+
+        Livewire::actingAs($parent)->test(SessionShow::class, ['session' => $s])
+            ->assertSee('Je participe');
+    }
+
+    // Revue de code — $flipConfirm null + LAST_COACH_NEEDS_CONFIRM auto-vivifiait un tableau à une
+    // seule clé, et la vue déréférençait ['user_id'] : erreur 500 au rendu du dialog.
+    public function test_flip_with_confirm_but_no_open_dialog_does_not_crash(): void
+    {
+        $s = $this->makeSession();
+        $dual = $this->categorize(User::factory()->athleteCoach()->create());
+        $s->coaches()->attach($dual->id); // seul coach → LAST_COACH_NEEDS_CONFIRM
+
+        Livewire::actingAs($dual)->test(SessionShow::class, ['session' => $s])
+            ->call('flipToAthlete', $dual->id, true)   // confirm sans dialog ouvert
+            ->assertSet('flipConfirm.user_id', $dual->id)
+            ->assertSet('flipConfirm.last_coach', true)
+            ->assertOk(); // le rendu du dialog ne doit pas planter
+    }
+
+    // ── Coach-pur hors encadrement : motif dédié + CTA d'inscription coach (§2, §4.11.2) ──
+
+    // Un coach-pur n'a pas de catégorie et n'en aura jamais : lui afficher « Aucune catégorie
+    // attribuée — contacte l'admin » l'envoyait vers une démarche sans issue.
+    public function test_pure_coach_not_coaching_sees_coach_cta_not_category_message(): void
+    {
+        $s = $this->makeSession();
+        $pureCoach = User::factory()->coach()->create(); // n'encadre PAS cette séance
+
+        Livewire::actingAs($pureCoach)->test(SessionShow::class, ['session' => $s])
+            ->assertDontSee('Aucune catégorie attribuée à ton compte', escape: false)
+            ->assertSeeHtml('wire:click="registerCoachSelf"');
+    }
+
+    // Le CTA suit les mêmes gardes que « M'inscrire comme coach » de l'onglet Encadrement :
+    // sur une séance commencée, l'inscription coach est fermée — on retombe sur le message.
+    public function test_pure_coach_sees_message_when_coach_registration_is_closed(): void
+    {
+        $s = $this->makeSession();
+        $s->forceFill(['start_at' => Carbon::now()->subHour()])->save();
+        $pureCoach = User::factory()->coach()->create();
+
+        Livewire::actingAs($pureCoach)->test(SessionShow::class, ['session' => $s->fresh()])
+            ->assertDontSeeHtml('wire:click="registerCoachSelf"')
+            ->assertDontSee('Aucune catégorie attribuée à ton compte', escape: false)
+            // Contrôle positif : sans lui, ces deux refus passeraient aussi sur une page vide
+            // ou une erreur de rendu. C'est le motif « séance commencée » qui prend la main,
+            // celui de l'inscription étant fermé pour tout le monde à ce stade.
+            ->assertSee('Séance commencée — inscriptions closes.', escape: false);
+    }
+
+    // ── Coach-athlète SANS catégorie active (§4.5) : la bascule aboutit à un register(), elle
+    // hérite donc des mêmes gardes que l'inscription directe. Cas réel : catégorie archivée, ou
+    // dob hors barème — le PRD §4.5 l.281 impose un message explicite, pas un bouton mort.
+
+    // Reproduction du bug : le bloc « Je participe » ignorait $canEnroll.
+    // On cible le bouton SELF par son libellé : l'icône de bascule tierce (onglet Encadrement)
+    // rend le même wire:click et doit, elle, rester offerte au staff (cf. test $byStaff plus bas).
+    public function test_self_participate_button_hidden_without_active_category(): void
+    {
+        $s = $this->makeSession();
+        $dual = User::factory()->athleteCoach()->create(); // volontairement PAS categorize()
+        $s->coaches()->attach($dual->id);
+
+        $this->assertFalse($dual->hasActiveCategory()); // pré-requis du scénario
+
+        Livewire::actingAs($dual)->test(SessionShow::class, ['session' => $s])
+            ->assertDontSee('Je participe')
+            ->assertDontSee('Mon inscription')
+            // Contrôle positif : le motif §4.5 remplace le bouton — on ne laisse pas un vide,
+            // et le test ne peut plus passer sur une page non rendue.
+            ->assertSee('Aucune catégorie attribuée à ton compte', escape: false);
+    }
+
+    // Masquer le bouton ne suffit pas : sans message on remplace un bouton trompeur par un
+    // silence. Le motif §4.5 doit s'afficher (même libellé que la voie athlète normale).
+    public function test_self_participate_message_shown_without_active_category(): void
+    {
+        $s = $this->makeSession();
+        $dual = User::factory()->athleteCoach()->create();
+        $s->coaches()->attach($dual->id);
+
+        Livewire::actingAs($dual)->test(SessionShow::class, ['session' => $s])
+            ->assertSee('Aucune catégorie attribuée à ton compte', escape: false);
+    }
+
+    // Contrôle positif appairé : avec une catégorie couvrante, la bascule reste offerte.
+    public function test_self_participate_button_visible_with_active_category(): void
+    {
+        $s = $this->makeSession();
+        $dual = $this->categorize(User::factory()->athleteCoach()->create());
+        $s->coaches()->attach($dual->id);
+
+        Livewire::actingAs($dual)->test(SessionShow::class, ['session' => $s])
+            ->assertSee('Je participe')
+            ->assertSeeHtml('flipToAthlete('.$dual->id.')');
+    }
+
+    // Défense en profondeur : la modale ne s'ouvre pas pour une auto-bascule qui échouera.
+    public function test_flip_to_athlete_does_not_open_dialog_without_category(): void
+    {
+        $s = $this->makeSession();
+        $dual = User::factory()->athleteCoach()->create();
+        $other = User::factory()->coach()->create();
+        $s->coaches()->attach([$dual->id, $other->id]);
+
+        Livewire::actingAs($dual)->test(SessionShow::class, ['session' => $s])
+            ->call('flipToAthlete', $dual->id)
+            ->assertSet('flipConfirm', null)
+            ->assertSee('Inscription impossible', escape: false);
+    }
+
+    // Garde-fou de non-régression : RegistrationService épargne le staff de la garde catégorielle
+    // ($byStaff, §4.9.7). La garde UI ne doit donc PAS bloquer la bascule d'un tiers par un admin.
+    public function test_staff_can_still_flip_a_third_party_without_category(): void
+    {
+        $s = $this->makeSession();
+        $admin = User::factory()->admin()->create();
+        $dual = User::factory()->athleteCoach()->create(); // sans catégorie
+        $other = User::factory()->coach()->create();
+        $s->coaches()->attach([$dual->id, $other->id]);
+
+        Livewire::actingAs($admin)->test(SessionShow::class, ['session' => $s])
+            ->call('flipToAthlete', $dual->id)
+            ->assertSet('flipConfirm.dir', 'to_athlete')   // le dialog s'ouvre bien
+            ->call('flipToAthlete', $dual->id, true)
+            ->assertSet('flipConfirm', null);
+
+        // La bascule staff a abouti malgré l'absence de catégorie.
+        $this->assertFalse($s->coaches()->whereKey($dual->id)->exists());
+        $this->assertSame('participating', $dual->registrations()
+            ->where('session_id', $s->id)->first()->status);
+    }
+
     public function test_flip_button_hidden_for_pure_coach(): void
     {
         $s = $this->makeSession();
@@ -242,6 +524,37 @@ class CoachManageParticipantsTest extends TestCase
         Livewire::actingAs($admin)->test(SessionShow::class, ['session' => $s])
             ->assertDontSeeHtml('flipToAthlete('.$pureCoach->id.')')
             ->assertSeeHtml('flipToAthlete('.$dualCoach->id.')');
+    }
+
+    // ── Retrait d'un inscrit : fermé une fois la séance commencée (§4.9.7) ──
+
+    // La désinscription est refusée par RegistrationService une fois la séance commencée : la
+    // corbeille ne doit donc plus être offerte au staff, sinon elle est morte sur toute séance passée.
+    public function test_remove_button_hidden_once_session_started(): void
+    {
+        $s = $this->makeSession();
+        $coach = User::factory()->coach()->create();
+        $athlete = $this->athlete();
+        app(RegistrationService::class)->register($s, $athlete, $athlete);
+        $s->forceFill(['start_at' => Carbon::now()->subHour()])->save();
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s->fresh()])
+            ->assertDontSeeHtml('wire:click="removeAthlete('.$athlete->id.')"')
+            // Contrôle positif : l'inscrit figure bien dans la liste — c'est le BOUTON qui manque,
+            // pas la page. Sans ça, le test passerait sur un rendu vide.
+            ->assertSee($athlete->first_name, escape: false);
+    }
+
+    // Contrôle positif appairé : sur une séance à venir, la corbeille reste offerte.
+    public function test_remove_button_visible_before_session_starts(): void
+    {
+        $s = $this->makeSession();
+        $coach = User::factory()->coach()->create();
+        $athlete = $this->athlete();
+        app(RegistrationService::class)->register($s, $athlete, $athlete);
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s])
+            ->assertSeeHtml('wire:click="removeAthlete('.$athlete->id.')"');
     }
 
     // ── Policy ──
@@ -304,5 +617,34 @@ class CoachManageParticipantsTest extends TestCase
         app(RegistrationService::class)->register($s, $athlete, $athlete);
 
         $this->assertSame(0, NotificationOutbox::where('type', 'enrolled_by_coach')->count());
+    }
+    // ── enrollBlockReason() : les 4 motifs, la règle vit dans le modèle (§4.4/§4.5) ──
+
+    // La priorité compte : un coach-pur n'a NI rôle athlète NI catégorie. Si l'ordre des tests
+    // s'inversait, il recevrait « contacte l'admin » — une démarche sans issue (§2).
+    public function test_enroll_block_reason_prioritises_missing_athlete_role(): void
+    {
+        $pureCoach = User::factory()->coach()->create();
+
+        $this->assertFalse($pureCoach->hasActiveCategory()); // les deux causes sont réunies
+        $this->assertSame('not_athlete', $pureCoach->enrollBlockReason());
+    }
+
+    public function test_enroll_block_reason_flags_suspension_before_category(): void
+    {
+        $suspended = $this->categorize(User::factory()->create(['athlete_access_suspended' => true]));
+
+        $this->assertTrue($suspended->hasActiveCategory()); // la catégorie est OK, c'est la suspension
+        $this->assertSame('suspended', $suspended->enrollBlockReason());
+    }
+
+    public function test_enroll_block_reason_distinguishes_no_category_from_mismatch(): void
+    {
+        $sansCategorie = User::factory()->create();
+        $this->assertSame('no_category', $sansCategorie->fresh()->enrollBlockReason());
+
+        // Catégorie rattachée mais séance non ciblée → mismatch, message différent.
+        $avecCategorie = $this->categorize(User::factory()->create());
+        $this->assertSame('category_mismatch', $avecCategorie->enrollBlockReason());
     }
 }

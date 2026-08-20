@@ -136,6 +136,13 @@ de tests. Ce qui passe en local passe en CI, et inversement.
 composer check
 ```
 
+Un harnais **Playwright** complète cette porte pour ce qu'elle ne voit pas — le rendu, les clics et
+les parcours de bout en bout. Il tourne à part (serveur + base de démo requis), jamais en CI :
+
+```bash
+node tests/E2E/run.mjs
+```
+
 Conventions, périmètre et attentes sur le code : **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 ---
@@ -151,6 +158,7 @@ Conventions, périmètre et attentes sur le code : **[CONTRIBUTING.md](CONTRIBUT
 | [`doc/CAPTURES.md`](doc/CAPTURES.md) | Tous les écrans en images, côté adhérent, coach et bureau |
 | [`doc/PLAN_TESTS_MEMBRES.md`](doc/PLAN_TESTS_MEMBRES.md) | Recette en interface, sans ligne de commande — pour les testeurs du club |
 | [`doc/PLAN_TESTS.md`](doc/PLAN_TESTS.md) | Recette côté organisateur : journaux, commandes, base |
+| [`tests/E2E/README.md`](tests/E2E/README.md) | Harnais de tests navigateur : couverture, exécution, conventions |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribuer : porte de qualité, conventions, périmètre |
 | [`SECURITY.md`](SECURITY.md) | Signaler une vulnérabilité |
 | [`CHANGELOG.md`](CHANGELOG.md) | Journal des versions |

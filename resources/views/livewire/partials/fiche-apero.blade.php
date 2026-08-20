@@ -25,8 +25,9 @@
                                 <span class="meta" title="{{ $flag->motif }}" style="font-size:12px;margin-left:6px">· {{ \Illuminate\Support\Str::limit($flag->motif, 60) }}</span>
                             @endif
                         </span>
+                        {{-- $canUnflagApero : le retrait est figé au début de la séance (§4.14.3). --}}
                         @can('moderateApero', $session)
-                            @unless ($flag->user_id === auth()->id())
+                            @unless ($flag->user_id === auth()->id() || ! ($canUnflagApero ?? false))
                                 <button wire:click="unflagApero({{ $flag->user_id }})" class="iconbtn" title="Retirer ce flag" aria-label="Retirer ce flag">
                                     <x-icon name="x" :size="14" />
                                 </button>
@@ -39,7 +40,7 @@
         </div>
     @endif
 
-    @if ($iAmAperoPayer)
+    @if ($iAmAperoPayer && ($canUnflagApero ?? false))
         <button wire:click="unflagApero({{ auth()->id() }})" wire:loading.attr="disabled" wire:target="unflagApero" class="btn btn-ghost btn-block">Je ne l'offre plus</button>
     @elseif ($canFlagApero)
         <div style="display:flex;flex-direction:column;gap:10px" x-data="{ n: 0 }">

@@ -43,8 +43,11 @@
             @if ($manage && $isTraining)
                 <div class="flex g4" style="flex:0 0 auto">
                     {{-- Bascule coach → athlète : seulement si la personne a le rôle athlète (§2) ;
-                         un coach-pur n'a pas d'existence athlète à activer. --}}
-                    @if ($coach->hasRole('athlete'))
+                         un coach-pur n'a pas d'existence athlète à activer. Accès suspendu exclu
+                         (§4.4) : register() refuse le suspendu MÊME par le bureau, la bascule
+                         ouvrirait un dialog de conséquences pour finir en refus. Même règle que le
+                         picker « Inscrire un athlète » (ManagesEnrollment::selectableAthletes). --}}
+                    @if ($coach->hasRole('athlete') && ! $coach->athlete_access_suspended)
                         <button wire:click="flipToAthlete({{ $coach->id }})" class="iconbtn" title="Passer {{ $coach->first_name }} en athlète" aria-label="Passer {{ $coach->first_name }} en athlète">
                             <x-icon name="user-check" :size="16" />
                         </button>

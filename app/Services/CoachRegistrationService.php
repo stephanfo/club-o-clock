@@ -191,6 +191,9 @@ class CoachRegistrationService
             $locked = Session::query()->lockForUpdate()->findOrFail($session->getKey());
 
             $this->guardOpen($locked);
+            // Cohérence avec register() et flipToCoach : l'encadrement est une notion training
+            // (§4.11). L'UI ne l'expose pas ailleurs, c'est un durcissement de la garde serveur.
+            $this->guardKindTraining($locked);
 
             if (! $locked->coaches()->whereKey($target->id)->exists()) {
                 throw new RuntimeException("Cet utilisateur n'est pas encadrant sur cette séance.");
@@ -211,6 +214,14 @@ class CoachRegistrationService
             // 1. Retire de l'encadrement.
             $locked->coaches()->detach($target->id);
             $remainingIds = $locked->coaches()->pluck('users.id')->all();
+
+            // Même journal d'activité que unregister() : une bascule est aussi un retrait
+            // d'encadrement, elle ne doit pas disparaître du journal (symétrique de flipToCoach,
+            // qui émet bien coach_registered).
+            ActivityLogger::record('coach_unregistered', $actor, [
+                'user_id' => $target->id,
+                'session_id' => $locked->id,
+            ]);
 
             AuditLogger::record('role_changed', $actor, [
                 'target_type' => User::class,

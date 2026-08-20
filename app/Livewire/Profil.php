@@ -224,6 +224,9 @@ class Profil extends Component
             'sessions' => $this->activeSessions(),
             'quotas' => $quota->weeklyUsage(auth()->user(), Carbon::now()),
             'lastAdmin' => $members->isLastActiveAdmin(auth()->user()),
+            // Seconde garde bloquante de requestDeletion (§4.2) : garant d'un pupille P1. Comme
+            // pour lastAdmin, on prévient AVANT d'ouvrir la modale de conséquences irréversibles.
+            'p1Wards' => auth()->user()->wards()->whereNull('email')->whereNull('anonymized_at')->count(),
             'weekLabel' => 'Semaine du '.$from->locale('fr')->isoFormat('D MMMM').' au '.$to->locale('fr')->isoFormat('D MMMM'),
         ]);
     }
