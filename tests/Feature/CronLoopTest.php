@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Console\Commands\ResetDemoCommand;
 use App\Console\Commands\RunCronLoopCommand;
 use App\Services\DuePeriodGuard;
 use App\Services\SchedulerHeartbeatService;
@@ -10,6 +11,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -234,6 +236,34 @@ class CronLoopTest extends TestCase
         // Le fuseau compte pour une échéance « du jour » : 23:30 UTC est déjà le lendemain à Paris.
         $veille = Carbon::parse('2026-08-21 23:30:00', 'UTC');
         $this->assertSame('2026-08-22', DuePeriodGuard::dailyPeriod($veille, 'Europe/Paris'));
+    }
+
+    // ─────────── Remise à zéro de la démo ───────────
+
+    public function test_le_marqueur_de_reset_demo_survit_a_un_migrate_fresh(): void
+    {
+        // `demo:reset` exécute `migrate:fresh`, qui DÉTRUIT la table `cache`. Un marqueur
+        // d'échéance stocké en cache disparaîtrait donc au milieu de sa propre exécution : la
+        // commande redeviendrait due à la passe suivante et la démo se reconstruirait en boucle
+        // pendant toute la fenêtre nocturne. Le marqueur doit vivre hors base.
+        Storage::fake('local');
+
+        $commande = new ResetDemoCommand;
+        $marquer = new \ReflectionMethod($commande, 'marquerFait');
+        $deja = new \ReflectionMethod($commande, 'dejaFaitAujourdhui');
+
+        $marquer->invoke($commande, '2026-08-21');
+        $this->assertTrue($deja->invoke($commande, '2026-08-21'));
+
+        // Le cache est vidé (ce que fait migrate:fresh) : le marqueur doit tenir.
+        Cache::flush();
+        $this->assertTrue(
+            $deja->invoke($commande, '2026-08-21'),
+            'Le marqueur n\'a pas survécu à la purge du cache : la démo se reconstruirait en boucle.',
+        );
+
+        // Le lendemain, la remise à zéro est de nouveau due.
+        $this->assertFalse($deja->invoke($commande, '2026-08-22'));
     }
 
     // ─────────── Point d'entrée cron.php ───────────

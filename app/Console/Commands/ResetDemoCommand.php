@@ -33,16 +33,30 @@ class ResetDemoCommand extends Command
         'local' => ['gpx', 'livewire-tmp'],
     ];
 
-    public function handle(DuePeriodGuard $guard): int
+    public function handle(): int
     {
         // Le garde d'échéance vient APRÈS le garde-fou DEMO_MODE : sur une instance de club, la
         // commande doit refuser, pas consommer silencieusement l'échéance du jour.
+        //
+        // ⚠️ Le marqueur ne peut PAS vivre en cache, contrairement aux autres tâches gardées :
+        // `migrate:fresh` détruit la table `cache` au milieu de l'exécution, effaçant la trace
+        // qu'on vient de tourner. La commande redeviendrait due à la passe suivante, et la démo
+        // se reconstruirait en boucle pendant toute la fenêtre nocturne. Le marqueur est donc un
+        // fichier du disque `local`, hors des dossiers purgés (cf. UPLOADS) et hors base.
         if (DemoMode::enabled() && $this->option('if-due')) {
-            $guard->runIfDue(
-                'demo-reset',
-                DuePeriodGuard::dailyPeriod(timezone: self::FUSEAU),
-                fn () => $this->reinitialiser(),
-            );
+            $jour = DuePeriodGuard::dailyPeriod(timezone: self::FUSEAU);
+
+            if ($this->dejaFaitAujourdhui($jour)) {
+                return self::SUCCESS;
+            }
+
+            // Marqueur posé AVANT la reconstruction, et non après : `migrate:fresh` peut échouer
+            // à mi-chemin (quota disque, verrou MySQL) en laissant la base inutilisable. Réessayer
+            // toutes les 5 min aggraverait la situation au lieu de la réparer — mieux vaut une
+            // démo cassée jusqu'au lendemain, visible, qu'une boucle de reconstructions.
+            $this->marquerFait($jour);
+
+            $this->reinitialiser();
 
             return self::SUCCESS;
         }
@@ -57,6 +71,27 @@ class ResetDemoCommand extends Command
         $this->reinitialiser();
 
         return self::SUCCESS;
+    }
+
+    /** Chemin du marqueur de dernière remise à zéro (disque `local`, survit à migrate:fresh). */
+    private function cheminMarqueur(): string
+    {
+        return 'demo/dernier-reset.txt';
+    }
+
+    /** La remise à zéro du jour a-t-elle déjà eu lieu ? */
+    private function dejaFaitAujourdhui(string $jour): bool
+    {
+        $disque = Storage::disk('local');
+
+        return $disque->exists($this->cheminMarqueur())
+            && trim((string) $disque->get($this->cheminMarqueur())) === $jour;
+    }
+
+    /** Enregistre que la remise à zéro du jour a été entreprise. */
+    private function marquerFait(string $jour): void
+    {
+        Storage::disk('local')->put($this->cheminMarqueur(), $jour);
     }
 
     /** Effectue la remise à zéro. Retourne true si elle est allée au bout. */
