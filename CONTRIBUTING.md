@@ -64,13 +64,22 @@ php artisan db:seed --class=DemoSeeder
 La source de vérité est **[database/migrations/](https://github.com/stephanfo/club-o-clock/tree/main/database/migrations/)**. Une évolution passe par une
 **nouvelle migration** — ne jamais éditer une migration déjà livrée, des instances l'ont déjà jouée.
 
-`database/schema/mariadb-schema.sql` est un **artefact dérivé** que Laravel charge au début de
-`migrate` pour reconstruire vite (tests, base neuve). Après toute migration qui touche au schéma,
-régénère-le, sinon les tests repartent d'un schéma périmé :
+`database/schema/mysql-schema.sql` et `database/schema/mariadb-schema.sql` sont des **artefacts
+dérivés** que Laravel charge au début de `migrate` pour reconstruire vite (tests, base neuve).
+Il y en a **un par moteur** parce que la CI joue la suite sur les deux : MySQL 8.4 (celui de la
+production) et MariaDB 11.4. Après toute migration qui touche au schéma, régénère **les deux**,
+sinon les tests repartent d'un schéma périmé :
 
 ```bash
-php artisan schema:dump      # régénère le dump depuis les migrations
+# Chaque dump se régénère SUR SON PROPRE MOTEUR : mysqldump et mariadb-dump écrivent des
+# dialectes différents, et régénérer l'un depuis l'autre produit un fichier que la CI rejette.
+DB_CONNECTION=mysql   php artisan schema:dump
+DB_CONNECTION=mariadb php artisan schema:dump
 ```
+
+> Les deux moteurs tournent en conteneur ; adapte `DB_HOST`/`DB_PORT` à ton installation. Le
+> client en ligne de commande du moteur visé (`mysql-client` / `mariadb-client`) doit être celui
+> que `schema:dump` trouve, sinon le dump sort dans le mauvais dialecte.
 
 ### La porte de qualité
 

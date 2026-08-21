@@ -23,9 +23,15 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
-        <!-- Tests sur MariaDB/InnoDB, même moteur que la prod : indispensable pour
-             reproduire FOR UPDATE / verrous de ligne (sérialisation inscriptions, J2).
-             SQLite ne verrouille pas à la ligne et fausserait ces tests. -->
+        <!-- Tests sur MySQL/MariaDB (InnoDB), jamais SQLite : le moteur doit reproduire
+             FOR UPDATE / verrous de ligne (sérialisation inscriptions, J2). SQLite ne
+             verrouille pas à la ligne et fausserait ces tests.
+
+             `force="false"` (le défaut) : la valeur ne s'applique QUE si l'environnement
+             n'en fournit pas déjà une. La CI joue la suite sur les deux moteurs (matrice
+             MySQL 8.4 = production OVH, et MariaDB 11.4) en passant DB_CONNECTION ; sans
+             cette souplesse, la moitié de la matrice testerait le mauvais SGBD sans le
+             dire. En local, sans variable, on reste sur mariadb. -->
         <env name="DB_CONNECTION" value="mariadb"/>
         <env name="DB_DATABASE" value="cluboclock_test"/>
         <env name="MAIL_MAILER" value="array"/>
