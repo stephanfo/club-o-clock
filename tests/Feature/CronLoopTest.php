@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Console\Commands\ResetDemoCommand;
 use App\Console\Commands\RunCronLoopCommand;
 use App\Services\DuePeriodGuard;
 use App\Services\SchedulerHeartbeatService;
@@ -11,7 +10,6 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -240,30 +238,20 @@ class CronLoopTest extends TestCase
 
     // ─────────── Remise à zéro de la démo ───────────
 
-    public function test_le_marqueur_de_reset_demo_survit_a_un_migrate_fresh(): void
+    public function test_le_reset_demo_n_est_pas_pilote_par_le_planificateur(): void
     {
-        // `demo:reset` exécute `migrate:fresh`, qui DÉTRUIT la table `cache`. Un marqueur
-        // d'échéance stocké en cache disparaîtrait donc au milieu de sa propre exécution : la
-        // commande redeviendrait due à la passe suivante et la démo se reconstruirait en boucle
-        // pendant toute la fenêtre nocturne. Le marqueur doit vivre hors base.
-        Storage::fake('local');
-
-        $commande = new ResetDemoCommand;
-        $marquer = new \ReflectionMethod($commande, 'marquerFait');
-        $deja = new \ReflectionMethod($commande, 'dejaFaitAujourdhui');
-
-        $marquer->invoke($commande, '2026-08-21');
-        $this->assertTrue($deja->invoke($commande, '2026-08-21'));
-
-        // Le cache est vidé (ce que fait migrate:fresh) : le marqueur doit tenir.
-        Cache::flush();
-        $this->assertTrue(
-            $deja->invoke($commande, '2026-08-21'),
-            'Le marqueur n\'a pas survécu à la purge du cache : la démo se reconstruirait en boucle.',
+        // `demo:reset` exécute `migrate:fresh` : il détruit la base, donc toute trace en base
+        // indiquant qu'il vient de tourner. Piloté par le planificateur (qui repasse toutes les
+        // 5 min), il se rejouerait en boucle — une vingtaine de reconstructions par nuit. Sa
+        // périodicité appartient au cron de l'hébergeur (cron-demo.php), pas à Laravel.
+        $commandes = array_map(
+            fn ($event) => $event->command ?? '',
+            app(Schedule::class)->events(),
         );
 
-        // Le lendemain, la remise à zéro est de nouveau due.
-        $this->assertFalse($deja->invoke($commande, '2026-08-22'));
+        foreach ($commandes as $commande) {
+            $this->assertStringNotContainsString('demo:reset', $commande);
+        }
     }
 
     // ─────────── Point d'entrée cron.php ───────────
@@ -277,12 +265,25 @@ class CronLoopTest extends TestCase
         $this->assertStringContainsString('http_response_code(404)', $source);
     }
 
-    public function test_cron_php_est_bloque_par_le_htaccess(): void
+    public function test_les_points_d_entree_cron_sont_bloques_par_le_htaccess(): void
     {
-        // Le docroot du mutualisé est la racine du dépôt : sans cette règle, cron.php est servi.
-        $this->assertMatchesRegularExpression(
-            '/RedirectMatch 404 .*cron\\\\\.php/',
-            file_get_contents(base_path('.htaccess')),
-        );
+        // Le docroot du mutualisé est la racine du dépôt : sans ces règles, les points d'entrée
+        // du planificateur sont servis par Apache. Déclencher cron.php par HTTP lancerait 55 min
+        // de traitement par requête ; cron-demo.php détruirait et reconstruirait la base.
+        $htaccess = file_get_contents(base_path('.htaccess'));
+
+        preg_match('/^RedirectMatch 404 .*artisan.*$/m', $htaccess, $regle);
+        $this->assertNotEmpty($regle, 'Règle de blocage des fichiers racine introuvable.');
+
+        // On éprouve le motif lui-même plutôt que sa graphie : il doit couvrir les deux fichiers.
+        $motif = trim(str_replace('RedirectMatch 404 ', '', $regle[0]));
+
+        foreach (['/cron.php', '/cron-demo.php'] as $chemin) {
+            $this->assertMatchesRegularExpression(
+                '#'.$motif.'#',
+                $chemin,
+                "Le point d'entrée {$chemin} n'est pas bloqué par le .htaccess.",
+            );
+        }
     }
 }

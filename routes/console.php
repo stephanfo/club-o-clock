@@ -1,6 +1,5 @@
 <?php
 
-use App\Support\DemoMode;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -46,17 +45,8 @@ Schedule::command('weather:refresh --if-due')->everyFiveMinutes()->withoutOverla
 // la croissance des tables et purge l'email résiduel des liens consommés (minimisation §4.3).
 Schedule::command('club:prune-tokens --if-due')->everyFiveMinutes()->withoutOverlapping(120);
 
-// Remise à zéro nocturne de l'instance de démonstration (plan open source OS7). Trois verrous
-// plutôt qu'un : `between()` borne le rattrapage à la nuit (une échéance manquée ne doit jamais
-// être reprise en pleine journée, la commande détruit la base), `when()` évite qu'une instance de
-// club fasse échouer une tâche planifiée chaque nuit (bruit dans les journaux), et la commande
-// refuse elle-même de s'exécuter hors DEMO_MODE — c'est ce dernier verrou qui protège vraiment,
-// au plus près de la destruction.
-// Fuseau écrit en dur, contrairement au reste de l'app qui lit ClubSettings.timezone : la démo
-// est l'instance du projet, pas un club, et routes/console.php ne doit pas taper en base.
-Schedule::command('demo:reset --if-due')
-    ->everyFiveMinutes()
-    ->between('04:00', '06:00')
-    ->timezone('Europe/Paris')
-    ->when(fn () => DemoMode::enabled())
-    ->withoutOverlapping(60);
+// La remise à zéro de la démo (plan OS7) n'est PAS planifiée ici : elle a sa propre tâche cron,
+// `cron-demo.php`, créée uniquement sur l'instance de démonstration. `demo:reset` exécute
+// `migrate:fresh` — il détruit la base, donc toute trace en base disant qu'il vient de tourner.
+// Piloté par ce planificateur, qui repasse toutes les 5 min, il se rejouerait en boucle.
+// Confier sa périodicité au cron de l'hébergeur supprime le problème plutôt que de le contenir.
