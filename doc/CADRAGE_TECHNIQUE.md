@@ -181,7 +181,7 @@ Lecture : *énoncé PRD → implication → où c'est tranché*. Les exigences s
   quota + capacité + rang FIFO évalués dans **une même transaction sous le même verrou**.
 
 ### 4.5 Contenu & médias (PRD §4.12, §4.13)
-- **Stockage objets** : pièce jointe séance ≤ 5 Mo (PDF/PNG/JPG/WebP), GPX ≤ 5 Mo, logo ≤ 1 Mo.
+- **Stockage objets** : pièce jointe séance ≤ 5 Mo (PDF/PNG/JPG/WebP), GPX ≤ 5 Mo, logo ≤ 1 Mo, icône PWA ≤ 1 Mo (PNG seul, cf. §7.16).
 - **WYSIWYG sanitisé** (gras/italique/barré/listes/liens/h2-h3/citation), **stocké en markdown**, anti-XSS. **Même pipeline** pour `contentMarkdown` (séance `training`), `agenda` (`club_event`) **et `Debrief.contentMarkdown`** (débrief de compétition, PRD §4.12.5) — un seul éditeur, une seule sanitisation serveur.
 - **Débrief de compétition** (`Debrief`, PRD §4.12.5) : table InnoDB, FK `sessions` + `users`, **index unique `(session_id, author_id)`**, `archived_at` nullable (**soft-delete**, même pattern que `SessionTemplate` / `Location` / `Qualification`, §7.9). Autorisation **serveur** (§6.5, jamais client) : create/edit par l'auteur **si** `Registration` `participating` **et** `now() >= session.start_at` ; edit aussi par l'admin ; archive/réactivation **admin seul**. Volumétrie négligeable : lecture indexée par `session_id`.
 - **`photosAlbumUrl`** (PRD §4.12.6) : colonne nullable sur `sessions`. Validation **serveur** = URL bien formée à **schéma `https` whitelisté** (rejet `javascript:` / `data:` / `http:`). Pas de validation du domaine (Google Photos non imposé), **aucun appel serveur** vers l'URL, rendu en lien `target="_blank" rel="noopener noreferrer"`.
@@ -522,6 +522,44 @@ donc servis par un **endpoint JSON dédié**, appelé une fois par jeu de filtre
   visibilité (parcours archivés notamment) ;
 - il **plafonne** le nombre de tracés renvoyés et signale la troncature, la carte devenant illisible
   bien avant de devenir lourde.
+
+### 7.16 Icônes PWA — surcharge par instance, repli versionné (PRD §4.17)
+
+L'application est distribuée en open source et déployée par plusieurs clubs, plus une démo publique.
+Les icônes PWA relèvent donc de l'**identité d'une instance**, comme le nom et les couleurs — mais,
+contrairement à eux, elles étaient des **fichiers du dépôt** (`public/icons/`) référencés en dur.
+
+**Le problème.** Un club qui personnalise en écrasant ces fichiers entre en conflit à chaque `git pull`,
+indéfiniment. Les sortir du dépôt (`.gitignore` + copie à l'installation) déplace le défaut sans le
+résoudre : les trois points d'appel pointent alors vers des 404 tant que la copie n'est pas faite, et
+**ce mode de panne est silencieux** — pas d'erreur, pas de log, seulement une PWA qui ne s'installe
+pas et des notifications sans icône. Inacceptable pour un déploiement fait par un bénévole.
+
+**Décision.** Les icônes du club sont **téléversées** et stockées sur le disque `public`
+(`storage/app/public/`), exactement comme le logo (§ClubBrandingService) ; le jeu livré dans
+`public/icons/` **reste versionné et sert de repli**. Un déploiement neuf est donc installable en PWA
+sans aucune étape, la démo montre le produit, et la personnalisation ne touche jamais l'arbre Git.
+Le stockage sous `storage/` est en outre déjà exclu des transferts de déploiement (INSTALL §5.2) :
+un `rsync --delete` ne peut pas effacer les icônes du club, ce qu'un dossier sous `public/` n'aurait
+pas garanti.
+
+**Trois fichiers téléversés séparément, pas un seul redimensionné.** Les trois icônes ne sont pas
+trois tailles d'un même rendu : les formats manifest sont déclarés `any maskable` (donc rognés en
+cercle par le lanceur Android, ce qui impose une zone de sécurité), tandis que l'icône iOS doit être
+**opaque**. Dériver le tout d'une source unique obligerait à choisir un fond d'aplatissement et une
+marge de rognage à la place du club, en silence. Le fond retenu pour l'aplatissement iOS est le
+`background_color` du manifest (blanc), et non `primary_color` : prévisible, et stable si la palette
+du club est retouchée.
+
+**Validation.** Même barrière que le logo — seul ce que **GD sait décoder** est publié sous une URL
+same-origin (un fichier refusé est corrompu ou exécutable déguisé) — plus une vérification des
+**dimensions exactes** : une icône hors format casse l'installation PWA sans erreur visible.
+
+**Deux conséquences à ne pas perdre de vue :**
+- `public/sw.js` est un fichier **statique** : il ne peut pas lire l'état du serveur. L'URL de
+  l'icône de notification transite donc par le **payload push**, déjà rendu côté serveur.
+- la liste blanche `/storage/` du `.htaccess` racine est **fermée par défaut** : le dossier des
+  icônes doit y être ajouté explicitement, faute de quoi elles répondent 404 sans autre explication.
 
 ---
 

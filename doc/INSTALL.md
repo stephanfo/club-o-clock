@@ -234,6 +234,16 @@ lien magique, Google) exigent un compte actif.
 - **nom** (affiché partout, y compris comme expéditeur des emails) ;
 - **baseline** — laissée vide, l'app affiche celle du produit ; en écrire une propre au club ;
 - **logo** (remplace le logo neutre par défaut) ;
+- **icônes PWA** — trois PNG aux dimensions **exactes** : `192×192` et `512×512` (Android, écran de
+  démarrage, notifications) et `180×180` (« Ajouter à l'écran d'accueil » iOS). **Facultatif** :
+  sans téléversement, l'application sert le jeu livré et reste installable. Deux contraintes de
+  fabrication : pour les deux formats du manifest (192 et 512), garder le motif dans les
+  **80 % centraux**, car Android les rogne en cercle ; l'icône iOS, elle, n'est pas rognée (le
+  système lui applique des coins arrondis) mais ne doit pas compter sur la transparence — elle est
+  **aplatie sur fond blanc** à la réception, car iOS rendrait l'alpha en noir. Un bouton rétablit
+  le jeu par défaut.
+  ⚠️ Un téléphone où la PWA est **déjà installée** garde l'ancienne icône jusqu'à sa
+  réinstallation : c'est une limite des PWA, rien ne le contourne côté serveur.
 - **palette** — trois couleurs (natation, vélo, course). Les déclinaisons et la couleur de texte
   lisible sont calculées automatiquement ;
 - **fuseau horaire** et **mois de bascule de saison** (septembre par défaut) — ce mois définit
@@ -409,11 +419,11 @@ curl -s -o /dev/null -w '%{http_code}\n' https://<domaine>/cron.php
 > le dossier `storage/` du dépôt (logs, cache, GPX hors webroot), à bloquer, et l'URL
 > `/storage/` du lien symbolique, par laquelle transite le logo. `RedirectMatch` (mod_alias)
 > teste l'URL indépendamment des `RewriteRule`, donc il intercepte les deux. La règle doit
-> porter un look-ahead négatif — `RedirectMatch 404 (?i)/storage/(?!logos/)` — exactement comme
+> porter un look-ahead négatif — `RedirectMatch 404 (?i)/storage/(?!(logos|icons)/)` — exactement comme
 > `/vendor/(?!livewire/)`. Diagnostic : `ls -la public/storage` et `namei -l` sont bons, mais
 > l'URL répond 404 y compris en contournant la réécriture par `/public/storage/…`.
 >
-> Cette règle est une **liste blanche** : seul `logos/` est exposé. Les traces GPX ne sont pas
+> Cette règle est une **liste blanche** : seuls `logos/` et `icons/` (icônes PWA) sont exposés. Les traces GPX ne sont pas
 > concernées (disque `local`, hors webroot, servies par une route PHP authentifiée), mais tout
 > futur dossier public devra y être ajouté, sous peine du même 404 silencieux.
 

@@ -58,6 +58,13 @@ class ClubSettingsForm extends Component
     /** Fichier déposé, traité au submit par ClubBrandingService (vignettes générées côté serveur, GD requis). */
     public $logo = null;
 
+    /** Icônes PWA en attente d'enregistrement, indexées par variante (cf. ClubSettings::PWA_ICONS). */
+    public $icon_192 = null;
+
+    public $icon_512 = null;
+
+    public $icon_apple = null;
+
     // ── Mentions légales (§OS3) ──
     // Contenu propre à l'instance, saisi ici plutôt qu'écrit dans la vue publique : un club ne doit
     // jamais avoir à éditer le code source pour publier ses mentions (son fork divergerait).
@@ -221,6 +228,12 @@ class ClubSettingsForm extends Component
             // règle du framework — et on exclut au passage gif/bmp, que `image` accepte et dont on
             // n'a aucun usage ici.
             'logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
+            // PNG SEUL pour les icônes, et dimensions EXACTES : le manifest les déclare en
+            // image/png, et une icône hors format casse l'installation PWA sans erreur visible
+            // (cadrage §7.16). Mieux vaut refuser au dépôt que livrer une PWA cassée en silence.
+            'icon_192' => ['nullable', 'image', 'mimes:png', 'dimensions:width=192,height=192', 'max:1024'],
+            'icon_512' => ['nullable', 'image', 'mimes:png', 'dimensions:width=512,height=512', 'max:1024'],
+            'icon_apple' => ['nullable', 'image', 'mimes:png', 'dimensions:width=180,height=180', 'max:1024'],
             'legal_publisher' => ['nullable', 'string', 'max:500'],
             'legal_host' => ['nullable', 'string', 'max:500'],
             'legal_director' => ['nullable', 'string', 'max:255'],
@@ -249,11 +262,61 @@ class ClubSettingsForm extends Component
         }
     }
 
+    /** Mêmes contraintes d'aperçu que updatedLogo() : on valide au dépôt, sinon temporaryUrl() 500. */
+    public function updatedIcon192(): void
+    {
+        $this->validateIconOrReset('icon_192');
+    }
+
+    public function updatedIcon512(): void
+    {
+        $this->validateIconOrReset('icon_512');
+    }
+
+    public function updatedIconApple(): void
+    {
+        $this->validateIconOrReset('icon_apple');
+    }
+
+    private function validateIconOrReset(string $property): void
+    {
+        try {
+            $this->validateOnly($property);
+        } catch (ValidationException $e) {
+            $this->reset($property);
+            throw $e;
+        }
+    }
+
+    /**
+     * Rétablit le jeu d'icônes livré avec l'application (PRD §4.17).
+     *
+     * Anodin et réversible (le club peut re-téléverser) : `wire:confirm` suffit, pas de x-dialog.
+     */
+    public function resetPwaIcons(ClubBrandingService $branding): void
+    {
+        $branding->resetPwaIcons(ClubSettings::current(), auth()->user());
+
+        $this->reset('icon_192', 'icon_512', 'icon_apple');
+
+        session()->flash('status', 'Icônes par défaut rétablies.');
+    }
+
     public function save(ClubBrandingService $branding): void
     {
         $data = $this->validate();
         $logo = $data['logo'] ?? null;
         unset($data['logo']);
+
+        // Les icônes ne sont pas des colonnes éditables directement : le service écrit lui-même le
+        // chemin après validation GD et ré-encodage. On les sort donc du $data d'update().
+        $icons = [];
+        foreach (array_keys(ClubSettings::PWA_ICONS) as $variant) {
+            if (! empty($data[$variant])) {
+                $icons[$variant] = $data[$variant];
+            }
+            unset($data[$variant]);
+        }
 
         // Les color pickers sont préremplis en affichage avec les couleurs de démarrage (mount()) —
         // un <input type="color"> ne peut pas rester vide. Si l'admin n'a pas dévié du défaut, on
@@ -284,10 +347,14 @@ class ClubSettingsForm extends Component
             $branding->replaceLogo($settings, $logo, auth()->user());
         }
 
+        foreach ($icons as $variant => $file) {
+            $branding->replacePwaIcon($settings, $variant, $file, auth()->user());
+        }
+
         AuditLogger::record('club_settings_updated', auth()->user(), []);
 
         session()->flash('status', 'Paramètres du club enregistrés.');
-        $this->reset('logo');
+        $this->reset('logo', 'icon_192', 'icon_512', 'icon_apple');
     }
 
     // ── Actions de saison (§4.4 suspension de masse · §4.5 recalcul catégories) ──
@@ -336,6 +403,20 @@ class ClubSettingsForm extends Component
         return $start->locale('fr')->isoFormat('MMM').' → '.$start->copy()->subMonth()->locale('fr')->isoFormat('MMM');
     }
 
+    /** Vrai dès qu'au moins une icône PWA a été téléversée par le club. */
+    private function pwaIconsCustomised(): bool
+    {
+        $settings = ClubSettings::current();
+
+        foreach (ClubSettings::PWA_ICONS as [$column, $fallback]) {
+            if ($settings->{$column}) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** Comptes actifs (non archivés) par catalogue — affichés en regard du hub (proto « · N »). */
     private function catalogueCounts(): array
     {
@@ -354,6 +435,9 @@ class ClubSettingsForm extends Component
         return view('livewire.admin.club-settings-form', [
             'counts' => $this->catalogueCounts(),
             'logoPath' => ClubSettings::current()->logo_path,
+            // Le bouton « rétablir » ne s'affiche que s'il y a quelque chose à rétablir : proposer
+            // de revenir au défaut quand on y est déjà n'a pas de sens et inquiète inutilement.
+            'pwaIconsCustomised' => $this->pwaIconsCustomised(),
             // Compteurs d'impact pour les modales de saison (calculés seulement à l'ouverture).
             'impact' => ($this->showBascule || $this->showNouvelleAnnee) ? $seasons->impactCounters() : null,
             // Avertissement en amont du clic : combien de comptes seraient verrouillés dehors si

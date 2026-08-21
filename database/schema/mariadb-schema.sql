@@ -138,6 +138,9 @@ CREATE TABLE `club_settings` (
   `name` varchar(255) NOT NULL DEFAULT 'Club',
   `tagline` varchar(120) DEFAULT NULL,
   `logo_path` varchar(255) DEFAULT NULL,
+  `icon_192_path` varchar(255) DEFAULT NULL,
+  `icon_512_path` varchar(255) DEFAULT NULL,
+  `icon_apple_path` varchar(255) DEFAULT NULL,
   `primary_color` varchar(9) DEFAULT NULL,
   `accent_color` varchar(9) DEFAULT NULL,
   `info_color` varchar(9) DEFAULT NULL,
@@ -793,4 +796,5 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (35,'2026_01_01_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (36,'2026_01_01_000370_create_activity_logs_table',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (37,'2026_01_01_000380_create_apero_flags_table',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (38,'2026_08_09_000100_add_channel_and_auth_switches_to_club_settings_table',2);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (39,'2026_08_21_000000_add_pwa_icon_paths_to_club_settings',2);
 commit;

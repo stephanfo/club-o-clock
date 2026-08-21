@@ -41,7 +41,10 @@ self.addEventListener('fetch', (event) => {
 });
 
 // --- Web Push (J8.6) ---
-// Le payload est rendu côté serveur par NotificationRenderer : { title, body, url }.
+// Le payload est rendu côté serveur par NotificationRenderer : { title, body, url, icon }.
+// `icon` est résolu par le serveur (icône du club ou jeu livré) : ce fichier est STATIQUE, il ne
+// peut pas lire l'état de l'instance. Repli en dur si la clé manque — une ligne d'outbox mise en
+// file avant cette version n'en a pas.
 self.addEventListener('push', (event) => {
     let data = {};
     try {
@@ -53,7 +56,7 @@ self.addEventListener('push', (event) => {
     const title = data.title || 'Notification';
     const options = {
         body: data.body || '',
-        icon: '/icons/icon-192.png',
+        icon: data.icon || '/icons/icon-192.png',
         data: { url: data.url || '/' },
     };
 

@@ -78,7 +78,7 @@ les deux.
 | **Base de données** | MariaDB / MySQL (InnoDB) |
 | **Push notifications** | Web Push VAPID natif (`minishlink/web-push`) |
 | **Email transactionnel** | Brevo (UE) via `symfony/brevo-mailer` |
-| **PWA** | Service worker maison + manifest statique |
+| **PWA** | Service worker maison + manifest dynamique (identité et icônes du club) |
 | **Stockage objets** | Filesystem hors webroot (servi par contrôleur PHP) |
 | **Météo** | Open-Meteo (gratuit, UE, sans clé, cache 3h) |
 | **XLSX** | `phpoffice/phpspreadsheet` (exports côté serveur) |

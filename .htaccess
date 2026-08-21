@@ -46,11 +46,11 @@ RedirectMatch 404 (?i)/(app|bootstrap|config|database|resources|routes|tests|nod
 # URL est le lien symbolique public/storage → storage/app/public, par lequel transite le LOGO
 # DU CLUB. Sans ce look-ahead, le logo répond 404 alors que fichier et lien sont corrects.
 #
-# ⚠ LISTE BLANCHE, à tenir à jour : seul `logos/` est exposé, car c'est aujourd'hui le seul
-# contenu du disque `public` (cf. ClubBrandingService ; les traces GPX vivent sur le disque
-# `local`, hors webroot, servies par une route PHP authentifiée). Tout nouveau dossier public
-# devra être AJOUTÉ ici — sinon il répondra 404 sans autre explication.
-RedirectMatch 404 (?i)/storage/(?!logos/)
+# ⚠ LISTE BLANCHE, à tenir à jour : `logos/` et `icons/` (icônes PWA du club, cadrage §7.16) sont
+# les seuls contenus exposés du disque `public` (cf. ClubBrandingService ; les traces GPX vivent
+# sur le disque `local`, hors webroot, servies par une route PHP authentifiée). Tout nouveau
+# dossier public devra être AJOUTÉ ici — sinon il répondra 404 sans autre explication.
+RedirectMatch 404 (?i)/storage/(?!(logos|icons)/)
 RedirectMatch 404 (?i)/vendor/(?!livewire/)
 RedirectMatch 404 (?i)/(artisan|cron(-demo)?\.php|composer\.(json|lock)|package(-lock)?\.json|phpunit\.xml|vite\.config\.js|README\.md|CLAUDE\.md)$
 

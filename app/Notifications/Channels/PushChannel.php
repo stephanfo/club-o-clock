@@ -2,6 +2,7 @@
 
 namespace App\Notifications\Channels;
 
+use App\Models\ClubSettings;
 use App\Models\NotificationOutbox;
 use App\Notifications\NotificationRenderer;
 use App\Notifications\Push\WebPushSender;
@@ -27,7 +28,15 @@ class PushChannel implements NotificationChannel
             return true;
         }
 
-        $payload = json_encode($this->renderer->render($line), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        // L'icône rejoint le payload ici, et non dans le renderer, qui sert aussi l'email : c'est
+        // une donnée d'affichage propre au push. public/sw.js est un fichier STATIQUE — il ne peut
+        // pas lire ClubSettings (cadrage §7.16), donc le serveur lui transmet l'URL déjà résolue,
+        // le service worker gardant un repli en dur si la clé manque (payload d'une version
+        // antérieure encore en vol dans l'outbox).
+        $payload = json_encode([
+            ...$this->renderer->render($line),
+            'icon' => ClubSettings::current()->pwaIconUrl('icon_192'),
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         $delivered = 0;
         $transientFailures = 0;

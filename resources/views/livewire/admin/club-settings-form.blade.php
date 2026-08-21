@@ -108,8 +108,56 @@
                     @foreach ($months as $num => $label)<option value="{{ $num }}">{{ $label }}</option>@endforeach
                 </select>
 
+                {{-- ── Icônes PWA (§4.17, cadrage §7.16) ──
+                     Trois fichiers distincts, et non trois tailles d'un même rendu : les deux
+                     formats du manifest sont rognés en cercle par Android (d'où la zone de
+                     sécurité), l'icône iOS doit être opaque. Vide = jeu livré avec l'application,
+                     de sorte qu'une instance neuve reste installable sans rien téléverser. --}}
+                <label class="field-label" style="margin-top:14px">Icônes de l'application (PWA)</label>
+                <div class="meta" style="font-size:12px;margin-bottom:8px">
+                    PNG aux dimensions exactes. Pour les deux premières, garder le motif dans les 80&nbsp;% centraux :
+                    Android les rogne en cercle. L'icône iOS n'est pas rognée (coins arrondis par le système) et son
+                    fond transparent est remplacé par du blanc.
+                </div>
+                {{-- L'aperçu imite la forme que le SYSTÈME applique, et elle diffère : Android rogne
+                     les formats `maskable` en cercle, iOS applique un squircle (carré à coins
+                     arrondis) et jamais un cercle. Un aperçu uniformément rond ferait cadrer
+                     l'icône iOS pour un rognage qui n'aura pas lieu. D'où le rayon par variante,
+                     et non la classe `disc-badge` (border-radius:50%) réutilisée telle quelle. --}}
+                <div class="flex g12" style="flex-wrap:wrap">
+                    @foreach ([
+                        'icon_192' => ['label' => '192×192', 'hint' => 'Android', 'radius' => '50%'],
+                        'icon_512' => ['label' => '512×512', 'hint' => 'Écran de démarrage', 'radius' => '50%'],
+                        'icon_apple' => ['label' => '180×180', 'hint' => 'iOS', 'radius' => 'var(--radius-lg)'],
+                    ] as $variant => $meta)
+                        <div style="text-align:center">
+                            <label style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:{{ $meta['radius'] }};background:var(--slate-50);border:2px solid var(--brand);cursor:pointer;overflow:hidden">
+                                {{-- isPreviewable() en garde, même raison que pour le logo. --}}
+                                @if ($$variant && $$variant->isPreviewable())
+                                    <img src="{{ $$variant->temporaryUrl() }}" alt="" style="width:100%;height:100%;object-fit:cover">
+                                @else
+                                    <img src="{{ \App\Models\ClubSettings::current()->pwaIconUrl($variant) }}" alt="" style="width:100%;height:100%;object-fit:cover">
+                                @endif
+                                <input type="file" wire:model="{{ $variant }}" accept="image/png" style="display:none">
+                            </label>
+                            <div class="meta" style="font-size:11px;margin-top:4px">{{ $meta['label'] }}</div>
+                            <div class="meta" style="font-size:11px;color:var(--fg-muted)">{{ $meta['hint'] }}</div>
+                        </div>
+                    @endforeach
+                </div>
+                @error('icon_192')<div class="meta" style="color:var(--danger);margin-top:6px">{{ $message }}</div>@enderror
+                @error('icon_512')<div class="meta" style="color:var(--danger);margin-top:6px">{{ $message }}</div>@enderror
+                @error('icon_apple')<div class="meta" style="color:var(--danger);margin-top:6px">{{ $message }}</div>@enderror
+                @if ($pwaIconsCustomised ?? false)
+                    <button type="button" class="btn btn-ghost btn-sm" style="margin-top:8px"
+                            wire:click="resetPwaIcons" wire:target="resetPwaIcons" wire:loading.attr="disabled"
+                            wire:confirm="Rétablir les icônes livrées avec l'application ?">
+                        Rétablir les icônes par défaut
+                    </button>
+                @endif
+
                 <div class="flex" style="justify-content:flex-end;margin-top:16px">
-                    <button type="submit" class="btn btn-primary btn-sm" wire:loading.attr="disabled" wire:target="save,logo">Enregistrer</button>
+                    <button type="submit" class="btn btn-primary btn-sm" wire:loading.attr="disabled" wire:target="save,logo,icon_192,icon_512,icon_apple">Enregistrer</button>
                 </div>
             </form>
 
