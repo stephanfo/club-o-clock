@@ -18,7 +18,7 @@ démonstration · flux réseau sortants · maintenance · dépannage.
 | Besoin | Version | Note |
 |---|---|---|
 | **PHP** | ≥ 8.3 | Extensions : `pdo_mysql`, `mbstring`, `openssl`, `bcmath`, `intl`, `fileinfo`, `zip`, `gd` |
-| **MariaDB** ou **MySQL** | MariaDB ≥ 10.6 · MySQL ≥ 8.0 | Moteur **InnoDB** |
+| **MariaDB** ou **MySQL** | MariaDB ≥ 10.6 · MySQL ≥ 8.0 | Moteur **InnoDB**. Les deux sont joués à chaque intégration continue (MySQL 8.4, MariaDB 11.4) : ce n'est pas une compatibilité annoncée mais non vérifiée. |
 | **Composer** | ≥ 2 | Dépendances PHP |
 | **Node.js + npm** | ≥ 20 | **Build des assets uniquement** — pas nécessaire sur le serveur (cf. §5) |
 | **Chromium (Playwright)** | — | **Tests navigateur en local uniquement**, optionnel : `npx playwright install chromium` (cf. [`tests/E2E/README.md`](https://github.com/stephanfo/club-o-clock/blob/main/tests/E2E/README.md)) |
@@ -448,9 +448,10 @@ curl -s -o /dev/null -w '%{http_code}\n' https://<domaine>/cron.php
 Deux pièges spécifiques au mutualisé, à vérifier **une fois** :
 
 > ⚠️ **Dialecte SQL.** Un hébergement mutualisé peut servir **MySQL** derrière un nom d'hôte en
-> `*.mysql.db` alors que le développement local tourne sur MariaDB. Vérifier par
-> `select version();` et aligner `DB_CONNECTION` (`mysql` ou `mariadb`) dans le `.env` **du
-> serveur** — sinon Laravel parle le mauvais dialecte.
+> `*.mysql.db` alors que le développement local tourne sur MariaDB — c'est le cas d'OVH Pro, qui
+> sert **MySQL 8.4**. Vérifier par `select version();` et aligner `DB_CONNECTION` (`mysql` ou
+> `mariadb`) dans le `.env` **du serveur** — sinon Laravel parle le mauvais dialecte, et il ne
+> charge pas le bon dump de schéma (`database/schema/<connexion>-schema.sql`).
 >
 > ⚠️ **Asset Livewire en statique.** `vendor:publish --tag=livewire:assets` est **obligatoire** :
 > servi par une route PHP, `livewire.min.js` casse le framing HTTP/2 de certains hébergeurs (§10).

@@ -17,7 +17,9 @@ Stack — **monolithe Laravel 13** sur hébergement mutualisé + **MariaDB/MySQL
 
 **Base de données** : la source de vérité du schéma est [database/migrations/](database/migrations/). Une évolution de schéma se porte dans une **nouvelle migration**, jamais en éditant une migration existante ni le dump.
 
-> [database/schema/mariadb-schema.sql](database/schema/mariadb-schema.sql) est un **artefact dérivé**, régénéré par `php artisan schema:dump` : Laravel le charge automatiquement au début de `migrate` pour accélérer la reconstruction (tests, base neuve). Il n'est **pas** une source de vérité, et il n'est chargé que pour la connexion `mariadb` (dev/test) — la production, en `DB_CONNECTION=mysql`, joue les migrations. **Le régénérer après toute migration qui change le schéma**, sinon les tests repartent d'un schéma périmé.
+> [database/schema/](database/schema/) contient un **artefact dérivé par moteur** — `mysql-schema.sql` et `mariadb-schema.sql` —, régénéré par `php artisan schema:dump` : Laravel charge celui de la connexion courante au début de `migrate` pour accélérer la reconstruction (tests, base neuve). Ce ne sont **pas** des sources de vérité. **Les régénérer après toute migration qui change le schéma**, sinon les tests repartent d'un schéma périmé.
+>
+> Les deux existent parce que la CI joue la suite sur les **deux SGBD** que le projet annonce supporter : **MySQL 8.4**, celui de la production (OVH Pro), et **MariaDB 11.4** pour les clubs déployant ailleurs. Chaque dump doit être régénéré **sur son propre moteur** — `mysqldump` et `mariadb-dump` écrivent des dialectes différents, et régénérer l'un depuis l'autre produit un fichier illisible par la CI. En local, `DB_CONNECTION` choisit le moteur ; les deux tournent en conteneur.
 
 ## Porte de qualité
 

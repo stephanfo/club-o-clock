@@ -20,28 +20,45 @@ concurrency:
 
 jobs:
   qualite:
-    name: Porte de qualité
+    name: Porte de qualité (${{ matrix.sgbd }})
     runs-on: ubuntu-latest
 
+    # Les deux SGBD que le projet annonce supporter (INSTALL §2) sont joués à chaque fois.
+    # `mysql` est celui de la PRODUCTION (OVH Pro sert MySQL 8.4) : c'est la référence, et
+    # elle ne doit jamais cesser d'être testée. `mariadb` couvre les clubs qui déploieraient
+    # ailleurs — MariaDB 11 n'est plus un clone de MySQL 8, une promesse non testée finirait
+    # par être fausse.
+    #
+    # fail-fast désactivé : quand un moteur casse, on veut savoir si l'autre casse aussi —
+    # c'est ce qui distingue une régression d'une incompatibilité de dialecte.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sgbd: mysql
+            image: mysql:8.4
+            client: mysql-client
+          - sgbd: mariadb
+            image: mariadb:11.4
+            client: mariadb-client
+
     services:
-      # Les tests tournent sur MariaDB/InnoDB, jamais SQLite : le moteur doit reproduire
-      # les verrous de ligne (FOR UPDATE) sur lesquels repose la sérialisation des
-      # inscriptions. Cf. le commentaire de phpunit.xml.
-      mariadb:
-        image: mariadb:11.4
+      # Les tests tournent sur InnoDB, jamais SQLite : le moteur doit reproduire les verrous
+      # de ligne (FOR UPDATE) sur lesquels repose la sérialisation des inscriptions. Cf. le
+      # commentaire de phpunit.xml.
+      #
+      # Les deux images acceptent les variables MYSQL_* (MariaDB les conserve en alias) et
+      # exposent `healthcheck.sh` ou `mysqladmin` : on teste le port, seul dénominateur commun.
+      db:
+        image: ${{ matrix.image }}
         env:
-          MARIADB_ROOT_PASSWORD: root
-          MARIADB_DATABASE: cluboclock_test
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: cluboclock_test
         ports:
           - 3306:3306
-        options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
 
     env:
-      DB_CONNECTION: mariadb
+      DB_CONNECTION: ${{ matrix.sgbd }}
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
       DB_DATABASE: cluboclock_test
@@ -55,15 +72,26 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          # gd est requis par composer.json (vignettes du logo de club) ; le client
-          # mariadb sert à Laravel pour charger le dump de schéma au début de `migrate`
-          # et à `schema:check-drift`.
+          # gd est requis par composer.json (vignettes du logo de club).
           extensions: pdo_mysql, mbstring, openssl, bcmath, intl, fileinfo, zip, gd
           tools: composer:v2
           coverage: none
 
-      - name: Installer le client MariaDB
-        run: sudo apt-get update && sudo apt-get install -y mariadb-client
+      # Le client en ligne de commande sert à Laravel pour charger le dump de schéma au début
+      # de `migrate` et à `schema:check-drift` — il doit être celui du moteur testé, sinon le
+      # dump est écrit ou relu dans le mauvais dialecte.
+      - name: Installer le client ${{ matrix.sgbd }}
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.client }}
+
+      - name: Attendre que la base réponde
+        run: |
+          for i in $(seq 1 30); do
+            if mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -proot --silent 2>/dev/null; then
+              echo "Base prête."; exit 0
+            fi
+            sleep 2
+          done
+          echo "La base n'a pas répondu dans le délai imparti."; exit 1
 
       - name: Cache des dépendances Composer
         uses: actions/cache@v4
