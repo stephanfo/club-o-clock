@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Services\DuePeriodGuard;
 use App\Support\DemoMode;
 use Database\Seeders\DemoSeeder;
 use Database\Seeders\GpxRouteSeeder;
@@ -19,13 +18,9 @@ use Illuminate\Support\Facades\Storage;
 // club n'a pas DEMO_MODE, donc la commande y est inerte, même lancée par erreur.
 class ResetDemoCommand extends Command
 {
-    protected $signature = 'demo:reset
-        {--if-due : N\'exécuter que si la remise à zéro du jour n\'a pas déjà eu lieu}';
+    protected $signature = 'demo:reset';
 
     protected $description = 'Réinitialise l\'instance de démonstration (base, uploads, journaux)';
-
-    /** Fuseau de référence de la démo, aligné sur routes/console.php (l'instance du projet). */
-    private const FUSEAU = 'Europe/Paris';
 
     /** Répertoires d'uploads purgés à chaque remise à zéro, par disque. */
     private const UPLOADS = [
@@ -33,20 +28,8 @@ class ResetDemoCommand extends Command
         'local' => ['gpx', 'livewire-tmp'],
     ];
 
-    public function handle(DuePeriodGuard $guard): int
+    public function handle(): int
     {
-        // Le garde d'échéance vient APRÈS le garde-fou DEMO_MODE : sur une instance de club, la
-        // commande doit refuser, pas consommer silencieusement l'échéance du jour.
-        if (DemoMode::enabled() && $this->option('if-due')) {
-            $guard->runIfDue(
-                'demo-reset',
-                DuePeriodGuard::dailyPeriod(timezone: self::FUSEAU),
-                fn () => $this->reinitialiser(),
-            );
-
-            return self::SUCCESS;
-        }
-
         if (! DemoMode::enabled()) {
             $this->error('Refusé : cette instance n\'est pas une démo (DEMO_MODE absent du .env).');
             $this->line('  Cette commande détruit la base. Elle ne s\'exécute que sur une instance de démonstration.');
@@ -54,14 +37,6 @@ class ResetDemoCommand extends Command
             return self::FAILURE;
         }
 
-        $this->reinitialiser();
-
-        return self::SUCCESS;
-    }
-
-    /** Effectue la remise à zéro. Retourne true si elle est allée au bout. */
-    private function reinitialiser(): bool
-    {
         $this->components->info('Réinitialisation de la démo…');
 
         // ⚠️ L'ORDRE COMPTE : on efface AVANT de reconstruire, jamais après.
@@ -96,7 +71,7 @@ class ResetDemoCommand extends Command
         $this->newLine();
         $this->components->info('Démo réinitialisée.');
 
-        return true;
+        return self::SUCCESS;
     }
 
     /**

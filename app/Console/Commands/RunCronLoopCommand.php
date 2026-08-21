@@ -117,16 +117,20 @@ class RunCronLoopCommand extends Command
         // Première passe immédiate : la boucle démarre à la minute imposée par l'hébergeur, il
         // n'y a aucune raison d'attendre la minute suivante pour honorer les échéances en retard.
         while (! $this->arretDemande && Carbon::now()->lessThan($dernierDepart)) {
-            $prochaine = Carbon::now()->startOfMinute()->addMinute();
-
             if (! $this->passe($echeance)) {
                 $echecs++;
             }
             $passes++;
 
-            // Cible recalculée à chaque tour, jamais `sleep(60)` après le travail : la durée des
-            // passes s'accumulerait et la boucle dériverait jusqu'à sauter une minute entière.
-            $this->dormirJusqua($prochaine, $dernierDepart);
+            // Cible calculée APRÈS la passe, sur l'heure courante : une passe qui déborde de sa
+            // minute (schedule:run lent, tâche longue) doit viser la minute suivante, pas une
+            // cible déjà périmée — sinon le sommeil est nul et deux passes s'enchaînent dans la
+            // même minute. Recalculer à chaque tour évite aussi la dérive d'un `sleep(60)` fixe,
+            // dont les durées d'exécution s'accumuleraient jusqu'à sauter une minute entière.
+            $this->dormirJusqua(
+                Carbon::now()->startOfMinute()->addMinute(),
+                $dernierDepart,
+            );
         }
 
         $this->info(sprintf('Boucle terminée : %d passe(s), %d en échec.', $passes, $echecs));

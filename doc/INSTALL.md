@@ -583,9 +583,21 @@ Ce seul drapeau **impose** les garde-fous, il ne se contente pas de les recomman
 | `demo:reset` déverrouillée | La commande **refuse de démarrer** sans ce drapeau (elle détruit la base) |
 
 **Remise à zéro.** `php artisan demo:reset` reconstruit la base, rejoue le jeu de démonstration et
-les parcours GPX, purge les fichiers téléversés **et les journaux**, puis vide les caches. Elle est
-planifiée à **04:00** et part donc toute seule avec le cron unique du §5.4 — rien de plus à
-installer.
+les parcours GPX, purge les fichiers téléversés **et les journaux**, puis vide les caches.
+
+Elle demande une **seconde tâche cron**, propre à la démo, en plus de celle du §5.4 : pointer
+`cron-demo.php`, **une fois par jour**, à une heure creuse. L'heure exacte n'a aucune importance
+(et la minute encore moins).
+
+> **Pourquoi une tâche à part, et non une entrée du planificateur ?** `demo:reset` exécute
+> `migrate:fresh` : il détruit la base, donc aussi toute trace en base indiquant qu'il vient de
+> tourner. Piloté par le planificateur — qui repasse toutes les 5 minutes — il se rejouerait en
+> boucle, une vingtaine de reconstructions par nuit. Confier sa périodicité au cron de
+> l'hébergeur supprime le problème au lieu d'avoir à le contenir par un marqueur, une fenêtre
+> horaire et un verrou.
+
+Sur une instance de club, cette tâche n'existe pas — et si elle était créée par erreur, la
+commande refuserait de s'exécuter (garde-fou `DEMO_MODE`).
 
 > Les journaux sont purgés pour une raison précise : avec `MAIL_MAILER=log`, le corps **complet**
 > de chaque email part dans `storage/logs`, liens magiques et jetons d'invitation compris. Le

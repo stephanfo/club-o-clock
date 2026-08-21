@@ -236,6 +236,49 @@ class CronLoopTest extends TestCase
         $this->assertSame('2026-08-22', DuePeriodGuard::dailyPeriod($veille, 'Europe/Paris'));
     }
 
+    // ─────────── Cadence de la boucle ───────────
+
+    public function test_une_passe_lente_ne_declenche_pas_deux_passes_dans_la_meme_minute(): void
+    {
+        // La cible de réveil doit être calculée APRÈS la passe. Calculée avant, une passe qui
+        // déborde de sa minute viserait un instant déjà périmé : le sommeil serait nul et deux
+        // `schedule:run` s'enchaîneraient dans la même minute d'horloge.
+        $dormir = new \ReflectionMethod(RunCronLoopCommand::class, 'dormirJusqua');
+
+        // Passe démarrée à 10:04:00 et durant 90 s : on est à 10:05:30 en sortie.
+        Carbon::setTestNow(Carbon::parse('2026-08-21 10:05:30'));
+
+        $cible = Carbon::now()->startOfMinute()->addMinute();
+
+        $this->assertSame(
+            '10:06:00',
+            $cible->format('H:i:s'),
+            'La cible doit viser la minute suivante, pas une minute déjà écoulée.',
+        );
+        $this->assertTrue($cible->greaterThan(Carbon::now()), 'Le sommeil serait nul.');
+
+        Carbon::setTestNow();
+        $this->assertTrue($dormir->isPrivate());
+    }
+
+    // ─────────── Remise à zéro de la démo ───────────
+
+    public function test_le_reset_demo_n_est_pas_pilote_par_le_planificateur(): void
+    {
+        // `demo:reset` exécute `migrate:fresh` : il détruit la base, donc toute trace en base
+        // indiquant qu'il vient de tourner. Piloté par le planificateur (qui repasse toutes les
+        // 5 min), il se rejouerait en boucle — une vingtaine de reconstructions par nuit. Sa
+        // périodicité appartient au cron de l'hébergeur (cron-demo.php), pas à Laravel.
+        $commandes = array_map(
+            fn ($event) => $event->command ?? '',
+            app(Schedule::class)->events(),
+        );
+
+        foreach ($commandes as $commande) {
+            $this->assertStringNotContainsString('demo:reset', $commande);
+        }
+    }
+
     // ─────────── Point d'entrée cron.php ───────────
 
     public function test_cron_php_refuse_le_contexte_http(): void
@@ -247,12 +290,25 @@ class CronLoopTest extends TestCase
         $this->assertStringContainsString('http_response_code(404)', $source);
     }
 
-    public function test_cron_php_est_bloque_par_le_htaccess(): void
+    public function test_les_points_d_entree_cron_sont_bloques_par_le_htaccess(): void
     {
-        // Le docroot du mutualisé est la racine du dépôt : sans cette règle, cron.php est servi.
-        $this->assertMatchesRegularExpression(
-            '/RedirectMatch 404 .*cron\\\\\.php/',
-            file_get_contents(base_path('.htaccess')),
-        );
+        // Le docroot du mutualisé est la racine du dépôt : sans ces règles, les points d'entrée
+        // du planificateur sont servis par Apache. Déclencher cron.php par HTTP lancerait 55 min
+        // de traitement par requête ; cron-demo.php détruirait et reconstruirait la base.
+        $htaccess = file_get_contents(base_path('.htaccess'));
+
+        preg_match('/^RedirectMatch 404 .*artisan.*$/m', $htaccess, $regle);
+        $this->assertNotEmpty($regle, 'Règle de blocage des fichiers racine introuvable.');
+
+        // On éprouve le motif lui-même plutôt que sa graphie : il doit couvrir les deux fichiers.
+        $motif = trim(str_replace('RedirectMatch 404 ', '', $regle[0]));
+
+        foreach (['/cron.php', '/cron-demo.php'] as $chemin) {
+            $this->assertMatchesRegularExpression(
+                '#'.$motif.'#',
+                $chemin,
+                "Le point d'entrée {$chemin} n'est pas bloqué par le .htaccess.",
+            );
+        }
     }
 }

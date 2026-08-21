@@ -33,6 +33,16 @@ class DuePeriodGuard
     private const TTL_DAYS = 7;
 
     /**
+     * Durée de vie du verrou d'exécution, en secondes.
+     *
+     * Doit dépasser largement la durée d'un travail gardé, sinon le verrou expire pendant
+     * l'exécution et une passe concurrente peut démarrer le même travail. 15 min laisse une marge
+     * confortable sur une cadence de 5 min — un TTL égal à la cadence ferait expirer le verrou
+     * pile au moment où la passe suivante se présente.
+     */
+    private const VERROU_SECONDES = 900;
+
+    /**
      * Exécute $work si la période courante n'a pas encore été honorée.
      *
      * @param  string  $task  Identifiant de tâche, ex. « weather-refresh »
@@ -50,9 +60,9 @@ class DuePeriodGuard
         // exécutent le travail deux fois. `withoutOverlapping()` du planificateur ne suffit
         // pas — il ignore la notion de période.
         //
-        // Verrou court, et non bloquant : passer son tour est sans conséquence, la passe
-        // suivante réessaiera dans 5 min. Attendre bloquerait la boucle pour rien.
-        $lock = Cache::lock($key.':lock', 300);
+        // Acquisition non bloquante : passer son tour est sans conséquence, l'échéance reste
+        // ouverte et la passe suivante réessaiera. Attendre immobiliserait la boucle pour rien.
+        $lock = Cache::lock($key.':lock', self::VERROU_SECONDES);
 
         if (! $lock->get()) {
             return false;
@@ -85,7 +95,14 @@ class DuePeriodGuard
         return is_string($raw) ? Carbon::parse($raw) : null;
     }
 
-    /** Clé de période horaire (UTC) : une échéance par heure d'horloge. */
+    /**
+     * Clé de période horaire : une échéance par heure d'horloge.
+     *
+     * Dans le fuseau de l'instant fourni (donc `app.timezone` par défaut). Le fuseau n'a pas
+     * d'importance ici, contrairement aux périodes quotidiennes : une heure reste une heure, et
+     * le compte des échéances est le même. Seul un changement de fuseau décalerait les clés une
+     * fois, sans conséquence.
+     */
     public static function hourlyPeriod(?Carbon $at = null): string
     {
         return ($at ?? Carbon::now())->format('Y-m-d\TH');

@@ -37,7 +37,15 @@ class RefreshWeatherCommand extends Command
         return self::SUCCESS;
     }
 
-    /** Rafraîchit le cache météo. Retourne true si la passe s'est déroulée sans exception. */
+    /**
+     * Rafraîchit le cache météo.
+     *
+     * Retourne true dès que la passe est allée au bout, même si aucune séance n'a pu être
+     * rafraîchie : `WeatherService::forecast()` avale ses propres échecs (timeout 4 s, retourne
+     * null). L'échéance de l'heure est donc consommée même si la source était injoignable —
+     * acceptable ici, le cache a un TTL de 3 h et la commande repasse 24 fois par jour. Seule
+     * une exception remontante laisserait l'échéance ouverte au rattrapage.
+     */
     private function rafraichir(WeatherService $weather): bool
     {
         $sessions = Session::query()
