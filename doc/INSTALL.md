@@ -118,7 +118,7 @@ MAIL_MAILER=brevo
 BREVO_API_KEY=xkeysib-…
 MAIL_FROM_ADDRESS="planning@monclub.fr"
 MAIL_FROM_NAME="Nom du club"
-NOTIF_EMAIL_DRIVER="App\Notifications\Channels\EmailChannel"
+NOTIF_EMAIL_DRIVER='App\Notifications\Channels\EmailChannel'
 ```
 
 Pour un SMTP classique (Scaleway TEM et autres), remplacer par `MAIL_MAILER=smtp` et les
@@ -185,7 +185,7 @@ php artisan club:vapid-keys      # affiche subject / public / private à coller 
 ```
 
 ```dotenv
-NOTIF_PUSH_DRIVER="App\Notifications\Channels\PushChannel"
+NOTIF_PUSH_DRIVER='App\Notifications\Channels\PushChannel'
 VAPID_SUBJECT="mailto:admin@monclub.fr"   # contact imposé par la spec VAPID
 VAPID_PUBLIC_KEY=…                        # exposée au front
 VAPID_PRIVATE_KEY=…                       # secret — ne jamais exposer ni versionner
