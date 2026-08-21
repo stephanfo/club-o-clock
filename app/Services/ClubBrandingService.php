@@ -59,6 +59,113 @@ class ClubBrandingService
         return $settings;
     }
 
+    /**
+     * Dimensions exigées et aplatissement, par variante d'icône PWA (cadrage §7.16).
+     *
+     * Les dimensions sont vérifiées EXACTEMENT plutôt que redimensionnées : une icône hors format
+     * casse l'installation PWA sans la moindre erreur visible, mieux vaut refuser à l'upload que
+     * livrer une PWA silencieusement cassée. `opaque` ne concerne que l'icône iOS : iOS rend toute
+     * transparence résiduelle en NOIR, alors que les formats manifest, déclarés `any maskable`,
+     * gardent leur canal alpha.
+     *
+     * @var array<string, array{size: int, opaque: bool}>
+     */
+    private const ICON_SPECS = [
+        'icon_192' => ['size' => 192, 'opaque' => false],
+        'icon_512' => ['size' => 512, 'opaque' => false],
+        'icon_apple' => ['size' => 180, 'opaque' => true],
+    ];
+
+    /** Fond d'aplatissement de l'icône iOS : le `background_color` du manifest, pas la couleur du club. */
+    private const ICON_FLATTEN_RGB = [255, 255, 255];
+
+    /**
+     * Remplace UNE icône PWA du club. $variant est une clé de ClubSettings::PWA_ICONS.
+     *
+     * Même barrière que le logo : seul ce que GD sait décoder est publié sous une URL same-origin.
+     */
+    public function replacePwaIcon(ClubSettings $settings, string $variant, UploadedFile $file, ?User $actor): ClubSettings
+    {
+        $spec = self::ICON_SPECS[$variant] ?? throw new RuntimeException("Icône PWA inconnue : {$variant}.");
+        $column = ClubSettings::PWA_ICONS[$variant][0];
+
+        $decoded = $this->decode($file->getRealPath());
+        if ($decoded === null) {
+            throw new RuntimeException("Le fichier déposé n'est pas une image exploitable.");
+        }
+
+        if (imagesx($decoded) !== $spec['size'] || imagesy($decoded) !== $spec['size']) {
+            throw new RuntimeException("L'icône doit faire exactement {$spec['size']}×{$spec['size']} pixels.");
+        }
+
+        $old = $settings->{$column};
+        $dir = 'icons/'.Str::random(24);
+        $path = "{$dir}/{$variant}.png";
+
+        // Ré-encodage systématique (jamais le fichier d'origine) : ce qui est publié est alors le
+        // rendu de GD, donc débarrassé de toute charge annexe qu'un PNG peut transporter.
+        $image = $spec['opaque'] ? $this->flatten($decoded, $spec['size']) : $decoded;
+
+        Storage::disk('public')->put($path, $this->encodePng($image, ! $spec['opaque']));
+
+        $settings->update([$column => $path]);
+
+        if ($old) {
+            $this->deleteIconDirectory($old);
+        }
+
+        AuditLogger::record('club_pwa_icon_updated', $actor, ['variant' => $variant]);
+
+        return $settings;
+    }
+
+    /** Rétablit le jeu d'icônes livré : efface les fichiers du club et remet les colonnes à NULL. */
+    public function resetPwaIcons(ClubSettings $settings, ?User $actor): ClubSettings
+    {
+        $cleared = [];
+
+        foreach (ClubSettings::PWA_ICONS as $variant => [$column, $fallback]) {
+            if ($settings->{$column}) {
+                $this->deleteIconDirectory($settings->{$column});
+                $cleared[] = $variant;
+            }
+            $settings->{$column} = null;
+        }
+
+        if ($cleared === []) {
+            return $settings;
+        }
+
+        $settings->save();
+
+        AuditLogger::record('club_pwa_icons_reset', $actor, ['variants' => $cleared]);
+
+        return $settings;
+    }
+
+    /** Aplatit sur fond opaque (iOS rend l'alpha en noir), en conservant le carré d'origine. */
+    private function flatten(GdImage $source, int $size): GdImage
+    {
+        $flat = imagecreatetruecolor($size, $size);
+        [$r, $g, $b] = self::ICON_FLATTEN_RGB;
+        imagefilledrectangle($flat, 0, 0, $size, $size, (int) imagecolorallocate($flat, $r, $g, $b));
+
+        // Alpha blending ACTIF : la source se compose sur le fond au lieu de l'écraser.
+        imagealphablending($flat, true);
+        imagecopy($flat, $source, 0, 0, 0, 0, $size, $size);
+
+        return $flat;
+    }
+
+    /** Supprime le dossier d'une icône remplacée (un dossier aléatoire par téléversement). */
+    private function deleteIconDirectory(string $oldPath): void
+    {
+        $dir = dirname($oldPath);
+        if ($dir !== '.' && $dir !== 'icons') {
+            Storage::disk('public')->deleteDirectory($dir);
+        }
+    }
+
     /** Décode l'image avec GD, ou null si le fichier n'est pas une image matricielle exploitable. */
     private function decode(string $sourcePath): ?GdImage
     {
@@ -94,8 +201,15 @@ class ClubBrandingService
         }
     }
 
-    private function encodePng(GdImage $image): string
+    private function encodePng(GdImage $image, bool $withAlpha = true): string
     {
+        // Sans ce couple, GD aplatit le canal alpha à l'encodage : les vignettes du logo et les
+        // icônes `maskable` doivent le conserver. L'icône iOS, déjà aplatie, s'en passe.
+        if ($withAlpha) {
+            imagealphablending($image, false);
+            imagesavealpha($image, true);
+        }
+
         ob_start();
         imagepng($image);
 

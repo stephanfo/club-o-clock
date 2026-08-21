@@ -26,6 +26,19 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Ajouté
 
+- **Icônes PWA personnalisables par le club.** Elles étaient des fichiers du dépôt
+  (`public/icons/`) : un club qui les remplaçait entrait en conflit à chaque `git pull`,
+  indéfiniment. Elles se téléversent désormais depuis *Paramètres du club* — trois PNG aux
+  dimensions exactes (192, 512, et 180 pour iOS) — et sont stockées comme le logo, hors de l'arbre
+  Git. Sans téléversement, l'application sert le jeu livré : une instance neuve reste installable
+  en PWA sans aucune étape, et la démo publique ne porte le branding d'aucun club. Un bouton
+  rétablit le jeu par défaut. L'icône iOS est aplatie sur fond blanc à la réception (iOS rend
+  autrement la transparence en noir), et les dimensions sont refusées si elles ne sont pas exactes
+  — une icône hors format casse l'installation PWA sans le moindre message d'erreur.
+
+  ⚠️ Un appareil où la PWA est **déjà installée** conserve l'ancienne icône jusqu'à sa
+  réinstallation : limite des PWA, sans contournement côté serveur.
+
 - **Tests navigateur (E2E)** : harnais Playwright rejouant 20 scénarios dans un vrai navigateur —
   clics, attente des mises à jour Livewire, vérification en base et captures aux formats mobile et
   desktop. Couvre les gardes d'inscription, la bascule de rôle coach/athlète, la tutelle parentale,

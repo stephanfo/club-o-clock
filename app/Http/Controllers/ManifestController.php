@@ -8,7 +8,8 @@ use Illuminate\Http\JsonResponse;
 
 // Manifest PWA dynamique (plan open source OS2) : name/short_name/theme_color reflètent
 // l'identité du club en base. Remplace l'ancien fichier statique public/manifest.webmanifest.
-// Icônes (public/icons/*.png) restent des fichiers statiques (pas de génération dynamique en V1).
+// Icônes : téléversables par le club (cadrage §7.16) et servies depuis le disque `public` ;
+// à défaut, repli sur le jeu versionné dans public/icons/ — une instance neuve reste installable.
 class ManifestController extends Controller
 {
     public function __invoke(): JsonResponse
@@ -27,13 +28,13 @@ class ManifestController extends Controller
             'lang' => 'fr',
             'icons' => [
                 [
-                    'src' => '/icons/icon-192.png',
+                    'src' => $settings->pwaIconUrl('icon_192'),
                     'sizes' => '192x192',
                     'type' => 'image/png',
                     'purpose' => 'any maskable',
                 ],
                 [
-                    'src' => '/icons/icon-512.png',
+                    'src' => $settings->pwaIconUrl('icon_512'),
                     'sizes' => '512x512',
                     'type' => 'image/png',
                     'purpose' => 'any maskable',
@@ -43,9 +44,15 @@ class ManifestController extends Controller
             ->header('Content-Type', 'application/manifest+json')
             // Le <link rel="manifest"> est dans head-meta, donc sur TOUTES les pages : sans cache,
             // chaque récupération paie un démarrage complet du framework et une requête SQL sur le
-            // mutualisé, pour un JSON qui ne bouge qu'à l'édition des paramètres du club. Un jour
-            // de péremption est sans conséquence pour un nom et une couleur (c'était un fichier
-            // statique auparavant).
-            ->header('Cache-Control', 'public, max-age=86400');
+            // mutualisé, pour un JSON qui ne bouge qu'à l'édition des paramètres du club.
+            //
+            // Une heure, et non plus un jour : depuis que les icônes PWA sont téléversables
+            // (§7.16), un admin qui remplace les siennes doit pouvoir CONSTATER le changement.
+            // Vingt-quatre heures d'écart entre l'upload et l'effet se lisent comme une panne et
+            // provoquent des re-téléversements en boucle. Le coût reste négligeable : le manifest
+            // n'est récupéré qu'à l'installation ou au rafraîchissement de la PWA, pas à chaque
+            // page. (L'URL des icônes porte un segment aléatoire : les FICHIERS, eux, restent
+            // cachables indéfiniment.)
+            ->header('Cache-Control', 'public, max-age=3600');
     }
 }

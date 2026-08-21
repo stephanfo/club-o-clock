@@ -885,6 +885,15 @@ Depuis le dashboard, lien **« Consulter les journaux »** mène à la page admi
 Page admin « Paramètres du club » :
 
 - **Identité** : nom du club, **logo** (upload PNG/JPG/JPEG/WebP/SVG, max **1 Mo**), couleurs primaires.
+- **Icônes PWA** : trois PNG téléversés séparément — `192×192` et `512×512` (manifest, tuile Android,
+  notification push) et `180×180` (« Ajouter à l'écran d'accueil » iOS). Aucun n'est dérivé du logo :
+  une icône d'application est carrée, masquée par le système (cercle sur Android pour les formats
+  `maskable`, coins arrondis sur iOS) et lue à 48 px, contraintes qu'un logo de club ne respecte pas. **Optionnel** : sans téléversement, l'instance sert le jeu
+  d'icônes livré avec l'application, de sorte qu'un déploiement neuf est installable en PWA sans
+  aucune étape de personnalisation. Un bouton **« revenir aux icônes par défaut »** rétablit ce jeu.
+  L'icône iOS est **aplatie sur fond opaque** à la réception (une transparence résiduelle est rendue
+  en noir par iOS). Exigence non-fonctionnelle : le remplacement des icônes ne doit **pas** exiger de
+  modifier un fichier du dépôt, afin qu'une instance reste à jour par simple mise à jour du code.
 - **Localisation** : fuseau horaire (défaut `Europe/Paris`).
 - **Catégories d'âge** : catalogue éditable (cf. §4.5).
 - **Disciplines** : catalogue éditable (cf. §4.6.1).

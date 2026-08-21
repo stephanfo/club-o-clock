@@ -27,6 +27,6 @@
 {{-- Icône « Ajouter à l'écran d'accueil » iOS : iOS ignore largement les icons du manifest et
      s'appuie sur apple-touch-icon (180×180, opaque, sans alpha — sinon fond noir). Sans ce lien,
      iOS captait un écran de la page (login vide hors auth). --}}
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="{{ \App\Models\ClubSettings::current()->pwaIconUrl('icon_apple') }}">
+<link rel="icon" type="image/png" sizes="192x192" href="{{ \App\Models\ClubSettings::current()->pwaIconUrl('icon_192') }}">
 <link rel="manifest" href="/manifest.webmanifest">

@@ -111,6 +111,9 @@ class NotificationDeliveryTest extends TestCase
             /** @var list<string> */
             public array $sent = [];
 
+            /** @var list<string> payloads JSON envoyés, dans l'ordre (cf. test des icônes PWA). */
+            public array $payloads = [];
+
             /** @var list<string> endpoints à marquer expirés (404/410) */
             public array $expire = [];
 
@@ -126,6 +129,7 @@ class NotificationDeliveryTest extends TestCase
                     return PushDeliveryResult::failed();
                 }
                 $this->sent[] = $subscription->endpoint;
+                $this->payloads[] = $payloadJson;
 
                 return PushDeliveryResult::delivered();
             }

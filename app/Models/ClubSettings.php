@@ -40,6 +40,7 @@ class ClubSettings extends Model
 
     protected $fillable = [
         'name', 'tagline', 'logo_path', 'primary_color', 'accent_color', 'info_color', 'timezone',
+        'icon_192_path', 'icon_512_path', 'icon_apple_path',
         'invitation_link_days', 'season_rollover_at', 'season_start_month',
         'legal_publisher', 'legal_host', 'legal_director', 'legal_contact_email',
         'legal_source_url', 'legal_mail_provider',
@@ -107,6 +108,40 @@ class ClubSettings extends Model
         return $this->logo_path
             ? Storage::disk('public')->url($this->logo_path)
             : asset('img/logo-default.png');
+    }
+
+    /**
+     * Icônes PWA : variante → [colonne, fichier de repli livré dans public/icons/].
+     *
+     * Le repli est versionné (cadrage §7.16) : une instance qui n'a rien téléversé reste
+     * installable en PWA, et la démo publique montre le produit sans porter le branding d'un club.
+     *
+     * @var array<string, array{0: string, 1: string}>
+     */
+    public const PWA_ICONS = [
+        'icon_192' => ['icon_192_path', 'icons/icon-192.png'],
+        'icon_512' => ['icon_512_path', 'icons/icon-512.png'],
+        'icon_apple' => ['icon_apple_path', 'icons/apple-touch-icon.png'],
+    ];
+
+    /**
+     * URL d'une icône PWA : celle du club si elle a été téléversée, sinon celle livrée.
+     *
+     * Le chemin stocké contient un segment aléatoire renouvelé à chaque téléversement : l'URL
+     * change donc avec le fichier, ce qui suffit à contourner le cache HTTP. Un écran d'accueil
+     * DÉJÀ installé garde en revanche l'ancienne icône jusqu'à réinstallation — limite des PWA,
+     * documentée dans INSTALL, pas contournable côté serveur.
+     */
+    public function pwaIconUrl(string $variant): string
+    {
+        [$column, $fallback] = self::PWA_ICONS[$variant]
+            ?? throw new \InvalidArgumentException("Icône PWA inconnue : {$variant}");
+
+        $path = $this->{$column};
+
+        return $path
+            ? Storage::disk('public')->url($path)
+            : asset($fallback);
     }
 
     /**
