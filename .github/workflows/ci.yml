@@ -4,6 +4,11 @@ name: CI
 # cohérence du schéma + suite de tests) sur chaque poussée et chaque pull request.
 # C'est la même commande que celle documentée dans CONTRIBUTING.md : ce qui passe en
 # local passe ici, et inversement — pas de porte de qualité à deux vitesses.
+#
+# Deux jobs : `qualite` joue la porte sur CHAQUE SGBD supporté (matrice), et `porte` en
+# agrège le résultat sous un nom stable — c'est LUI que la protection de `main` exige.
+# Ne pas renommer `porte` sans mettre à jour la règle de protection de la branche, sinon
+# toutes les PR resteront bloquées en attente d'un check qui n'arrive jamais.
 
 on:
   push:
@@ -124,3 +129,26 @@ jobs:
 
       - name: Porte de qualité
         run: composer check
+
+  # Point de contrôle unique, au nom STABLE, exigé par la protection de `main`.
+  #
+  # Les jobs de matrice s'appellent « Porte de qualité (mysql) » / « (mariadb) » : leurs noms
+  # changeraient à chaque ajout de moteur, et une règle de protection qui les nommerait
+  # individuellement casserait toute PR au prochain remaniement de la matrice. Ce job-ci ne
+  # fait rien d'autre que refléter leur résultat, sous un nom qui ne bougera pas.
+  #
+  # `if: always()` + test explicite : sans cela, un job de matrice ANNULÉ ou en échec rendrait
+  # celui-ci « skipped », que les règles de protection interprètent comme un succès.
+  porte:
+    name: Porte de qualité
+    runs-on: ubuntu-latest
+    needs: qualite
+    if: always()
+    steps:
+      - name: Vérifier le résultat de la matrice
+        run: |
+          if [ "${{ needs.qualite.result }}" != "success" ]; then
+            echo "La porte de qualité a échoué sur au moins un SGBD (${{ needs.qualite.result }})."
+            exit 1
+          fi
+          echo "Porte de qualité franchie sur tous les SGBD de la matrice."
