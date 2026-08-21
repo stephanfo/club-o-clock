@@ -52,7 +52,7 @@ RedirectMatch 404 (?i)/(app|bootstrap|config|database|resources|routes|tests|nod
 # devra être AJOUTÉ ici — sinon il répondra 404 sans autre explication.
 RedirectMatch 404 (?i)/storage/(?!logos/)
 RedirectMatch 404 (?i)/vendor/(?!livewire/)
-RedirectMatch 404 (?i)/(artisan|composer\.(json|lock)|package(-lock)?\.json|phpunit\.xml|vite\.config\.js|README\.md|CLAUDE\.md)$
+RedirectMatch 404 (?i)/(artisan|cron\.php|composer\.(json|lock)|package(-lock)?\.json|phpunit\.xml|vite\.config\.js|README\.md|CLAUDE\.md)$
 
 # Empêche l'indexation de dossier
 Options -Indexes
