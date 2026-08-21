@@ -37,14 +37,6 @@ class ResetDemoCommand extends Command
             return self::FAILURE;
         }
 
-        $this->reinitialiser();
-
-        return self::SUCCESS;
-    }
-
-    /** Effectue la remise à zéro. Retourne true si elle est allée au bout. */
-    private function reinitialiser(): bool
-    {
         $this->components->info('Réinitialisation de la démo…');
 
         // ⚠️ L'ORDRE COMPTE : on efface AVANT de reconstruire, jamais après.
@@ -79,7 +71,7 @@ class ResetDemoCommand extends Command
         $this->newLine();
         $this->components->info('Démo réinitialisée.');
 
-        return true;
+        return self::SUCCESS;
     }
 
     /**

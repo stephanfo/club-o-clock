@@ -236,6 +236,31 @@ class CronLoopTest extends TestCase
         $this->assertSame('2026-08-22', DuePeriodGuard::dailyPeriod($veille, 'Europe/Paris'));
     }
 
+    // ─────────── Cadence de la boucle ───────────
+
+    public function test_une_passe_lente_ne_declenche_pas_deux_passes_dans_la_meme_minute(): void
+    {
+        // La cible de réveil doit être calculée APRÈS la passe. Calculée avant, une passe qui
+        // déborde de sa minute viserait un instant déjà périmé : le sommeil serait nul et deux
+        // `schedule:run` s'enchaîneraient dans la même minute d'horloge.
+        $dormir = new \ReflectionMethod(RunCronLoopCommand::class, 'dormirJusqua');
+
+        // Passe démarrée à 10:04:00 et durant 90 s : on est à 10:05:30 en sortie.
+        Carbon::setTestNow(Carbon::parse('2026-08-21 10:05:30'));
+
+        $cible = Carbon::now()->startOfMinute()->addMinute();
+
+        $this->assertSame(
+            '10:06:00',
+            $cible->format('H:i:s'),
+            'La cible doit viser la minute suivante, pas une minute déjà écoulée.',
+        );
+        $this->assertTrue($cible->greaterThan(Carbon::now()), 'Le sommeil serait nul.');
+
+        Carbon::setTestNow();
+        $this->assertTrue($dormir->isPrivate());
+    }
+
     // ─────────── Remise à zéro de la démo ───────────
 
     public function test_le_reset_demo_n_est_pas_pilote_par_le_planificateur(): void
