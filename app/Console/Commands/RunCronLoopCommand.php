@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Services\SchedulerHeartbeatService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -47,7 +46,24 @@ class RunCronLoopCommand extends Command
     /** Durée maximale tolérée par l'hébergeur (OVH : « 3600 seconds »). */
     private const LIMITE_HEBERGEUR_MINUTES = 60;
 
-    public function handle(SchedulerHeartbeatService $heartbeat): int
+    /** Granularité du sommeil : borne le délai de prise en compte d'un signal d'arrêt. */
+    private const PAS_SOMMEIL_MS = 500;
+
+    /**
+     * Signaux d'arrêt, en valeurs littérales POSIX.
+     *
+     * Les constantes SIGINT/SIGTERM/SIGQUIT sont fournies par l'extension **pcntl**, absente de
+     * certains mutualisés : les référencer ferait échouer la commande au chargement, sur un
+     * hébergement où elle est justement indispensable. `trap()` est de toute façon inopérant sans
+     * pcntl (Laravel l'ignore silencieusement) ; ces entiers ne servent alors à rien, mais ne
+     * cassent rien.
+     */
+    private const SIGNAUX_ARRET = [2, 15, 3];   // SIGINT, SIGTERM, SIGQUIT
+
+    /** Passé à true par un signal d'arrêt : la boucle finit son tour puis rend la main. */
+    private bool $arretDemande = false;
+
+    public function handle(): int
     {
         $duree = (int) $this->option('duree');
 
@@ -77,14 +93,21 @@ class RunCronLoopCommand extends Command
             return self::SUCCESS;
         }
 
+        // Arrêt propre : sans cela, un SIGTERM (redémarrage de l'hébergeur, arrêt manuel) tue la
+        // boucle sans passer par le `finally`, laissant le verrou jusqu'à son TTL. On sort en fin
+        // de tour plutôt qu'au milieu d'une passe, pour ne pas interrompre un envoi en cours.
+        $this->trap(self::SIGNAUX_ARRET, function () {
+            $this->arretDemande = true;
+        });
+
         try {
-            return $this->boucler($duree, $heartbeat);
+            return $this->boucler($duree);
         } finally {
             $lock->release();
         }
     }
 
-    private function boucler(int $duree, SchedulerHeartbeatService $heartbeat): int
+    private function boucler(int $duree): int
     {
         $echeance = Carbon::now()->addMinutes($duree);
         $dernierDepart = $echeance->copy()->subSeconds(self::MARGE_SORTIE_SECONDES);
@@ -93,7 +116,7 @@ class RunCronLoopCommand extends Command
 
         // Première passe immédiate : la boucle démarre à la minute imposée par l'hébergeur, il
         // n'y a aucune raison d'attendre la minute suivante pour honorer les échéances en retard.
-        while (Carbon::now()->lessThan($dernierDepart)) {
+        while (! $this->arretDemande && Carbon::now()->lessThan($dernierDepart)) {
             $prochaine = Carbon::now()->startOfMinute()->addMinute();
 
             if (! $this->passe($echeance)) {
@@ -105,8 +128,6 @@ class RunCronLoopCommand extends Command
             // passes s'accumulerait et la boucle dériverait jusqu'à sauter une minute entière.
             $this->dormirJusqua($prochaine, $dernierDepart);
         }
-
-        $heartbeat->beat();
 
         $this->info(sprintf('Boucle terminée : %d passe(s), %d en échec.', $passes, $echecs));
 
@@ -153,14 +174,25 @@ class RunCronLoopCommand extends Command
         return false;
     }
 
-    /** Dort jusqu'à $cible, sans jamais dépasser $limite. */
+    /**
+     * Dort jusqu'à $cible, sans jamais dépasser $limite.
+     *
+     * Sommeil fractionné plutôt qu'un `usleep` d'une minute : un signal reçu pendant un sommeil
+     * long ne serait traité qu'à son terme, et l'arrêt « propre » prendrait jusqu'à une minute.
+     * On se réveille régulièrement pour laisser passer les signaux et réévaluer l'arrêt.
+     */
     private function dormirJusqua(Carbon $cible, Carbon $limite): void
     {
         $reveil = $cible->greaterThan($limite) ? $limite : $cible;
-        $microsecondes = ($reveil->getTimestampMs() - Carbon::now()->getTimestampMs()) * 1000;
 
-        if ($microsecondes > 0) {
-            usleep((int) $microsecondes);
+        while (! $this->arretDemande) {
+            $restantMs = $reveil->getTimestampMs() - Carbon::now()->getTimestampMs();
+
+            if ($restantMs <= 0) {
+                return;
+            }
+
+            usleep((int) min($restantMs, self::PAS_SOMMEIL_MS) * 1000);
         }
     }
 }

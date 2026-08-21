@@ -383,6 +383,9 @@ php artisan migrate --force                       # ⚠ obligatoire dès qu'une 
 php artisan vendor:publish --tag=livewire:assets --force
 php artisan optimize:clear                        # purge les caches de l'ancien code
 php artisan config:cache && php artisan route:cache && php artisan view:cache
+
+# Le planificateur ne doit JAMAIS être joignable par HTTP (§5.4) : 404 attendu.
+curl -s -o /dev/null -w '%{http_code}\n' https://<domaine>/cron.php
 ```
 
 > Rien à migrer ? `migrate --force` est un no-op sans risque : le lancer systématiquement coûte
@@ -753,7 +756,7 @@ Le symptôme le plus fréquent, et presque toujours l'une de ces trois causes :
 
 | Vérifier | Commande / indice |
 |---|---|
-| **Le cron tourne** | Admin → Envois : un bandeau rouge « Traitement automatique interrompu » répond directement (§5.4). Sinon, tester `php artisan notifications:drain` à la main |
+| **Le cron tourne** | Admin → Envois : un bandeau rouge « Traitement automatique interrompu » répond directement (§5.4). Sinon, tester `php cron.php` à la main (il doit tourner ~55 min puis afficher « Boucle terminée »), ou `php artisan notifications:drain` pour isoler l'envoi |
 | **`NOTIF_EMAIL_DRIVER` est renseigné** | Vide → tout est marqué « livré » sans qu'aucun email ne parte (§3.1) |
 | **`MAIL_MAILER` ≠ `log`** | En `log`, les emails vont dans `storage/logs/laravel.log` |
 

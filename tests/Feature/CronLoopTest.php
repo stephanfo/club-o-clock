@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Console\Commands\RunCronLoopCommand;
 use App\Services\DuePeriodGuard;
+use App\Services\SchedulerHeartbeatService;
 use Cron\CronExpression;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -121,6 +123,52 @@ class CronLoopTest extends TestCase
         } finally {
             $lock->release();
         }
+    }
+
+    public function test_le_verrou_expire_avant_le_cron_suivant(): void
+    {
+        // Un verrou survivant à un processus tué net ferait rejeter l'exécution de l'heure
+        // suivante : deux heures d'arrêt au lieu d'une. Le TTL doit rester sous l'intervalle
+        // du cron (60 min), tout en couvrant la durée de la boucle.
+        $ttl = (self::DUREE_BOUCLE * 60) + 120;
+
+        $this->assertGreaterThan(
+            self::DUREE_BOUCLE * 60,
+            $ttl,
+            'Le verrou expirerait pendant que la boucle tourne.',
+        );
+        $this->assertLessThan(
+            60 * 60,
+            $ttl,
+            'Un verrou fantôme bloquerait le cron de l\'heure suivante.',
+        );
+    }
+
+    public function test_les_signaux_d_arret_sont_des_valeurs_litterales(): void
+    {
+        // Les constantes de signal viennent de l'extension pcntl, absente de certains
+        // mutualisés : les référencer ferait échouer la commande au chargement, sur
+        // l'hébergement même où elle est indispensable. On vérifie la valeur effective.
+        $signaux = (new \ReflectionClass(RunCronLoopCommand::class))
+            ->getConstant('SIGNAUX_ARRET');
+
+        $this->assertSame([2, 15, 3], $signaux, 'Valeurs POSIX attendues (SIGINT, SIGTERM, SIGQUIT).');
+    }
+
+    public function test_la_boucle_ne_depend_pas_du_battement_de_coeur(): void
+    {
+        // Le battement de cœur appartient au drain (DrainNotificationsCommand) : il atteste qu'une
+        // tâche a réellement tourné. Si la boucle en posait un, une série de passes toutes en
+        // échec afficherait quand même « traitement automatique actif » — la panne silencieuse
+        // que SchedulerHeartbeatService existe précisément pour éviter.
+        $handle = new \ReflectionMethod(RunCronLoopCommand::class, 'handle');
+
+        $types = array_map(
+            fn (\ReflectionParameter $p) => $p->getType()?->__toString(),
+            $handle->getParameters(),
+        );
+
+        $this->assertNotContains(SchedulerHeartbeatService::class, $types);
     }
 
     // ─────────── Garde d'échéance (rattrapage) ───────────
