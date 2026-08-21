@@ -7,6 +7,23 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ## [Non publié]
 
+### Corrigé
+
+- **Le planificateur ne tournait pas sur hébergement mutualisé.** La documentation prescrivait un
+  cron `* * * * *`, qu'OVH ne permet pas : une exécution par heure au maximum, à une minute imposée
+  par l'hébergeur, et une tâche qui ne peut pointer qu'un fichier PHP sans arguments. Deux
+  conséquences, dont la seconde silencieuse : les notifications différées attendaient jusqu'à une
+  heure, et surtout les tâches planifiées à une minute fixe (`hourly()`, `daily()`) pouvaient n'être
+  exécutées **jamais** — la boucle de rattrapage couvrant 55 minutes sur 60, le trou restant se
+  déplace avec la minute imposée, et aucune minute d'horloge n'est sûre. Météo et purge des jetons
+  ne partaient donc pas, sans le moindre signal.
+
+  Le point d'entrée devient `cron.php` (tâche horaire au manager), qui lance `schedule:run` chaque
+  minute pendant 55 min. Toutes les tâches récurrentes sont désormais planifiées fréquemment et
+  **rattrapables** : chacune n'honore qu'une exécution par période, et reprend une échéance manquée
+  à la passe suivante au lieu de la perdre. Un test balaie les 60 minutes de démarrage possibles et
+  échoue si une tâche redevient dépendante d'une minute absolue.
+
 ### Ajouté
 
 - **Tests navigateur (E2E)** : harnais Playwright rejouant 20 scénarios dans un vrai navigateur —

@@ -444,23 +444,46 @@ Deux pièges spécifiques au mutualisé, à vérifier **une fois** :
 
 ### 5.4 Le cron (indispensable)
 
-Une seule ligne à configurer dans le manager, **chaque minute** :
+Une seule tâche à créer dans le manager, **toutes les heures**, pointant le fichier `cron.php` à la
+racine du dépôt. **Sans elle, aucune notification ne part jamais** — elles s'accumulent
+silencieusement dans l'outbox.
 
-```
-* * * * * /path/to/php /path/to/artisan schedule:run >> /dev/null 2>&1
-```
+> **Pourquoi `cron.php` et pas `artisan schedule:run` ?** Le mutualisé impose deux contraintes que
+> le planificateur de Laravel ne prévoit pas :
+>
+> 1. **Une exécution par heure au maximum**, et **la minute n'est pas choisissable** (le champ
+>    « Minutes » est désactivé, `?` dans la vue crontab). Or Laravel attend `schedule:run` *chaque
+>    minute*.
+> 2. **Le gestionnaire ne sait pointer qu'un fichier PHP**, sans arguments : on ne peut pas y
+>    écrire `artisan club:cron-boucle --duree=55`.
+>
+> `cron.php` répond aux deux : il fixe les arguments qu'`artisan` attend, puis lance une boucle qui
+> appelle `schedule:run` chaque minute pendant 55 min avant de rendre la main — dans le budget de
+> 60 minutes d'exécution qu'OVH accorde par tâche.
 
-C'est lui qui cadence **toutes** les tâches internes : drain des notifications (5 min), météo
-(horaire), purge des données expirées (quotidien). **Sans ce cron, aucune notification ne part
-jamais** — elles s'accumulent silencieusement dans l'outbox. Un cron plus espacé décale ou rate ces
-créneaux.
+**Le piège à connaître avant de modifier `routes/console.php`.** La boucle couvre 55 minutes sur
+60 : il reste un trou de 5 minutes par heure, **et ce trou se déplace avec la minute que
+l'hébergeur a attribuée**. Aucune minute d'horloge n'est donc sûre. Une tâche planifiée
+`->hourly()` (soit `0 * * * *`) n'est due qu'à la minute 0 : si l'hébergeur démarre le cron entre
+:31 et :34, elle n'est vue **jamais** — pas « en retard », jamais, et sans le moindre signal.
+
+C'est pourquoi **toutes** les tâches sont planifiées `everyFiveMinutes()` et se gardent
+elles-mêmes par `--if-due` (une seule exécution par période). Ne pas revenir à `hourly()` /
+`dailyAt()` : le test `CronLoopTest::test_toutes_les_taches_sont_vues_quelle_que_soit_la_minute_imposee`
+échoue si on le fait.
+
+> **Les « rapports d'exécution » d'OVH ne sont pas une supervision.** Ils ne partent qu'*« en cas
+> d'erreur »*, *« une fois par jour (pendant les heures de nuit) »*, et *« ne seront envoyés que
+> lorsque les 10 tentatives auront échoué »* — la tâche étant alors **désactivée**. Aucun email
+> n'arrive tant que tout va bien : le silence ne prouve rien. C'est le voyant ci-dessous qui
+> renseigne, et c'est aussi pourquoi la boucle sort toujours en code 0.
 
 **Vérifier qu'il tourne** — l'écran **Admin → Envois** affiche l'état du traitement automatique :
 
 | Ce qui s'affiche | Signification | Quoi faire |
 |---|---|---|
 | « traitement automatique actif » (sous le titre) | Le cron est passé il y a moins de 15 min | Rien |
-| Bandeau rouge « **Traitement automatique interrompu** » | Aucun passage depuis 15 min ou plus | Le cron ne tourne plus : vérifier la ligne dans le manager, le chemin de `php` et celui d'`artisan` |
+| Bandeau rouge « **Traitement automatique interrompu** » | Aucun passage depuis 15 min ou plus | La boucle ne tourne plus : vérifier la tâche dans le manager, le chemin de `php` et celui de `cron.php`. Tester à la main : `php cron.php` |
 | Bandeau bleu « **jamais observé** » | Aucun passage n'a encore été enregistré | Normal pendant les 5 premières minutes après l'installation. Persistant → le cron n'a jamais été mis en place |
 
 Cette surveillance est passive et sans coût : chaque passage du drain laisse un horodatage, et
@@ -518,6 +541,9 @@ chmod -R 775 storage bootstrap/cache
 ```
 * * * * * cd /var/www/club-o-clock && php artisan schedule:run >> /dev/null 2>&1
 ```
+
+> Sur VPS, ni `cron.php` ni `club:cron-boucle` ne servent : la crontab appelle `schedule:run`
+> chaque minute, ce que le mutualisé ne permet pas (§5.4).
 
 **HTTPS** obligatoire (Let's Encrypt via certbot) : le push web et l'installation PWA l'exigent, et
 les liens de connexion transitent par email.

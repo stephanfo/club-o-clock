@@ -41,7 +41,7 @@ Cette contrainte structure tout le reste du document. Caractéristiques de l'off
 | **PHP** (versions récentes sélectionnables, dont 8.x) | Accès **root** |
 | **MariaDB / MySQL** InnoDB — **10 bases × 2 Go** (transactions, verrous) | **Docker** / conteneurs |
 | **Ressources dédiées : 1 vCore / 2 Go RAM** | **Node long-running** / processus daemon / worker permanent |
-| **Tâches cron** planifiables | **WebSocket** serveur / SSE long-running |
+| **Tâches cron** planifiables (**horaire max, minute imposée** — cf. §7.13) | **WebSocket** serveur / SSE long-running |
 | **SSH** + multi-SSH · **FTP/SFTP** | Redis / file de messages persistante managée |
 | **Git intégré** (déploiement par `git`) | Scheduler sub-minute, crons en très grand nombre |
 | **250 Go SSD** (NAS) — confortable pour le stockage objets | PostgreSQL |
@@ -57,8 +57,8 @@ un seul artefact à déployer, pas de runtime Node, pas d'API REST ni d'auth cro
 
 > **À confirmer dans le manager OVH au moment de l'init** : version PHP active (cibler 8.2+), version
 > exacte de MariaDB (la sérialisation atomique §4.9.5 du PRD suppose InnoDB + `SELECT … FOR UPDATE`),
-> et **fréquence minimale des crons** (historiquement ~5 min sur le mutualisé OVH — compatible avec le
-> modèle « un cron unique → scheduler framework », cf. §7.9 et §8.7).
+> et **fréquence minimale des crons** (**une fois par heure**, minute non choisissable — d'où la boucle
+> interne de §7.13 et INSTALL §5.4).
 
 ### 1.4 Méthode
 Exigences PRD → implications techniques (§4) → comparatif d'options (§6) → décisions sur les points
@@ -412,15 +412,26 @@ vérité** pour l'implémentation du frontend.
 
 ### 7.13 Inventaire des tâches planifiées (périmètre exact du cron)
 
-Le mutualisé n'a pas de worker permanent. On configure **un cron unique** (toutes les ~5 min, limite
-OVH) qui invoque le **scheduler du framework** (`schedule:run`). Ce scheduler ne porte que **deux**
-tâches récurrentes ; tout le reste de l'app est **événementiel** (dans la transaction), **paresseux**
-(calculé à l'affichage), ou **explicitement exclu** par le PRD.
+Le mutualisé n'a pas de worker permanent. Il n'accepte pas non plus un cron fréquent : **une
+exécution par heure au maximum, à une minute imposée** par l'hébergeur (contrainte vérifiée, cf.
+INSTALL §5.4). On configure donc **une tâche horaire unique** pointant `cron.php`, qui lance une
+boucle appelant le **scheduler du framework** (`schedule:run`) chaque minute pendant ~55 min.
+
+⚠️ **Conséquence structurante** : la boucle couvre 55 min sur 60, et le trou restant se déplace avec
+la minute imposée — **aucune minute d'horloge n'est sûre**. Une tâche en `hourly()` (`0 * * * *`)
+peut n'être vue *jamais*. Toutes les tâches récurrentes sont donc planifiées `everyFiveMinutes()` et
+**gardées par `--if-due`** (`DuePeriodGuard`) : « au moins une fois après l'échéance, une seule fois
+effectivement ». Verrouillé par test (`CronLoopTest`).
+
+Le scheduler porte **quatre** tâches récurrentes ; tout le reste de l'app est **événementiel** (dans
+la transaction), **paresseux** (calculé à l'affichage), ou **explicitement exclu** par le PRD.
 
 | Tâche | Cron ? | Justification |
 |---|---|---|
 | **Pré-calcul météo J-16** (§4.13.5) | ✅ **Oui** | Rafraîchit le cache (TTL 3h) des séances géocodées à venir → affichage instantané, source non martelée. Seule tâche réellement incontournable. |
 | **Drain de l'`outbox`** notifications (§7.14) | ✅ **Oui** | Vide la file d'envois push/email par lots. |
+| **Élagage des jetons d'auth** (§4.3) | ✅ **Oui** | `club:prune-tokens` — borne la croissance des tables et purge l'email résiduel des liens consommés (minimisation). |
+| **Reset de la démo** (plan OS7) | ✅ **Oui** | `demo:reset` — instance de démonstration uniquement (`DEMO_MODE`), fenêtre nocturne. |
 | Reset surclassements / nouvelle année (§4.5) | ❌ **Non** | Devenu **action admin manuelle** (§7.9). |
 | Sauvegardes BDD/fichiers (§6) | ❌ **Non** | **Natif OVH** (quotidien 30j / fichiers J-14, §8.2). |
 | Reset quota hebdo (§4.10.6) | ❌ **Non** | PRD : *« pas de cron de reset »* — recalcul naturel sur la semaine courante. |

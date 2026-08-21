@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Session;
+use App\Services\DuePeriodGuard;
 use App\Services\WeatherService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -11,11 +12,33 @@ use Illuminate\Support\Carbon;
 // séances géocodées de la fenêtre J-16. Déclenché par le cron unique (cadrage §7.13/§7.14).
 class RefreshWeatherCommand extends Command
 {
-    protected $signature = 'weather:refresh';
+    protected $signature = 'weather:refresh
+        {--if-due : N\'exécuter que si l\'échéance horaire courante n\'a pas déjà été honorée}';
 
     protected $description = 'Pré-calcule la météo Open-Meteo des séances géocodées dans la fenêtre J-16 (§4.13.5).';
 
-    public function handle(WeatherService $weather): int
+    public function handle(WeatherService $weather, DuePeriodGuard $guard): int
+    {
+        // Mode rattrapable : la commande est planifiée toutes les 5 min et se garde elle-même,
+        // car aucune minute d'horloge n'est fiable sur un cron horaire à minute imposée
+        // (cf. RunCronLoopCommand). Sans --if-due, exécution inconditionnelle (appel manuel).
+        if ($this->option('if-due')) {
+            $guard->runIfDue(
+                'weather-refresh',
+                DuePeriodGuard::hourlyPeriod(),
+                fn () => $this->rafraichir($weather),
+            );
+
+            return self::SUCCESS;
+        }
+
+        $this->rafraichir($weather);
+
+        return self::SUCCESS;
+    }
+
+    /** Rafraîchit le cache météo. Retourne true si la passe s'est déroulée sans exception. */
+    private function rafraichir(WeatherService $weather): bool
     {
         $sessions = Session::query()
             ->whereNull('cancelled_at')
@@ -36,6 +59,6 @@ class RefreshWeatherCommand extends Command
 
         $this->info("Météo rafraîchie pour {$refreshed} séance(s) sur {$sessions->count()} géocodée(s).");
 
-        return self::SUCCESS;
+        return true;
     }
 }
