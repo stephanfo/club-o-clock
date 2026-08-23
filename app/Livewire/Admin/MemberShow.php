@@ -10,7 +10,10 @@ use App\Services\GuardianshipService;
 use App\Services\MemberService;
 use App\Services\SeasonService;
 use App\Support\AgeCategory;
+use App\Support\DemoMode;
+use App\Support\Logging\AuditLogger;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Password;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -289,6 +292,57 @@ class MemberShow extends Component
         $season->reactivateAthlete($this->user, auth()->user());
         $this->user->refresh();
         session()->flash('status', 'Accès athlète réactivé — email de réactivation mis en file.');
+    }
+
+    // --- Dépannage d'accès (§4.1.5) ---
+
+    /**
+     * Envoie à l'adhérent un lien de réinitialisation de mot de passe (TTL 15 min, §4.1.1).
+     *
+     * L'admin DÉCLENCHE, il ne connaît jamais le secret : pas de mot de passe temporaire, pas de
+     * champ, pas d'affichage. C'est une propriété de sécurité, pas un détail d'implémentation —
+     * détenir le facteur d'authentification d'un tiers rendrait l'usurpation possible et
+     * indétectable. Le secret ne transite que par la boîte mail de l'adhérent.
+     *
+     * Envoi immédiat hors outbox (notification Laravel native), comme le magic link : l'adhérent
+     * attend au bout du fil (cadrage §14.1, envois sensibles à la latence).
+     */
+    public function sendPasswordReset(): void
+    {
+        $u = $this->user;
+
+        // Le mailer est forcé sur `log` en démo : le lien promis « dans ta boîte mail » n'arriverait
+        // jamais. Même raisonnement que DemoMode::magicLinkUsable().
+        if (DemoMode::enabled()) {
+            session()->flash('warn', 'Indisponible en mode démo.');
+
+            return;
+        }
+
+        // is_active couvre aussi la demande de suppression en cours (§4.3) : on n'aide pas un compte
+        // à revenir alors que le tampon de 7 jours court.
+        if ($u->email === null || ! $u->is_active || $u->anonymized_at !== null) {
+            session()->flash('warn', 'Ce compte ne peut pas recevoir de lien de réinitialisation.');
+
+            return;
+        }
+
+        $status = Password::broker()->sendResetLink(['email' => $u->email]);
+
+        if ($status !== Password::RESET_LINK_SENT) {
+            session()->flash('warn', $status === Password::RESET_THROTTLED
+                ? 'Un lien vient déjà d’être envoyé — patiente une minute.'
+                : 'Envoi impossible pour ce compte.');
+
+            return;
+        }
+
+        AuditLogger::record('password_reset_sent', auth()->user(), [
+            'target_type' => User::class,
+            'target_id' => $u->id,
+        ]);
+
+        session()->flash('status', 'Lien de réinitialisation envoyé à '.$u->email.'.');
     }
 
     // --- Suppression RGPD voie admin (§4.3) ---

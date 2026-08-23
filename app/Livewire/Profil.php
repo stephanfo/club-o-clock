@@ -2,10 +2,13 @@
 
 namespace App\Livewire;
 
+use App\Actions\Fortify\PasswordValidationRules;
 use App\Services\AuthMethodService;
 use App\Services\MemberService;
 use App\Services\NotificationPreferenceService;
+use App\Services\PasswordService;
 use App\Services\QuotaService;
+use App\Support\DemoMode;
 use App\Support\Logging\AuditLogger;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -26,6 +29,10 @@ use Livewire\Component;
 #[Title('Profil')]
 class Profil extends Component
 {
+    // Mêmes règles de robustesse que le reset par email et l'écran d'activation — une seule
+    // politique de mot de passe pour toutes les surfaces.
+    use PasswordValidationRules;
+
     /** Onglet actif : identite | notifs | quotas | connexion. */
     #[Url]
     public string $tab = 'identite';
@@ -47,6 +54,17 @@ class Profil extends Component
      * coupé s'affiche inerte — le réglage personnel reste stocké pour une éventuelle réactivation.
      */
     public array $clubChannels = [];
+
+    // ── Connexion : mot de passe ──
+    /** Mot de passe actuel — exigé pour changer ou retirer, jamais pour poser le premier. */
+    public string $current_password = '';
+
+    public string $password = '';
+
+    public string $password_confirmation = '';
+
+    /** « Déconnecter mes autres appareils » — cochée par défaut, sans effet à la première pose. */
+    public bool $revokeOthers = true;
 
     // ── Connexion : suppression de compte ──
     /** Modale de confirmation « supprimer mon compte » ouverte. */
@@ -98,6 +116,93 @@ class Profil extends Component
         $prefs->setCell(auth()->user(), $typeValue, $channel, $next);
     }
 
+    // ── Connexion : mot de passe (§4.1.1, §4.1.5) ──
+
+    /**
+     * Pose un premier mot de passe, ou remplace l'actuel. Un compte créé par invitation ou par
+     * activation de tutelle est passwordless : lui réclamer son « mot de passe actuel » serait une
+     * impasse, d'où la règle conditionnelle.
+     *
+     * Politique de sessions, volontairement asymétrique :
+     *   • POSER  → on ne déconnecte rien. Ajouter un moyen n'est pas un signal de compromission, et
+     *     déconnecter tous ses appareils parce qu'on vient d'ajouter une sécurité est punitif.
+     *   • CHANGER → on déconnecte les autres appareils par défaut (case décochable) : c'est ce
+     *     qu'attend quelqu'un qui change son mot de passe parce qu'il craint une fuite.
+     */
+    public function savePassword(PasswordService $passwords): void
+    {
+        $u = auth()->user();
+
+        // Le mot de passe de démo est public (écran de connexion) et partagé : laisser un visiteur
+        // le changer verrouillerait tous les suivants jusqu'à la remise à zéro nocturne.
+        if (DemoMode::enabled()) {
+            session()->flash('warn', 'Indisponible en mode démo — les comptes sont partagés.');
+
+            return;
+        }
+
+        $changing = $u->password !== null;
+
+        $this->validate([
+            ...($changing ? ['current_password' => ['required', 'string', 'current_password:web']] : []),
+            'password' => $this->passwordRules(),
+        ], attributes: [
+            'current_password' => 'mot de passe actuel',
+            'password' => 'mot de passe',
+        ]);
+
+        $passwords->set($u, $this->password);
+
+        // Ordre important : couper les autres sessions AVANT de rafraîchir les cookies remember,
+        // pour que la ré-émission du cookie courant ne survienne pas dans une session supprimée.
+        if ($changing && $this->revokeOthers) {
+            $this->purgeOtherSessions();
+            $this->invalidateRememberCookies();
+        }
+
+        $this->reset(['current_password', 'password', 'password_confirmation']);
+
+        session()->flash('status', $changing ? 'Mot de passe modifié.' : 'Mot de passe défini.');
+    }
+
+    /**
+     * Retire le mot de passe : le compte redevient passwordless (lien magique / Google). Refusé si
+     * c'est le dernier moyen d'entrer, et toujours suivi d'une déconnexion des autres appareils —
+     * on retire un moyen, aucune session ouverte avec lui ne doit lui survivre.
+     */
+    public function removePassword(PasswordService $passwords, AuthMethodService $authMethods): void
+    {
+        $u = auth()->user();
+
+        if (DemoMode::enabled()) {
+            session()->flash('warn', 'Indisponible en mode démo — les comptes sont partagés.');
+
+            return;
+        }
+
+        if ($u->password === null) {
+            return;
+        }
+
+        if (! $authMethods->keepsAnotherWayIn($u, 'password')) {
+            session()->flash('warn', 'Impossible de retirer ta seule méthode de connexion.');
+
+            return;
+        }
+
+        $this->validate(
+            ['current_password' => ['required', 'string', 'current_password:web']],
+            attributes: ['current_password' => 'mot de passe actuel'],
+        );
+
+        $passwords->remove($u);
+        $this->purgeOtherSessions();
+        $this->invalidateRememberCookies();
+        $this->reset(['current_password', 'password', 'password_confirmation']);
+
+        session()->flash('status', 'Mot de passe retiré — tu te connecteras par lien ou par Google.');
+    }
+
     // ── Connexion : méthodes de login (§4.1.1) ──
 
     /** Délie une identité OAuth (Google). Refuse si c'est le dernier moyen de se connecter. */
@@ -109,16 +214,9 @@ class Profil extends Component
             return;
         }
 
-        // Garde-fou : ne pas verrouiller l'utilisateur dehors. Il garde un accès s'il a un mot de
-        // passe, un email (lien magique) ou une autre identité liée.
-        //
-        // Chaque voie n'est un accès que si le club l'a laissée ouverte (§4.17) : un email ne sauve
-        // plus rien si le lien magique est coupé, et une autre identité Google ne sauve rien si
-        // Google est coupé. Le mot de passe, lui, est toujours utilisable.
-        $hasOtherWay = $u->password !== null
-            || ($u->email !== null && $authMethods->magicLinkEnabled())
-            || ($authMethods->googleEnabled() && $u->authIdentities()->where('id', '!=', $identityId)->exists());
-        if (! $hasOtherWay) {
+        // Garde-fou : ne pas verrouiller l'utilisateur dehors (§4.1.2). La règle vit dans
+        // AuthMethodService, qui la pose aussi à l'échelle du club (lockedOutBy).
+        if (! $authMethods->keepsAnotherWayIn($u, 'oauth', $identityId)) {
             session()->flash('warn', 'Impossible de délier ta seule méthode de connexion.');
 
             return;
@@ -150,12 +248,22 @@ class Profil extends Component
     /** Déconnecte tous les autres appareils (conserve la session courante). */
     public function revokeOtherSessions(): void
     {
+        $this->purgeOtherSessions();
+        $this->invalidateRememberCookies();
+        session()->flash('status', 'Déconnecté de tous les autres appareils.');
+    }
+
+    /**
+     * Supprime les lignes de session des AUTRES appareils, sans toucher aux cookies remember ni
+     * flasher : le geste est partagé avec le changement de mot de passe, qui compose son propre
+     * message et décide lui-même de la ré-émission.
+     */
+    private function purgeOtherSessions(): void
+    {
         DB::table(config('session.table'))
             ->where('user_id', auth()->id())
             ->where('id', '!=', session()->getId())
             ->delete();
-        $this->invalidateRememberCookies();
-        session()->flash('status', 'Déconnecté de tous les autres appareils.');
     }
 
     /**
@@ -222,6 +330,11 @@ class Profil extends Component
             'groups' => $prefs->visibleGroups(auth()->user()),
             'methods' => $this->linkedMethods($authMethods),
             'sessions' => $this->activeSessions(),
+            // Le bouton « Retirer » n'apparaît que s'il resterait un moyen d'entrer : proposer un
+            // geste que le serveur refusera est une promesse en l'air (la garde reste serveur).
+            'canRemovePassword' => auth()->user()->password !== null
+                && $authMethods->keepsAnotherWayIn(auth()->user(), 'password'),
+            'demo' => DemoMode::enabled(),
             'quotas' => $quota->weeklyUsage(auth()->user(), Carbon::now()),
             'lastAdmin' => $members->isLastActiveAdmin(auth()->user()),
             // Seconde garde bloquante de requestDeletion (§4.2) : garant d'un pupille P1. Comme

@@ -96,7 +96,9 @@ return [
         'users' => [
             'provider' => 'users',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
-            'expire' => 60,
+            // 15 min (PRD §4.1.1) — même TTL que le lien magique, pour la même raison : un lien
+            // d'accès reçu par email ne doit pas rester vivant après la lecture du message.
+            'expire' => 15,
             'throttle' => 60,
         ],
     ],

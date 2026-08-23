@@ -387,6 +387,18 @@
                                 </button>
                             @endif
 
+                            {{-- Dépannage d'accès (§4.1.5). Le bureau DÉCLENCHE l'envoi ; il ne voit
+                                 ni ne choisit jamais le mot de passe — le secret ne transite que par
+                                 la boîte mail de l'adhérent. --}}
+                            @if ($u->email && $u->is_active && ! $u->anonymized_at)
+                                <button type="button" class="btn btn-ghost btn-block" style="margin-bottom:12px"
+                                    wire:click="sendPasswordReset"
+                                    wire:confirm="Envoyer un lien de réinitialisation à {{ $u->email }} ?"
+                                    wire:loading.attr="disabled" wire:target="sendPasswordReset">
+                                    <x-icon name="mail" :size="15" /> Envoyer un lien de réinitialisation
+                                </button>
+                            @endif
+
                             @if ($pending)
                                 <div class="card card-soft" style="padding:12px;border-radius:var(--radius-md);margin-bottom:12px">
                                     <div class="flex ac jb g8">

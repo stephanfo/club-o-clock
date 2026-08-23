@@ -7,12 +7,16 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\User;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Fortify;
 
 class FortifyServiceProvider extends ServiceProvider
@@ -24,6 +28,22 @@ class FortifyServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Politique de mot de passe, unique pour toutes les surfaces (profil, activation, reset).
+        // Longueur seule : pas de règles de composition (majuscules/chiffres), contre-productives et
+        // contraires aux recommandations ANSSI/NIST. Pas de `uncompromised()` non plus — l'appel
+        // sortant vers HIBP ajoute de la latence sur mutualisé et échoue OUVERT si le réseau tombe :
+        // coût réel, garantie nulle.
+        Password::defaults(fn () => Password::min(10));
+
+        // Un reset de mot de passe est le chemin « j'ai perdu le contrôle » : les sessions ouvertes
+        // ailleurs doivent tomber. CompletePasswordReset régénère bien remember_token (donc les
+        // cookies « se souvenir de moi »), mais laisse vivre les lignes de session — un attaquant
+        // encore connecté le resterait. L'événement est émis AVANT le login qui suit, donc tout
+        // supprimer sans exception est sûr.
+        Event::listen(PasswordReset::class, function (PasswordReset $event) {
+            DB::table(config('session.table', 'sessions'))->where('user_id', $event->user->getAuthIdentifier())->delete();
+        });
+
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
