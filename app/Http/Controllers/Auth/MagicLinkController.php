@@ -64,7 +64,12 @@ class MagicLinkController extends Controller
         // l'anti-énumération tient à ce que rien ne diffère ici (même redirection, même contenu).
         // Seule la saisie d'un code peut échouer, avec le même message générique pour toutes les
         // causes.
-        $request->session()->put('magic-link.email', $email);
+        //
+        // FLASH et non put() : sur un poste partagé (borne du club, ordinateur familial), une
+        // adresse posée en session pour de bon attendait le visiteur suivant, pré-remplie dans le
+        // formulaire. Les écrans de saisie la reconduisent tant qu'on y est (keep) ; dès qu'on va
+        // ailleurs, elle disparaît.
+        $request->session()->flash('magic-link.email', $email);
 
         return redirect()->route('magic-link.sent');
     }
@@ -75,6 +80,9 @@ class MagicLinkController extends Controller
         if (! $this->authMethods->magicLinkEnabled()) {
             return redirect()->route('login');
         }
+
+        // L'adresse ne survit que le temps où l'on reste sur les écrans de saisie (cf. send()).
+        $request->session()->keep('magic-link.email');
 
         return view('auth.magic-link-sent', [
             'email' => (string) $request->session()->get('magic-link.email', ''),
@@ -91,6 +99,8 @@ class MagicLinkController extends Controller
         if (! $this->authMethods->magicLinkEnabled()) {
             return redirect()->route('login');
         }
+
+        $request->session()->keep('magic-link.email');
 
         return view('auth.magic-link-code', [
             'email' => (string) $request->session()->get('magic-link.email', ''),
@@ -116,12 +126,20 @@ class MagicLinkController extends Controller
         // DEUX limiteurs, complémentaires. Celui par (email+IP) borne l'acharnement sur une cible ;
         // celui par IP seule borne le balayage de nombreux emails, que le compteur par jeton ne voit
         // pas — un attaquant qui essaie un code sur mille adresses n'épuise le compteur d'aucune.
+        //
+        // Le plafond par IP est large (30/10 min) parce qu'une IP n'est PAS une personne : derrière
+        // le NAT du gymnase ou la box familiale, tout le club partage la même. La protection ciblée
+        // reste portée par les deux compteurs qui, eux, visent juste — 5 essais/min par (email+IP)
+        // et 5 essais par jeton avant brûlage.
         $ip = (string) $request->ip();
         $parCible = 'magic-code|'.mb_strtolower($validated['email']).'|'.$ip;
         $parIp = 'magic-code|'.$ip;
 
-        if (RateLimiter::tooManyAttempts($parCible, 5) || RateLimiter::tooManyAttempts($parIp, 10)) {
-            return back()->withErrors(['code' => __('Trop de tentatives. Réessaie dans quelques minutes.')]);
+        // Message distinct du « code invalide » : il ne parle que du débit de cette IP, jamais de
+        // l'existence d'un compte — il ne peut donc rien apprendre à un énumérateur, alors qu'un
+        // message unique laissait l'adhérent bloqué sans comprendre qu'il devait juste attendre.
+        if (RateLimiter::tooManyAttempts($parCible, 5) || RateLimiter::tooManyAttempts($parIp, 30)) {
+            return back()->withErrors(['code' => __('Trop de tentatives depuis cet appareil. Réessaie dans quelques minutes.')]);
         }
 
         RateLimiter::hit($parCible, 60);
@@ -133,10 +151,16 @@ class MagicLinkController extends Controller
         // Message unique pour toutes les causes (code faux, expiré, brûlé, email inconnu, compte
         // fermé) : distinguer renseignerait un attaquant sur l'existence du compte.
         if (! $user || ! $user->is_active) {
-            $request->session()->put('magic-link.email', $validated['email']);
+            $request->session()->flash('magic-link.email', $validated['email']);
 
             return back()->withErrors(['code' => __('Ce code est invalide ou expiré.')]);
         }
+
+        // Succès : on rend leur quota aux compteurs. Sans ça, les essais d'une connexion réussie
+        // restaient à charge — quelques fautes de frappe rapprochées et l'adhérent, ou son voisin
+        // de NAT, se retrouvait bloqué alors qu'il venait justement de prouver son identité.
+        RateLimiter::clear($parCible);
+        RateLimiter::clear($parIp);
 
         Auth::login($user, remember: true);
         $request->session()->regenerate();

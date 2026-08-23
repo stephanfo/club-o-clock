@@ -6,14 +6,17 @@ use App\Livewire\Admin\MemberCreate;
 use App\Livewire\Admin\MemberList;
 use App\Livewire\Admin\MemberShow;
 use App\Models\AuthIdentity;
+use App\Models\ClubSettings;
 use App\Models\InvitationToken;
 use App\Models\NotificationOutbox;
 use App\Models\User;
 use App\Services\InvitationService;
 use App\Services\MemberService;
+use App\Support\MagicLink;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
+use RuntimeException;
 use Tests\TestCase;
 
 // Invitation d'activation d'un adhérent (PRD §4.1.3).
@@ -214,6 +217,137 @@ class MemberInvitationTest extends TestCase
         // Second clic : plus personne en attente (chacun a une invitation vivante).
         $composant->call('sendPendingInvitations');
         $this->assertSame(2, NotificationOutbox::where('type', 'member_invitation')->count());
+    }
+
+    public function test_bulk_invitation_caps_in_the_query_not_in_memory(): void
+    {
+        // Le plafond doit borner la REQUÊTE : appliqué à une collection déjà hydratée, il chargeait
+        // tous les adhérents en attente en mémoire pour n'en garder qu'une poignée.
+        foreach (['a', 'b', 'c'] as $prenom) {
+            $this->membreCree("{$prenom}@club.test");
+        }
+
+        $this->assertCount(2, app(InvitationService::class)->awaitingInvitation(2));
+        $this->assertCount(3, app(InvitationService::class)->awaitingInvitation());
+    }
+
+    // ── Un envoi que personne ne recevra n'est pas un envoi (§4.17) ──
+
+    public function test_invitation_is_refused_when_the_club_email_channel_is_off(): void
+    {
+        [$admin, $membre] = $this->membreCree();
+        ClubSettings::current()->update(['notif_email_enabled' => false]);
+        ClubSettings::flushCache();
+
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $membre])
+            ->call('sendInvitation')
+            ->assertSee('canal email du club est coupé');
+
+        // Aucun jeton vivant : sinon l'adhérent restait exclu du rattrapage 30 jours durant, pour
+        // un mail jamais parti.
+        $this->assertDatabaseCount('invitation_tokens', 0);
+        $this->assertDatabaseCount('notification_outbox', 0);
+    }
+
+    public function test_invitation_is_refused_when_the_member_paused_notifications(): void
+    {
+        [$admin, $membre] = $this->membreCree();
+        $membre->notificationPreferences()->create(['paused' => true, 'matrix' => []]);
+
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $membre])
+            ->call('sendInvitation')
+            ->assertSee('mis ses notifications en pause');
+
+        $this->assertDatabaseCount('invitation_tokens', 0);
+    }
+
+    public function test_a_refused_invitation_leaves_the_member_in_the_awaiting_list(): void
+    {
+        // Contrôle positif apparié : le rattrapage doit toujours voir ce compte, puisque rien
+        // n'est parti. C'est précisément ce que le jeton fantôme empêchait.
+        [, $membre] = $this->membreCree();
+        ClubSettings::current()->update(['notif_email_enabled' => false]);
+        ClubSettings::flushCache();
+
+        try {
+            app(InvitationService::class)->sendToMember($membre, $this->admin());
+        } catch (RuntimeException) {
+            // attendu
+        }
+
+        $this->assertTrue(app(InvitationService::class)->awaitingInvitation()->contains('id', $membre->id));
+    }
+
+    public function test_bulk_invitation_does_not_claim_success_when_nothing_can_be_sent(): void
+    {
+        $this->membreCree('un@club.test');
+        ClubSettings::current()->update(['notif_email_enabled' => false]);
+        ClubSettings::flushCache();
+
+        Livewire::actingAs($this->admin())->test(MemberList::class)
+            ->call('sendPendingInvitations')
+            ->assertSee('Aucune invitation')
+            ->assertDontSee('mise(s) en file');
+
+        $this->assertDatabaseCount('notification_outbox', 0);
+    }
+
+    public function test_creating_a_member_reports_the_invitation_could_not_be_sent(): void
+    {
+        ClubSettings::current()->update(['notif_email_enabled' => false]);
+        ClubSettings::flushCache();
+
+        Livewire::actingAs($this->admin())->test(MemberCreate::class)
+            ->set('first_name', 'Chloé')->set('last_name', 'Bernard')
+            ->set('dob', '1992-03-14')->set('email', 'chloe@club.test')
+            ->call('create');
+
+        // La fiche est créée — on ne perd pas la saisie — mais aucun jeton fantôme n'est ouvert,
+        // et le compte reste dans la liste de rattrapage puisque rien n'est parti.
+        $membre = User::where('email', 'chloe@club.test')->firstOrFail();
+        $this->assertDatabaseCount('invitation_tokens', 0);
+        $this->assertTrue(app(InvitationService::class)->awaitingInvitation()->contains('id', $membre->id));
+    }
+
+    // ── Le lien magique seul est une activation (§4.1.1) ──
+
+    public function test_a_member_who_only_ever_used_a_magic_link_counts_as_activated(): void
+    {
+        // Ni mot de passe, ni OAuth, ni invitation consommée : les trois marqueurs historiques
+        // rataient le parcours passwordless, et ce compte se faisait relancer à vie.
+        [$admin, $membre] = $this->membreCree();
+
+        $emis = MagicLink::issue($membre->email);
+        $this->get('/magic-link/'.str($emis['url'])->afterLast('/')->toString())->assertRedirect();
+
+        $membre->refresh();
+        $this->assertNotNull($membre->last_login_at);
+        $this->assertFalse(app(InvitationService::class)->awaitingInvitation()->contains('id', $membre->id));
+
+        auth()->logout();
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $membre])
+            ->assertSee('Compte activé')
+            ->assertDontSee('Jamais invité');
+    }
+
+    public function test_a_member_who_never_logged_in_is_still_flagged(): void
+    {
+        // Contrôle positif apparié : sans connexion, le bandeau d'alerte doit bien apparaître.
+        [$admin, $membre] = $this->membreCree();
+
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $membre])
+            ->assertSee('Jamais invité');
+        $this->assertTrue(app(InvitationService::class)->awaitingInvitation()->contains('id', $membre->id));
+    }
+
+    public function test_password_login_also_stamps_the_last_login(): void
+    {
+        // Le marqueur est branché sur l'événement du garde : il vaut pour TOUS les moyens.
+        $membre = User::factory()->create(['email' => 'mdp@club.test', 'password' => 'password-de-test']);
+
+        $this->post('/login', ['email' => 'mdp@club.test', 'password' => 'password-de-test']);
+
+        $this->assertNotNull($membre->fresh()->last_login_at);
     }
 
     public function test_non_admin_cannot_reach_the_member_list(): void

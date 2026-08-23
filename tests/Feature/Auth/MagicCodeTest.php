@@ -149,15 +149,123 @@ class MagicCodeTest extends TestCase
     {
         // Le compteur par jeton ne voit pas un attaquant qui essaie un code sur mille adresses :
         // il n'épuise le compteur d'aucune. D'où le limiteur par IP seule.
-        for ($i = 0; $i < 10; $i++) {
+        for ($i = 0; $i < 30; $i++) {
             $this->poster("cible{$i}@club.test", '000000');
         }
 
         [$u, $bon] = $this->codePour('vraie@club.test');
-        // 11e tentative depuis la même IP : refusée, quel que soit l'email visé.
+        // 31e tentative depuis la même IP : refusée, quel que soit l'email visé.
         $this->poster($u->email, $bon);
 
         $this->assertGuest();
+    }
+
+    public function test_a_shared_ip_is_not_locked_out_by_a_handful_of_members(): void
+    {
+        // Une IP n'est PAS une personne : derrière le NAT du gymnase, tout le club la partage. Le
+        // plafond de 10 bloquait l'accès de tous après quelques fautes de frappe légitimes.
+        for ($i = 0; $i < 12; $i++) {
+            $this->poster("membre{$i}@club.test", '000000');
+        }
+
+        [$u, $bon] = $this->codePour('douzieme@club.test');
+        $this->poster($u->email, $bon);
+
+        $this->assertAuthenticatedAs($u);
+    }
+
+    public function test_a_successful_login_gives_the_counters_their_quota_back(): void
+    {
+        // Sans remise à zéro, les essais d'une connexion RÉUSSIE restaient à charge : quelques
+        // fautes de frappe rapprochées et l'adhérent se bloquait juste après avoir prouvé qui il est.
+        [$u, $bon] = $this->codePour();
+        $faux = $bon === '000000' ? '111111' : '000000';
+
+        $this->poster($u->email, $faux);
+        $this->poster($u->email, $bon);
+        $this->assertAuthenticatedAs($u);
+
+        $this->assertSame(0, RateLimiter::attempts('magic-code|'.$u->email.'|127.0.0.1'));
+        $this->assertSame(0, RateLimiter::attempts('magic-code|127.0.0.1'));
+    }
+
+    public function test_the_throttle_message_differs_from_the_wrong_code_message(): void
+    {
+        // Le message ne parle que du débit de cette IP, jamais de l'existence d'un compte : il
+        // n'apprend rien à un énumérateur, et il dit à l'adhérent qu'il lui suffit d'attendre.
+        for ($i = 0; $i < 30; $i++) {
+            $this->poster("balayage{$i}@club.test", '000000');
+        }
+
+        $this->poster('a@club.test', '000000')
+            ->assertSessionHasErrors(['code' => 'Trop de tentatives depuis cet appareil. Réessaie dans quelques minutes.']);
+    }
+
+    // ── Renvois en rafale : plusieurs codes vivants pour la même adresse ──
+
+    public function test_a_code_from_an_earlier_mail_is_still_accepted(): void
+    {
+        // Le mail est lent : on clique deux fois « Envoyer le lien », puis on saisit le code du
+        // PREMIER message reçu. Comparé au seul jeton le plus récent, ce code valide passait pour
+        // faux — et grillait en prime un essai du seul jeton exploitable.
+        $u = $this->membre();
+        $premier = MagicLink::issue($u->email)['code'];
+        MagicLink::issue($u->email);
+
+        $this->poster($u->email, $premier);
+
+        $this->assertAuthenticatedAs($u);
+    }
+
+    public function test_the_most_recent_code_still_works_when_several_are_live(): void
+    {
+        // Contrôle positif apparié : accepter l'ancien ne doit pas casser le nouveau.
+        $u = $this->membre();
+        MagicLink::issue($u->email);
+        $dernier = MagicLink::issue($u->email)['code'];
+
+        $this->poster($u->email, $dernier);
+
+        $this->assertAuthenticatedAs($u);
+    }
+
+    public function test_a_wrong_code_counts_against_every_live_token(): void
+    {
+        // Sinon chaque renvoi offrirait 5 essais de plus : le plafond se contournerait en
+        // redemandant un lien.
+        $u = $this->membre();
+        MagicLink::issue($u->email);
+        MagicLink::issue($u->email);
+
+        $this->poster($u->email, '000000');
+
+        $this->assertSame([1, 1], MagicLinkToken::where('email', $u->email)->orderBy('id')->pluck('code_attempts')->all());
+    }
+
+    // ── Poste partagé ──
+
+    public function test_the_requested_email_does_not_await_the_next_visitor(): void
+    {
+        // Borne du club, ordinateur familial : l'adresse posée en session pour de bon accueillait
+        // le visiteur suivant, pré-remplie dans le formulaire.
+        $this->post('/magic-link', ['email' => 'premier@club.test']);
+        $this->get(route('magic-link.sent'))->assertSee('premier@club.test');
+
+        // Le visiteur suivant passe par une autre page avant d'arriver sur l'écran de saisie.
+        $this->get(route('login'));
+
+        $this->get(route('magic-link.code'))->assertOk()->assertDontSee('premier@club.test');
+    }
+
+    public function test_the_email_survives_while_the_visitor_stays_on_the_code_screens(): void
+    {
+        // Contrôle positif apparié : le confort de la saisie n'est pas sacrifié — tant qu'on reste
+        // sur ces écrans, l'adresse est reconduite.
+        $this->post('/magic-link', ['email' => 'reste@club.test']);
+
+        $this->get(route('magic-link.sent'))->assertSee('reste@club.test');
+        $this->get(route('magic-link.code'))->assertSee('reste@club.test');
+        $this->get(route('magic-link.code'))->assertSee('reste@club.test');
     }
 
     // ── Anti-énumération ──

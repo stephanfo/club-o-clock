@@ -132,6 +132,56 @@ class SeasonService
     }
 
     /**
+     * §4.4 — Suspension INDIVIDUELLE de l'accès athlète, pendant exact de reactivateAthlete().
+     *
+     * La suspension n'existait qu'en masse (bascule de saison) : pour écarter un seul adhérent —
+     * licence non renouvelée, départ en cours de saison, litige — il fallait suspendre le club
+     * entier. Même flag, mêmes effets, même absence de notification que le geste de masse (§4.15 :
+     * pas d'email ni de push à la suspension, c'est la bannière in-app persistante qui informe).
+     *
+     * Trace `account_deactivated` CIBLÉE, contrairement au geste de masse qui n'écrit qu'une entrée
+     * globale : ici l'acte vise une personne, le journal doit pouvoir répondre « qui, quand ».
+     *
+     * `isActive` n'est pas touché : l'adhérent se connecte toujours et voit le planning, il ne peut
+     * plus s'y inscrire. Fermer le compte, c'est la suppression (§4.3), un autre geste.
+     *
+     * @return int inscriptions futures annulées
+     */
+    public function suspendAthlete(User $member, User $admin, ?string $motif = null): int
+    {
+        if ($member->athlete_access_suspended || $member->anonymized_at !== null) {
+            return 0;
+        }
+
+        $member->update(['athlete_access_suspended' => true]);
+
+        // Mêmes inscriptions que le geste de masse : futures, sur séances non annulées. L'annulation
+        // passe par cancelAsSystem, donc les promotions automatiques de file (mécanisme A) jouent —
+        // c'est voulu, la place libérée revient à quelqu'un.
+        $futureRegs = Registration::query()
+            ->where('user_id', $member->id)
+            ->whereIn('status', ['participating', 'waitlist'])
+            ->whereHas('session', fn ($q) => $q->whereNull('cancelled_at')->where('start_at', '>', Carbon::now()))
+            ->with(['session', 'user'])
+            ->get();
+
+        $registrations = 0;
+        foreach ($futureRegs as $reg) {
+            if ($reg->session && $reg->user && $this->registrations->cancelAsSystem($reg->session, $reg->user)) {
+                $registrations++;
+            }
+        }
+
+        AuditLogger::record('account_deactivated', $admin, [
+            'target_type' => User::class,
+            'target_id' => $member->id,
+            'motif' => trim(sprintf('%d inscription(s) annulée(s)%s', $registrations, $motif ? ' — '.$motif : '')),
+        ]);
+
+        return $registrations;
+    }
+
+    /**
      * §4.4 — Réactivation individuelle de l'accès athlète. Lève le flag, trace account_activated,
      * et émet un email via le dispatcher (mis en file dans l'outbox, drainé en J8 — §7.14).
      * Les inscriptions précédemment annulées ne sont PAS restaurées. No-op si déjà actif.

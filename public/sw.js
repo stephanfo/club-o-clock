@@ -75,21 +75,37 @@ self.addEventListener('notificationclick', (event) => {
             // au lieu de revenir sur celle qui était déjà là.
             const cible = new URL(url, self.location.origin);
 
-            for (const client of clients) {
-                if (!('focus' in client)) continue;
-
-                const ouvert = new URL(client.url);
-                if (ouvert.origin !== cible.origin) continue;
-
-                // Fenêtre de l'app déjà ouverte : on la réutilise. Sur la bonne page, simple focus ;
-                // ailleurs, on y navigue — cohérent avec launch_handler: navigate-existing.
-                if (ouvert.pathname === cible.pathname) {
-                    return client.focus();
+            const notres = clients.filter((client) => {
+                if (!('focus' in client)) return false;
+                try {
+                    return new URL(client.url).origin === cible.origin;
+                } catch (e) {
+                    return false;
                 }
-                if ('navigate' in client) {
-                    return client.navigate(cible.href).then((c) => (c ? c.focus() : null));
+            });
+
+            // DEUX passes, et pas une boucle qui tranche fenêtre par fenêtre : la première venue au
+            // chemin différent était détournée par navigate() alors qu'une autre était peut-être déjà
+            // sur la cible. Avec deux fenêtres ouvertes, le planning (ou un formulaire à moitié
+            // rempli) partait ailleurs pendant que la bonne page restait en arrière-plan.
+            const surLaCible = notres.find((client) => {
+                try {
+                    return new URL(client.url).pathname === cible.pathname;
+                } catch (e) {
+                    return false;
                 }
+            });
+            if (surLaCible) {
+                return surLaCible.focus();
             }
+
+            // Aucune fenêtre sur la cible : on en réutilise une — cohérent avec launch_handler:
+            // navigate-existing.
+            const aNaviguer = notres.find((client) => 'navigate' in client);
+            if (aNaviguer) {
+                return aNaviguer.navigate(cible.href).then((c) => (c ? c.focus() : null));
+            }
+
             return self.clients.openWindow(cible.href);
         })
     );

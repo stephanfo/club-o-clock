@@ -72,9 +72,65 @@ class NotificationDispatcher
     }
 
     /**
-     * Crée les lignes d'outbox d'un destinataire unique : interrupteur de canal du club (§4.17),
-     * pause globale (§4.15.4), matrice §4.15.3 (défaut tout activé, opt-out cellule par cellule)
-     * et présence d'adresse pour l'email.
+     * Canaux par lesquels ce type ATTEINDRAIT réellement ce destinataire, sans rien écrire.
+     *
+     * Permet à un appelant de savoir AVANT d'agir qu'il ne sera pas entendu. C'est nécessaire là où
+     * l'envoi n'est pas un effet de bord mais l'objet même du geste : une invitation d'activation
+     * silencieusement filtrée laissait un jeton vivant de 30 jours, un « invitation envoyée » à
+     * l'écran, et l'adhérent exclu du rattrapage pendant tout ce temps — pour un mail jamais parti.
+     *
+     * @param  list<'push'|'email'>|null  $channels
+     * @return list<'push'|'email'>
+     */
+    public function deliverableChannels(NotificationType $type, User $recipient, ?array $channels = null): array
+    {
+        return $this->filterChannels($type, $recipient, $this->resolveChannels($type, $channels));
+    }
+
+    /**
+     * Filtres de délivrabilité d'un destinataire, partagés par l'écriture et la prévision :
+     * interrupteur de canal du club (§4.17), pause globale (§4.15.4), matrice §4.15.3 (défaut tout
+     * activé, opt-out cellule par cellule) et présence d'adresse pour l'email.
+     *
+     * @param  list<'push'|'email'>  $channels
+     * @return list<'push'|'email'>
+     */
+    private function filterChannels(NotificationType $type, User $recipient, array $channels): array
+    {
+        // Les fan-outs préchargent les prefs (with) ; les envois unitaires (génération de modèles,
+        // tutelle…) arrivent sans — chargement explicite si absent plutôt que lazy-load.
+        $prefs = $recipient->loadMissing('notificationPreferences')->notificationPreferences;
+
+        // Pause globale (§4.15.4) : interrupteur master, coupe tous les canaux de ce destinataire.
+        if ($prefs?->paused) {
+            return [];
+        }
+
+        $matrix = $prefs?->matrix ?? [];
+        // Singleton mémoïsé par requête : lecture hors boucle, aucune requête dans le fan-out.
+        $settings = ClubSettings::current();
+
+        return array_values(array_filter($channels, function (string $channel) use ($type, $recipient, $matrix, $settings) {
+            // Interrupteur club (§4.17) : canal fermé → aucune ligne créée. Filtre en amont de la
+            // préférence individuelle, donc l'outbox ne contient que ce qui est réellement
+            // envoyable — pas de ligne marquée « envoyée » alors que rien n'est parti.
+            if (! $settings->channelEnabled($channel)) {
+                return false;
+            }
+
+            // Pas d'adresse → pas d'email possible (cas mineur P1 sans compte propre, etc.).
+            if ($channel === 'email' && $recipient->email === null) {
+                return false;
+            }
+
+            // Matrice §4.15.3 : défaut tout activé, opt-out cellule par cellule.
+            return (bool) ($matrix[$type->value][$channel] ?? true);
+        }));
+    }
+
+    /**
+     * Crée les lignes d'outbox d'un destinataire unique, pour les canaux qui l'atteignent
+     * réellement (cf. filterChannels).
      *
      * @param  list<'push'|'email'>  $channels
      * @param  array<string,mixed>  $payload
@@ -83,38 +139,9 @@ class NotificationDispatcher
     private function linesFor(NotificationType $type, User $recipient, array $channels, array $payload): Collection
     {
         $created = collect();
-        // Les fan-outs préchargent les prefs (with) ; les envois unitaires (génération de modèles,
-        // tutelle…) arrivent sans — chargement explicite si absent plutôt que lazy-load.
-        $prefs = $recipient->loadMissing('notificationPreferences')->notificationPreferences;
-
-        // Pause globale (§4.15.4) : interrupteur master, coupe tous les canaux de ce destinataire.
-        if ($prefs?->paused) {
-            return $created;
-        }
-
-        $matrix = $prefs?->matrix ?? [];
         $now = Carbon::now();
-        // Singleton mémoïsé par requête : lecture hors boucle, aucune requête dans le fan-out.
-        $settings = ClubSettings::current();
 
-        foreach ($channels as $channel) {
-            // Interrupteur club (§4.17) : canal fermé → aucune ligne créée. Filtre en amont de la
-            // préférence individuelle, donc l'outbox ne contient que ce qui est réellement
-            // envoyable — pas de ligne marquée « envoyée » alors que rien n'est parti.
-            if (! $settings->channelEnabled($channel)) {
-                continue;
-            }
-
-            // Pas d'adresse → pas d'email possible (cas mineur P1 sans compte propre, etc.).
-            if ($channel === 'email' && $recipient->email === null) {
-                continue;
-            }
-
-            // Matrice §4.15.3 : défaut tout activé, opt-out cellule par cellule.
-            if (! (bool) ($matrix[$type->value][$channel] ?? true)) {
-                continue;
-            }
-
+        foreach ($this->filterChannels($type, $recipient, $channels) as $channel) {
             $created->push(NotificationOutbox::create([
                 'type' => $type->value,
                 'channel' => $channel,

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Support\AgeCategory;
 use App\Support\Logging\ActivityLogger;
+use App\Support\Logging\AuditLogger;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -193,8 +194,23 @@ class MemberImportService
                     throw new RuntimeException("Garant introuvable au commit pour la ligne {$r['line']}.");
                 }
 
-                $createdIds[] = $service->create($r['data'] + ['roles' => ['athlete'], 'guardian_id' => $guardianId], $actor)->id;
+                $enfant = $service->create($r['data'] + ['roles' => ['athlete'], 'guardian_id' => $guardianId], $actor);
+                $createdIds[] = $enfant->id;
                 $created++;
+
+                // Mineur créé AVEC son propre email et un garant : c'est un P2 d'emblée, donc une
+                // autonomisation (§4.2.1) réalisée par l'import. Elle passe à côté de
+                // GuardianshipService::invite(), qui est d'ordinaire le seul chemin — sans cette
+                // trace, l'ouverture d'un compte autonome à un mineur n'apparaissait nulle part au
+                // journal d'audit, alors que c'est précisément l'acte qu'il doit retenir.
+                if ($enfant->email !== null) {
+                    AuditLogger::record('guardianship_invite_sent', $actor, [
+                        'target_type' => User::class,
+                        'target_id' => $enfant->id,
+                        'motif' => 'csv_import',
+                    ]);
+                    ActivityLogger::record('guardianship_invite_sent', $actor, ['user_id' => $enfant->id]);
+                }
             }
 
             // Synthèse métier (les créations individuelles sont déjà tracées par MemberService).

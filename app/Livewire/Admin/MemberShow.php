@@ -46,6 +46,11 @@ class MemberShow extends Component
 
     public string $dob = '';
 
+    // Édition de l'email de connexion (§4.1.3). Pré-remplie au mount.
+    public bool $editingEmail = false;
+
+    public string $email = '';
+
     // Panneaux d'ajout (UI proto).
     public bool $addingCat = false;
 
@@ -59,10 +64,57 @@ class MemberShow extends Component
 
     public bool $confirmingFinal = false;
 
+    // Suspension individuelle de l'accès athlète (§4.4) : modale de conséquences + motif libre,
+    // repris tel quel dans l'AuditLog comme pour le geste de masse.
+    public bool $confirmingSuspend = false;
+
+    public string $suspendMotif = '';
+
     public function mount(User $user): void
     {
         $this->user = $user;
         $this->dob = $user->dob?->toDateString() ?? '';
+        $this->email = $user->email ?? '';
+    }
+
+    /** Ouvre le champ d'édition de l'email (réinitialise à la valeur courante). */
+    public function editEmail(): void
+    {
+        $this->email = $this->user->email ?? '';
+        $this->resetErrorBag('email');
+        $this->editingEmail = true;
+    }
+
+    public function cancelEditEmail(): void
+    {
+        $this->email = $this->user->email ?? '';
+        $this->resetErrorBag('email');
+        $this->editingEmail = false;
+    }
+
+    /**
+     * Corrige l'email de connexion (§4.1.3).
+     *
+     * C'est la contrepartie du risque assumé à la création : l'admin est cru sur parole et l'adresse
+     * saisie est marquée vérifiée d'office, donc une coquille donne la prise du compte à un tiers.
+     * Sans ce geste, cette coquille n'avait AUCUN chemin de correction, et l'invitation de 30 jours
+     * partie à la mauvaise adresse restait vivante.
+     *
+     * Vider l'adresse est refusé : pour un pupille, ce serait une bascule P2 → P1 silencieuse. La
+     * rupture de tutelle a son propre geste, avec ses conséquences affichées.
+     */
+    public function saveEmail(MemberService $service): void
+    {
+        $this->validate(
+            ['email' => ['required', 'email', 'max:255', 'unique:users,email,'.$this->user->id]],
+            [],
+            ['email' => 'email'],
+        );
+
+        $service->updateEmail($this->user, trim($this->email), auth()->user());
+        $this->user->refresh();
+        $this->editingEmail = false;
+        session()->flash('status', 'Email mis à jour — les liens envoyés à l\'ancienne adresse sont révoqués.');
     }
 
     /** Ouvre le champ d'édition de la date de naissance (réinitialise à la valeur courante). */
@@ -288,6 +340,26 @@ class MemberShow extends Component
 
     // --- Bascule de saison : réactivation individuelle (§4.4) ---
 
+    /**
+     * Suspend l'accès athlète de CET adhérent (§4.4). Pendant individuel de la bascule de saison :
+     * il fallait jusqu'ici suspendre tout le club pour écarter une seule personne.
+     *
+     * Modale de conséquences et non `wire:confirm` : le geste annule des inscriptions futures, donc
+     * il libère des places et fait remonter des tiers depuis la file d'attente — qui, eux, sont
+     * notifiés. C'est le critère de la convention (destructif ou notifiant des tiers).
+     */
+    public function suspendAccess(SeasonService $season): void
+    {
+        $annulees = $season->suspendAthlete($this->user, auth()->user(), trim($this->suspendMotif) ?: null);
+
+        $this->user->refresh();
+        $this->confirmingSuspend = false;
+        $this->suspendMotif = '';
+
+        session()->flash('status', 'Accès athlète suspendu'
+            .($annulees > 0 ? ' — '.$annulees.' inscription(s) future(s) annulée(s).' : '.'));
+    }
+
     /** Réactive l'accès athlète suspendu (§4.4). Email transactionnel mis en file ; inscriptions annulées non restaurées. */
     public function reactivateAccess(SeasonService $season): void
     {
@@ -486,12 +558,20 @@ class MemberShow extends Component
             'wards' => $this->user->wards->whereNull('anonymized_at')->values(),
             'canBeGuardian' => $canBeGuardian,
             'wardCandidates' => $wardCandidates,
-            // État d'activation (§4.1.3) : un compte est entré s'il a posé un mot de passe, lié une
-            // identité OAuth, ou consommé une invitation. Le jeton consommé sert de marqueur durable
-            // (cf. InvitationToken::prunable, qui ne l'élague plus).
-            'activated' => $this->user->password !== null
+            // État d'activation (§4.1.3) : un compte est entré s'il s'est DÉJÀ CONNECTÉ, ou s'il a
+            // posé un mot de passe, lié une identité OAuth, ou consommé une invitation. Le jeton
+            // consommé sert de marqueur durable (cf. InvitationToken::prunable, qui ne l'élague
+            // plus) ; last_login_at couvre le cas que les trois autres ratent — l'adhérent qui
+            // n'entre que par lien magique, et qu'on affichait « jamais invité·e » à vie.
+            'activated' => $this->user->last_login_at !== null
+                || $this->user->password !== null
                 || $this->user->authIdentities()->exists()
                 || $this->user->invitations()->whereNotNull('consumed_at')->exists(),
+            // Compteur d'impact de la suspension : ce que la modale annonce avant le clic.
+            'futureRegs' => $this->user->registrations()
+                ->whereIn('status', ['participating', 'waitlist'])
+                ->whereHas('session', fn ($q) => $q->whereNull('cancelled_at')->where('start_at', '>', Carbon::now()))
+                ->count(),
             'pendingInvite' => $this->user->invitations()
                 ->whereNull('consumed_at')
                 ->where('expires_at', '>', Carbon::now())

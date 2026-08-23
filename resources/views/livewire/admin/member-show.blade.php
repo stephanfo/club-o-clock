@@ -81,25 +81,47 @@
 
                         {{-- Email & connexion --}}
                         <div class="card card-pad">
-                            <div class="flex ac jb"><span class="sect-title">Email & connexion</span><x-icon name="mail" :size="16" class="muted" /></div>
-                            @if ($u->email)
-                                <div class="input flex ac jb" style="margin-top:12px"><span>{{ $u->email }}</span></div>
-                                {{-- État d'activation (§4.1.3). Le compte est réputé activé s'il a
-                                     posé un mot de passe, lié Google, ou consommé une invitation —
-                                     d'où la conservation des jetons consommés. --}}
-                                @if ($activated)
-                                    <div class="meta flex ac g4" style="margin-top:8px;color:var(--brand-700)"><x-icon name="check" :size="13" /> Compte activé</div>
-                                @elseif ($pendingInvite)
-                                    <x-banner kind="info" style="margin-top:8px"><div>Invitation envoyée · expire le <b>{{ $pendingInvite->expires_at->locale('fr')->isoFormat('D MMM YYYY') }}</b>.</div></x-banner>
+                            <div class="flex ac jb">
+                                <span class="sect-title">Email & connexion</span>
+                                @if ($u->email && ! $editingEmail)
+                                    <button wire:click="editEmail" class="iconbtn" aria-label="Modifier l'email"><x-icon name="edit" :size="15" /></button>
                                 @else
-                                    <x-banner kind="warn" style="margin-top:8px"><div>Jamais invité·e — cet adhérent ne sait pas que son compte existe.</div></x-banner>
+                                    <x-icon name="mail" :size="16" class="muted" />
                                 @endif
-                                @unless ($activated)
-                                    <button type="button" class="btn btn-primary btn-block" style="margin-top:10px"
-                                        wire:click="sendInvitation" wire:loading.attr="disabled" wire:target="sendInvitation">
-                                        <x-icon name="mail" :size="15" /> {{ $pendingInvite ? "Renvoyer l'invitation" : "Envoyer l'invitation" }}
-                                    </button>
-                                @endunless
+                            </div>
+                            @if ($u->email)
+                                {{-- Correction de l'adresse (§4.1.3) : contrepartie du risque assumé
+                                     à la création (adresse crue sur parole, marquée vérifiée). Sans
+                                     ce geste, une coquille n'avait aucun chemin de correction et son
+                                     invitation de 30 jours restait vivante chez un tiers. --}}
+                                @if ($editingEmail)
+                                    <div class="ifield" style="margin-top:12px"><x-icon name="mail" :size="15" class="muted" /><input class="ifield-input" type="email" wire:model="email" placeholder="email de connexion"></div>
+                                    @error('email') <div class="meta" style="color:var(--danger);margin-top:8px">{{ $message }}</div> @enderror
+                                    <div class="meta" style="margin-top:8px;line-height:1.5">Changer l'adresse révoque l'invitation en cours et les liens de connexion envoyés à l'ancienne.</div>
+                                    <div class="flex ac g8" style="margin-top:12px">
+                                        <button wire:click="saveEmail" class="btn btn-primary btn-sm" wire:loading.attr="disabled" wire:target="saveEmail">Enregistrer</button>
+                                        <button wire:click="cancelEditEmail" class="btn btn-ghost btn-sm">Annuler</button>
+                                    </div>
+                                @else
+                                    <div class="input flex ac jb" style="margin-top:12px"><span>{{ $u->email }}</span></div>
+                                    {{-- État d'activation (§4.1.3). Le compte est réputé activé s'il
+                                         s'est déjà connecté (tous moyens), a posé un mot de passe, lié
+                                         Google, ou consommé une invitation — d'où la conservation des
+                                         jetons consommés. --}}
+                                    @if ($activated)
+                                        <div class="meta flex ac g4" style="margin-top:8px;color:var(--brand-700)"><x-icon name="check" :size="13" /> Compte activé</div>
+                                    @elseif ($pendingInvite)
+                                        <x-banner kind="info" style="margin-top:8px"><div>Invitation envoyée · expire le <b>{{ $pendingInvite->expires_at->locale('fr')->isoFormat('D MMM YYYY') }}</b>.</div></x-banner>
+                                    @else
+                                        <x-banner kind="warn" style="margin-top:8px"><div>Jamais invité·e — cet adhérent ne sait pas que son compte existe.</div></x-banner>
+                                    @endif
+                                    @unless ($activated)
+                                        <button type="button" class="btn btn-primary btn-block" style="margin-top:10px"
+                                            wire:click="sendInvitation" wire:loading.attr="disabled" wire:target="sendInvitation">
+                                            <x-icon name="mail" :size="15" /> {{ $pendingInvite ? "Renvoyer l'invitation" : "Envoyer l'invitation" }}
+                                        </button>
+                                    @endunless
+                                @endif
                             @else
                                 <x-banner kind="info" style="margin-top:12px"><div>Mineur <b>P1</b> sans email — accès géré par le parent garant. Aucune connexion directe.</div></x-banner>
                             @endif
@@ -393,8 +415,17 @@
 
                             @if ($suspended)
                                 <x-banner kind="warn" style="margin-bottom:12px"><div>Accès athlète <b>suspendu</b>.</div></x-banner>
-                                <button type="button" class="btn btn-primary btn-block" style="margin-bottom:12px" wire:click="reactivateAccess">
+                                <button type="button" class="btn btn-primary btn-block" style="margin-bottom:12px" wire:click="reactivateAccess"
+                                    wire:loading.attr="disabled" wire:target="reactivateAccess">
                                     <x-icon name="refresh-cw" :size="15" /> Réactiver l'accès athlète
+                                </button>
+                            {{-- Suspension individuelle (§4.4) : pendant du geste de masse, pour
+                                 écarter une seule personne sans suspendre tout le club. Masquée sur
+                                 un compte en cours de suppression — il est déjà désactivé. --}}
+                            @elseif ($u->hasRole('athlete') && $u->is_active && ! $u->anonymized_at && ! $pending)
+                                <button type="button" class="btn btn-ghost btn-block" style="margin-bottom:12px;color:var(--warning)"
+                                    wire:click="$set('confirmingSuspend', true)">
+                                    <x-icon name="user-minus" :size="15" /> Suspendre l'accès athlète
                                 </button>
                             @endif
 
@@ -505,6 +536,35 @@
             <x-slot:footer>
                 <button type="button" class="btn btn-ghost" wire:click="$set('confirmingRequest', false)">Annuler</button>
                 <button type="button" class="btn btn-danger" wire:click="requestDeletion">Demander la suppression</button>
+            </x-slot:footer>
+        </x-dialog>
+    @endif
+
+    {{-- ── Modale : suspension individuelle de l'accès athlète (§4.4) ── --}}
+    @if ($confirmingSuspend)
+        <x-dialog title="Suspendre l'accès athlète" :danger="true" :width="460" close="$set('confirmingSuspend', false)">
+            <div style="display:flex;flex-direction:column;gap:12px">
+                <x-conseq-row icon="calendar" label="{{ $futureRegs }} inscription(s) future(s)" tone="warn">
+                    Annulée(s) immédiatement. Les places libérées repartent à la file d'attente, et les
+                    athlètes promus en sont avertis.
+                </x-conseq-row>
+                <x-conseq-row icon="user" label="Le compte reste ouvert">
+                    {{ $u->first_name }} se connecte toujours et voit le planning, mais ne peut plus
+                    s'inscrire. Une bannière lui explique la suspension.
+                </x-conseq-row>
+                <x-conseq-row icon="rotate-ccw" label="Réversible">
+                    « Réactiver l'accès athlète » lève la suspension et envoie un email. Les inscriptions
+                    annulées ne sont pas restaurées.
+                </x-conseq-row>
+            </div>
+            <div style="margin-top:14px">
+                <label class="field-label">Motif (optionnel, consigné au journal)</label>
+                <input class="input" style="margin-top:8px" wire:model="suspendMotif" placeholder="Licence non renouvelée…" autocomplete="off">
+            </div>
+            <x-slot:footer>
+                <button type="button" class="btn btn-ghost" wire:click="$set('confirmingSuspend', false)">Annuler</button>
+                <button type="button" class="btn btn-danger" wire:click="suspendAccess"
+                    wire:loading.attr="disabled" wire:target="suspendAccess">Suspendre l'accès</button>
             </x-slot:footer>
         </x-dialog>
     @endif

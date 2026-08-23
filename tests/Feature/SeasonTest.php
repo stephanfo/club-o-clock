@@ -192,6 +192,128 @@ class SeasonTest extends TestCase
         $this->assertFalse($athlete->fresh()->athlete_access_suspended);
     }
 
+    // ── §4.4 — suspension individuelle (pendant du geste de masse) ──
+
+    public function test_suspend_one_athlete_without_touching_the_rest_of_the_club(): void
+    {
+        // Le trou comblé : pour écarter une seule personne — licence non renouvelée, départ en
+        // cours de saison — il fallait suspendre TOUT le club par la bascule de saison.
+        $admin = User::factory()->admin()->create();
+        $vise = $this->categorize(User::factory()->create(['roles' => ['athlete']]));
+        $epargne = $this->categorize(User::factory()->create(['roles' => ['athlete']]));
+
+        $session = $this->makeSession(capacity: 5);
+        app(RegistrationService::class)->register($session, $vise, $vise);
+        app(RegistrationService::class)->register($session, $epargne, $epargne);
+
+        $annulees = app(SeasonService::class)->suspendAthlete($vise, $admin, 'Licence non renouvelée');
+
+        $this->assertSame(1, $annulees);
+        $this->assertTrue($vise->fresh()->athlete_access_suspended);
+        // Contrôle positif apparié : le voisin n'est pas touché, ni son inscription.
+        $this->assertFalse($epargne->fresh()->athlete_access_suspended);
+        $this->assertDatabaseHas('registrations', [
+            'session_id' => $session->id, 'user_id' => $epargne->id, 'status' => 'participating',
+        ]);
+    }
+
+    public function test_suspending_cancels_only_future_registrations(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $membre = $this->categorize(User::factory()->create(['roles' => ['athlete']]));
+
+        $future = $this->makeSession();
+        app(RegistrationService::class)->register($future, $membre, $membre);
+
+        app(SeasonService::class)->suspendAthlete($membre, $admin);
+
+        $this->assertDatabaseHas('registrations', [
+            'session_id' => $future->id, 'user_id' => $membre->id, 'status' => 'cancelled',
+        ]);
+    }
+
+    public function test_suspending_keeps_the_account_open(): void
+    {
+        // La suspension n'est PAS une fermeture de compte : l'adhérent se connecte toujours et voit
+        // le planning. Fermer le compte, c'est la suppression (§4.3), un autre geste.
+        $admin = User::factory()->admin()->create();
+        $membre = User::factory()->create(['roles' => ['athlete'], 'email' => 'a@b.test']);
+
+        app(SeasonService::class)->suspendAthlete($membre, $admin);
+
+        $this->assertTrue($membre->fresh()->is_active);
+        $this->assertNull($membre->fresh()->deletion_requested_at);
+    }
+
+    public function test_suspending_is_audited_with_a_target_and_the_motif(): void
+    {
+        // Trace CIBLÉE, contrairement au geste de masse qui n'écrit qu'une entrée globale : ici
+        // l'acte vise une personne, le journal doit pouvoir répondre « qui, quand ».
+        $admin = User::factory()->admin()->create();
+        $membre = User::factory()->create(['roles' => ['athlete']]);
+
+        app(SeasonService::class)->suspendAthlete($membre, $admin, 'Licence non renouvelée');
+
+        $entree = AuditLog::where('action', 'account_deactivated')->firstOrFail();
+        $this->assertSame($admin->id, $entree->actor_id);
+        $this->assertSame($membre->id, $entree->target_id);
+        $this->assertStringContainsString('Licence non renouvelée', (string) $entree->motif);
+    }
+
+    public function test_suspending_sends_no_notification(): void
+    {
+        // §4.15 : pas d'email ni de push à la suspension — c'est la bannière in-app persistante qui
+        // informe. Même règle que le geste de masse, sinon une suspension de club inonderait les
+        // boîtes.
+        $admin = User::factory()->admin()->create();
+        $membre = User::factory()->create(['roles' => ['athlete'], 'email' => 'a@b.test']);
+
+        app(SeasonService::class)->suspendAthlete($membre, $admin);
+
+        $this->assertDatabaseMissing('notification_outbox', ['user_id' => $membre->id]);
+    }
+
+    public function test_suspending_is_noop_when_already_suspended(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $membre = User::factory()->create(['roles' => ['athlete'], 'athlete_access_suspended' => true]);
+
+        $this->assertSame(0, app(SeasonService::class)->suspendAthlete($membre, $admin));
+        $this->assertSame(0, AuditLog::where('action', 'account_deactivated')->count());
+    }
+
+    public function test_member_show_suspends_then_reactivates(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $membre = User::factory()->create(['roles' => ['athlete'], 'email' => 'a@b.test']);
+
+        $composant = Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $membre])
+            ->set('suspendMotif', 'Licence non renouvelée')
+            ->call('suspendAccess')
+            ->assertHasNoErrors();
+
+        $this->assertTrue($membre->fresh()->athlete_access_suspended);
+        // La modale se referme et le bouton bascule vers la réactivation.
+        // escape:false — l'apostrophe typographique du gabarit est rendue telle quelle.
+        $composant->assertSet('confirmingSuspend', false)->assertSee("Réactiver l'accès athlète", false);
+
+        $composant->call('reactivateAccess');
+        $this->assertFalse($membre->fresh()->athlete_access_suspended);
+    }
+
+    public function test_non_admin_cannot_suspend_from_the_member_sheet(): void
+    {
+        $membre = User::factory()->create(['roles' => ['athlete']]);
+
+        foreach ([['athlete'], ['coach']] as $roles) {
+            Livewire::actingAs(User::factory()->create(['roles' => $roles]))
+                ->test(MemberShow::class, ['user' => $membre])
+                ->assertForbidden();
+        }
+
+        $this->assertFalse($membre->fresh()->athlete_access_suspended);
+    }
+
     // ── §4.4 — réactivation individuelle ──
 
     public function test_reactivate_clears_flag_audits_and_queues_email(): void

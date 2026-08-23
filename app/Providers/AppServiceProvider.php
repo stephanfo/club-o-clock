@@ -6,7 +6,9 @@ use App\Models\User;
 use App\Notifications\Push\MinishlinkWebPushSender;
 use App\Notifications\Push\WebPushSender;
 use App\Support\DemoMode;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -73,5 +75,16 @@ class AppServiceProvider extends ServiceProvider
         // Pages d'information (notes club, ajout post-cadrage) : édition = admin uniquement.
         // La consultation n'est pas gardée ici (tout membre), elle est filtrée par visibilité.
         Gate::define('manage-information-pages', fn (User $user) => $user->isAdmin());
+
+        // Dernière connexion réussie (§4.1.3). Branché sur l'événement du garde, donc UNIQUE point
+        // pour les quatre moyens d'entrée : mot de passe, OAuth, lien magique et code à 6 chiffres.
+        // C'est le seul marqueur d'activation qui couvre le parcours passwordless : sans lui, un
+        // adhérent qui n'entre que par lien reste « jamais activé » et se fait relancer à vie.
+        //
+        // toBase() : écriture d'un fait de session, pas une modification de fiche — ni updated_at
+        // touché, ni événement de modèle émis (le mode strict Eloquent interdirait le non-fillable).
+        Event::listen(Login::class, function (Login $event) {
+            User::whereKey($event->user->getAuthIdentifier())->toBase()->update(['last_login_at' => now()]);
+        });
     }
 }

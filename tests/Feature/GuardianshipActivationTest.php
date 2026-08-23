@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\ClubSettings;
 use App\Models\InvitationToken;
 use App\Models\User;
+use App\Services\GuardianshipService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use RuntimeException;
 use Tests\TestCase;
 
 // J8.6 — Page d'activation du compte mineur autonomisé (PRD §4.1.3, §4.2.1 ; punted J7.7 → J8).
@@ -81,5 +84,33 @@ class GuardianshipActivationTest extends TestCase
 
         $this->get("/invitation/{$token}")->assertRedirect(route('login'));
         $this->assertGuest();
+    }
+
+    public function test_autonomisation_is_cancelled_when_no_channel_can_carry_the_invitation(): void
+    {
+        // Sans le lien, l'enfant a un compte dont il ignore l'existence et qu'il ne peut pas
+        // activer : l'autonomisation N'EST PAS l'ouverture d'un compte plus un mail en bonus.
+        $admin = User::factory()->create(['roles' => ['admin']]);
+        $garant = User::factory()->create(['email' => 'parent@club.test']);
+        $enfant = User::factory()->create([
+            'email' => null, 'is_minor' => true, 'guardian_id' => $garant->id,
+            'guardianship_linked_at' => now(),
+        ]);
+
+        ClubSettings::current()->update(['notif_email_enabled' => false]);
+        ClubSettings::flushCache();
+
+        try {
+            app(GuardianshipService::class)->invite($enfant, $admin, 'enfant@club.test');
+            $this->fail('L\'autonomisation aurait dû être refusée.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('canal email', $e->getMessage());
+        }
+
+        // Tout est annulé : ni email posé, ni jeton, ni trace d'un acte qui n'a pas eu lieu.
+        $enfant->refresh();
+        $this->assertNull($enfant->email);
+        $this->assertDatabaseCount('invitation_tokens', 0);
+        $this->assertDatabaseMissing('audit_logs', ['action' => 'guardianship_invite_sent']);
     }
 }

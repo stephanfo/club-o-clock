@@ -273,11 +273,42 @@ class MemberService
         });
     }
 
-    /** Change l'email de connexion (§4.1.3). Acte sensible (accès) → AuditLog + ActivityLog. */
+    /**
+     * Change l'email de connexion (§4.1.3). Acte sensible (accès) → AuditLog + ActivityLog.
+     *
+     * Changer l'adresse RÉVOQUE tout ce qui pointait l'ancienne. C'est le cœur du geste, pas un
+     * ménage : on corrige typiquement une coquille de saisie, donc les secrets déjà partis sont
+     * précisément entre les mains de quelqu'un d'autre. Trois familles à couper —
+     *   - les invitations d'activation non consommées, indexées par user_id : elles survivraient
+     *     au changement d'adresse et resteraient honorées jusqu'à 30 jours ;
+     *   - les liens magiques et codes émis pour l'ancienne adresse ;
+     *   - les jetons de réinitialisation de mot de passe de l'ancienne adresse.
+     *
+     * La nouvelle adresse est marquée vérifiée pour la même raison qu'à la création : l'admin la
+     * tient du dossier de licence, et sans email vérifié le compte redeviendrait muet (§4.1.1).
+     */
     public function updateEmail(User $member, ?string $email, User $actor): void
     {
         DB::transaction(function () use ($member, $email, $actor) {
-            $member->update(['email' => $email ?: null]);
+            $ancien = $member->email;
+            $nouveau = $email ?: null;
+
+            if ($ancien === $nouveau) {
+                return;
+            }
+
+            $member->update(['email' => $nouveau]);
+
+            // email_verified_at n'est pas fillable : fait de sécurité, jamais posé depuis un tableau
+            // de formulaire. Vidé si l'adresse disparaît — il ne vérifie plus rien.
+            $member->forceFill(['email_verified_at' => $nouveau !== null ? Carbon::now() : null])->save();
+
+            InvitationToken::where('user_id', $member->id)->whereNull('consumed_at')->delete();
+
+            if ($ancien !== null) {
+                MagicLinkToken::where('email', $ancien)->delete();
+                DB::table('password_reset_tokens')->where('email', $ancien)->delete();
+            }
 
             AuditLogger::record('email_changed', $actor, [
                 'target_type' => User::class,

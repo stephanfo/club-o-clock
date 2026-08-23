@@ -11,6 +11,7 @@ use App\Notifications\NotificationType;
 use App\Notifications\OutboxDrainer;
 use App\Support\Logging\ActivityLogger;
 use App\Support\Logging\AuditLogger;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -79,6 +80,14 @@ class InvitationService
             throw new RuntimeException('Ce compte n\'est pas actif.');
         }
 
+        // AVANT de frapper le jeton : rien ne sert d'ouvrir une autorisation de 30 jours si aucun
+        // canal ne porte l'invitation. C'est la différence entre un effet de bord manqué et un
+        // geste sans objet — sans cette garde, l'admin lisait « invitation envoyée », le jeton
+        // vivant excluait l'adhérent du rattrapage pendant 30 jours, et rien n'était parti.
+        if ($this->notifier->deliverableChannels(NotificationType::MemberInvitation, $user) === []) {
+            throw new RuntimeException($this->motifNonDelivrable($user));
+        }
+
         $token = DB::transaction(function () use ($user, $actor) {
             $token = $this->mint($user);
 
@@ -98,6 +107,14 @@ class InvitationService
             'token' => $token,
         ]);
 
+        // Filet : entre la garde ci-dessus et ici, un admin a pu couper le canal email. Le jeton
+        // frappé pour rien repart — le laisser vivre bloquerait le rattrapage 30 jours durant.
+        if ($lines->isEmpty()) {
+            InvitationToken::where('user_id', $user->id)->whereNull('consumed_at')->delete();
+
+            throw new RuntimeException($this->motifNonDelivrable($user));
+        }
+
         if ($immediate) {
             $this->drainer->drainNow($lines);
         }
@@ -105,27 +122,62 @@ class InvitationService
         return $lines;
     }
 
+    /** Pourquoi l'invitation ne peut pas partir — message actionnable, pas un « échec d'envoi ». */
+    private function motifNonDelivrable(User $user): string
+    {
+        if (! ClubSettings::current()->channelEnabled('email')) {
+            return 'Le canal email du club est coupé (Admin → Réglages) : l\'invitation ne peut pas partir.';
+        }
+
+        if ($user->loadMissing('notificationPreferences')->notificationPreferences?->paused) {
+            return 'Cet adhérent a mis ses notifications en pause : l\'invitation ne peut pas partir.';
+        }
+
+        return 'Cet adhérent a désactivé ce type de notification : l\'invitation ne peut pas partir.';
+    }
+
     /**
      * Adhérents actifs qui n'ont jamais activé leur compte et n'ont aucune invitation en cours.
      *
-     * Un compte est réputé activé s'il a un mot de passe, une identité OAuth, ou un jeton consommé —
-     * d'où l'élagage restreint d'InvitationToken (les jetons consommés sont conservés, ils sont le
-     * marqueur d'activation). Sert l'action de masse qui rattrape un import CSV envoyé en silence.
+     * Un compte est réputé activé s'il s'est déjà connecté (last_login_at, tous moyens confondus),
+     * ou s'il porte un mot de passe, une identité OAuth ou un jeton consommé — d'où l'élagage
+     * restreint d'InvitationToken (les jetons consommés sont conservés, ils sont le marqueur
+     * d'activation). Sert l'action de masse qui rattrape un import CSV envoyé en silence.
      *
-     * @return Collection<int,User>
+     * Rendue en REQUÊTE et non en Collection : l'écran n'en veut souvent que le compte, et l'action
+     * de masse n'en prend que les premiers. Matérialiser toute la table pour ça se payait à chaque
+     * frappe dans la recherche.
+     *
+     * @return Builder<User>
      */
-    public function awaitingInvitation(): Collection
+    public function awaitingInvitationQuery(): Builder
     {
         return User::query()
             ->where('is_active', true)
             ->whereNull('anonymized_at')
             ->whereNotNull('email')
             ->whereNull('password')
+            ->whereNull('last_login_at')
             ->whereDoesntHave('authIdentities')
             ->whereDoesntHave('invitations', fn ($q) => $q->whereNotNull('consumed_at'))
             ->whereDoesntHave('invitations', fn ($q) => $q->whereNull('consumed_at')->where('expires_at', '>', Carbon::now()))
             ->orderBy('last_name')
-            ->orderBy('first_name')
-            ->get();
+            ->orderBy('first_name');
+    }
+
+    /**
+     * Matérialise awaitingInvitationQuery(), bornée EN BASE quand un plafond est donné.
+     *
+     * @return Collection<int,User>
+     */
+    public function awaitingInvitation(?int $limit = null): Collection
+    {
+        $query = $this->awaitingInvitationQuery();
+
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        return $query->get();
     }
 }

@@ -22,6 +22,9 @@ class MagicLink
     /** Essais autorisés avant de brûler le jeton. 5 essais sur 10⁶ = 5 chances sur un million. */
     public const MAX_CODE_ATTEMPTS = 5;
 
+    /** Jetons vivants confrontés à un code saisi (les plus récents). Couvre les renvois en rafale. */
+    public const MAX_LIVE_CODES = 10;
+
     /**
      * Génère un token, persiste son hash, renvoie l'URL signée à envoyer par email.
      * Le token clair n'est jamais stocké.
@@ -87,33 +90,48 @@ class MagicLink
      * L'email est OBLIGATOIRE et sert de clé de recherche. Sans lui, un attaquant testerait 10⁶
      * combinaisons contre TOUS les jetons vivants à la fois : la probabilité de toucher quelqu'un
      * croîtrait avec le nombre d'utilisateurs, au lieu de rester bornée par jeton.
+     *
+     * Le code est confronté à TOUS les jetons vivants de l'adresse, pas au seul dernier émis. Le
+     * mail est lent : on clique deux fois « Envoyer le lien », puis on saisit le code du premier
+     * message reçu. Comparé au seul jeton le plus récent, ce code valide passait pour faux — et
+     * consommait en prime un essai du seul jeton exploitable, cinq fautes de ce genre le brûlant.
      */
     public static function consumeCode(string $email, string $code): ?string
     {
         $email = mb_strtolower(trim($email));
         $code = trim($code);
 
-        $record = MagicLinkToken::where('email', $email)
+        // Borné aux plus récents : le débit d'émission (5 demandes/min) permettrait sinon d'aligner
+        // des dizaines de jetons vivants sur la fenêtre de 15 min, donc autant d'écritures par code
+        // faux. Au-delà de quelques renvois, les plus anciens n'intéressent plus personne.
+        $candidats = MagicLinkToken::where('email', $email)
             ->whereNotNull('code_hash')
             ->whereNull('consumed_at')
             ->where('expires_at', '>', Carbon::now())
             ->where('code_attempts', '<', self::MAX_CODE_ATTEMPTS)
             ->latest('id')
-            ->first();
+            ->limit(self::MAX_LIVE_CODES)
+            ->get();
 
-        if (! $record) {
+        if ($candidats->isEmpty()) {
             return null;
         }
 
         // hash_equals : comparaison en temps constant, pour ne pas laisser fuir par la durée de
         // réponse combien de caractères de tête sont corrects.
-        if (! hash_equals((string) $record->code_hash, self::hashCode($code))) {
-            // L'échec compte, et au 5e le jeton est brûlé — le compteur par IP ne suffit pas, il se
-            // contourne ; celui-ci est attaché au secret lui-même.
-            $record->increment('code_attempts');
+        $attendu = self::hashCode($code);
+        $record = $candidats->first(fn (MagicLinkToken $c) => hash_equals((string) $c->code_hash, $attendu));
 
-            if ($record->code_attempts >= self::MAX_CODE_ATTEMPTS) {
-                $record->forceFill(['consumed_at' => Carbon::now()])->save();
+        if ($record === null) {
+            // L'échec compte sur CHAQUE jeton vivant, et au 5e chacun est brûlé — le compteur par IP
+            // ne suffit pas, il se contourne ; celui-ci est attaché aux secrets eux-mêmes. Le faire
+            // porter sur un seul laisserait les autres offrir 5 essais de plus chacun.
+            foreach ($candidats as $candidat) {
+                $candidat->increment('code_attempts');
+
+                if ($candidat->code_attempts >= self::MAX_CODE_ATTEMPTS) {
+                    $candidat->forceFill(['consumed_at' => Carbon::now()])->save();
+                }
             }
 
             return null;

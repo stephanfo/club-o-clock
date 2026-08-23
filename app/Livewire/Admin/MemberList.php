@@ -13,6 +13,7 @@ use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use RuntimeException;
 
 // Page « Adhérents » (PRD §4.17.1) — porté de screen-admin.jsx AdminAdherents.
 // Liste paginée filtrable : recherche nom/email/catégorie, filtres accès + rôle, compteurs
@@ -102,16 +103,41 @@ class MemberList extends Component
      */
     public function sendPendingInvitations(InvitationService $invitations): void
     {
-        $cibles = $invitations->awaitingInvitation()->take(self::BULK_INVITE_CAP);
-
-        foreach ($cibles as $membre) {
-            $invitations->sendToMember($membre, auth()->user(), immediate: false);
-        }
+        // Plafond posé EN BASE : la borne doit s'appliquer à la requête, pas à une collection déjà
+        // hydratée — sinon un club au gros import charge tous ses adhérents en mémoire pour n'en
+        // garder que 500, sur un mutualisé à memory_limit basse.
+        $cibles = $invitations->awaitingInvitation(self::BULK_INVITE_CAP);
 
         $this->confirmingBulkInvite = false;
-        session()->flash('status', $cibles->isEmpty()
-            ? 'Aucun adhérent en attente d’invitation.'
-            : $cibles->count().' invitation(s) mise(s) en file (Admin → Envois).');
+
+        if ($cibles->isEmpty()) {
+            session()->flash('status', 'Aucun adhérent en attente d’invitation.');
+
+            return;
+        }
+
+        // On compte ce qui est RÉELLEMENT parti : un canal coupé ou une préférence en pause fait
+        // refuser l'envoi, et annoncer 500 invitations quand aucune n'a été mise en file serait un
+        // mensonge que rien ne viendrait corriger ensuite.
+        $misesEnFile = 0;
+        $refusees = 0;
+        foreach ($cibles as $membre) {
+            try {
+                $invitations->sendToMember($membre, auth()->user(), immediate: false);
+                $misesEnFile++;
+            } catch (RuntimeException) {
+                $refusees++;
+            }
+        }
+
+        if ($misesEnFile === 0) {
+            session()->flash('warn', 'Aucune invitation n’a pu partir — vérifie le canal email (Admin → Réglages).');
+
+            return;
+        }
+
+        session()->flash('status', $misesEnFile.' invitation(s) mise(s) en file (Admin → Envois).'
+            .($refusees > 0 ? ' '.$refusees.' non envoyée(s) : canal ou préférence bloquant.' : ''));
     }
 
     /** Commit tout-ou-rien : ré-analyse le fichier puis crée/met à jour en lot (§4.2). */
@@ -135,17 +161,25 @@ class MemberList extends Component
         // Mise en FILE (immediate: false) et non envoi direct — 200 envois SMTP synchrones dans une
         // requête, c'est un timeout garanti sur mutualisé. Le cron draine par lots toutes les 5 min.
         $queued = 0;
+        $refusees = 0;
         if ($this->sendInvitations) {
             foreach (User::whereKey($result['created_ids'])->whereNotNull('email')->get() as $nouveau) {
-                $invitations->sendToMember($nouveau, auth()->user(), immediate: false);
-                $queued++;
+                try {
+                    $invitations->sendToMember($nouveau, auth()->user(), immediate: false);
+                    $queued++;
+                } catch (RuntimeException) {
+                    // Canal coupé ou préférence bloquante : les fiches sont créées, on ne perd pas
+                    // l'import pour autant — mais on ne prétend pas avoir envoyé.
+                    $refusees++;
+                }
             }
         }
 
         $this->closeImport();
         $this->perPage = 20;
         session()->flash('status', "Import terminé : {$result['created']} adhérent(s) créé(s), {$result['updated']} mis à jour."
-            .($queued > 0 ? " {$queued} invitation(s) mise(s) en file (Admin → Envois)." : ''));
+            .($queued > 0 ? " {$queued} invitation(s) mise(s) en file (Admin → Envois)." : '')
+            .($refusees > 0 ? " {$refusees} invitation(s) non envoyée(s) : canal email coupé ou préférence bloquante." : ''));
     }
 
     public function updated(string $name): void
@@ -216,8 +250,10 @@ class MemberList extends Component
             'total' => $total,
             'counts' => $counts,
             // Comptes jamais entrés et sans invitation en cours : le bouton de rattrapage n'apparaît
-            // que s'il a quelque chose à faire.
-            'awaiting' => app(InvitationService::class)->awaitingInvitation()->count(),
+            // que s'il a quelque chose à faire. COUNT en base : ce render rejoue à chaque frappe
+            // dans la recherche, hydrater tous les modèles pour n'afficher qu'un nombre se payait
+            // à chaque caractère.
+            'awaiting' => app(InvitationService::class)->awaitingInvitationQuery()->count(),
         ]);
     }
 }

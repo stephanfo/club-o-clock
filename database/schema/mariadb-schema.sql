@@ -715,6 +715,7 @@ CREATE TABLE `users` (
   `last_name` varchar(255) NOT NULL,
   `email` varchar(255) DEFAULT NULL,
   `email_verified_at` timestamp NULL DEFAULT NULL,
+  `last_login_at` timestamp NULL DEFAULT NULL,
   `password` varchar(255) DEFAULT NULL,
   `dob` date DEFAULT NULL,
   `roles` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`roles`)),
@@ -800,3 +801,5 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (37,'2026_01_01_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (38,'2026_08_09_000100_add_channel_and_auth_switches_to_club_settings_table',2);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (39,'2026_08_21_000000_add_pwa_icon_paths_to_club_settings',2);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (40,'2026_08_23_000000_add_code_to_magic_link_tokens',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (41,'2026_08_24_000000_add_last_login_at_to_users',4);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (42,'2026_08_24_000010_purge_sent_outbox_secrets',4);

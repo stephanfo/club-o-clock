@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ClubSettings;
 use App\Models\User;
 use App\Notifications\NotificationDispatcher;
 use App\Notifications\NotificationType;
@@ -47,6 +48,18 @@ class GuardianshipService
             }
             if (! $ward->email) {
                 throw new RuntimeException('Renseigne l\'email de l\'enfant avant d\'envoyer l\'invitation.');
+            }
+
+            // DANS la transaction, une fois l'email posé : si aucun canal ne porte l'invitation, on
+            // annule tout — email, jeton et trace. L'autonomisation N'EST PAS l'ouverture d'un
+            // compte plus l'envoi d'un mail en bonus : sans le lien, l'enfant a un compte dont il
+            // ignore l'existence et qu'il ne peut pas activer. Même raisonnement qu'InvitationService.
+            if ($this->notifier->deliverableChannels(NotificationType::GuardianshipInvitation, $ward) === []) {
+                throw new RuntimeException(
+                    ClubSettings::current()->channelEnabled('email')
+                        ? 'Cet enfant ne peut pas recevoir de notification : l\'invitation ne peut pas partir.'
+                        : 'Le canal email du club est coupé (Admin → Réglages) : l\'invitation ne peut pas partir.'
+                );
             }
 
             // Même jeton et même page d'activation que l'invitation d'adhérent (§4.1.3) : la frappe

@@ -42,24 +42,30 @@ class OutboxSecretPurgeTest extends TestCase
         $this->assertArrayNotHasKey('token', $ligne->payload ?? []);
     }
 
-    public function test_failed_lines_keep_their_token_to_stay_replayable(): void
+    public function test_the_one_shot_migration_purges_already_sent_lines(): void
     {
-        // Vider une ligne en échec produirait un lien mort au rejeu depuis l'écran d'envois.
-        $ligne = $this->ligne('failed');
+        // Rattrapage des lignes écrites avant que le drain ne purge lui-même. Ce nettoyage vivait
+        // dans la tâche quotidienne, qui rescannait donc toute la table chaque jour et pour
+        // toujours ; il est désormais joué UNE fois, à la migration.
+        $envoyee = $this->ligne('sent');
+        // Contrôle positif apparié : vider une ligne en échec produirait un lien mort au rejeu
+        // depuis l'écran d'envois — elle doit garder son jeton.
+        $echouee = $this->ligne('failed');
 
-        $this->artisan('club:prune-tokens');
+        (require database_path('migrations/2026_08_24_000010_purge_sent_outbox_secrets.php'))->up();
 
-        $this->assertSame('jeton-tres-secret', $ligne->fresh()->payload['token'] ?? null);
+        $this->assertArrayNotHasKey('token', $envoyee->fresh()->payload ?? []);
+        $this->assertSame('jeton-tres-secret', $echouee->fresh()->payload['token'] ?? null);
     }
 
-    public function test_prune_purges_secrets_left_by_previously_sent_lines(): void
+    public function test_daily_prune_no_longer_rescans_the_outbox(): void
     {
-        // Rattrapage des lignes écrites avant que le drain ne purge lui-même.
-        $ligne = $this->ligne('sent');
+        // La tâche quotidienne ne touche plus aux payloads : son travail est l'élagage des jetons.
+        $envoyee = $this->ligne('sent');
 
         $this->artisan('club:prune-tokens');
 
-        $this->assertArrayNotHasKey('token', $ligne->fresh()->payload ?? []);
+        $this->assertSame('jeton-tres-secret', $envoyee->fresh()->payload['token'] ?? null);
     }
 
     public function test_admin_drawer_never_renders_a_live_token(): void
