@@ -51,6 +51,13 @@ Route::get('/mentions-legales', LegalController::class)->name('legal');
 Route::middleware('guest')->group(function () {
     Route::get('magic-link', [MagicLinkController::class, 'request'])->name('magic-link.request');
     Route::post('magic-link', [MagicLinkController::class, 'send'])->name('magic-link.send');
+
+    // ⚠️ ORDRE : ces routes littérales DOIVENT précéder magic-link/{token}, qui les capterait
+    // sinon (« envoye » et « code » seraient pris pour des jetons).
+    Route::get('magic-link/envoye', [MagicLinkController::class, 'sent'])->name('magic-link.sent');
+    Route::get('magic-link/code', [MagicLinkController::class, 'codeForm'])->name('magic-link.code');
+    Route::post('magic-link/code', [MagicLinkController::class, 'verifyCode'])->name('magic-link.code.verify');
+
     Route::get('magic-link/{token}', [MagicLinkController::class, 'consume'])->name('magic-link.consume');
 
     // Google OAuth via Socialite (PRD §4.1.1)

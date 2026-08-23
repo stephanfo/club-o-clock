@@ -200,6 +200,33 @@ Lecture : *énoncé PRD → implication → où c'est tranché*. Les exigences s
   jusqu'à l'envoi. `OutboxDrainer` le retire au passage en `sent` (`SENSITIVE_PAYLOAD_KEYS`), et le
   tiroir admin n'affiche jamais que `redactedPayload()`. **Pas de purge sur `failed`** : ces lignes
   restent rejouables, les vider produirait un lien mort. `club:prune-tokens` rattrape l'historique.
+- **Code à usage unique (PRD §4.1.1)** : deux colonnes sur `magic_link_tokens` (`code_hash`,
+  `code_attempts`), **pas de table séparée** — le code et le lien sont les deux faces d'une même
+  autorisation (même destinataire, même TTL, même `consumed_at`). Une table à part rendrait possible
+  l'état incohérent « lien consommé, code encore vivant ».
+  - 6 chiffres ≈ **20 bits** : le format n'est acceptable que parce que TOUS les contrôles suivants
+    sont réunis. `random_int` (CSPRNG) ; stockage en **HMAC-SHA256 clé APP_KEY** — un sha256 nu de
+    6 chiffres se renverse en microsecondes, donc un dump de base livrerait les codes en clair ;
+    `hash_equals` ; **compteur par jeton** (5 essais, puis le jeton est brûlé → 5·10⁻⁶) ; **double
+    limiteur** 5/min par (email+IP) *et* 10/10 min par IP seule — le compteur par jeton ne voit pas
+    un attaquant qui essaie un code sur mille adresses, il n'épuise celui d'aucune ; TTL 15 min ;
+    `UPDATE` conditionnel atomique pour l'usage unique.
+  - **L'email est obligatoire à la saisie** et sert de clé de recherche. Sans lui, un attaquant
+    testerait 10⁶ combinaisons contre *tous* les jetons vivants simultanément : la probabilité de
+    toucher quelqu'un croîtrait avec le nombre d'adhérents au lieu de rester bornée par jeton.
+    Corollaire testé : un mauvais email **n'incrémente pas** le compteur de la victime, sinon on
+    offrirait un déni de service.
+  - **Écran dédié**, pas de 3ᵉ onglet sur l'écran de connexion : le code n'est pas une troisième
+    méthode mais la seconde moitié du lien magique, et il ne veut rien dire tant qu'aucun code n'a
+    été demandé. Accessoirement, le segment de connexion est un toggle CSS à deux radios dupliqué
+    dans les deux coquilles — un troisième libellé en capitales y déborde à 360 px, sur l'écran le
+    plus critique de l'application.
+  - **Pas de code sur l'invitation à 30 jours** : à entropie égale, la fenêtre d'exposition serait
+    2880 fois plus grande, et le verrouillage à 5 essais deviendrait une arme (invalider en boucle
+    les invitations d'une promotion entière). Le besoin n'existe pas non plus — le cas iOS suppose
+    une PWA *déjà installée*, ce qui n'est pas vrai à la première activation. *Le code compense un
+    défaut de contexte de session, pas un défaut de possession du lien ; il n'a de sens que sur un
+    jeton court.*
 - **Politique de mot de passe** : `Password::defaults()` = longueur seule (10). Pas de règles de
   composition (contraires aux recommandations ANSSI/NIST), pas de `uncompromised()` — l'appel HIBP est
   un aller-retour réseau sortant qui ajoute de la latence sur mutualisé et **échoue ouvert** en cas de

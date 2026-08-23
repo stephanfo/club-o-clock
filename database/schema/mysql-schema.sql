@@ -398,6 +398,8 @@ CREATE TABLE `magic_link_tokens` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `token_hash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `code_hash` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `code_attempts` tinyint unsigned NOT NULL DEFAULT '0',
   `expires_at` timestamp NOT NULL,
   `consumed_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
@@ -796,3 +798,4 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (35,'2026_01_01_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (36,'2026_01_01_000370_create_activity_logs_table',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (37,'2026_01_01_000380_create_apero_flags_table',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (38,'2026_08_21_000000_add_pwa_icon_paths_to_club_settings',2);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (39,'2026_08_23_000000_add_code_to_magic_link_tokens',3);

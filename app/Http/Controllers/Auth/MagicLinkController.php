@@ -56,11 +56,92 @@ class MagicLinkController extends Controller
         // reste identique dans tous les cas (anti-énumération).
         $user = User::findByEmail($email);
         if ($user && $user->hasVerifiedEmail()) {
-            $url = MagicLink::createUrlFor($email);
-            Notification::route('mail', $email)->notify(new MagicLinkNotification($url));
+            $emis = MagicLink::issue($email);
+            Notification::route('mail', $email)->notify(new MagicLinkNotification($emis['url'], $emis['code']));
         }
 
-        return back()->with('status', __('Si un compte existe pour cet email, un lien de connexion vient d\'être envoyé.'));
+        // On atterrit sur l'écran de vérification, identique que le compte existe ou non :
+        // l'anti-énumération tient à ce que rien ne diffère ici (même redirection, même contenu).
+        // Seule la saisie d'un code peut échouer, avec le même message générique pour toutes les
+        // causes.
+        $request->session()->put('magic-link.email', $email);
+
+        return redirect()->route('magic-link.sent');
+    }
+
+    /** « Un email t'attend » : le lien est parti, et le code se saisit ici. */
+    public function sent(Request $request)
+    {
+        if (! $this->authMethods->magicLinkEnabled()) {
+            return redirect()->route('login');
+        }
+
+        return view('auth.magic-link-sent', [
+            'email' => (string) $request->session()->get('magic-link.email', ''),
+        ]);
+    }
+
+    /**
+     * Saisie d'un code seul, sans être passé par la demande dans ce contexte de navigation. C'est
+     * LE chemin de la PWA iOS : le lien a été demandé depuis Safari, l'utilisateur ouvre ensuite
+     * l'application installée, où la session est vierge.
+     */
+    public function codeForm(Request $request)
+    {
+        if (! $this->authMethods->magicLinkEnabled()) {
+            return redirect()->route('login');
+        }
+
+        return view('auth.magic-link-code', [
+            'email' => (string) $request->session()->get('magic-link.email', ''),
+        ]);
+    }
+
+    /** Vérifie le code à usage unique et connecte. */
+    public function verifyCode(Request $request)
+    {
+        // Avant toute consommation, comme consume() : un refus ne doit pas brûler un jeton que le
+        // club pourrait vouloir honorer en réactivant le moyen.
+        if (! $this->authMethods->magicLinkEnabled()) {
+            return redirect()->route('login')->withErrors([
+                'email' => __('La connexion par lien est désactivée.'),
+            ]);
+        }
+
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+            'code' => ['required', 'string'],
+        ]);
+
+        // DEUX limiteurs, complémentaires. Celui par (email+IP) borne l'acharnement sur une cible ;
+        // celui par IP seule borne le balayage de nombreux emails, que le compteur par jeton ne voit
+        // pas — un attaquant qui essaie un code sur mille adresses n'épuise le compteur d'aucune.
+        $ip = (string) $request->ip();
+        $parCible = 'magic-code|'.mb_strtolower($validated['email']).'|'.$ip;
+        $parIp = 'magic-code|'.$ip;
+
+        if (RateLimiter::tooManyAttempts($parCible, 5) || RateLimiter::tooManyAttempts($parIp, 10)) {
+            return back()->withErrors(['code' => __('Trop de tentatives. Réessaie dans quelques minutes.')]);
+        }
+
+        RateLimiter::hit($parCible, 60);
+        RateLimiter::hit($parIp, 600);
+
+        $email = MagicLink::consumeCode($validated['email'], $validated['code']);
+        $user = $email !== null ? User::findByEmail($email) : null;
+
+        // Message unique pour toutes les causes (code faux, expiré, brûlé, email inconnu, compte
+        // fermé) : distinguer renseignerait un attaquant sur l'existence du compte.
+        if (! $user || ! $user->is_active) {
+            $request->session()->put('magic-link.email', $validated['email']);
+
+            return back()->withErrors(['code' => __('Ce code est invalide ou expiré.')]);
+        }
+
+        Auth::login($user, remember: true);
+        $request->session()->regenerate();
+
+        return redirect()->intended(route('dashboard'));
     }
 
     /** Consommation du lien : connecte l'utilisateur si le token est valide. */
