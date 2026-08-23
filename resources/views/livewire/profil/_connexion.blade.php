@@ -59,6 +59,9 @@
                     <input id="pf-new-pwd" type="password" class="input" autocomplete="new-password"
                         wire:model="password">
                     @error('password') <div class="meta" style="color:var(--danger);font-size:12px;margin-top:4px">{{ $message }}</div> @enderror
+                    {{-- La règle est annoncée AVANT la saisie, et sort de PasswordPolicy : c'est la
+                         même source que la validation, donc les deux ne peuvent plus diverger. --}}
+                    <div class="meta" style="font-size:12px;margin-top:4px">{{ \App\Support\PasswordPolicy::hint() }}</div>
                 </div>
                 <div>
                     <label class="field-label" for="pf-new-pwd2">Confirmer</label>

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
+use App\Support\PasswordPolicy;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -80,11 +81,14 @@ class CreateAdminCommand extends Command
         $firstName = $this->option('first-name') ?: $this->ask('Prénom', 'Admin');
         $lastName = $this->option('last-name') ?: $this->ask('Nom', 'Club');
 
-        $password = $this->option('password') ?: $this->secret('Mot de passe (min. 8 caractères)');
+        $password = $this->option('password') ?: $this->secret('Mot de passe (min. '.PasswordPolicy::MIN.' caractères)');
 
+        // Password::defaults() : la commande hérite de la politique du club au lieu d'en porter une
+        // copie. Elle exigeait 8 quand toutes les autres surfaces exigeaient 10 — le seul compte
+        // créable sur une base vide était donc aussi le seul autorisé à être plus faible.
         $check = Validator::make(
             ['password' => $password],
-            ['password' => ['required', 'string', Password::min(8)]],
+            ['password' => ['required', 'string', Password::defaults()]],
         );
 
         if ($check->fails()) {

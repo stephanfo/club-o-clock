@@ -7,6 +7,7 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\User;
+use App\Support\PasswordPolicy;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -28,18 +29,19 @@ class FortifyServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Politique de mot de passe, unique pour toutes les surfaces (profil, activation, reset).
-        // Longueur seule : pas de règles de composition (majuscules/chiffres), contre-productives et
-        // contraires aux recommandations ANSSI/NIST. Pas de `uncompromised()` non plus — l'appel
-        // sortant vers HIBP ajoute de la latence sur mutualisé et échoue OUVERT si le réseau tombe :
-        // coût réel, garantie nulle.
-        Password::defaults(fn () => Password::min(10));
+        // Politique de mot de passe, unique pour toutes les surfaces (profil, activation, reset,
+        // console). La longueur ET son énoncé à l'écran vivent dans PasswordPolicy : les deux
+        // avaient divergé (10 ici, 8 dans `club:create-admin`, « au moins 8 » sur l'écran de reset).
+        // Pas de `uncompromised()` : l'appel sortant vers HIBP ajoute de la latence sur mutualisé et
+        // échoue OUVERT si le réseau tombe — coût réel, garantie nulle.
+        Password::defaults(fn () => PasswordPolicy::rules());
 
         // Un reset de mot de passe est le chemin « j'ai perdu le contrôle » : les sessions ouvertes
         // ailleurs doivent tomber. CompletePasswordReset régénère bien remember_token (donc les
         // cookies « se souvenir de moi »), mais laisse vivre les lignes de session — un attaquant
-        // encore connecté le resterait. L'événement est émis AVANT le login qui suit, donc tout
-        // supprimer sans exception est sûr.
+        // encore connecté le resterait. Tout supprimer sans exception est sûr : le reset ne connecte
+        // personne (NewPasswordController redirige vers l'écran de login), il n'y a donc aucune
+        // session légitime à préserver à cet instant.
         Event::listen(PasswordReset::class, function (PasswordReset $event) {
             DB::table(config('session.table', 'sessions'))->where('user_id', $event->user->getAuthIdentifier())->delete();
         });

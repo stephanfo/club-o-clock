@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process';
 
 const HERE = new URL('.', import.meta.url).pathname;
-const suites = ['scenarios.mjs', 'parcours.mjs', 'responsive.mjs'];
+const suites = ['scenarios.mjs', 'parcours.mjs', 'comptes.mjs', 'responsive.mjs'];
 const echecs = [];
 
 for (const suite of suites) {
