@@ -173,12 +173,6 @@
          borné à 100dvh sur le planning mobile, un enfant position:fixed s'y verrait re-parenté. --}}
     <x-demo-badge />
 
-    {{-- data-navigate-once : wire:navigate ré-exécute les scripts du body à chaque swap ;
-         l'enregistrement du SW n'a de sens qu'au chargement initial. --}}
-    <script data-navigate-once>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
-        }
-    </script>
+    @include('partials.sw-register')
 </body>
 </html>

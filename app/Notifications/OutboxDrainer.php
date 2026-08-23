@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\ClubSettings;
 use App\Models\NotificationOutbox;
 use App\Notifications\Channels\ChannelManager;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -92,7 +93,14 @@ class OutboxDrainer
             }
 
             if ($delivered) {
-                $line->update(['status' => 'sent', 'sent_at' => Carbon::now()]);
+                // Le secret a servi : il n'a plus rien à faire en base. On ne purge QUE sur `sent` —
+                // une ligne `failed` reste rejouable depuis l'écran d'envois, la vider produirait un
+                // lien mort au rejeu.
+                $line->update([
+                    'status' => 'sent',
+                    'sent_at' => Carbon::now(),
+                    'payload' => Arr::except($line->payload ?? [], NotificationOutbox::SENSITIVE_PAYLOAD_KEYS),
+                ]);
                 $stats['sent']++;
 
                 continue;

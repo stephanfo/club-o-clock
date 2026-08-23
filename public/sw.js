@@ -70,12 +70,27 @@ self.addEventListener('notificationclick', (event) => {
 
     event.waitUntil(
         self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+            // On compare les CHEMINS, pas les URL entières : une égalité stricte ne matchait presque
+            // jamais (slash final, query, hash), donc on ouvrait une fenêtre de plus à chaque clic
+            // au lieu de revenir sur celle qui était déjà là.
+            const cible = new URL(url, self.location.origin);
+
             for (const client of clients) {
-                if (client.url === url && 'focus' in client) {
+                if (!('focus' in client)) continue;
+
+                const ouvert = new URL(client.url);
+                if (ouvert.origin !== cible.origin) continue;
+
+                // Fenêtre de l'app déjà ouverte : on la réutilise. Sur la bonne page, simple focus ;
+                // ailleurs, on y navigue — cohérent avec launch_handler: navigate-existing.
+                if (ouvert.pathname === cible.pathname) {
                     return client.focus();
                 }
+                if ('navigate' in client) {
+                    return client.navigate(cible.href).then((c) => (c ? c.focus() : null));
+                }
             }
-            return self.clients.openWindow(url);
+            return self.clients.openWindow(cible.href);
         })
     );
 });

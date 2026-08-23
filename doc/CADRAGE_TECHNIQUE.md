@@ -135,6 +135,16 @@ Lecture : *énoncé PRD → implication → où c'est tranché*. Les exigences s
   natif) en **cache-first** sur l'app-shell et les pages du planning de la semaine courante, manifest
   statique, HTML/CSS/JS minifiés et compressés. La PWA dépend de la *plateforme web* (manifest + SW +
   HTTPS), **pas d'un build SPA** (cf. §6.6). → §6.2 (frontend), §8 (perf).
+- **Ouverture des liens dans l'app installée.** Le manifest déclare `id` (identité stable — **à ne
+  jamais changer** une fois livré, sous peine de faire apparaître une seconde app installée),
+  `handle_links: preferred` et `launch_handler: navigate-existing`, et `notificationclick` réutilise
+  une fenêtre existante en comparant les **chemins** (l'égalité stricte d'URL ne matchait quasiment
+  jamais). **Chromium uniquement** : Safari n'implémente ni l'un ni l'autre. Sur iOS, une PWA
+  installée possède un **pot de cookies distinct** de Safari — un lien cliqué dans Mail ouvre la
+  session dans Safari et laisse la PWA déconnectée. Aucun réglage de manifest n'y remédie ; c'est le
+  rôle du **code à usage unique** joint au magic link (PRD §4.1.1). Le service worker est enregistré
+  par les layouts `app` **et** `guest` : sans quoi un visiteur qui installe l'app depuis l'écran de
+  connexion n'a aucun SW avant sa première page authentifiée.
 
 ### 4.2 Souveraineté UE / RGPD / AGPL / self-hosting (PRD §1.4, §6)
 - **Hébergement UE strict** (Paris/Francfort), données + backups en UE → mutualisé OVH FR + services
@@ -167,7 +177,36 @@ Lecture : *énoncé PRD → implication → où c'est tranché*. Les exigences s
     en reste. L'enjeu est concret : les comptes créés par invitation ou activation de tutelle (§4.2.1)
     sont *passwordless* et sans identité OAuth — le magic link est leur seule porte. Le même service
     corrige le garde-fou de révocation du profil, qui tenait `users.email` pour un accès valide en
-    supposant le magic link toujours disponible.
+    supposant le magic link toujours disponible. Le pendant **individuel** de cette règle,
+    `keepsAnotherWayIn()`, vit dans le même service : révoquer une identité Google et retirer son mot
+    de passe posent la même question, elle n'a pas à être réécrite par surface.
+- **Invitation d'activation (PRD §4.1.3)** : `App\Services\InvitationService` frappe le jeton
+  (`invitation_tokens`, hash sha256, TTL `ClubSettings.invitation_link_days`) pour les **deux**
+  origines — adhérent créé par le bureau et mineur autonomisé (§4.2.1) —, qui partagent la route
+  `invitation/{token}` et l'écran d'accueil `/bienvenue`.
+  - Le jeton est **consommé au GET**, pas dans le composant Livewire qui suit : un écran monté sur le
+    jeton le porterait en clair dans le DOM et dans chacun de ses payloads (historique, cache,
+    capture). Le coût — un onglet fermé trop tôt brûle le lien — se paie quand l'adhérent est déjà
+    connecté et son email vérifié.
+  - `InvitationToken::prunable()` n'élague **que** les jetons expirés non consommés. Le jeton consommé
+    est conservé comme **marqueur d'activation** durable, ce qui évite une colonne `activated_at` (donc
+    une migration) et permet à l'invitation de masse de ne solliciter personne deux fois. Sans coût de
+    minimisation : la table ne porte aucune donnée personnelle, contrairement à `magic_link_tokens`.
+  - **Cadence d'envoi** : geste unitaire → `OutboxDrainer::drainNow()` ; import CSV et action de masse
+    → mise en file, drainée par le cron. 200 envois SMTP synchrones dans une requête, c'est 40 à 100 s
+    et un timeout sur mutualisé. L'outbox **est** la file (backoff, tentatives, rejeu, écran admin) —
+    une file Laravel exigerait un worker long-running, écarté ici.
+- **Secrets dans l'outbox** : un jeton d'activation voyage en clair dans `notification_outbox.payload`
+  jusqu'à l'envoi. `OutboxDrainer` le retire au passage en `sent` (`SENSITIVE_PAYLOAD_KEYS`), et le
+  tiroir admin n'affiche jamais que `redactedPayload()`. **Pas de purge sur `failed`** : ces lignes
+  restent rejouables, les vider produirait un lien mort. `club:prune-tokens` rattrape l'historique.
+- **Politique de mot de passe** : `Password::defaults()` = longueur seule (10). Pas de règles de
+  composition (contraires aux recommandations ANSSI/NIST), pas de `uncompromised()` — l'appel HIBP est
+  un aller-retour réseau sortant qui ajoute de la latence sur mutualisé et **échoue ouvert** en cas de
+  coupure : coût réel, garantie nulle. TTL du reset aligné sur le magic link (15 min).
+  Un `PasswordReset` supprime **les lignes de session** de l'utilisateur : Fortify ne régénère que
+  `remember_token`, ce qui laissait vivre une session déjà ouverte — soit exactement ce que le reset
+  est censé clore.
 - **Contrôle d'accès côté backend** (pas seulement client) ; règle clé : un **parent garant** lit/écrit
   les `Registration` de ses enfants (P1/P2). → l'auth et l'autorisation **vivent dans le backend PHP**
   (cf. §6.5 : Firebase Auth écarté). → §7.3, §7.4.

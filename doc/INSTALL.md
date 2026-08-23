@@ -202,6 +202,27 @@ morts (404/410) sont purgés automatiquement.
 > **uniquement PWA installée** sur l'écran d'accueil. Dans un onglet classique, le bouton
 > n'apparaît pas. **L'email est le fallback** pour ces adhérents — d'où l'intérêt des deux canaux.
 
+**Tester le push sans créer ni séance ni utilisateur.** Le rendu d'une notification est générique
+(titre = libellé du type, corps = description) et ne charge aucune entité à l'envoi : une ligne
+d'outbox avec un payload vide suffit. Après s'être abonné depuis Profil → Notifications :
+
+```php
+// php artisan tinker
+\App\Models\NotificationOutbox::create([
+    'user_id' => \App\Models\User::where('email', 'moi@monclub.fr')->value('id'),
+    'type'    => 'session_cancelled',
+    'channel' => 'push',   // 'push' seul : aucun email n'est envoyé
+    'payload' => [],       // sans session_id, le lien retombe sur le planning
+    'status'  => 'pending',
+]);
+```
+
+**Laisser le cron l'expédier** (au plus tard au passage suivant) plutôt que de lancer
+`notifications:drain` à la main : sur mutualisé, le drain en SSH échoue souvent pour une raison sans
+rapport avec le push — voir l'encadré du §10 « Les notifications ne partent pas ». La ligne reste
+ensuite visible dans **Alertes** (60 j) et dans Admin → Envois ; la supprimer si on ne veut pas l'y
+laisser.
+
 ---
 
 ## 4. Premier démarrage — checklist club
@@ -268,9 +289,29 @@ semaine type du club se construit ici.
 **6. Générer les séances** sur l'horizon souhaité, depuis chaque modèle.
 
 **7. Créer les adhérents** — Admin → Adhérents → Ajouter. L'admin saisit chaque membre (identité,
-date de naissance, rôles). Il n'y a **pas d'email d'invitation automatique** : préviens tes
-adhérents que l'application est ouverte, ils se connectent seuls depuis l'écran de connexion en
-demandant un **lien magique** à leur adresse. La date de naissance détermine la catégorie d'âge.
+date de naissance, rôles). La date de naissance détermine la catégorie d'âge.
+
+**L'email saisi ici est réputé vérifié** : le bureau est de confiance, l'adresse vient du dossier de
+licence. Une **invitation** part alors à cette adresse avec un lien d'activation valable
+`invitation_link_days` (30 jours par défaut, réglable dans *Paramètres du club*). L'adhérent clique,
+son compte s'ouvre, et il choisit sa méthode de connexion — **définir un mot de passe est
+facultatif**, le lien magique est une méthode complète à part entière.
+
+> ⚠️ Une adresse mal saisie donne la prise du compte à un tiers, sans confirmation. Relire l'email
+> avant de valider — c'est la contrepartie assumée de l'absence de double vérification.
+
+- La case **« Envoyer l'invitation maintenant »** (cochée par défaut) permet de créer une fiche en
+  silence, et d'inviter plus tard depuis la fiche adhérent.
+- Un **import CSV** met les invitations **en file** au lieu de les envoyer d'un bloc : elles partent
+  au fil du cron (visibles dans *Admin → Envois*). Un envoi synchrone de 200 emails ne tiendrait pas
+  dans une requête sur mutualisé.
+- Le bouton **« Inviter N en attente »** de la liste rattrape les comptes jamais entrés — après un
+  import fait sans envoi, ou une invitation expirée sans clic. Il ne sollicite jamais deux fois
+  quelqu'un qui a déjà une invitation vivante ou un compte activé.
+- Depuis la fiche adhérent, le bureau peut **renvoyer l'invitation** (l'ancien lien cesse alors
+  d'être valable) et **envoyer un lien de réinitialisation de mot de passe**. Il ne peut ni
+  consulter ni choisir le mot de passe de quelqu'un : le secret ne transite que par la boîte mail de
+  l'adhérent.
 
 Pour un **mineur**, créer d'abord le compte du **représentant légal**, puis rattacher l'enfant en le
 désignant comme garant. Trois configurations sont possibles selon l'âge et l'autonomie (enfant sans
@@ -769,6 +810,10 @@ php artisan optimize:clear         # purger tous les caches
 composer check                     # pint + phpstan + tests (avant contribution)
 ```
 
+> Les deux commandes qui **sortent sur le réseau** (`notifications:drain`, `weather:refresh`) peuvent
+> échouer en SSH sur un mutualisé sans que rien ne soit cassé : leur échec n'y est pas un diagnostic
+> (§10, « Les notifications ne partent pas »).
+
 ---
 
 ## 10. Dépannage
@@ -779,9 +824,34 @@ Le symptôme le plus fréquent, et presque toujours l'une de ces trois causes :
 
 | Vérifier | Commande / indice |
 |---|---|
-| **Le cron tourne** | Admin → Envois : un bandeau rouge « Traitement automatique interrompu » répond directement (§5.4). Sinon, tester `php cron.php` à la main (il doit tourner ~55 min puis afficher « Boucle terminée »), ou `php artisan notifications:drain` pour isoler l'envoi |
+| **Le cron tourne** | Admin → Envois : un bandeau rouge « Traitement automatique interrompu » répond directement (§5.4). Sinon, tester `php cron.php` à la main (il doit tourner ~55 min puis afficher « Boucle terminée ») |
 | **`NOTIF_EMAIL_DRIVER` est renseigné** | Vide → tout est marqué « livré » sans qu'aucun email ne parte (§3.1) |
 | **`MAIL_MAILER` ≠ `log`** | En `log`, les emails vont dans `storage/logs/laravel.log` |
+
+> ⚠️ **Sur mutualisé, ne pas conclure d'un `php artisan notifications:drain` lancé en SSH.** Chez
+> certains hébergeurs (OVH constaté), **le PHP en session SSH n'a pas d'accès réseau sortant**,
+> alors que le **même PHP lancé par le cron l'a**. La commande signale alors un échec — « 0
+> envoyée(s), 1 reprogrammée(s) » — qui ne dit rien de l'état réel de l'instance : la ligne repasse
+> `pending`, et **le cron l'expédie normalement une à cinq minutes plus tard**. Le retry fait son
+> travail ; il n'y a ni panne, ni doublon.
+>
+> Conséquence : en SSH, tout ce qui sort sur le réseau échoue de la même façon — drain, météo,
+> email. Ce n'est pas un signal de panne, c'est le contexte d'exécution. **Diagnostiquer par l'écran
+> Admin → Envois** (§5.4), qui reflète ce que fait le cron, et non par un drain manuel. Pour forcer
+> un envoi, utiliser le bouton **« Pousser »** de cet écran : il s'exécute en contexte **web**, qui a
+> le réseau.
+>
+> Pour lever le doute sur une instance donnée, tester la sortie réseau en SSH :
+>
+> ```bash
+> php -r '$c=curl_init("https://api.brevo.com/v3/account");
+> curl_setopt($c,CURLOPT_RETURNTRANSFER,1); curl_setopt($c,CURLOPT_TIMEOUT,15); curl_exec($c);
+> printf("code=%s erreur=%s\n", curl_getinfo($c,CURLINFO_HTTP_CODE), curl_error($c) ?: "aucune");'
+> ```
+>
+> `code=401` = la sortie fonctionne (l'API répond, sans clé). `code=0` avec une erreur de connexion
+> ou de résolution DNS, **alors que les emails partent en production**, confirme que seul le contexte
+> SSH est coupé — et qu'il ne faut donc rien conclure d'un envoi tenté depuis là.
 
 ### Erreur 500 après un déploiement
 

@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Models\NotificationOutbox;
 use App\Services\DuePeriodGuard;
 use Illuminate\Console\Command;
+use Illuminate\Support\Arr;
 
 /**
  * Enveloppe rattrapable de `model:prune` (élagage des jetons d'auth expirés/consommés).
@@ -21,7 +23,7 @@ class PruneTokensCommand extends Command
     protected $signature = 'club:prune-tokens
         {--if-due : N\'exécuter que si l\'élagage du jour n\'a pas déjà eu lieu}';
 
-    protected $description = 'Élague les jetons d\'authentification expirés ou consommés (enveloppe rattrapable de model:prune).';
+    protected $description = 'Élague les jetons d\'authentification expirés et purge les secrets résiduels des envois effectués.';
 
     public function handle(DuePeriodGuard $guard): int
     {
@@ -43,6 +45,35 @@ class PruneTokensCommand extends Command
     /** Retourne true si l'élagage s'est terminé sans erreur (seul un succès honore l'échéance). */
     private function elaguer(): bool
     {
-        return $this->callSilent('model:prune') === self::SUCCESS;
+        $ok = $this->callSilent('model:prune') === self::SUCCESS;
+
+        $this->purgerSecretsEnvoyes();
+
+        return $ok;
+    }
+
+    /**
+     * Purge les secrets restés dans le payload d'envois DÉJÀ EFFECTUÉS.
+     *
+     * OutboxDrainer les retire désormais au moment de l'envoi ; ceci rattrape les lignes écrites
+     * avant, qui gardaient un jeton d'invitation en clair — de quoi entrer dans le compte visé.
+     * Bornée aux lignes `sent` : une ligne `failed` reste rejouable, la vider produirait un lien
+     * mort. Chaque ligne est réécrite individuellement (payload JSON : pas d'UPDATE ensembliste
+     * portable entre MySQL et MariaDB pour retirer une clé).
+     */
+    private function purgerSecretsEnvoyes(): void
+    {
+        NotificationOutbox::query()
+            ->where('status', 'sent')
+            ->whereNotNull('payload')
+            ->chunkById(200, function ($lignes) {
+                foreach ($lignes as $ligne) {
+                    $propre = Arr::except($ligne->payload ?? [], NotificationOutbox::SENSITIVE_PAYLOAD_KEYS);
+
+                    if ($propre !== ($ligne->payload ?? [])) {
+                        $ligne->update(['payload' => $propre]);
+                    }
+                }
+            });
     }
 }

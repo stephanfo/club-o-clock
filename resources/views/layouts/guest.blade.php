@@ -10,5 +10,6 @@
 </head>
 <body>
     @yield('content')
+    @include('partials.sw-register')
 </body>
 </html>

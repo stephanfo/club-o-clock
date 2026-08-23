@@ -21,9 +21,36 @@ class NotificationOutbox extends Model
         'cancelled' => 'Annulée',
     ];
 
+    /**
+     * Clés de payload qui portent un SECRET D'ACCÈS et ne doivent survivre ni à l'envoi ni à
+     * l'affichage. Un jeton d'invitation en clair vaut la prise du compte de l'adhérent : le laisser
+     * dormir dans la table et le rendre lisible dans le tiroir admin donnait à tout admin, pour
+     * toujours, de quoi entrer dans n'importe quel compte invité.
+     */
+    public const SENSITIVE_PAYLOAD_KEYS = ['token'];
+
     protected $fillable = [
         'type', 'channel', 'payload', 'user_id', 'status', 'attempts', 'available_at', 'sent_at', 'read_at',
     ];
+
+    /**
+     * Payload rendu affichable : les secrets sont masqués, jamais montrés — y compris sur une ligne
+     * `pending` ou `failed`, dont le jeton est encore vivant.
+     *
+     * @return array<string,mixed>
+     */
+    public function redactedPayload(): array
+    {
+        $payload = $this->payload ?? [];
+
+        foreach (self::SENSITIVE_PAYLOAD_KEYS as $cle) {
+            if (array_key_exists($cle, $payload)) {
+                $payload[$cle] = '••••••';
+            }
+        }
+
+        return $payload;
+    }
 
     /** @var array<string, string> */
     protected $casts = [

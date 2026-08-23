@@ -20,9 +20,23 @@ class ManifestController extends Controller
             'name' => $settings->name,
             'short_name' => mb_substr($settings->name, 0, 12),
             'description' => "Planning d'entraînement du club",
+            // `id` est l'identité STABLE de l'app installée. Une fois livré, il ne doit plus jamais
+            // changer : le modifier ferait apparaître une seconde application chez ceux qui ont déjà
+            // installé la première. Il vaut le start_url historique.
+            'id' => '/',
             'start_url' => '/',
             'scope' => '/',
             'display' => 'standalone',
+            // Ouvrir les liens du domaine dans l'app installée plutôt que dans un onglet, et
+            // réutiliser la fenêtre déjà ouverte — utile pour les liens d'email (invitation, lien
+            // magique, notification).
+            //
+            // ATTENTION : Chromium uniquement. Safari n'implémente NI handle_links NI launch_handler.
+            // Sur iOS, une PWA installée a un pot de cookies distinct de Safari : un lien cliqué dans
+            // Mail ouvre la session dans Safari et laisse la PWA déconnectée, et rien dans ce fichier
+            // n'y change quoi que ce soit. C'est le code à usage unique qui répond à ce cas.
+            'launch_handler' => ['client_mode' => ['navigate-existing', 'auto']],
+            'handle_links' => 'preferred',
             'background_color' => '#ffffff',
             'theme_color' => $settings->primary_color ?: ClubPalette::DEFAULTS['primary_color'],
             'lang' => 'fr',
