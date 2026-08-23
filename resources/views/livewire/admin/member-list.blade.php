@@ -12,6 +12,12 @@
         </div>
         {{-- Import CSV adhérents (§3.1, §4.2 — J6.5). --}}
         <button type="button" wire:click="openImport" class="btn btn-ghost btn-sm"><x-icon name="upload" :size="15" /> Import CSV</button>
+        {{-- Rattrapage (§4.1.3) : comptes jamais entrés, typiquement un import fait sans envoi. --}}
+        @if ($awaiting > 0)
+            <button type="button" wire:click="confirmBulkInvite" class="btn btn-ghost btn-sm">
+                <x-icon name="mail" :size="15" /> Inviter {{ $awaiting }} en attente
+            </button>
+        @endif
         <a href="{{ route('admin.members.create') }}" class="btn btn-primary btn-sm" wire:navigate>
             <x-icon name="plus" :size="15" /> Ajouter
         </a>
@@ -176,12 +182,39 @@
                 @endif
             @endif
 
+            {{-- Les invitations d'un import partent en FILE (outbox), pas en direct : voir
+                 MemberList::import(). Décocher importe en silence, à rattraper plus tard. --}}
+            <label class="flex ac g8" style="margin-top:12px;font-size:13px">
+                <input type="checkbox" wire:model="sendInvitations"> Envoyer les invitations aux comptes créés
+            </label>
+
             <x-slot:footer>
                 <button type="button" class="btn btn-ghost" wire:click="closeImport">Annuler</button>
                 <button type="button" class="btn btn-primary{{ $clean ? '' : ' is-disabled' }}"
                         @if ($clean) wire:click="import" @endif wire:loading.attr="disabled" wire:target="import">
                     <x-icon name="upload" :size="15" />
                     {{ $clean ? 'Importer '.$rep['total'].' ligne'.($rep['total'] > 1 ? 's' : '') : 'Importer' }}
+                </button>
+            </x-slot:footer>
+        </x-dialog>
+    @endif
+
+    {{-- Envoi de masse : notifie des tiers → confirmation à conséquences (conventions UI). --}}
+    @if ($confirmingBulkInvite)
+        <x-dialog title="Inviter les adhérents en attente" :sub="$awaiting.' compte'.($awaiting > 1 ? 's' : '').' concerné'.($awaiting > 1 ? 's' : '')" :width="460" close="$set('confirmingBulkInvite', false)">
+            <div style="display:flex;flex-direction:column;gap:12px">
+                <x-conseq-row icon="mail" label="Envoi" tone="green">
+                    <span><b>{{ $awaiting }}</b> invitation{{ $awaiting > 1 ? 's' : '' }} mise{{ $awaiting > 1 ? 's' : '' }} en file — elles partent au fil du cron, visibles dans <b>Admin → Envois</b>.</span>
+                </x-conseq-row>
+                <x-conseq-row icon="users" label="Qui" tone="ink">
+                    <span>Uniquement les comptes actifs, avec email, <b>jamais entrés</b> et sans invitation en cours. Personne n'est sollicité deux fois.</span>
+                </x-conseq-row>
+            </div>
+            <x-slot:footer>
+                <button type="button" class="btn btn-ghost" wire:click="$set('confirmingBulkInvite', false)">Annuler</button>
+                <button type="button" class="btn btn-primary" wire:click="sendPendingInvitations"
+                        wire:loading.attr="disabled" wire:target="sendPendingInvitations">
+                    <x-icon name="mail" :size="15" /> Envoyer
                 </button>
             </x-slot:footer>
         </x-dialog>

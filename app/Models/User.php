@@ -251,6 +251,17 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(AuthIdentity::class);
     }
 
+    /**
+     * Jetons d'activation (§4.1.3). Un jeton CONSOMMÉ est conservé : c'est le marqueur durable
+     * « ce compte a été activé un jour », que lit l'action d'invitation de masse.
+     *
+     * @return HasMany<InvitationToken, $this>
+     */
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(InvitationToken::class);
+    }
+
     /** @return HasOne<NotificationPreferences, $this> */
     public function notificationPreferences(): HasOne
     {

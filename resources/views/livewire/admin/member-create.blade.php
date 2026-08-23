@@ -69,7 +69,12 @@
                     @if ($this->isP1)
                         <x-banner kind="info" style="margin-top:10px"><div>Mineur <b>P1</b> sans email — aucun compte propre. L'accès est géré par le <b>parent garant</b> ci-dessous.</div></x-banner>
                     @else
-                        <div class="meta" style="margin-top:10px">Un <b>lien magique de confirmation</b> sera envoyé à cette adresse — l'adhérent active son accès et se connecte sans mot de passe.</div>
+                        {{-- L'email saisi par le bureau est réputé vérifié (§4.1.3) : l'invitation
+                             part directement, l'adhérent n'a pas de double confirmation à faire. --}}
+                        <label class="flex ac g8" style="margin-top:12px;font-size:13px">
+                            <input type="checkbox" wire:model="sendInvitation"> Envoyer l'invitation maintenant
+                        </label>
+                        <div class="meta" style="margin-top:8px">Un <b>lien d'activation</b> sera envoyé à cette adresse. L'adhérent choisit sa méthode de connexion — le mot de passe reste facultatif.</div>
                     @endif
                 </div>
 
@@ -212,7 +217,11 @@
                             @if ($this->isP1)
                                 <span>Aucun compte créé — <b>{{ optional($guardians->firstWhere('id', $guardian_id))->fullName() ?? 'le parent garant' }}</b> gère les inscriptions.</span>
                             @else
-                                <span>Lien magique de confirmation envoyé à <b>{{ $email ?: "l'email saisi" }}</b>.</span>
+                                @if ($sendInvitation)
+                                    <span>Lien d'activation envoyé à <b>{{ $email ?: "l'email saisi" }}</b>.</span>
+                                @else
+                                    <span>Compte créé <b>sans prévenir</b> — invitation à envoyer depuis la fiche.</span>
+                                @endif
                             @endif
                         </x-conseq-row>
                         <x-conseq-row icon="calendar" label="Catégorie">

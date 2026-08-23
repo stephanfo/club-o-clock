@@ -84,11 +84,22 @@
                             <div class="flex ac jb"><span class="sect-title">Email & connexion</span><x-icon name="mail" :size="16" class="muted" /></div>
                             @if ($u->email)
                                 <div class="input flex ac jb" style="margin-top:12px"><span>{{ $u->email }}</span></div>
-                                @if ($u->email_verified_at)
-                                    <div class="meta flex ac g4" style="margin-top:8px;color:var(--brand-700)"><x-icon name="check" :size="13" /> Email confirmé · connexion par lien magique active</div>
+                                {{-- État d'activation (§4.1.3). Le compte est réputé activé s'il a
+                                     posé un mot de passe, lié Google, ou consommé une invitation —
+                                     d'où la conservation des jetons consommés. --}}
+                                @if ($activated)
+                                    <div class="meta flex ac g4" style="margin-top:8px;color:var(--brand-700)"><x-icon name="check" :size="13" /> Compte activé</div>
+                                @elseif ($pendingInvite)
+                                    <x-banner kind="info" style="margin-top:8px"><div>Invitation envoyée · expire le <b>{{ $pendingInvite->expires_at->locale('fr')->isoFormat('D MMM YYYY') }}</b>.</div></x-banner>
                                 @else
-                                    <x-banner kind="info" style="margin-top:8px"><div>Email non confirmé · en attente d'activation.</div></x-banner>
+                                    <x-banner kind="warn" style="margin-top:8px"><div>Jamais invité·e — cet adhérent ne sait pas que son compte existe.</div></x-banner>
                                 @endif
+                                @unless ($activated)
+                                    <button type="button" class="btn btn-primary btn-block" style="margin-top:10px"
+                                        wire:click="sendInvitation" wire:loading.attr="disabled" wire:target="sendInvitation">
+                                        <x-icon name="mail" :size="15" /> {{ $pendingInvite ? "Renvoyer l'invitation" : "Envoyer l'invitation" }}
+                                    </button>
+                                @endunless
                             @else
                                 <x-banner kind="info" style="margin-top:12px"><div>Mineur <b>P1</b> sans email — accès géré par le parent garant. Aucune connexion directe.</div></x-banner>
                             @endif

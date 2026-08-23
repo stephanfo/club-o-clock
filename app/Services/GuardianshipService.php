@@ -2,8 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\ClubSettings;
-use App\Models\InvitationToken;
 use App\Models\User;
 use App\Notifications\NotificationDispatcher;
 use App\Notifications\NotificationType;
@@ -11,7 +9,6 @@ use App\Support\Logging\ActivityLogger;
 use App\Support\Logging\AuditLogger;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use RuntimeException;
 
 // Cycle de vie des comptes mineurs (PRD §4.2). Deux transitions explicites, tracées en AuditLog,
@@ -21,7 +18,10 @@ use RuntimeException;
 //   P2 → P3 : rupture manuelle du lien de tutelle (par l'enfant en P2, le parent garant, ou l'admin).
 class GuardianshipService
 {
-    public function __construct(private NotificationDispatcher $notifier) {}
+    public function __construct(
+        private NotificationDispatcher $notifier,
+        private InvitationService $invitations,
+    ) {}
 
     /**
      * P1 → P2 (§4.2.1) : pose l'email de l'enfant (si fourni), crée un jeton d'invitation (TTL =
@@ -49,15 +49,9 @@ class GuardianshipService
                 throw new RuntimeException('Renseigne l\'email de l\'enfant avant d\'envoyer l\'invitation.');
             }
 
-            // Une seule invitation active à la fois : on invalide les précédentes non consommées.
-            InvitationToken::where('user_id', $ward->id)->whereNull('consumed_at')->delete();
-
-            $token = Str::random(64);
-            InvitationToken::create([
-                'user_id' => $ward->id,
-                'token_hash' => hash('sha256', $token),
-                'expires_at' => Carbon::now()->addDays(ClubSettings::current()->invitation_link_days),
-            ]);
+            // Même jeton et même page d'activation que l'invitation d'adhérent (§4.1.3) : la frappe
+            // vit dans InvitationService, elle n'a pas à exister en deux exemplaires.
+            $token = $this->invitations->mint($ward);
 
             AuditLogger::record('guardianship_invite_sent', $actor, [
                 'target_type' => User::class,

@@ -4,6 +4,7 @@ namespace App\Livewire\Admin;
 
 use App\Livewire\Concerns\AuthorizesAdminGate;
 use App\Models\User;
+use App\Services\InvitationService;
 use App\Services\MemberImportService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
@@ -46,6 +47,12 @@ class MemberList extends Component
     // Import CSV adhérents (§3.1, §4.2 — J6.5) : modale upload + aperçu + rapport tout-ou-rien.
     public bool $showImport = false;
 
+    /** Envoyer les invitations d'activation aux comptes créés par l'import (§4.1.3). */
+    public bool $sendInvitations = true;
+
+    /** Modale de confirmation de l'envoi de masse (elle notifie des tiers → x-dialog). */
+    public bool $confirmingBulkInvite = false;
+
     /** Fichier CSV téléversé (Livewire temporary upload). */
     public $csvFile = null;
 
@@ -76,8 +83,39 @@ class MemberList extends Component
         $this->importReport = Arr::except($report, 'rows');
     }
 
+    // --- Invitations en attente (§4.1.3) ---
+
+    /** Plafond par clic : borne l'à-coup sur l'outbox et rend l'action réexécutable sans surprise. */
+    public const BULK_INVITE_CAP = 500;
+
+    public function confirmBulkInvite(): void
+    {
+        $this->confirmingBulkInvite = true;
+    }
+
+    /**
+     * Invite en masse les adhérents jamais entrés (import silencieux, invitation expirée sans clic).
+     *
+     * Mise en file, jamais d'envoi direct : c'est le même raisonnement que l'import. Idempotent —
+     * un compte qui a déjà une invitation vivante n'est pas re-sollicité, donc deux clics de suite
+     * n'envoient rien la seconde fois.
+     */
+    public function sendPendingInvitations(InvitationService $invitations): void
+    {
+        $cibles = $invitations->awaitingInvitation()->take(self::BULK_INVITE_CAP);
+
+        foreach ($cibles as $membre) {
+            $invitations->sendToMember($membre, auth()->user(), immediate: false);
+        }
+
+        $this->confirmingBulkInvite = false;
+        session()->flash('status', $cibles->isEmpty()
+            ? 'Aucun adhérent en attente d’invitation.'
+            : $cibles->count().' invitation(s) mise(s) en file (Admin → Envois).');
+    }
+
     /** Commit tout-ou-rien : ré-analyse le fichier puis crée/met à jour en lot (§4.2). */
-    public function import(MemberImportService $import): void
+    public function import(MemberImportService $import, InvitationService $invitations): void
     {
         if ($this->csvFile === null) {
             return;
@@ -92,9 +130,22 @@ class MemberList extends Component
         }
 
         $result = $import->commit($report, auth()->user());
+
+        // APRÈS le commit, donc hors de sa transaction : on n'émet rien qui pourrait être annulé.
+        // Mise en FILE (immediate: false) et non envoi direct — 200 envois SMTP synchrones dans une
+        // requête, c'est un timeout garanti sur mutualisé. Le cron draine par lots toutes les 5 min.
+        $queued = 0;
+        if ($this->sendInvitations) {
+            foreach (User::whereKey($result['created_ids'])->whereNotNull('email')->get() as $nouveau) {
+                $invitations->sendToMember($nouveau, auth()->user(), immediate: false);
+                $queued++;
+            }
+        }
+
         $this->closeImport();
         $this->perPage = 20;
-        session()->flash('status', "Import terminé : {$result['created']} adhérent(s) créé(s), {$result['updated']} mis à jour.");
+        session()->flash('status', "Import terminé : {$result['created']} adhérent(s) créé(s), {$result['updated']} mis à jour."
+            .($queued > 0 ? " {$queued} invitation(s) mise(s) en file (Admin → Envois)." : ''));
     }
 
     public function updated(string $name): void
@@ -164,6 +215,9 @@ class MemberList extends Component
             'members' => $members,
             'total' => $total,
             'counts' => $counts,
+            // Comptes jamais entrés et sans invitation en cours : le bouton de rattrapage n'apparaît
+            // que s'il a quelque chose à faire.
+            'awaiting' => app(InvitationService::class)->awaitingInvitation()->count(),
         ]);
     }
 }

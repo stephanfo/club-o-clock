@@ -45,6 +45,17 @@ class MemberService
                 'guardianship_linked_at' => ($isMinor && ! empty($data['guardian_id'])) ? Carbon::now() : null,
             ]);
 
+            // L'admin est de confiance : l'email qu'il saisit vient du dossier de licence, il n'a pas
+            // à être reconfirmé par un aller-retour. Sans ça, le compte naissait MUET — le lien
+            // magique exige un email vérifié (§4.1.1) et l'OAuth aussi, donc l'adhérent n'avait
+            // aucun moyen d'entrer. Risque assumé (§4.1.3) : une adresse mal saisie donne la prise
+            // du compte à un tiers ; en contrepartie l'invitation part à cette adresse et la
+            // création est tracée en AuditLog. forceFill : email_verified_at n'est pas fillable,
+            // c'est un fait de sécurité qu'on ne pose jamais depuis un tableau de formulaire.
+            if (($data['email'] ?? null) !== null) {
+                $user->forceFill(['email_verified_at' => Carbon::now()])->save();
+            }
+
             // Catégorie principale dérivée (peut être null : compte sans catégorie, cas limite §4.5).
             $primary = AgeCategory::derive($dob);
             $attach = [];

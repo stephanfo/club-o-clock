@@ -145,7 +145,7 @@ class MemberImportService
      * pass A crée/met à jour adultes + mineurs sans garant (les garants entrent en base) ; pass B
      * crée les mineurs avec garant en résolvant le parent désormais présent.
      *
-     * @return array{created:int,updated:int}
+     * @return array{created:int,updated:int,created_ids:list<int>}
      *
      * @throws RuntimeException si l'analyse comporte des erreurs (garde redondante avec l'UI).
      */
@@ -160,6 +160,8 @@ class MemberImportService
         return DB::transaction(function () use ($analysis, $actor, $service) {
             $created = 0;
             $updated = 0;
+            /** @var list<int> $createdIds ids des comptes créés — l'appelant leur envoie l'invitation. */
+            $createdIds = [];
 
             // Pass A — tout sauf les créations de mineurs avec garant.
             foreach ($analysis['rows'] as $r) {
@@ -172,7 +174,7 @@ class MemberImportService
                     $service->importUpdate(User::findOrFail($r['existing_id']), $r['data'], $actor);
                     $updated++;
                 } else {
-                    $service->create($r['data'] + ['roles' => ['athlete']], $actor);
+                    $createdIds[] = $service->create($r['data'] + ['roles' => ['athlete']], $actor)->id;
                     $created++;
                 }
             }
@@ -191,14 +193,14 @@ class MemberImportService
                     throw new RuntimeException("Garant introuvable au commit pour la ligne {$r['line']}.");
                 }
 
-                $service->create($r['data'] + ['roles' => ['athlete'], 'guardian_id' => $guardianId], $actor);
+                $createdIds[] = $service->create($r['data'] + ['roles' => ['athlete'], 'guardian_id' => $guardianId], $actor)->id;
                 $created++;
             }
 
             // Synthèse métier (les créations individuelles sont déjà tracées par MemberService).
             ActivityLogger::record('members_imported', $actor, ['created' => $created, 'updated' => $updated]);
 
-            return ['created' => $created, 'updated' => $updated];
+            return ['created' => $created, 'updated' => $updated, 'created_ids' => $createdIds];
         });
     }
 

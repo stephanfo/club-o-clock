@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Qualification;
 use App\Models\User;
 use App\Services\GuardianshipService;
+use App\Services\InvitationService;
 use App\Services\MemberService;
 use App\Services\SeasonService;
 use App\Support\AgeCategory;
@@ -14,6 +15,7 @@ use App\Support\DemoMode;
 use App\Support\Logging\AuditLogger;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -294,6 +296,34 @@ class MemberShow extends Component
         session()->flash('status', 'Accès athlète réactivé — email de réactivation mis en file.');
     }
 
+    // --- Invitation d'activation (§4.1.3) ---
+
+    /**
+     * (Ré)envoie l'invitation d'activation. Régénère le jeton — le PRD veut le lien « régénérable »,
+     * et l'ancien cesse d'être honoré : un lien qu'on croit remplacé ne doit pas rester ouvert.
+     *
+     * Throttle 3/h : un renvoi en rafale est du spam vers la boîte de l'adhérent, pas un dépannage.
+     */
+    public function sendInvitation(InvitationService $invitations): void
+    {
+        $key = 'member-invite|'.$this->user->id;
+
+        if (RateLimiter::tooManyAttempts($key, 3)) {
+            session()->flash('warn', 'Trop d’envois pour cet adhérent — réessaie plus tard.');
+
+            return;
+        }
+
+        try {
+            $invitations->sendToMember($this->user, auth()->user());
+            RateLimiter::hit($key, 3600);
+            $this->user->refresh();
+            session()->flash('status', 'Invitation envoyée à '.$this->user->email.'.');
+        } catch (RuntimeException $e) {
+            session()->flash('warn', $e->getMessage());
+        }
+    }
+
     // --- Dépannage d'accès (§4.1.5) ---
 
     /**
@@ -456,6 +486,17 @@ class MemberShow extends Component
             'wards' => $this->user->wards->whereNull('anonymized_at')->values(),
             'canBeGuardian' => $canBeGuardian,
             'wardCandidates' => $wardCandidates,
+            // État d'activation (§4.1.3) : un compte est entré s'il a posé un mot de passe, lié une
+            // identité OAuth, ou consommé une invitation. Le jeton consommé sert de marqueur durable
+            // (cf. InvitationToken::prunable, qui ne l'élague plus).
+            'activated' => $this->user->password !== null
+                || $this->user->authIdentities()->exists()
+                || $this->user->invitations()->whereNotNull('consumed_at')->exists(),
+            'pendingInvite' => $this->user->invitations()
+                ->whereNull('consumed_at')
+                ->where('expires_at', '>', Carbon::now())
+                ->latest('expires_at')
+                ->first(),
         ]);
     }
 }

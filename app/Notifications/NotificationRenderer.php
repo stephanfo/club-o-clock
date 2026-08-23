@@ -52,10 +52,12 @@ class NotificationRenderer
             // Récap d'une série : pas de séance unique → planning.
             NotificationType::CoachTemplateRecap => route('planning'),
 
-            // Invitation d'autonomisation : le token clair voyage dans le payload (§4.2.1), le lien
-            // ouvre la page d'activation qui consomme le jeton.
+            // Invitations (adhérent §4.1.3, autonomisation §4.2.1) : le token clair voyage dans le
+            // payload, le lien ouvre la page d'activation qui consomme le jeton. Même page pour les
+            // deux — activer un compte est le même geste, quelle qu'en soit l'origine.
+            NotificationType::MemberInvitation,
             NotificationType::GuardianshipInvitation => isset($payload['token'])
-                ? route('guardianship.activate', $payload['token'])
+                ? route('invitation.activate', $payload['token'])
                 : route('login'),
 
             NotificationType::GuardianshipSevered => route('profil'),

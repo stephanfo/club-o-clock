@@ -45,7 +45,9 @@ class GuardianshipActivationTest extends TestCase
         $ward = $this->ward();
         $token = $this->tokenFor($ward);
 
-        $this->get("/invitation/{$token}")->assertRedirect(route('dashboard'));
+        // Depuis §4.1.3, l'activation atterrit sur l'écran d'accueil qui laisse choisir sa méthode
+        // de connexion (mot de passe optionnel), et non plus directement sur le dashboard.
+        $this->get("/invitation/{$token}")->assertRedirect(route('activation'));
 
         $this->assertAuthenticatedAs($ward);
         $this->assertNotNull($ward->fresh()->email_verified_at);
