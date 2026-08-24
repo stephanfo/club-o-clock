@@ -22,6 +22,7 @@ enum NotificationType: string
     case CoachAssigned = 'coach_assigned';
     case CoachTemplateRecap = 'coach_template_recap';
     case AthleteReactivated = 'athlete_reactivated';
+    case MemberInvitation = 'member_invitation';
     case GuardianshipInvitation = 'guardianship_invitation';
     case GuardianshipSevered = 'guardianship_severed';
 
@@ -42,6 +43,7 @@ enum NotificationType: string
             self::CoachAssigned => 'Affectation à une séance',
             self::CoachTemplateRecap => 'Récapitulatif d\'affectations (série)',
             self::AthleteReactivated => 'Compte réactivé',
+            self::MemberInvitation => 'Invitation à rejoindre le club',
             self::GuardianshipInvitation => 'Invitation à créer ton compte',
             self::GuardianshipSevered => 'Lien de tutelle rompu',
         };
@@ -57,7 +59,7 @@ enum NotificationType: string
     public function channels(): array
     {
         return match ($this) {
-            self::AthleteReactivated, self::GuardianshipInvitation => ['email'],
+            self::AthleteReactivated, self::MemberInvitation, self::GuardianshipInvitation => ['email'],
             default => ['push', 'email'],
         };
     }
@@ -79,6 +81,7 @@ enum NotificationType: string
             self::CoachAssigned => 'Tu es affecté·e comme encadrant·e d\'une séance',
             self::CoachTemplateRecap => 'Récapitulatif de tes affectations sur une série de séances',
             self::AthleteReactivated => 'Ton accès athlète est réactivé',
+            self::MemberInvitation => 'Ton compte est ouvert : active-le via le lien reçu',
             self::GuardianshipInvitation => 'Un compte autonome t\'est ouvert : active-le via le lien reçu',
             self::GuardianshipSevered => 'Le lien de tutelle a été rompu',
         };
@@ -88,7 +91,7 @@ enum NotificationType: string
      * Groupes de la matrice de préférences (§4.15.3), dans l'ordre d'affichage. Chaque groupe
      * porte les types qu'un utilisateur peut moduler ; `coachOnly` masque le groupe aux non-coachs.
      * Hors matrice (notifs transactionnelles, toujours émises) : `athlete_reactivated`,
-     * `guardianship_invitation` et `guardianship_severed`.
+     * `member_invitation`, `guardianship_invitation` et `guardianship_severed`.
      *
      * @return list<array{label:string,coachOnly:bool,types:list<self>}>
      */

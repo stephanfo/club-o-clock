@@ -11,7 +11,7 @@ class MagicLinkToken extends Model
 {
     use Prunable;
 
-    protected $fillable = ['email', 'token_hash', 'expires_at', 'consumed_at'];
+    protected $fillable = ['email', 'token_hash', 'code_hash', 'code_attempts', 'expires_at', 'consumed_at'];
 
     /**
      * Élagage (model:prune, planifié) : tout jeton inutilisable — expiré OU déjà consommé.
@@ -29,6 +29,7 @@ class MagicLinkToken extends Model
     protected $casts = [
         'expires_at' => 'datetime',
         'consumed_at' => 'datetime',
+        'code_attempts' => 'integer',
     ];
 
     public function isUsable(): bool

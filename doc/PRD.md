@@ -105,7 +105,7 @@ Remplacer le tableur Google Sheets actuel par une **PWA** qui offre aux adhéren
 
 #### 4.1.1 Méthodes d'auth
 - **Email + mot de passe** : disponible pour tout compte avec email. Reset par lien email à usage unique, **TTL 15 min**.
-- **Magic link** : méthode d'auth complète à part entière, utilisable seule (passwordless) ou en complément d'un MDP. À chaque connexion, l'adhérent choisit Google / MDP (si défini) / « recevoir un lien ». Sert également de mécanisme « mot de passe oublié ». **TTL 15 min**, usage unique.
+- **Magic link** : méthode d'auth complète à part entière, utilisable seule (passwordless) ou en complément d'un MDP. À chaque connexion, l'adhérent choisit Google / MDP (si défini) / « recevoir un lien ». Sert également de mécanisme « mot de passe oublié ». **TTL 15 min**, usage unique. Un **code à usage unique** accompagne le lien, de même durée et de même portée : il répond aux contextes où le lien ne peut pas ouvrir la session attendue (application installée dont le contexte de navigation est distinct de celui du navigateur). Consommer l'un invalide l'autre. Le nombre d'essais du code est borné.
 - **Google OAuth 2.0 / OIDC** : chaque club self-hosté configure **son propre** client OAuth dans sa Google Cloud Console (à documenter dans le guide d'installation). Données récupérées et stockées : **email + name** uniquement (pas de photo). Le nom Google n'écrase pas un nom déjà saisi.
 
 **Méthodes proposées par le club.** Le **magic link** et **Google** sont activables par instance
@@ -126,8 +126,21 @@ avant son expiration.
 
 #### 4.1.3 Flow de création
 1. Admin importe un CSV (nom, prénom, email, catégorie, date de naissance, parent garant éventuel). L'**email est facultatif** pour les mineurs en phase 1 (cf. §4.2) : pas d'invitation, le `User` enfant est créé sans credential.
-2. Pour les adhérents avec email : invitation par email avec lien d'activation **valide 30 jours** (durée configurable admin, régénérable).
+2. Pour les adhérents avec email : invitation par email avec lien d'activation **valide 30 jours** (durée configurable admin, régénérable). Un renvoi invalide le lien précédent.
 3. L'adhérent choisit sa méthode d'auth à l'activation. **La définition d'un mot de passe est optionnelle**.
+
+**L'email saisi par l'admin est réputé vérifié.** L'adresse vient du dossier de licence et l'admin
+engage sa responsabilité ; exiger en plus une confirmation par l'adhérent n'apporterait rien, et
+priverait d'accès tout compte n'ayant pas encore cliqué (le lien magique et Google exigent l'un
+comme l'autre un email vérifié). **Risque assumé** : une adresse mal saisie donne à un tiers la
+prise du compte, sans confirmation. Contreparties : l'adresse est visible à la saisie, l'invitation
+part à cette adresse, et la création est tracée.
+
+**Envoi en masse.** Une création unitaire envoie l'invitation immédiatement ; un import de rentrée
+la **met en file** (exigence non-fonctionnelle : aucun geste d'administration ne doit dépendre d'un
+nombre d'envois synchrones). Une action d'administration permet de (ré)inviter les comptes jamais
+activés, sans jamais solliciter deux fois un adhérent déjà entré ou disposant d'une invitation
+valide.
 
 Voie complémentaire : la **page admin « Ajouter un adhérent »** permet la création one-shot en cours de saison (mêmes champs, même invitation).
 
@@ -138,10 +151,18 @@ Au déploiement, un email de bootstrap admin est configuré (mécanisme arrêté
 **L'utilisateur édite seul** :
 - Identité : nom, prénom.
 - Préférences de notifications : matrice §4.15 + toggle pause global.
-- Mot de passe : changement avec MDP actuel, ou définition initiale si arrivé via magic link / Google sans MDP.
+- Mot de passe : changement avec MDP actuel, ou définition initiale si arrivé via magic link / Google sans MDP. **Retrait** possible également (le compte redevient passwordless), dès lors qu'il reste au moins une méthode active (§4.1.2).
 - Méthodes d'auth liées : voir et révoquer.
 
+Un **changement** de mot de passe déconnecte par défaut les autres appareils (choix décochable) ;
+une **définition initiale** n'en déconnecte aucun — ajouter une méthode n'est pas un signal de
+compromission. Un **retrait**, comme une réinitialisation par email, les déconnecte sans condition.
+
 **L'admin uniquement** (depuis la fiche utilisateur §4.17) :
+- (Ré)envoi de l'invitation d'activation, et **déclenchement** d'une réinitialisation de mot de
+  passe. L'admin **ne peut ni consulter ni choisir** le mot de passe d'un adhérent, et aucun mot de
+  passe provisoire n'est prévu : le secret ne transite que par la boîte mail du titulaire. Détenir
+  le facteur d'authentification d'un tiers rendrait l'usurpation possible et indétectable.
 - Email (avec mail de confirmation au nouvel email pour validation).
 - Date de naissance (impacte la catégorie principale et la bascule de saison).
 - Catégories (rattachements manuels, surclassements).

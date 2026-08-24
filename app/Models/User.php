@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\ResetPasswordNotification;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
@@ -63,6 +64,7 @@ class User extends Authenticatable implements MustVerifyEmail
     /** @var array<string, string> */
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'last_login_at' => 'datetime',
         'password' => 'hashed',
         'dob' => 'date',
         'roles' => 'array',
@@ -239,6 +241,15 @@ class User extends Authenticatable implements MustVerifyEmail
         return trim("{$this->first_name} {$this->last_name}");
     }
 
+    /**
+     * Email de réinitialisation en français (§ « Langue du projet »). La notification par défaut de
+     * Laravel est intégralement anglaise et ses chaînes sont à clé JSON, hors de portée de `lang/fr/`.
+     */
+    public function sendPasswordResetNotification(#[\SensitiveParameter] $token): void
+    {
+        $this->notify(new ResetPasswordNotification($token));
+    }
+
     /** @return HasMany<Registration, $this> */
     public function registrations(): HasMany
     {
@@ -249,6 +260,17 @@ class User extends Authenticatable implements MustVerifyEmail
     public function authIdentities(): HasMany
     {
         return $this->hasMany(AuthIdentity::class);
+    }
+
+    /**
+     * Jetons d'activation (§4.1.3). Un jeton CONSOMMÉ est conservé : c'est le marqueur durable
+     * « ce compte a été activé un jour », que lit l'action d'invitation de masse.
+     *
+     * @return HasMany<InvitationToken, $this>
+     */
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(InvitationToken::class);
     }
 
     /** @return HasOne<NotificationPreferences, $this> */

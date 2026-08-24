@@ -28,6 +28,66 @@
         </div>
     @endforeach
 
+    {{-- Mot de passe (§4.1.1, §4.1.5). Un compte créé par invitation n'en a pas : le bloc POSE alors
+         un premier mot de passe, sans réclamer d'ancien. Le mot de passe reste facultatif — le lien
+         magique est une méthode complète à part entière. --}}
+    @php($hasPassword = $user->password !== null)
+    <div class="sect-head" style="margin-top:4px">
+        <span class="sect-title">{{ $hasPassword ? 'Changer mon mot de passe' : 'Définir un mot de passe' }}</span>
+    </div>
+    <div class="card card-pad">
+        @if ($demo)
+            <div class="meta">Indisponible en mode démo : les comptes sont partagés entre visiteurs.</div>
+        @else
+            @unless ($hasPassword)
+                <div class="meta" style="margin-bottom:10px">
+                    Ton compte n'a pas de mot de passe — tu te connectes par lien ou par Google.
+                    En définir un est facultatif, mais te permet d'entrer sans attendre d'email.
+                </div>
+            @endunless
+            <div style="display:flex;flex-direction:column;gap:10px">
+                @if ($hasPassword)
+                    <div>
+                        <label class="field-label" for="pf-cur-pwd">Mot de passe actuel</label>
+                        <input id="pf-cur-pwd" type="password" class="input" autocomplete="current-password"
+                            wire:model="current_password">
+                        @error('current_password') <div class="meta" style="color:var(--danger);font-size:12px;margin-top:4px">{{ $message }}</div> @enderror
+                    </div>
+                @endif
+                <div>
+                    <label class="field-label" for="pf-new-pwd">Nouveau mot de passe</label>
+                    <input id="pf-new-pwd" type="password" class="input" autocomplete="new-password"
+                        wire:model="password">
+                    @error('password') <div class="meta" style="color:var(--danger);font-size:12px;margin-top:4px">{{ $message }}</div> @enderror
+                    {{-- La règle est annoncée AVANT la saisie, et sort de PasswordPolicy : c'est la
+                         même source que la validation, donc les deux ne peuvent plus diverger. --}}
+                    <div class="meta" style="font-size:12px;margin-top:4px">{{ \App\Support\PasswordPolicy::hint() }}</div>
+                </div>
+                <div>
+                    <label class="field-label" for="pf-new-pwd2">Confirmer</label>
+                    <input id="pf-new-pwd2" type="password" class="input" autocomplete="new-password"
+                        wire:model="password_confirmation">
+                </div>
+                @if ($hasPassword)
+                    <label class="flex ac g8" style="font-size:13px">
+                        <input type="checkbox" wire:model="revokeOthers"> Déconnecter mes autres appareils
+                    </label>
+                @endif
+                <div class="flex ac g8" style="flex-wrap:wrap;row-gap:8px">
+                    <button type="button" wire:click="savePassword" class="btn btn-primary btn-sm"
+                        wire:loading.attr="disabled" wire:target="savePassword">
+                        {{ $hasPassword ? 'Modifier' : 'Définir' }}
+                    </button>
+                    @if ($hasPassword && $canRemovePassword)
+                        <button type="button" wire:click="removePassword" class="btn btn-ghost btn-sm"
+                            wire:confirm="Retirer ton mot de passe ? Tu te connecteras par lien ou par Google."
+                            wire:loading.attr="disabled" wire:target="removePassword">Retirer</button>
+                    @endif
+                </div>
+            </div>
+        @endif
+    </div>
+
     {{-- Sessions actives --}}
     <div class="sect-head" style="margin-top:4px"><span class="sect-title">Sessions actives</span></div>
     @forelse ($sessions as $s)

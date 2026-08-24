@@ -962,6 +962,13 @@ a.scard { text-decoration: none; color: inherit; }
     .profil-mobile { display: block; padding-top: var(--topbar-total); padding-bottom: var(--botnav-reserve); }
 }
 
+/* ── Écran d'activation (§4.1.3) : même bascule de coquilles que le profil. ── */
+.activation-mobile { display: none; }
+@media (max-width: 768px) {
+    .activation-desktop { display: none; }
+    .activation-mobile { display: block; padding-top: var(--topbar-total); padding-bottom: var(--botnav-reserve); }
+}
+
 /* ── « Mes enfants » (screen-parent.jsx) : bascule coquilles mobile/desktop ── */
 .children-mobile { display: none; }
 @media (max-width: 768px) {

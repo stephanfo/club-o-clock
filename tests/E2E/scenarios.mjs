@@ -92,11 +92,16 @@ const tous = [];
 // ───────────────────────────────────────────────────────────────────
 {
   // Séance future ciblant la catégorie de Kevin : le refus doit venir de la SUSPENSION (§4.4),
-  // pas d'un motif de catégorie ni d'une séance déjà commencée.
+  // pas d'un motif de catégorie ni d'une séance déjà commencée. Et une séance où il n'est PAS
+  // déjà inscrit : un athlète suspendu garde le droit de se désinscrire de ce qu'il a réservé
+  // avant sa suspension, donc « SE DÉSINSCRIRE » y est légitime et le scénario testait l'inverse
+  // de son intention selon la séance que le jeu de démo lui attribuait en premier.
   const kevin = Number(sql("SELECT id FROM users WHERE email='kevin@demo.club'"));
   const sK = seance(`kind='training' AND cancelled_at IS NULL AND start_at > NOW()
       AND EXISTS (SELECT 1 FROM session_category k JOIN user_category uc ON uc.category_id=k.category_id
-                  WHERE k.session_id=sessions.id AND uc.user_id=${kevin})`);
+                  WHERE k.session_id=sessions.id AND uc.user_id=${kevin})
+      AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.session_id=sessions.id
+                      AND r.user_id=${kevin} AND r.status <> 'cancelled')`);
   const s = new Scenario(`S3 · Kevin (accès suspendu) sur séance ${sK}`);
   const { ctx, page } = await session(browser, 'kevin@demo.club', MOBILE);
   await fiche(page, sK);

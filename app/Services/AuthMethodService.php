@@ -52,6 +52,31 @@ class AuthMethodService
     }
 
     /**
+     * Restera-t-il à cet utilisateur un moyen de se connecter s'il retire celui qu'il vise ?
+     * (§4.1.2 « au moins une méthode active »). Pendant individuel de lockedOutBy(), qui pose la
+     * même question à l'échelle du club — la règle ne doit exister qu'ici.
+     *
+     * Chaque voie ne compte que si le club l'a laissée ouverte (§4.17) : un email ne sauve rien si
+     * le lien magique est coupé, une identité Google ne sauve rien si Google est coupé. Le mot de
+     * passe, lui, est toujours utilisable — son login n'a pas d'interrupteur.
+     *
+     * @param  'password'|'oauth'  $removing  moyen que l'utilisateur cherche à retirer
+     * @param  int|null  $identityId  identité OAuth visée, ignorée hors du cas 'oauth'
+     */
+    public function keepsAnotherWayIn(User $user, string $removing, ?int $identityId = null): bool
+    {
+        $hasPassword = $removing === 'password' ? false : $user->password !== null;
+
+        $otherIdentities = $user->authIdentities()
+            ->when($removing === 'oauth', fn ($q) => $q->where('id', '!=', $identityId))
+            ->exists();
+
+        return $hasPassword
+            || ($user->email !== null && $this->magicLinkEnabled())
+            || ($this->googleEnabled() && $otherIdentities);
+    }
+
+    /**
      * Comptes actifs qui n'auraient PLUS AUCUN moyen de se connecter si les interrupteurs valaient
      * l'état passé. Sert de garde avant toute coupure (§4.1.2 « au moins une méthode active »).
      *

@@ -7,10 +7,15 @@ use App\Models\Category;
 use App\Models\Qualification;
 use App\Models\User;
 use App\Services\GuardianshipService;
+use App\Services\InvitationService;
 use App\Services\MemberService;
 use App\Services\SeasonService;
 use App\Support\AgeCategory;
+use App\Support\DemoMode;
+use App\Support\Logging\AuditLogger;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -41,6 +46,11 @@ class MemberShow extends Component
 
     public string $dob = '';
 
+    // Édition de l'email de connexion (§4.1.3). Pré-remplie au mount.
+    public bool $editingEmail = false;
+
+    public string $email = '';
+
     // Panneaux d'ajout (UI proto).
     public bool $addingCat = false;
 
@@ -54,10 +64,57 @@ class MemberShow extends Component
 
     public bool $confirmingFinal = false;
 
+    // Suspension individuelle de l'accès athlète (§4.4) : modale de conséquences + motif libre,
+    // repris tel quel dans l'AuditLog comme pour le geste de masse.
+    public bool $confirmingSuspend = false;
+
+    public string $suspendMotif = '';
+
     public function mount(User $user): void
     {
         $this->user = $user;
         $this->dob = $user->dob?->toDateString() ?? '';
+        $this->email = $user->email ?? '';
+    }
+
+    /** Ouvre le champ d'édition de l'email (réinitialise à la valeur courante). */
+    public function editEmail(): void
+    {
+        $this->email = $this->user->email ?? '';
+        $this->resetErrorBag('email');
+        $this->editingEmail = true;
+    }
+
+    public function cancelEditEmail(): void
+    {
+        $this->email = $this->user->email ?? '';
+        $this->resetErrorBag('email');
+        $this->editingEmail = false;
+    }
+
+    /**
+     * Corrige l'email de connexion (§4.1.3).
+     *
+     * C'est la contrepartie du risque assumé à la création : l'admin est cru sur parole et l'adresse
+     * saisie est marquée vérifiée d'office, donc une coquille donne la prise du compte à un tiers.
+     * Sans ce geste, cette coquille n'avait AUCUN chemin de correction, et l'invitation de 30 jours
+     * partie à la mauvaise adresse restait vivante.
+     *
+     * Vider l'adresse est refusé : pour un pupille, ce serait une bascule P2 → P1 silencieuse. La
+     * rupture de tutelle a son propre geste, avec ses conséquences affichées.
+     */
+    public function saveEmail(MemberService $service): void
+    {
+        $this->validate(
+            ['email' => ['required', 'email', 'max:255', 'unique:users,email,'.$this->user->id]],
+            [],
+            ['email' => 'email'],
+        );
+
+        $service->updateEmail($this->user, trim($this->email), auth()->user());
+        $this->user->refresh();
+        $this->editingEmail = false;
+        session()->flash('status', 'Email mis à jour — les liens envoyés à l\'ancienne adresse sont révoqués.');
     }
 
     /** Ouvre le champ d'édition de la date de naissance (réinitialise à la valeur courante). */
@@ -283,12 +340,111 @@ class MemberShow extends Component
 
     // --- Bascule de saison : réactivation individuelle (§4.4) ---
 
+    /**
+     * Suspend l'accès athlète de CET adhérent (§4.4). Pendant individuel de la bascule de saison :
+     * il fallait jusqu'ici suspendre tout le club pour écarter une seule personne.
+     *
+     * Modale de conséquences et non `wire:confirm` : le geste annule des inscriptions futures, donc
+     * il libère des places et fait remonter des tiers depuis la file d'attente — qui, eux, sont
+     * notifiés. C'est le critère de la convention (destructif ou notifiant des tiers).
+     */
+    public function suspendAccess(SeasonService $season): void
+    {
+        $annulees = $season->suspendAthlete($this->user, auth()->user(), trim($this->suspendMotif) ?: null);
+
+        $this->user->refresh();
+        $this->confirmingSuspend = false;
+        $this->suspendMotif = '';
+
+        session()->flash('status', 'Accès athlète suspendu'
+            .($annulees > 0 ? ' — '.$annulees.' inscription(s) future(s) annulée(s).' : '.'));
+    }
+
     /** Réactive l'accès athlète suspendu (§4.4). Email transactionnel mis en file ; inscriptions annulées non restaurées. */
     public function reactivateAccess(SeasonService $season): void
     {
         $season->reactivateAthlete($this->user, auth()->user());
         $this->user->refresh();
         session()->flash('status', 'Accès athlète réactivé — email de réactivation mis en file.');
+    }
+
+    // --- Invitation d'activation (§4.1.3) ---
+
+    /**
+     * (Ré)envoie l'invitation d'activation. Régénère le jeton — le PRD veut le lien « régénérable »,
+     * et l'ancien cesse d'être honoré : un lien qu'on croit remplacé ne doit pas rester ouvert.
+     *
+     * Throttle 3/h : un renvoi en rafale est du spam vers la boîte de l'adhérent, pas un dépannage.
+     */
+    public function sendInvitation(InvitationService $invitations): void
+    {
+        $key = 'member-invite|'.$this->user->id;
+
+        if (RateLimiter::tooManyAttempts($key, 3)) {
+            session()->flash('warn', 'Trop d’envois pour cet adhérent — réessaie plus tard.');
+
+            return;
+        }
+
+        try {
+            $invitations->sendToMember($this->user, auth()->user());
+            RateLimiter::hit($key, 3600);
+            $this->user->refresh();
+            session()->flash('status', 'Invitation envoyée à '.$this->user->email.'.');
+        } catch (RuntimeException $e) {
+            session()->flash('warn', $e->getMessage());
+        }
+    }
+
+    // --- Dépannage d'accès (§4.1.5) ---
+
+    /**
+     * Envoie à l'adhérent un lien de réinitialisation de mot de passe (TTL 15 min, §4.1.1).
+     *
+     * L'admin DÉCLENCHE, il ne connaît jamais le secret : pas de mot de passe temporaire, pas de
+     * champ, pas d'affichage. C'est une propriété de sécurité, pas un détail d'implémentation —
+     * détenir le facteur d'authentification d'un tiers rendrait l'usurpation possible et
+     * indétectable. Le secret ne transite que par la boîte mail de l'adhérent.
+     *
+     * Envoi immédiat hors outbox (notification Laravel native), comme le magic link : l'adhérent
+     * attend au bout du fil (cadrage §14.1, envois sensibles à la latence).
+     */
+    public function sendPasswordReset(): void
+    {
+        $u = $this->user;
+
+        // Le mailer est forcé sur `log` en démo : le lien promis « dans ta boîte mail » n'arriverait
+        // jamais. Même raisonnement que DemoMode::magicLinkUsable().
+        if (DemoMode::enabled()) {
+            session()->flash('warn', 'Indisponible en mode démo.');
+
+            return;
+        }
+
+        // is_active couvre aussi la demande de suppression en cours (§4.3) : on n'aide pas un compte
+        // à revenir alors que le tampon de 7 jours court.
+        if ($u->email === null || ! $u->is_active || $u->anonymized_at !== null) {
+            session()->flash('warn', 'Ce compte ne peut pas recevoir de lien de réinitialisation.');
+
+            return;
+        }
+
+        $status = Password::broker()->sendResetLink(['email' => $u->email]);
+
+        if ($status !== Password::RESET_LINK_SENT) {
+            session()->flash('warn', $status === Password::RESET_THROTTLED
+                ? 'Un lien vient déjà d’être envoyé — patiente une minute.'
+                : 'Envoi impossible pour ce compte.');
+
+            return;
+        }
+
+        AuditLogger::record('password_reset_sent', auth()->user(), [
+            'target_type' => User::class,
+            'target_id' => $u->id,
+        ]);
+
+        session()->flash('status', 'Lien de réinitialisation envoyé à '.$u->email.'.');
     }
 
     // --- Suppression RGPD voie admin (§4.3) ---
@@ -402,6 +558,25 @@ class MemberShow extends Component
             'wards' => $this->user->wards->whereNull('anonymized_at')->values(),
             'canBeGuardian' => $canBeGuardian,
             'wardCandidates' => $wardCandidates,
+            // État d'activation (§4.1.3) : un compte est entré s'il s'est DÉJÀ CONNECTÉ, ou s'il a
+            // posé un mot de passe, lié une identité OAuth, ou consommé une invitation. Le jeton
+            // consommé sert de marqueur durable (cf. InvitationToken::prunable, qui ne l'élague
+            // plus) ; last_login_at couvre le cas que les trois autres ratent — l'adhérent qui
+            // n'entre que par lien magique, et qu'on affichait « jamais invité·e » à vie.
+            'activated' => $this->user->last_login_at !== null
+                || $this->user->password !== null
+                || $this->user->authIdentities()->exists()
+                || $this->user->invitations()->whereNotNull('consumed_at')->exists(),
+            // Compteur d'impact de la suspension : ce que la modale annonce avant le clic.
+            'futureRegs' => $this->user->registrations()
+                ->whereIn('status', ['participating', 'waitlist'])
+                ->whereHas('session', fn ($q) => $q->whereNull('cancelled_at')->where('start_at', '>', Carbon::now()))
+                ->count(),
+            'pendingInvite' => $this->user->invitations()
+                ->whereNull('consumed_at')
+                ->where('expires_at', '>', Carbon::now())
+                ->latest('expires_at')
+                ->first(),
         ]);
     }
 }

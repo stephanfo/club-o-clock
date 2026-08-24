@@ -216,7 +216,10 @@
                 @endforeach
                 <div>
                     <div class="meta" style="font-size:12px;margin-bottom:4px">Contenu (payload)</div>
-                    <pre class="card card-pad mono" style="font-size:12px;white-space:pre-wrap;overflow:auto">{{ json_encode($detail->payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+                    {{-- redactedPayload : un jeton d'invitation en clair vaut la prise du compte.
+                         Masqué quel que soit le statut — sur une ligne encore en attente, il est
+                         vivant. --}}
+                    <pre class="card card-pad mono" style="font-size:12px;white-space:pre-wrap;overflow:auto">{{ json_encode($detail->redactedPayload(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
                 </div>
             </div>
 

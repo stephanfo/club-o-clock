@@ -6,12 +6,14 @@ use App\Livewire\Concerns\AuthorizesAdminGate;
 use App\Models\Category;
 use App\Models\Qualification;
 use App\Models\User;
+use App\Services\InvitationService;
 use App\Services\MemberService;
 use App\Support\AgeCategory;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use RuntimeException;
 
 // « Ajouter un adhérent » (PRD §4.17.1) — porté de screen-adherent-create.jsx.
 // Catégorie principale DÉRIVÉE de la date de naissance ; mineurs ouvrent le bloc parent garant
@@ -34,6 +36,12 @@ class MemberCreate extends Component
     public string $dob = '';
 
     public string $email = '';
+
+    /**
+     * Envoyer l'invitation d'activation dans la foulée (§4.1.3). Cochée par défaut : sans email,
+     * l'adhérent ne sait pas que son compte existe — c'est le cas nominal, pas une option.
+     */
+    public bool $sendInvitation = true;
 
     /** @var array<string,bool> */
     public array $roles = ['athlete' => true, 'coach' => false, 'admin' => false];
@@ -118,7 +126,7 @@ class MemberCreate extends Component
         $this->qualifications = array_values(array_filter($this->qualifications, fn ($q) => $q !== $id));
     }
 
-    public function create(MemberService $service)
+    public function create(MemberService $service, InvitationService $invitations)
     {
         $this->validate([
             'first_name' => ['required', 'string', 'max:120'],
@@ -139,7 +147,21 @@ class MemberCreate extends Component
             'guardian_id' => $this->isMinor ? $this->guardian_id : null,
         ], auth()->user());
 
-        session()->flash('status', $member->fullName().' créé·e.');
+        // Envoi immédiat (drainNow) : un seul email, et l'admin veut voir « invitation partie »
+        // avant de quitter l'écran. Un mineur P1 n'a pas d'email — rien à envoyer, c'est prévu.
+        $invite = '';
+        if ($this->sendInvitation && $member->email !== null) {
+            try {
+                $invitations->sendToMember($member, auth()->user());
+                $invite = ' Invitation envoyée à '.$member->email.'.';
+            } catch (RuntimeException $e) {
+                // La fiche est créée : on ne perd pas le travail de saisie pour un envoi raté, on le
+                // dit, et le bouton « Renvoyer l'invitation » de la fiche reprend la main.
+                $invite = ' Invitation non envoyée ('.$e->getMessage().') — à renvoyer depuis la fiche.';
+            }
+        }
+
+        session()->flash('status', $member->fullName().' créé·e.'.$invite);
 
         return $this->redirect(route('admin.members.show', $member), navigate: true);
     }

@@ -58,7 +58,14 @@ const tous = [];
   s.check('prérequis : quota déjà consommé cette semaine-là', Number(dejaNat) >= 1, `n=${dejaNat}`);
 
   // On retire son éventuelle inscription sur la cible pour tester à froid.
+  //
+  // On mémorise le statut ET le MOTIF de file. La restauration ne reposait que sur `status` :
+  // une inscription « waitlist / quota_exceeded » revenait en « waitlist / NULL », et comme la
+  // vérification ne comparait elle aussi que `status`, la perte passait inaperçue. Le jeu de démo
+  // ne contient qu'UNE inscription en file quota — celle de Marie, sur cette séance — donc S17,
+  // qui la cherche plus bas, ne trouvait plus rien et faisait tomber tout le fichier.
   const avant = sql(`SELECT status FROM registrations WHERE session_id=${cible} AND user_id=${marie}`);
+  const avantMotif = sql(`SELECT IFNULL(waitlist_reason,'') FROM registrations WHERE session_id=${cible} AND user_id=${marie}`);
   sql(`DELETE FROM registrations WHERE session_id=${cible} AND user_id=${marie}`);
 
   await fiche(page, cible);
@@ -81,10 +88,16 @@ const tous = [];
   const apresAnnul = sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${cible} AND user_id=${marie}`);
   s.check('annulation : aucune inscription créée', apresAnnul === '0', `n=${apresAnnul}`);
 
-  // Remise en état : on restaure la waitlist d'origine.
-  if (avant) sql(`INSERT INTO registrations (session_id, user_id, status, registered_at, created_at, updated_at) VALUES (${cible}, ${marie}, '${avant}', NOW(), NOW(), NOW())`);
+  // Remise en état : statut ET motif de file, sinon le scénario suivant hérite d'un jeu de démo
+  // appauvri (cf. le commentaire de la sauvegarde ci-dessus).
+  if (avant) {
+    const motif = avantMotif ? `'${avantMotif}'` : 'NULL';
+    sql(`INSERT INTO registrations (session_id, user_id, status, waitlist_reason, registered_at, created_at, updated_at) VALUES (${cible}, ${marie}, '${avant}', ${motif}, NOW(), NOW(), NOW())`);
+  }
   const restaure = sql(`SELECT status FROM registrations WHERE session_id=${cible} AND user_id=${marie}`);
-  s.check('état restauré', restaure === avant, `${restaure || 'aucun'} (attendu ${avant || 'aucun'})`);
+  const restaureMotif = sql(`SELECT IFNULL(waitlist_reason,'') FROM registrations WHERE session_id=${cible} AND user_id=${marie}`);
+  s.check('état restauré (statut)', restaure === avant, `${restaure || 'aucun'} (attendu ${avant || 'aucun'})`);
+  s.check('état restauré (motif de file)', restaureMotif === avantMotif, `${restaureMotif || 'aucun'} (attendu ${avantMotif || 'aucun'})`);
 
   tous.push(s.report());
   await ctx.close();

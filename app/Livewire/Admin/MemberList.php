@@ -4,6 +4,7 @@ namespace App\Livewire\Admin;
 
 use App\Livewire\Concerns\AuthorizesAdminGate;
 use App\Models\User;
+use App\Services\InvitationService;
 use App\Services\MemberImportService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
@@ -12,6 +13,7 @@ use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use RuntimeException;
 
 // Page « Adhérents » (PRD §4.17.1) — porté de screen-admin.jsx AdminAdherents.
 // Liste paginée filtrable : recherche nom/email/catégorie, filtres accès + rôle, compteurs
@@ -46,6 +48,12 @@ class MemberList extends Component
     // Import CSV adhérents (§3.1, §4.2 — J6.5) : modale upload + aperçu + rapport tout-ou-rien.
     public bool $showImport = false;
 
+    /** Envoyer les invitations d'activation aux comptes créés par l'import (§4.1.3). */
+    public bool $sendInvitations = true;
+
+    /** Modale de confirmation de l'envoi de masse (elle notifie des tiers → x-dialog). */
+    public bool $confirmingBulkInvite = false;
+
     /** Fichier CSV téléversé (Livewire temporary upload). */
     public $csvFile = null;
 
@@ -76,8 +84,64 @@ class MemberList extends Component
         $this->importReport = Arr::except($report, 'rows');
     }
 
+    // --- Invitations en attente (§4.1.3) ---
+
+    /** Plafond par clic : borne l'à-coup sur l'outbox et rend l'action réexécutable sans surprise. */
+    public const BULK_INVITE_CAP = 500;
+
+    public function confirmBulkInvite(): void
+    {
+        $this->confirmingBulkInvite = true;
+    }
+
+    /**
+     * Invite en masse les adhérents jamais entrés (import silencieux, invitation expirée sans clic).
+     *
+     * Mise en file, jamais d'envoi direct : c'est le même raisonnement que l'import. Idempotent —
+     * un compte qui a déjà une invitation vivante n'est pas re-sollicité, donc deux clics de suite
+     * n'envoient rien la seconde fois.
+     */
+    public function sendPendingInvitations(InvitationService $invitations): void
+    {
+        // Plafond posé EN BASE : la borne doit s'appliquer à la requête, pas à une collection déjà
+        // hydratée — sinon un club au gros import charge tous ses adhérents en mémoire pour n'en
+        // garder que 500, sur un mutualisé à memory_limit basse.
+        $cibles = $invitations->awaitingInvitation(self::BULK_INVITE_CAP);
+
+        $this->confirmingBulkInvite = false;
+
+        if ($cibles->isEmpty()) {
+            session()->flash('status', 'Aucun adhérent en attente d’invitation.');
+
+            return;
+        }
+
+        // On compte ce qui est RÉELLEMENT parti : un canal coupé ou une préférence en pause fait
+        // refuser l'envoi, et annoncer 500 invitations quand aucune n'a été mise en file serait un
+        // mensonge que rien ne viendrait corriger ensuite.
+        $misesEnFile = 0;
+        $refusees = 0;
+        foreach ($cibles as $membre) {
+            try {
+                $invitations->sendToMember($membre, auth()->user(), immediate: false);
+                $misesEnFile++;
+            } catch (RuntimeException) {
+                $refusees++;
+            }
+        }
+
+        if ($misesEnFile === 0) {
+            session()->flash('warn', 'Aucune invitation n’a pu partir — vérifie le canal email (Admin → Réglages).');
+
+            return;
+        }
+
+        session()->flash('status', $misesEnFile.' invitation(s) mise(s) en file (Admin → Envois).'
+            .($refusees > 0 ? ' '.$refusees.' non envoyée(s) : canal ou préférence bloquant.' : ''));
+    }
+
     /** Commit tout-ou-rien : ré-analyse le fichier puis crée/met à jour en lot (§4.2). */
-    public function import(MemberImportService $import): void
+    public function import(MemberImportService $import, InvitationService $invitations): void
     {
         if ($this->csvFile === null) {
             return;
@@ -92,9 +156,30 @@ class MemberList extends Component
         }
 
         $result = $import->commit($report, auth()->user());
+
+        // APRÈS le commit, donc hors de sa transaction : on n'émet rien qui pourrait être annulé.
+        // Mise en FILE (immediate: false) et non envoi direct — 200 envois SMTP synchrones dans une
+        // requête, c'est un timeout garanti sur mutualisé. Le cron draine par lots toutes les 5 min.
+        $queued = 0;
+        $refusees = 0;
+        if ($this->sendInvitations) {
+            foreach (User::whereKey($result['created_ids'])->whereNotNull('email')->get() as $nouveau) {
+                try {
+                    $invitations->sendToMember($nouveau, auth()->user(), immediate: false);
+                    $queued++;
+                } catch (RuntimeException) {
+                    // Canal coupé ou préférence bloquante : les fiches sont créées, on ne perd pas
+                    // l'import pour autant — mais on ne prétend pas avoir envoyé.
+                    $refusees++;
+                }
+            }
+        }
+
         $this->closeImport();
         $this->perPage = 20;
-        session()->flash('status', "Import terminé : {$result['created']} adhérent(s) créé(s), {$result['updated']} mis à jour.");
+        session()->flash('status', "Import terminé : {$result['created']} adhérent(s) créé(s), {$result['updated']} mis à jour."
+            .($queued > 0 ? " {$queued} invitation(s) mise(s) en file (Admin → Envois)." : '')
+            .($refusees > 0 ? " {$refusees} invitation(s) non envoyée(s) : canal email coupé ou préférence bloquante." : ''));
     }
 
     public function updated(string $name): void
@@ -164,6 +249,14 @@ class MemberList extends Component
             'members' => $members,
             'total' => $total,
             'counts' => $counts,
+            // Comptes jamais entrés et sans invitation en cours : le bouton de rattrapage n'apparaît
+            // que s'il a quelque chose à faire. COUNT en base : ce render rejoue à chaque frappe
+            // dans la recherche, hydrater tous les modèles pour n'afficher qu'un nombre se payait
+            // à chaque caractère.
+            'awaiting' => app(InvitationService::class)->awaitingInvitationQuery()->count(),
+            // La modale annonce ce que CE clic enverra, pas le total en attente : l'action est
+            // plafonnée, et promettre 800 envois pour en faire 500 mentirait à l'admin.
+            'inviteCap' => self::BULK_INVITE_CAP,
         ]);
     }
 }

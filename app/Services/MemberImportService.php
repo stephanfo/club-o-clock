@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Support\AgeCategory;
 use App\Support\Logging\ActivityLogger;
+use App\Support\Logging\AuditLogger;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -145,7 +146,7 @@ class MemberImportService
      * pass A crée/met à jour adultes + mineurs sans garant (les garants entrent en base) ; pass B
      * crée les mineurs avec garant en résolvant le parent désormais présent.
      *
-     * @return array{created:int,updated:int}
+     * @return array{created:int,updated:int,created_ids:list<int>}
      *
      * @throws RuntimeException si l'analyse comporte des erreurs (garde redondante avec l'UI).
      */
@@ -160,6 +161,8 @@ class MemberImportService
         return DB::transaction(function () use ($analysis, $actor, $service) {
             $created = 0;
             $updated = 0;
+            /** @var list<int> $createdIds ids des comptes créés — l'appelant leur envoie l'invitation. */
+            $createdIds = [];
 
             // Pass A — tout sauf les créations de mineurs avec garant.
             foreach ($analysis['rows'] as $r) {
@@ -172,7 +175,7 @@ class MemberImportService
                     $service->importUpdate(User::findOrFail($r['existing_id']), $r['data'], $actor);
                     $updated++;
                 } else {
-                    $service->create($r['data'] + ['roles' => ['athlete']], $actor);
+                    $createdIds[] = $service->create($r['data'] + ['roles' => ['athlete']], $actor)->id;
                     $created++;
                 }
             }
@@ -191,14 +194,29 @@ class MemberImportService
                     throw new RuntimeException("Garant introuvable au commit pour la ligne {$r['line']}.");
                 }
 
-                $service->create($r['data'] + ['roles' => ['athlete'], 'guardian_id' => $guardianId], $actor);
+                $enfant = $service->create($r['data'] + ['roles' => ['athlete'], 'guardian_id' => $guardianId], $actor);
+                $createdIds[] = $enfant->id;
                 $created++;
+
+                // Mineur créé AVEC son propre email et un garant : c'est un P2 d'emblée, donc une
+                // autonomisation (§4.2.1) réalisée par l'import. Elle passe à côté de
+                // GuardianshipService::invite(), qui est d'ordinaire le seul chemin — sans cette
+                // trace, l'ouverture d'un compte autonome à un mineur n'apparaissait nulle part au
+                // journal d'audit, alors que c'est précisément l'acte qu'il doit retenir.
+                if ($enfant->email !== null) {
+                    AuditLogger::record('guardianship_invite_sent', $actor, [
+                        'target_type' => User::class,
+                        'target_id' => $enfant->id,
+                        'motif' => 'csv_import',
+                    ]);
+                    ActivityLogger::record('guardianship_invite_sent', $actor, ['user_id' => $enfant->id]);
+                }
             }
 
             // Synthèse métier (les créations individuelles sont déjà tracées par MemberService).
             ActivityLogger::record('members_imported', $actor, ['created' => $created, 'updated' => $updated]);
 
-            return ['created' => $created, 'updated' => $updated];
+            return ['created' => $created, 'updated' => $updated, 'created_ids' => $createdIds];
         });
     }
 

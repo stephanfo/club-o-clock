@@ -31,11 +31,24 @@ node tests/E2E/run.mjs          # les 3 suites non destructives (verdict agrég�
 
 node tests/E2E/scenarios.mjs    # S1–S5   gardes d'inscription et bascule de rôle
 node tests/E2E/parcours.mjs     # S7–S17  parcours métier et cloisonnement
+node tests/E2E/comptes.mjs      # S18–S20 messages d'auth, correction d'email, suspension d'accès
 node tests/E2E/responsive.mjs   # S6      bascule mobile/desktop
 ```
 
 Sortie : une ligne par assertion (✅/❌), code de sortie non nul si un scénario échoue.
 Les captures atterrissent dans `tests/E2E/shots/` (non versionné).
+
+### Service worker — sans navigateur ni serveur
+
+```bash
+node --test tests/E2E/sw.test.mjs
+```
+
+`public/sw.js` n'est joignable ni par PHPUnit (qui ne voit pas le JavaScript) ni par Playwright (on
+ne pilote pas un clic sur une notification système). Ce fichier charge le vrai `sw.js` dans une
+portée feinte — un faux `self` qui capture les écouteurs — puis rejoue `notificationclick` à la
+main. Runner intégré de Node, **aucune dépendance ajoutée**, aucun prérequis : contrairement au
+reste du répertoire, il tourne sans serveur ni base.
 
 ### Scénarios destructifs — à part
 

@@ -12,6 +12,7 @@ use App\Support\AgeCategory;
 use App\Support\Logging\ActivityLogger;
 use App\Support\Logging\AuditLogger;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -44,6 +45,17 @@ class MemberService
                 'guardian_id' => $isMinor ? ($data['guardian_id'] ?? null) : null,
                 'guardianship_linked_at' => ($isMinor && ! empty($data['guardian_id'])) ? Carbon::now() : null,
             ]);
+
+            // L'admin est de confiance : l'email qu'il saisit vient du dossier de licence, il n'a pas
+            // à être reconfirmé par un aller-retour. Sans ça, le compte naissait MUET — le lien
+            // magique exige un email vérifié (§4.1.1) et l'OAuth aussi, donc l'adhérent n'avait
+            // aucun moyen d'entrer. Risque assumé (§4.1.3) : une adresse mal saisie donne la prise
+            // du compte à un tiers ; en contrepartie l'invitation part à cette adresse et la
+            // création est tracée en AuditLog. forceFill : email_verified_at n'est pas fillable,
+            // c'est un fait de sécurité qu'on ne pose jamais depuis un tableau de formulaire.
+            if (($data['email'] ?? null) !== null) {
+                $user->forceFill(['email_verified_at' => Carbon::now()])->save();
+            }
 
             // Catégorie principale dérivée (peut être null : compte sans catégorie, cas limite §4.5).
             $primary = AgeCategory::derive($dob);
@@ -262,11 +274,49 @@ class MemberService
         });
     }
 
-    /** Change l'email de connexion (§4.1.3). Acte sensible (accès) → AuditLog + ActivityLog. */
+    /**
+     * Change l'email de connexion (§4.1.3). Acte sensible (accès) → AuditLog + ActivityLog.
+     *
+     * Changer l'adresse RÉVOQUE tout ce qui pointait l'ancienne. C'est le cœur du geste, pas un
+     * ménage : on corrige typiquement une coquille de saisie, donc les secrets déjà partis sont
+     * précisément entre les mains de quelqu'un d'autre. Quatre familles à couper —
+     *   - les invitations d'activation non consommées, indexées par user_id : elles survivraient
+     *     au changement d'adresse et resteraient honorées jusqu'à 30 jours ;
+     *   - les liens magiques et codes émis pour l'ancienne adresse ;
+     *   - les jetons de réinitialisation de mot de passe de l'ancienne adresse ;
+     *   - les SESSIONS déjà ouvertes et les cookies « se souvenir de moi ». Sans elles, révoquer
+     *     les jetons ne sert à rien : le tiers qui a activé le compte depuis l'ancienne adresse
+     *     reste connecté indéfiniment, exactement le risque que le geste prétend couvrir. Seule
+     *     exception, la session de l'acteur quand il corrige SA propre adresse (cf. revokeSessions) :
+     *     il vient de prouver qu'il la contrôle, et le geste n'a pas à le déconnecter lui-même.
+     *
+     * La nouvelle adresse est marquée vérifiée pour la même raison qu'à la création : l'admin la
+     * tient du dossier de licence, et sans email vérifié le compte redeviendrait muet (§4.1.1).
+     */
     public function updateEmail(User $member, ?string $email, User $actor): void
     {
         DB::transaction(function () use ($member, $email, $actor) {
-            $member->update(['email' => $email ?: null]);
+            $ancien = $member->email;
+            $nouveau = $email ?: null;
+
+            if ($ancien === $nouveau) {
+                return;
+            }
+
+            $member->update(['email' => $nouveau]);
+
+            // email_verified_at n'est pas fillable : fait de sécurité, jamais posé depuis un tableau
+            // de formulaire. Vidé si l'adresse disparaît — il ne vérifie plus rien.
+            $member->forceFill(['email_verified_at' => $nouveau !== null ? Carbon::now() : null])->save();
+
+            InvitationToken::where('user_id', $member->id)->whereNull('consumed_at')->delete();
+
+            if ($ancien !== null) {
+                MagicLinkToken::where('email', $ancien)->delete();
+                DB::table('password_reset_tokens')->where('email', $ancien)->delete();
+            }
+
+            $this->revokeSessions($member, $actor);
 
             AuditLogger::record('email_changed', $actor, [
                 'target_type' => User::class,
@@ -274,6 +324,44 @@ class MemberService
             ]);
             ActivityLogger::record('member_email_changed', $actor, ['user_id' => $member->id]);
         });
+    }
+
+    /**
+     * Coupe les accès déjà ouverts d'un adhérent : lignes de session ET cookies « se souvenir de
+     * moi ». Supprimer les sessions ne suffit pas — les deux chemins de login (lien magique, OAuth)
+     * posent un cookie remember, et Laravel ré-authentifierait l'appareil au passage suivant.
+     * Régénérer `remember_token` invalide tous ces cookies d'un coup (le jeton est par-utilisateur,
+     * pas par-session), d'où la ré-émission de celui de l'acteur quand il est sa propre cible.
+     *
+     * `$actor` non nul ÉPARGNE la session courante quand l'acteur est la cible. Un admin peut
+     * corriger sa propre adresse depuis sa fiche : tout couper le déconnectait lui-même, et l'écran
+     * affichait alors un succès vert sur une session déjà morte — il croyait pouvoir enchaîner et
+     * se faisait éjecter vers /login au geste suivant, sans rien pour relier les deux. Sa session
+     * est légitime par construction : il vient de prouver qu'il la contrôle en agissant. Ce que la
+     * révocation vise, ce sont les TIERS qui détenaient l'ancienne adresse. Même raisonnement que
+     * Profil::purgeOtherSessions(), qui préserve la courante pour la même raison.
+     *
+     * `$actor` nul = ne rien épargner (suppression RGPD : le compte doit perdre tous ses accès).
+     */
+    private function revokeSessions(User $member, ?User $actor = null): void
+    {
+        $sessionCourante = $actor !== null && $actor->id === $member->id && auth()->id() === $member->id
+            ? session()->getId()
+            : null;
+
+        DB::table(config('session.table', 'sessions'))
+            ->where('user_id', $member->id)
+            ->when($sessionCourante !== null, fn ($q) => $q->where('id', '!=', $sessionCourante))
+            ->delete();
+
+        $member->forceFill(['remember_token' => null])->save();
+
+        // Ré-émission APRÈS la purge : Auth::login régénère l'id de session courante, donc le faire
+        // avant ferait porter le `!=` ci-dessus sur un id périmé — la session épargnée serait celle
+        // qui n'existe plus, et l'acteur se retrouverait déconnecté malgré la garde.
+        if ($sessionCourante !== null) {
+            Auth::login($member, remember: true);
+        }
     }
 
     // --- Suppression de compte RGPD (PRD §4.3, §4.18.3) ---
@@ -391,6 +479,12 @@ class MemberService
             $member->authIdentities()->delete();
             InvitationToken::where('user_id', $member->id)->delete();
             $member->notificationPreferences()->delete();
+
+            // Les SESSIONS déjà ouvertes, sans quoi l'effacement ne ferme rien : les gardes
+            // `is_active` / `anonymized_at` ne valent que pour un NOUVEAU login (§4.3), donc un
+            // appareil resté connecté continuerait de naviguer dans l'application sur un compte
+            // effacé. Purger `remember_token` fait partie du scrub juste en dessous.
+            $this->revokeSessions($member);
 
             // Minimisation + non-contact après effacement (§4.3) : les endpoints push identifient
             // les appareils de la personne (le cascadeOnDelete ne joue jamais, le tombstone reste),

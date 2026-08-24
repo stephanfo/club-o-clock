@@ -190,6 +190,42 @@ class MemberDeletionTest extends TestCase
         ]);
     }
 
+    public function test_confirm_deletion_closes_the_sessions_still_open(): void
+    {
+        // Les gardes `is_active` / `anonymized_at` ne bloquent qu'un NOUVEAU login (§4.3) : rien
+        // n'interrompt une session déjà ouverte. Sans cette purge, un appareil resté connecté
+        // continuait de naviguer dans l'application sur un compte effacé — la suppression RGPD
+        // révoquait tous les credentials sauf le seul qui donnait encore accès.
+        $admin = User::factory()->admin()->create();
+        $member = $this->eligibleSince(User::factory()->create(), 8);
+        DB::table('http_sessions')->insert([
+            'id' => 'appareil-encore-ouvert', 'user_id' => $member->id, 'ip_address' => '1.2.3.4',
+            'user_agent' => 'Mozilla/5.0 (iPhone) Safari', 'payload' => 'x', 'last_activity' => time(),
+        ]);
+
+        app(MemberService::class)->confirmDeletion($member, $admin);
+
+        $this->assertDatabaseMissing('http_sessions', ['id' => 'appareil-encore-ouvert']);
+    }
+
+    public function test_the_deletion_buffer_leaves_the_sessions_open_so_the_athlete_can_retract(): void
+    {
+        // Contrôle positif apparié : le tampon de 7 j n'est PAS un effacement. `is_active=false`
+        // ne bloque que les nouveaux logins, précisément pour que l'athlète puisse se rétracter
+        // in-app tant que la demande est ouverte (§4.3 voie 1). Couper sa session ici le
+        // priverait du seul écran d'où il peut annuler.
+        $admin = User::factory()->admin()->create();
+        $member = User::factory()->create();
+        DB::table('http_sessions')->insert([
+            'id' => 'session-de-la-retractation', 'user_id' => $member->id, 'ip_address' => '1.2.3.4',
+            'user_agent' => 'Mozilla/5.0 (Macintosh) Firefox', 'payload' => 'x', 'last_activity' => time(),
+        ]);
+
+        app(MemberService::class)->requestDeletion($member, $admin);
+
+        $this->assertDatabaseHas('http_sessions', ['id' => 'session-de-la-retractation']);
+    }
+
     public function test_confirm_deletion_on_already_anonymized_is_blocked(): void
     {
         $admin = User::factory()->admin()->create();

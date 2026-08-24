@@ -14,12 +14,21 @@ class InvitationToken extends Model
 
     protected $fillable = ['user_id', 'token_hash', 'expires_at', 'consumed_at'];
 
-    /** Élagage (model:prune, planifié) : jetons d'activation expirés OU déjà consommés. */
+    /**
+     * Élagage (model:prune, planifié) : jetons expirés SANS avoir été consommés — eux seuls sont
+     * des déchets.
+     *
+     * Un jeton consommé est CONSERVÉ : il est le marqueur durable « ce compte a été activé un jour »,
+     * que lit l'invitation de masse pour ne pas re-solliciter quelqu'un déjà entré. Aucun coût de
+     * minimisation (§4.3) — contrairement à MagicLinkToken, cette table ne stocke aucune donnée
+     * personnelle : un `user_id` et un hash inversable par personne. La croissance est bornée à une
+     * ligne par adhérent activé.
+     */
     public function prunable(): Builder
     {
         return static::query()
-            ->where('expires_at', '<', now())
-            ->orWhereNotNull('consumed_at');
+            ->whereNull('consumed_at')
+            ->where('expires_at', '<', now());
     }
 
     /** @var array<string, string> */

@@ -8,6 +8,7 @@ use App\Models\PushSubscription;
 use App\Models\User;
 use App\Notifications\Channels\ChannelManager;
 use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\LogChannel;
 use App\Notifications\Channels\PushChannel;
 use App\Notifications\NotificationRenderer;
 use App\Notifications\NotificationType;
@@ -237,6 +238,43 @@ class NotificationDeliveryTest extends TestCase
 
         $this->assertInstanceOf(PushChannel::class, $manager->driver('push'));
         $this->assertInstanceOf(EmailChannel::class, $manager->driver('email'));
+    }
+
+    // Régression : `.env.example` (donc la CI, donc tout contributeur qui en part) définit
+    // NOTIF_EMAIL_DRIVER SANS VALEUR. Une variable présente mais vide ne déclenche pas le 2e
+    // argument d'`env()` : le canal se résolvait sur '', le drain levait à l'instanciation, et la
+    // ligne repartait en backoff `pending` au lieu de partir. Symptôme : deux tests d'invitation
+    // verts en local (où le driver est renseigné) et rouges en CI.
+    //
+    // Le repli vit dans config/club.php, que `config()` court-circuiterait : on relit donc le
+    // fichier de config lui-même, avec la variable vide telle que la CI la pose.
+    public function test_an_empty_driver_variable_falls_back_to_the_log_channel(): void
+    {
+        $_ENV['NOTIF_EMAIL_DRIVER'] = $_SERVER['NOTIF_EMAIL_DRIVER'] = '';
+        $_ENV['NOTIF_PUSH_DRIVER'] = $_SERVER['NOTIF_PUSH_DRIVER'] = '';
+
+        try {
+            $club = require config_path('club.php');
+        } finally {
+            unset($_ENV['NOTIF_EMAIL_DRIVER'], $_SERVER['NOTIF_EMAIL_DRIVER']);
+            unset($_ENV['NOTIF_PUSH_DRIVER'], $_SERVER['NOTIF_PUSH_DRIVER']);
+        }
+
+        $this->assertSame(LogChannel::class, $club['notifications']['channels']['email']);
+        $this->assertSame(LogChannel::class, $club['notifications']['channels']['push']);
+    }
+
+    // Seconde ligne de défense : quelle que soit la SOURCE d'une valeur vide, le manager doit dire
+    // « pas de driver configuré » et non laisser `make('')` lever un « Target class [] » que le
+    // drain confondrait avec une panne de transport (et donc réessaierait indéfiniment).
+    public function test_an_empty_driver_is_reported_as_missing_configuration(): void
+    {
+        config(['club.notifications.channels.email' => '']);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Aucun driver configuré pour le canal 'email'.");
+
+        app(ChannelManager::class)->driver('email');
     }
 
     public function test_vapid_keys_command_outputs_a_keypair(): void

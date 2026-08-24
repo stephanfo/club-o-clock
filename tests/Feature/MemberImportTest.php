@@ -141,6 +141,40 @@ class MemberImportTest extends TestCase
         ]);
     }
 
+    public function test_minor_created_with_both_email_and_guardian_is_traced_as_an_autonomisation(): void
+    {
+        // Une ligne portant l'email de l'enfant ET un parent_email crée un P2 d'emblée : c'est une
+        // autonomisation (§4.2.1) réalisée par l'import, hors de GuardianshipService::invite() qui
+        // en est d'ordinaire le seul chemin. Sans cette trace, l'ouverture d'un compte autonome à
+        // un mineur n'apparaissait nulle part au journal d'audit.
+        $this->seedCategories();
+        $admin = User::factory()->admin()->create();
+
+        $csv = <<<'CSV'
+        nom,prénom,email,date_nais,parent_email
+        Fortin,Pierre,pierre@club.fr,1980-05-05,
+        Fortin,Manon,manon@club.fr,2010-11-24,pierre@club.fr
+        Fortin,Hugo,,2014-09-03,pierre@club.fr
+        CSV;
+
+        $this->service()->commit($this->service()->analyze($csv), $admin);
+
+        $manon = User::where('email', 'manon@club.fr')->firstOrFail();
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'guardianship_invite_sent',
+            'target_id' => $manon->id,
+            'motif' => 'csv_import',
+        ]);
+
+        // Contrôle positif apparié : le mineur P1 (sans email) n'est PAS une autonomisation — il
+        // reste sous l'accès du garant, rien ne lui est ouvert.
+        $hugo = User::where('first_name', 'Hugo')->firstOrFail();
+        $this->assertDatabaseMissing('audit_logs', [
+            'action' => 'guardianship_invite_sent',
+            'target_id' => $hugo->id,
+        ]);
+    }
+
     public function test_minor_without_parent_email_is_created_without_guardian(): void
     {
         $this->seedCategories();

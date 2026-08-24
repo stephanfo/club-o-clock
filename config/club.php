@@ -31,8 +31,14 @@ return [
 
     'notifications' => [
         'channels' => [
-            'push' => env('NOTIF_PUSH_DRIVER', LogChannel::class),
-            'email' => env('NOTIF_EMAIL_DRIVER', LogChannel::class),
+            // `?:` et non le 2e argument de `env()` : une variable PRÉSENTE MAIS VIDE (c'est le cas
+            // dans .env.example, et donc en CI) ne déclenche pas le défaut d'`env()` — elle le
+            // remplace par ''. Le drainer tentait alors d'instancier une classe vide, l'envoi
+            // levait, et la ligne repartait en backoff `pending` : le canal était réputé « branché »
+            // tout en n'envoyant rien. Le commentaire ci-dessus promet « Vide = LogChannel » ; ceci
+            // le rend vrai.
+            'push' => env('NOTIF_PUSH_DRIVER') ?: LogChannel::class,
+            'email' => env('NOTIF_EMAIL_DRIVER') ?: LogChannel::class,
         ],
     ],
 

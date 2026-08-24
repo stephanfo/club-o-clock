@@ -21,7 +21,7 @@ class PruneTokensCommand extends Command
     protected $signature = 'club:prune-tokens
         {--if-due : N\'exécuter que si l\'élagage du jour n\'a pas déjà eu lieu}';
 
-    protected $description = 'Élague les jetons d\'authentification expirés ou consommés (enveloppe rattrapable de model:prune).';
+    protected $description = 'Élague les jetons d\'authentification expirés et consommés.';
 
     public function handle(DuePeriodGuard $guard): int
     {
@@ -40,7 +40,14 @@ class PruneTokensCommand extends Command
         return self::SUCCESS;
     }
 
-    /** Retourne true si l'élagage s'est terminé sans erreur (seul un succès honore l'échéance). */
+    /**
+     * Retourne true si l'élagage s'est terminé sans erreur (seul un succès honore l'échéance).
+     *
+     * La purge des secrets résiduels de l'outbox vivait ici : elle rescannait chaque jour toutes
+     * les lignes `sent`, pour toujours et à coût croissant, alors qu'OutboxDrainer retire le jeton
+     * au moment de l'envoi. C'était un rattrapage ponctuel déguisé en tâche périodique — il est
+     * désormais joué une fois, en migration (2026_08_24_000010_purge_sent_outbox_secrets).
+     */
     private function elaguer(): bool
     {
         return $this->callSilent('model:prune') === self::SUCCESS;

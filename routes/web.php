@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\Auth\GuardianshipActivationController;
+use App\Http\Controllers\Auth\InvitationActivationController;
 use App\Http\Controllers\Auth\MagicLinkController;
 use App\Http\Controllers\Auth\OAuthController;
 use App\Http\Controllers\GpxRouteGpxController;
@@ -8,6 +8,7 @@ use App\Http\Controllers\GpxRouteTracesController;
 use App\Http\Controllers\LegalController;
 use App\Http\Controllers\ManifestController;
 use App\Http\Controllers\PushSubscriptionController;
+use App\Livewire\Activation;
 use App\Livewire\Admin\CatalogueManager;
 use App\Livewire\Admin\ClubSettingsForm;
 use App\Livewire\Admin\Dashboard;
@@ -50,19 +51,31 @@ Route::get('/mentions-legales', LegalController::class)->name('legal');
 Route::middleware('guest')->group(function () {
     Route::get('magic-link', [MagicLinkController::class, 'request'])->name('magic-link.request');
     Route::post('magic-link', [MagicLinkController::class, 'send'])->name('magic-link.send');
+
+    // ⚠️ ORDRE : ces routes littérales DOIVENT précéder magic-link/{token}, qui les capterait
+    // sinon (« envoye » et « code » seraient pris pour des jetons).
+    Route::get('magic-link/envoye', [MagicLinkController::class, 'sent'])->name('magic-link.sent');
+    Route::get('magic-link/code', [MagicLinkController::class, 'codeForm'])->name('magic-link.code');
+    Route::post('magic-link/code', [MagicLinkController::class, 'verifyCode'])->name('magic-link.code.verify');
+
     Route::get('magic-link/{token}', [MagicLinkController::class, 'consume'])->name('magic-link.consume');
 
     // Google OAuth via Socialite (PRD §4.1.1)
     Route::get('auth/{provider}/redirect', [OAuthController::class, 'redirect'])->name('oauth.redirect');
     Route::get('auth/{provider}/callback', [OAuthController::class, 'callback'])->name('oauth.callback');
 
-    // Activation d'un compte mineur autonomisé via le lien d'invitation (PRD §4.1.3, §4.2.1 ; J8.6)
-    Route::get('invitation/{token}', [GuardianshipActivationController::class, 'activate'])->name('guardianship.activate');
+    // Activation d'un compte via son lien d'invitation (PRD §4.1.3, §4.2.1) — adhérent créé par le
+    // bureau comme mineur autonomisé : même jeton, même page.
+    Route::get('invitation/{token}', [InvitationActivationController::class, 'activate'])->name('invitation.activate');
 });
 
 // --- Espace connecté ---
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', Home::class)->name('dashboard');
+
+    // Écran d'accueil d'une activation d'invitation (§4.1.3) : choix de la méthode de connexion.
+    // S'affiche une seule fois, sur le drapeau de session posé par InvitationActivationController.
+    Route::get('/bienvenue', Activation::class)->name('activation');
 
     // Profil utilisateur — compte courant (J8.4, PRD §4.15.3/.4, §4.10, §4.1.1). Self only.
     Route::get('/profil', Profil::class)->name('profil');

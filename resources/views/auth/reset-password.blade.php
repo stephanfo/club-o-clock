@@ -33,7 +33,7 @@
                         <label class="field-label">Nouveau mot de passe</label>
                         <div class="ifield">
                             <x-icon name="lock" :size="18" />
-                            <input class="ifield-input" type="password" name="password" placeholder="Au moins 8 caractères">
+                            <input class="ifield-input" type="password" name="password" placeholder="{{ \App\Support\PasswordPolicy::placeholder() }}">
                         </div>
                     </div>
                     <div>
@@ -44,7 +44,7 @@
                         </div>
                     </div>
 
-                    <div class="banner banner-info">8 caractères minimum. Un mélange de majuscules, chiffres et symboles renforce ta sécurité.</div>
+                    <div class="banner banner-info">{{ \App\Support\PasswordPolicy::hint() }}</div>
 
                     <button type="submit" class="btn btn-primary btn-block btn-lg">Mettre à jour</button>
                 </form>

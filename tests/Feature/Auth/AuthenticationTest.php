@@ -105,8 +105,11 @@ class AuthenticationTest extends TestCase
 
     public function test_magic_link_send_does_not_leak_account_existence(): void
     {
-        // Email inexistant : réponse neutre identique, aucun token créé.
-        $this->post('/magic-link', ['email' => 'ghost@club.test'])->assertSessionHas('status');
+        // Email inexistant : on atterrit sur le MÊME écran de vérification qu'un compte connu
+        // (§4.1.1), et aucun token n'est créé. Depuis l'ajout du code à usage unique, la neutralité
+        // ne tient plus à un message flash mais à l'identité stricte de la redirection.
+        $this->post('/magic-link', ['email' => 'ghost@club.test'])
+            ->assertRedirect(route('magic-link.sent'));
         $this->assertDatabaseCount('magic_link_tokens', 0);
     }
 

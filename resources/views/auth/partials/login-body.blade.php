@@ -63,6 +63,9 @@
                     <x-icon name="send" :size="17" /> Envoyer le lien
                 </button>
                 <p class="auth-fine">Un lien de connexion sans mot de passe, valable <b>15&nbsp;min</b>, t'attend dans ta boîte mail.</p>
+                {{-- Chemin de l'application installée : le lien a pu être demandé depuis le
+                     navigateur, où la session ne vaut pas ici (§4.1.1). --}}
+                <a href="{{ route('magic-link.code') }}" class="auth-link auth-link-center">J'ai déjà reçu un code</a>
             </form>
 
             @include('auth.partials.login-password', ['pane' => true])
