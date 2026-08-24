@@ -60,11 +60,15 @@
             "@php artisan config:clear --ansi @no_additional_args",
             "@php -d memory_limit=1G vendor/bin/phpunit"
         ],
+        "test-destructif": [
+            "@php -d memory_limit=1G vendor/bin/phpunit --group=destructif"
+        ],
         "check": [
             "vendor/bin/pint --test",
             "vendor/bin/phpstan analyse --no-progress --memory-limit=1G",
             "@php artisan schema:check-drift",
-            "@test"
+            "@test",
+            "@test-destructif"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",

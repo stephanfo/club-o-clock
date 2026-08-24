@@ -12,6 +12,17 @@
             <directory>tests/Feature</directory>
         </testsuite>
     </testsuites>
+    <!-- Le groupe `destructif` joue `demo:reset`, donc `migrate:fresh` : un DROP/CREATE de
+         toutes les tables. Au milieu de la suite, il traverse les transactions ouvertes de
+         RefreshDatabase et fait rougir des tests sans rapport (deadlock InnoDB 1213 observé
+         sur l'activation d'invitation). Il est donc exclu ici et rejoué SEUL, en second
+         passage, par `composer check` — couverture identique, sans la porte erratique.
+         Le lancer à la main : `composer test-destructif`. -->
+    <groups>
+        <exclude>
+            <group>destructif</group>
+        </exclude>
+    </groups>
     <source>
         <include>
             <directory>app</directory>

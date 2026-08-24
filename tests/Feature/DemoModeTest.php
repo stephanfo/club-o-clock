@@ -11,6 +11,7 @@ use App\Support\DemoMode;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 // Instance de démonstration publique (plan open source OS7).
@@ -179,7 +180,15 @@ class DemoModeTest extends TestCase
      * Il joue la commande pour de vrai : `migrate:fresh` et suppression des journaux locaux
      * compris. C'est assumé — les journaux sont éphémères et gitignorés, et le seul moyen de
      * verrouiller l'ORDRE des étapes est de les exécuter.
+     *
+     * ⚠️ D'où le groupe `destructif`, EXCLU de la suite principale (phpunit.xml) et rejoué
+     * seul par `composer check`. `migrate:fresh` fait un DROP/CREATE de toutes les tables :
+     * joué au milieu des autres tests, il traverse les transactions ouvertes de
+     * RefreshDatabase et produit des échecs erratiques — un deadlock InnoDB (1213) observé
+     * sur un test d'activation qui n'a aucun rapport avec la démo. Un test qui rougit une
+     * fois sur dix sans cause réelle est pire qu'absent : il apprend à ignorer le rouge.
      */
+    #[Group('destructif')]
     public function test_reset_leaves_every_seeded_route_with_its_file_on_disk(): void
     {
         $this->enableDemo();
