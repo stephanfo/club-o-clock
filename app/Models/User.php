@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\ResetPasswordNotification;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
@@ -238,6 +239,15 @@ class User extends Authenticatable implements MustVerifyEmail
     public function fullName(): string
     {
         return trim("{$this->first_name} {$this->last_name}");
+    }
+
+    /**
+     * Email de réinitialisation en français (§ « Langue du projet »). La notification par défaut de
+     * Laravel est intégralement anglaise et ses chaînes sont à clé JSON, hors de portée de `lang/fr/`.
+     */
+    public function sendPasswordResetNotification(#[\SensitiveParameter] $token): void
+    {
+        $this->notify(new ResetPasswordNotification($token));
     }
 
     /** @return HasMany<Registration, $this> */

@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
+use App\Notifications\ResetPasswordNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Password;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -103,10 +105,11 @@ class TraductionsTest extends TestCase
         // Le seul email que Laravel compose lui-même : ses lignes sont à clé JSON, donc rien dans
         // lang/fr/*.php ne pouvait les traduire. Le bouton admin « envoyer un lien » expédiait un
         // mail intégralement anglais (« Hello! », « Reset Password », « This password reset link
-        // will expire in :count minutes. ») à un adhérent francophone.
+        // will expire in :count minutes. ») à un adhérent francophone. App\Notifications\
+        // ResetPasswordNotification le remplace, branchée par User::sendPasswordResetNotification().
         $membre = User::factory()->create(['email' => 'membre@club.test']);
 
-        $rendu = (new ResetPassword('un-jeton'))->toMail($membre)->render()->toHtml();
+        $rendu = (new ResetPasswordNotification('un-jeton'))->toMail($membre)->render()->toHtml();
 
         $this->assertStringContainsString('Bonjour,', $rendu);
         $this->assertStringContainsString('Choisir un nouveau mot de passe', $rendu);
@@ -116,6 +119,19 @@ class TraductionsTest extends TestCase
             $this->assertStringNotContainsString($anglais, $rendu,
                 "L'email de réinitialisation contient encore « {$anglais} ».");
         }
+    }
+
+    public function test_the_password_reset_flow_actually_sends_the_french_notification(): void
+    {
+        // Le test ci-dessus rend la classe à la main : il resterait vert si plus personne ne
+        // l'envoyait. Celui-ci vérifie le BRANCHEMENT — User::sendPasswordResetNotification() —
+        // sans lequel le broker repartirait sur la notification anglaise de Laravel.
+        Notification::fake();
+        $membre = User::factory()->create(['email' => 'membre@club.test']);
+
+        Password::broker()->sendResetLink(['email' => 'membre@club.test']);
+
+        Notification::assertSentTo($membre, ResetPasswordNotification::class);
     }
 
     public function test_the_reset_link_answer_does_not_reveal_whether_the_account_exists(): void

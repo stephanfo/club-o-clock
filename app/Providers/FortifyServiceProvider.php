@@ -9,10 +9,8 @@ use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\User;
 use App\Support\PasswordPolicy;
 use Illuminate\Auth\Events\PasswordReset;
-use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
@@ -47,23 +45,6 @@ class FortifyServiceProvider extends ServiceProvider
         Event::listen(PasswordReset::class, function (PasswordReset $event) {
             DB::table(config('session.table', 'sessions'))->where('user_id', $event->user->getAuthIdentifier())->delete();
         });
-
-        // L'email de réinitialisation est le SEUL mail sortant que Laravel compose lui-même, et il
-        // partait entièrement en anglais (« Hello! », « Reset Password », « This password reset link
-        // will expire in :count minutes. ») : ses chaînes sont à clé JSON, or le projet n'a que des
-        // fichiers PHP dans lang/fr — rien ne les traduisait. On rédige donc le message ici, comme
-        // MagicLinkNotification, plutôt que d'introduire un lang/fr.json pour trois phrases de
-        // vendor. Tutoiement et ton alignés sur les autres emails du club.
-        ResetPassword::toMailUsing(fn (object $notifiable, string $token) => (new MailMessage)
-            ->subject('Réinitialiser ton mot de passe')
-            ->greeting('Bonjour,')
-            ->line('Tu reçois cet email parce qu\'une réinitialisation de mot de passe a été demandée pour ton compte.')
-            ->action('Choisir un nouveau mot de passe', url(route('password.reset', [
-                'token' => $token,
-                'email' => $notifiable->getEmailForPasswordReset(),
-            ], absolute: false)))
-            ->line('Ce lien expire dans '.config('auth.passwords.'.config('auth.defaults.passwords').'.expire').' minutes.')
-            ->line('Si tu n\'es pas à l\'origine de cette demande, ignore cet email : ton mot de passe reste inchangé.'));
 
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);

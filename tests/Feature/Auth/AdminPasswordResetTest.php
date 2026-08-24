@@ -4,7 +4,7 @@ namespace Tests\Feature\Auth;
 
 use App\Livewire\Admin\MemberShow;
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
+use App\Notifications\ResetPasswordNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -30,7 +30,9 @@ class AdminPasswordResetTest extends TestCase
         Livewire::actingAs($this->admin())->test(MemberShow::class, ['user' => $membre])
             ->call('sendPasswordReset');
 
-        Notification::assertSentTo($membre, ResetPassword::class);
+        // La classe CONCRÈTE, pas la ResetPassword de Laravel : assertSentTo compare la classe
+        // exacte, et c'est bien la notification française qui doit partir (cf. TraductionsTest).
+        Notification::assertSentTo($membre, ResetPasswordNotification::class);
         $this->assertDatabaseHas('audit_logs', [
             'action' => 'password_reset_sent',
             'target_id' => $membre->id,
