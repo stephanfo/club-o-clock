@@ -695,8 +695,15 @@ a.scard { text-decoration: none; color: inherit; }
        entre le contenu gris et la barre S'inscrire. On neutralise donc la réserve blanche héritée
        (partagée avec Alertes) et on la remet sur .fiche-scroll-m pour une continuité de fond. */
     .fiche-screen .fiche-mobile { padding-top: 0; padding-bottom: 0; }
+    /* min-height : la réserve basse ci-dessous ne suffit pas quand le PANNEAU est court.
+       Le `min-height: 40vh` de base laissait le gris s'arrêter à 40 % de l'écran, et le blanc
+       de .fiche-mobile réapparaissait dessous — la bande blanche que ce bloc combat, revenue
+       par l'autre bout (vu sur l'onglet Waitlist d'une séance à un seul inscrit en file).
+       100dvh (et non vh) : sur mobile, vh ignore la barre d'URL rétractable et fabriquerait un
+       débordement vertical à chaque scroll. */
     .fiche-screen .fiche-scroll-m {
         padding-bottom: calc(var(--botnav-top) + var(--fiche-actions-h) + 12px);
+        min-height: 100dvh;
     }
     /* La mini-barre fiche n'a pas sa propre fleur (le héros fondu en porte une, cf. ::before). */
     .topbar-fiche::before { display: none; }

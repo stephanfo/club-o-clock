@@ -94,8 +94,20 @@ Les trois séparément, si tu veux itérer plus vite :
 ```bash
 vendor/bin/pint                                  # corrige le style
 vendor/bin/phpstan analyse --memory-limit=1G     # analyse statique
-composer test                                    # tests
+composer test                                    # tests (hors groupe `destructif`)
+composer test-destructif                         # le groupe `destructif`, seul
 ```
+
+> **Pourquoi deux passages de tests.** `demo:reset` exécute `migrate:fresh` — un DROP/CREATE de
+> toutes les tables. Joué au milieu de la suite, il traverse les transactions ouvertes de
+> `RefreshDatabase` et fait échouer des tests qui n'ont aucun rapport (un deadlock InnoDB 1213 a
+> été observé sur l'activation d'invitation). Les tests concernés portent donc l'attribut
+> `#[Group('destructif')]` : exclus de la suite principale par `phpunit.xml`, rejoués seuls
+> ensuite. `composer check` enchaîne les deux — la couverture est identique, la porte cesse
+> d'être erratique. **Un test qui rougit une fois sur dix sans cause réelle est pire qu'absent :
+> il apprend à ignorer le rouge.**
+>
+> Tout nouveau test qui détruit ou reconstruit la base doit rejoindre ce groupe.
 
 ### Tests navigateur (E2E) — hors porte de qualité
 

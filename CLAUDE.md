@@ -29,6 +29,12 @@ Stack — **monolithe Laravel 13** sur hébergement mutualisé + **MariaDB/MySQL
 composer check
 ```
 
+> `composer check` enchaîne **deux passages de tests** : la suite principale, puis le groupe
+> `destructif` seul (`composer test-destructif`). Les tests de ce groupe exécutent
+> `migrate:fresh` (DROP/CREATE de toutes les tables) : joués au milieu de la suite, ils
+> traversent les transactions de `RefreshDatabase` et font rougir des tests sans rapport.
+> **Tout nouveau test qui détruit ou reconstruit la base porte `#[Group('destructif')]`.**
+
 Une correction de bug apporte **un test qui échouait avant**. Une fonctionnalité apporte les tests de son comportement, **y compris les refus** (qui n'a *pas* le droit de faire quoi).
 
 ### Tests navigateur (E2E) — hors `composer check`
