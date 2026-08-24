@@ -231,6 +231,50 @@ class MemberInvitationTest extends TestCase
         $this->assertCount(3, app(InvitationService::class)->awaitingInvitation());
     }
 
+    // ── La modale annonce ce que le clic fait vraiment ──
+
+    /** Insère en masse des comptes « jamais entrés » — 800 factories seraient trop lentes ici. */
+    private function comptesEnAttente(int $nombre): void
+    {
+        $lignes = [];
+        for ($i = 0; $i < $nombre; $i++) {
+            $lignes[] = [
+                'first_name' => 'Lot', 'last_name' => 'Numero'.str_pad((string) $i, 4, '0', STR_PAD_LEFT),
+                'email' => "lot{$i}@club.test", 'email_verified_at' => now(),
+                'roles' => json_encode(['athlete']), 'is_active' => true, 'is_minor' => false,
+                'created_at' => now(), 'updated_at' => now(),
+            ];
+        }
+        User::insert($lignes);
+    }
+
+    public function test_the_confirmation_modal_announces_the_real_batch_not_the_backlog(): void
+    {
+        // La modale affichait `$awaiting`, le total en attente, alors que le clic est plafonné à
+        // BULK_INVITE_CAP : l'admin d'un gros import lisait « 800 invitations mises en file », en
+        // envoyait 500, et les 300 restants étaient omis sans un mot.
+        $this->comptesEnAttente(MemberList::BULK_INVITE_CAP + 300);
+
+        Livewire::actingAs($this->admin())->test(MemberList::class)
+            ->call('confirmBulkInvite')
+            ->assertSee('<b>'.MemberList::BULK_INVITE_CAP.'</b> invitations mises en file', escape: false)
+            ->assertDontSee('<b>'.(MemberList::BULK_INVITE_CAP + 300).'</b> invitation', escape: false)
+            // Le reliquat est dit, sinon l'admin croit l'action terminée alors qu'elle est à relancer.
+            ->assertSee('<b>300</b> compte', escape: false);
+    }
+
+    public function test_the_confirmation_modal_says_nothing_about_a_leftover_when_there_is_none(): void
+    {
+        // Contrôle positif apparié : sous le plafond, le nombre annoncé EST l'arriéré et la ligne
+        // « Reste » ne doit pas apparaître.
+        $this->comptesEnAttente(12);
+
+        Livewire::actingAs($this->admin())->test(MemberList::class)
+            ->call('confirmBulkInvite')
+            ->assertSee('<b>12</b> invitations mises en file', escape: false)
+            ->assertDontSee('Envoi limité à');
+    }
+
     // ── Un envoi que personne ne recevra n'est pas un envoi (§4.17) ──
 
     public function test_invitation_is_refused_when_the_club_email_channel_is_off(): void

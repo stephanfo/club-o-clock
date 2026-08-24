@@ -278,11 +278,17 @@ class MemberService
      *
      * Changer l'adresse RÉVOQUE tout ce qui pointait l'ancienne. C'est le cœur du geste, pas un
      * ménage : on corrige typiquement une coquille de saisie, donc les secrets déjà partis sont
-     * précisément entre les mains de quelqu'un d'autre. Trois familles à couper —
+     * précisément entre les mains de quelqu'un d'autre. Quatre familles à couper —
      *   - les invitations d'activation non consommées, indexées par user_id : elles survivraient
      *     au changement d'adresse et resteraient honorées jusqu'à 30 jours ;
      *   - les liens magiques et codes émis pour l'ancienne adresse ;
-     *   - les jetons de réinitialisation de mot de passe de l'ancienne adresse.
+     *   - les jetons de réinitialisation de mot de passe de l'ancienne adresse ;
+     *   - les SESSIONS déjà ouvertes et les cookies « se souvenir de moi ». Sans elles, révoquer
+     *     les jetons ne sert à rien : le tiers qui a activé le compte depuis l'ancienne adresse
+     *     reste connecté indéfiniment, exactement le risque que le geste prétend couvrir. On coupe
+     *     TOUTES les sessions sans exception — l'admin agit depuis SA propre session, aucune
+     *     session légitime de l'adhérent n'est à préserver à cet instant (même raisonnement que le
+     *     listener PasswordReset de FortifyServiceProvider).
      *
      * La nouvelle adresse est marquée vérifiée pour la même raison qu'à la création : l'admin la
      * tient du dossier de licence, et sans email vérifié le compte redeviendrait muet (§4.1.1).
@@ -310,12 +316,29 @@ class MemberService
                 DB::table('password_reset_tokens')->where('email', $ancien)->delete();
             }
 
+            $this->revokeSessions($member);
+
             AuditLogger::record('email_changed', $actor, [
                 'target_type' => User::class,
                 'target_id' => $member->id,
             ]);
             ActivityLogger::record('member_email_changed', $actor, ['user_id' => $member->id]);
         });
+    }
+
+    /**
+     * Coupe tous les accès déjà ouverts d'un adhérent : lignes de session ET cookies « se souvenir
+     * de moi ». Supprimer les sessions ne suffit pas — les deux chemins de login (lien magique,
+     * OAuth) posent un cookie remember, et Laravel ré-authentifierait l'appareil au passage suivant.
+     * Régénérer `remember_token` invalide tous ces cookies d'un coup (le jeton est par-utilisateur).
+     *
+     * Appelé depuis des gestes ADMIN : jamais depuis la session de l'adhérent visé, donc aucune
+     * session à épargner — à l'inverse de Profil::purgeOtherSessions(), qui préserve la courante.
+     */
+    private function revokeSessions(User $member): void
+    {
+        DB::table(config('session.table', 'sessions'))->where('user_id', $member->id)->delete();
+        $member->forceFill(['remember_token' => null])->save();
     }
 
     // --- Suppression de compte RGPD (PRD §4.3, §4.18.3) ---
@@ -433,6 +456,12 @@ class MemberService
             $member->authIdentities()->delete();
             InvitationToken::where('user_id', $member->id)->delete();
             $member->notificationPreferences()->delete();
+
+            // Les SESSIONS déjà ouvertes, sans quoi l'effacement ne ferme rien : les gardes
+            // `is_active` / `anonymized_at` ne valent que pour un NOUVEAU login (§4.3), donc un
+            // appareil resté connecté continuerait de naviguer dans l'application sur un compte
+            // effacé. Purger `remember_token` fait partie du scrub juste en dessous.
+            $this->revokeSessions($member);
 
             // Minimisation + non-contact après effacement (§4.3) : les endpoints push identifient
             // les appareils de la personne (le cascadeOnDelete ne joue jamais, le tombstone reste),

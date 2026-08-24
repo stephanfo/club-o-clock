@@ -201,11 +201,22 @@
 
     {{-- Envoi de masse : notifie des tiers → confirmation à conséquences (conventions UI). --}}
     @if ($confirmingBulkInvite)
+        {{-- Ce clic est PLAFONNÉ (MemberList::BULK_INVITE_CAP) : la modale annonce ce qui va
+             réellement partir, pas le total en attente. Sinon l'admin d'un gros import lisait
+             « 800 invitations mises en file » avant de cliquer, et 300 étaient omises en silence.
+             Le reliquat est dit explicitement — l'action est réexécutable. --}}
+        @php($lot = min($awaiting, $inviteCap))
+        @php($reste = $awaiting - $lot)
         <x-dialog title="Inviter les adhérents en attente" :sub="$awaiting.' compte'.($awaiting > 1 ? 's' : '').' concerné'.($awaiting > 1 ? 's' : '')" :width="460" close="$set('confirmingBulkInvite', false)">
             <div style="display:flex;flex-direction:column;gap:12px">
                 <x-conseq-row icon="mail" label="Envoi" tone="green">
-                    <span><b>{{ $awaiting }}</b> invitation{{ $awaiting > 1 ? 's' : '' }} mise{{ $awaiting > 1 ? 's' : '' }} en file — elles partent au fil du cron, visibles dans <b>Admin → Envois</b>.</span>
+                    <span><b>{{ $lot }}</b> invitation{{ $lot > 1 ? 's' : '' }} mise{{ $lot > 1 ? 's' : '' }} en file — elles partent au fil du cron, visibles dans <b>Admin → Envois</b>.</span>
                 </x-conseq-row>
+                @if ($reste > 0)
+                    <x-conseq-row icon="clock" label="Reste" tone="warn">
+                        <span>Envoi limité à <b>{{ $inviteCap }}</b> par clic pour ne pas saturer la file. <b>{{ $reste }}</b> compte{{ $reste > 1 ? 's' : '' }} restera{{ $reste > 1 ? 'nt' : '' }} en attente : relance l'action pour les traiter.</span>
+                    </x-conseq-row>
+                @endif
                 <x-conseq-row icon="users" label="Qui" tone="ink">
                     <span>Uniquement les comptes actifs, avec email, <b>jamais entrés</b> et sans invitation en cours. Personne n'est sollicité deux fois.</span>
                 </x-conseq-row>

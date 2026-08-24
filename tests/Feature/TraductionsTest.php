@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 // Traductions FR des messages du framework (§ « Langue du projet : français »).
@@ -65,6 +67,54 @@ class TraductionsTest extends TestCase
                 $this->assertDoesNotMatchRegularExpression('/^[a-z_]+\.[a-z_]+$/', $valeur,
                     "lang/fr/{$fichier}.php : « {$cle} » ressemble encore à une clé.");
             }
+        }
+    }
+
+    // ── Chaînes du framework à clé JSON (gabarit d'email) ──
+
+    /**
+     * Le gabarit de notification par email n'utilise PAS de clés `fichier.cle` : il appelle
+     * `@lang('Regards,')`, `@lang('Hello!')` et la ligne de repli du bouton avec la PHRASE ANGLAISE
+     * pour clé. Ces chaînes-là ne vivent pas dans `lang/fr/*.php` mais dans `lang/fr.json` — les
+     * ignorer laissait le pied de TOUS les emails du club en anglais, sans que rien ne le voie.
+     *
+     * @return array<int, array<int, string>>
+     */
+    public static function chainesDuGabaritMail(): array
+    {
+        return [
+            ['Hello!'],
+            ['Whoops!'],
+            ['Regards,'],
+            ['All rights reserved.'],
+            ["If you're having trouble clicking the \":actionText\" button, copy and paste the URL below\ninto your web browser:"],
+        ];
+    }
+
+    #[DataProvider('chainesDuGabaritMail')]
+    public function test_the_mail_template_strings_are_translated(string $chaine): void
+    {
+        $this->assertNotSame($chaine, __($chaine),
+            "lang/fr.json ne traduit pas « {$chaine} » — le gabarit d'email la rendrait en anglais.");
+    }
+
+    public function test_the_password_reset_email_is_written_in_french(): void
+    {
+        // Le seul email que Laravel compose lui-même : ses lignes sont à clé JSON, donc rien dans
+        // lang/fr/*.php ne pouvait les traduire. Le bouton admin « envoyer un lien » expédiait un
+        // mail intégralement anglais (« Hello! », « Reset Password », « This password reset link
+        // will expire in :count minutes. ») à un adhérent francophone.
+        $membre = User::factory()->create(['email' => 'membre@club.test']);
+
+        $rendu = (new ResetPassword('un-jeton'))->toMail($membre)->render()->toHtml();
+
+        $this->assertStringContainsString('Bonjour,', $rendu);
+        $this->assertStringContainsString('Choisir un nouveau mot de passe', $rendu);
+        $this->assertStringContainsString('À bientôt,', $rendu);
+
+        foreach (['Hello!', 'Reset Password', 'Regards,', 'no further action is required', 'having trouble clicking'] as $anglais) {
+            $this->assertStringNotContainsString($anglais, $rendu,
+                "L'email de réinitialisation contient encore « {$anglais} ».");
         }
     }
 

@@ -91,6 +91,49 @@ class MemberEmailChangeTest extends TestCase
         $this->assertDatabaseHas('invitation_tokens', ['token_hash' => hash('sha256', 'consomme')]);
     }
 
+    public function test_changing_the_address_closes_the_sessions_already_open(): void
+    {
+        // Le cœur du geste : le tiers qui a activé le compte depuis l'adresse erronée est DÉJÀ
+        // entré. Révoquer les jetons sans couper sa session le laisserait connecté indéfiniment —
+        // exactement le risque que la correction prétend fermer.
+        $membre = $this->membre();
+        DB::table('http_sessions')->insert([
+            'id' => 'session-du-tiers', 'user_id' => $membre->id, 'ip_address' => '1.2.3.4',
+            'user_agent' => 'Mozilla/5.0 (iPhone) Safari', 'payload' => 'x', 'last_activity' => time(),
+        ]);
+
+        app(MemberService::class)->updateEmail($membre, 'correct@club.test', $this->admin());
+
+        $this->assertDatabaseMissing('http_sessions', ['id' => 'session-du-tiers']);
+    }
+
+    public function test_changing_the_address_invalidates_the_remember_cookies(): void
+    {
+        // Supprimer la ligne de session ne suffit pas : les deux chemins de login posent un cookie
+        // « se souvenir de moi », et Laravel ré-authentifierait l'appareil au passage suivant.
+        $membre = $this->membre();
+        $membre->forceFill(['remember_token' => str_repeat('a', 60)])->save();
+
+        app(MemberService::class)->updateEmail($membre, 'correct@club.test', $this->admin());
+
+        $this->assertNull($membre->refresh()->remember_token);
+    }
+
+    public function test_an_unchanged_address_leaves_the_sessions_alone(): void
+    {
+        // Contrôle positif apparié au test ci-dessus : rouvrir et réenregistrer sans rien changer
+        // ne doit déconnecter personne.
+        $membre = $this->membre();
+        DB::table('http_sessions')->insert([
+            'id' => 'session-legitime', 'user_id' => $membre->id, 'ip_address' => '1.2.3.4',
+            'user_agent' => 'Mozilla/5.0 (Macintosh) Firefox', 'payload' => 'x', 'last_activity' => time(),
+        ]);
+
+        app(MemberService::class)->updateEmail($membre, 'coquille@club.test', $this->admin());
+
+        $this->assertDatabaseHas('http_sessions', ['id' => 'session-legitime']);
+    }
+
     // ── Ce que le changement rétablit ──
 
     public function test_the_new_address_is_verified_so_the_account_is_not_mute(): void

@@ -254,6 +254,9 @@ class MemberList extends Component
             // dans la recherche, hydrater tous les modèles pour n'afficher qu'un nombre se payait
             // à chaque caractère.
             'awaiting' => app(InvitationService::class)->awaitingInvitationQuery()->count(),
+            // La modale annonce ce que CE clic enverra, pas le total en attente : l'action est
+            // plafonnée, et promettre 800 envois pour en faire 500 mentirait à l'admin.
+            'inviteCap' => self::BULK_INVITE_CAP,
         ]);
     }
 }
