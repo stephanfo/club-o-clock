@@ -119,6 +119,59 @@ class MemberEmailChangeTest extends TestCase
         $this->assertNull($membre->refresh()->remember_token);
     }
 
+    public function test_an_admin_correcting_their_own_address_stays_logged_in(): void
+    {
+        // Un admin peut corriger SA propre adresse depuis sa fiche. Tout couper le déconnectait
+        // lui-même — et l'écran affichait un succès vert sur une session déjà morte : il croyait
+        // pouvoir enchaîner et se faisait éjecter vers /login au geste suivant, sans rien pour
+        // relier les deux. Sa session est légitime : il vient de prouver qu'il la contrôle.
+        $admin = $this->admin();
+        $this->actingAs($admin);
+        $sienne = session()->getId();
+        DB::table('http_sessions')->insert([
+            'id' => $sienne, 'user_id' => $admin->id, 'ip_address' => '1.2.3.4',
+            'user_agent' => 'Mozilla/5.0 (Macintosh) Firefox', 'payload' => 'x', 'last_activity' => time(),
+        ]);
+
+        app(MemberService::class)->updateEmail($admin, 'admin-corrige@club.test', $admin);
+
+        $this->assertDatabaseHas('http_sessions', ['id' => $sienne]);
+        $this->assertTrue(auth()->check(), 'L’admin ne doit pas être déconnecté par sa propre correction.');
+    }
+
+    public function test_an_admin_correcting_their_own_address_still_closes_their_other_devices(): void
+    {
+        // Contrôle positif apparié : la garde épargne LA session courante, pas les autres. Un
+        // second appareil de l'admin tombe comme n'importe quel accès ouvert.
+        $admin = $this->admin();
+        $this->actingAs($admin);
+        DB::table('http_sessions')->insert([
+            'id' => 'autre-appareil-de-l-admin', 'user_id' => $admin->id, 'ip_address' => '5.6.7.8',
+            'user_agent' => 'Mozilla/5.0 (iPhone) Safari', 'payload' => 'x', 'last_activity' => time(),
+        ]);
+
+        app(MemberService::class)->updateEmail($admin, 'admin-corrige@club.test', $admin);
+
+        $this->assertDatabaseMissing('http_sessions', ['id' => 'autre-appareil-de-l-admin']);
+    }
+
+    public function test_the_exemption_does_not_extend_to_a_member_who_is_not_the_actor(): void
+    {
+        // La garde ne doit JAMAIS épargner la session d'un tiers : c'est tout l'objet du geste.
+        // Un admin connecté corrige l'adresse d'un adhérent, dont la session doit tomber.
+        $admin = $this->admin();
+        $this->actingAs($admin);
+        $membre = $this->membre();
+        DB::table('http_sessions')->insert([
+            'id' => 'session-du-tiers-visee', 'user_id' => $membre->id, 'ip_address' => '1.2.3.4',
+            'user_agent' => 'Mozilla/5.0 (iPhone) Safari', 'payload' => 'x', 'last_activity' => time(),
+        ]);
+
+        app(MemberService::class)->updateEmail($membre, 'correct@club.test', $admin);
+
+        $this->assertDatabaseMissing('http_sessions', ['id' => 'session-du-tiers-visee']);
+    }
+
     public function test_an_unchanged_address_leaves_the_sessions_alone(): void
     {
         // Contrôle positif apparié au test ci-dessus : rouvrir et réenregistrer sans rien changer

@@ -12,6 +12,7 @@ use App\Support\AgeCategory;
 use App\Support\Logging\ActivityLogger;
 use App\Support\Logging\AuditLogger;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -285,10 +286,9 @@ class MemberService
      *   - les jetons de réinitialisation de mot de passe de l'ancienne adresse ;
      *   - les SESSIONS déjà ouvertes et les cookies « se souvenir de moi ». Sans elles, révoquer
      *     les jetons ne sert à rien : le tiers qui a activé le compte depuis l'ancienne adresse
-     *     reste connecté indéfiniment, exactement le risque que le geste prétend couvrir. On coupe
-     *     TOUTES les sessions sans exception — l'admin agit depuis SA propre session, aucune
-     *     session légitime de l'adhérent n'est à préserver à cet instant (même raisonnement que le
-     *     listener PasswordReset de FortifyServiceProvider).
+     *     reste connecté indéfiniment, exactement le risque que le geste prétend couvrir. Seule
+     *     exception, la session de l'acteur quand il corrige SA propre adresse (cf. revokeSessions) :
+     *     il vient de prouver qu'il la contrôle, et le geste n'a pas à le déconnecter lui-même.
      *
      * La nouvelle adresse est marquée vérifiée pour la même raison qu'à la création : l'admin la
      * tient du dossier de licence, et sans email vérifié le compte redeviendrait muet (§4.1.1).
@@ -316,7 +316,7 @@ class MemberService
                 DB::table('password_reset_tokens')->where('email', $ancien)->delete();
             }
 
-            $this->revokeSessions($member);
+            $this->revokeSessions($member, $actor);
 
             AuditLogger::record('email_changed', $actor, [
                 'target_type' => User::class,
@@ -327,18 +327,41 @@ class MemberService
     }
 
     /**
-     * Coupe tous les accès déjà ouverts d'un adhérent : lignes de session ET cookies « se souvenir
-     * de moi ». Supprimer les sessions ne suffit pas — les deux chemins de login (lien magique,
-     * OAuth) posent un cookie remember, et Laravel ré-authentifierait l'appareil au passage suivant.
-     * Régénérer `remember_token` invalide tous ces cookies d'un coup (le jeton est par-utilisateur).
+     * Coupe les accès déjà ouverts d'un adhérent : lignes de session ET cookies « se souvenir de
+     * moi ». Supprimer les sessions ne suffit pas — les deux chemins de login (lien magique, OAuth)
+     * posent un cookie remember, et Laravel ré-authentifierait l'appareil au passage suivant.
+     * Régénérer `remember_token` invalide tous ces cookies d'un coup (le jeton est par-utilisateur,
+     * pas par-session), d'où la ré-émission de celui de l'acteur quand il est sa propre cible.
      *
-     * Appelé depuis des gestes ADMIN : jamais depuis la session de l'adhérent visé, donc aucune
-     * session à épargner — à l'inverse de Profil::purgeOtherSessions(), qui préserve la courante.
+     * `$actor` non nul ÉPARGNE la session courante quand l'acteur est la cible. Un admin peut
+     * corriger sa propre adresse depuis sa fiche : tout couper le déconnectait lui-même, et l'écran
+     * affichait alors un succès vert sur une session déjà morte — il croyait pouvoir enchaîner et
+     * se faisait éjecter vers /login au geste suivant, sans rien pour relier les deux. Sa session
+     * est légitime par construction : il vient de prouver qu'il la contrôle en agissant. Ce que la
+     * révocation vise, ce sont les TIERS qui détenaient l'ancienne adresse. Même raisonnement que
+     * Profil::purgeOtherSessions(), qui préserve la courante pour la même raison.
+     *
+     * `$actor` nul = ne rien épargner (suppression RGPD : le compte doit perdre tous ses accès).
      */
-    private function revokeSessions(User $member): void
+    private function revokeSessions(User $member, ?User $actor = null): void
     {
-        DB::table(config('session.table', 'sessions'))->where('user_id', $member->id)->delete();
+        $sessionCourante = $actor !== null && $actor->id === $member->id && auth()->id() === $member->id
+            ? session()->getId()
+            : null;
+
+        DB::table(config('session.table', 'sessions'))
+            ->where('user_id', $member->id)
+            ->when($sessionCourante !== null, fn ($q) => $q->where('id', '!=', $sessionCourante))
+            ->delete();
+
         $member->forceFill(['remember_token' => null])->save();
+
+        // Ré-émission APRÈS la purge : Auth::login régénère l'id de session courante, donc le faire
+        // avant ferait porter le `!=` ci-dessus sur un id périmé — la session épargnée serait celle
+        // qui n'existe plus, et l'acteur se retrouverait déconnecté malgré la garde.
+        if ($sessionCourante !== null) {
+            Auth::login($member, remember: true);
+        }
     }
 
     // --- Suppression de compte RGPD (PRD §4.3, §4.18.3) ---
