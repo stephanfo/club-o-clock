@@ -24,7 +24,7 @@
             <div>
                 <label class="field-label" for="ip-title">Titre</label>
                 <div class="ifield">
-                    <input id="ip-title" class="ifield-input" type="text" wire:model="title" maxlength="160"
+                    <input id="ip-title" class="ifield-input" type="text" wire:model.blur="title" maxlength="160"
                            placeholder="ex. Bon d'achat chez notre partenaire">
                 </div>
                 @error('title')<div class="meta" style="color:var(--danger);margin-top:4px">{{ $message }}</div>@enderror

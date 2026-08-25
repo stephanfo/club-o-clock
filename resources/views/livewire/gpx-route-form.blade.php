@@ -37,7 +37,7 @@
                         <div>
                             <label class="field-label">Nom<x-req-mark /></label>
                             <div class="ifield @error('name') is-error @enderror">
-                                <input class="ifield-input" type="text" wire:model="name" placeholder="Ex. Boucle Loire 42 km">
+                                <input class="ifield-input" type="text" wire:model.blur="name" placeholder="Ex. Boucle Loire 42 km">
                             </div>
                             @error('name')<div class="field-error">{{ $message }}</div>@enderror
                         </div>
@@ -71,7 +71,7 @@
                         <div style="grid-column:1/-1">
                             <label class="field-label">Description <span class="meta" style="text-transform:none;letter-spacing:0;font-weight:400">· optionnel</span></label>
                             <div class="ifield @error('description') is-error @enderror">
-                                <textarea class="ifield-input" rows="3" wire:model="description" placeholder="Revêtement, points d'eau, passages délicats…"></textarea>
+                                <textarea class="ifield-input" rows="3" wire:model.blur="description" placeholder="Revêtement, points d'eau, passages délicats…"></textarea>
                             </div>
                             @error('description')<div class="field-error">{{ $message }}</div>@enderror
                         </div>
@@ -147,7 +147,7 @@
                     <div>
                         <label class="field-label">Lien d'embed <span class="meta" style="text-transform:none;letter-spacing:0;font-weight:400">· optionnel</span></label>
                         <div class="ifield @error('openrunner_embed_url') is-error @enderror">
-                            <input class="ifield-input" type="text" wire:model="openrunner_embed_url" placeholder="https://www.openrunner.com/embed.html?code=…">
+                            <input class="ifield-input" type="text" wire:model.blur="openrunner_embed_url" placeholder="https://www.openrunner.com/embed.html?code=…">
                         </div>
                         @error('openrunner_embed_url')<div class="field-error">{{ $message }}</div>@enderror
                     </div>
@@ -155,7 +155,7 @@
                     <div style="margin-top:12px">
                         <label class="field-label">Lien public <span class="meta" style="text-transform:none;letter-spacing:0;font-weight:400">· optionnel</span></label>
                         <div class="ifield @error('openrunner_public_url') is-error @enderror">
-                            <input class="ifield-input" type="text" wire:model="openrunner_public_url" placeholder="https://www.openrunner.com/route-details/…">
+                            <input class="ifield-input" type="text" wire:model.blur="openrunner_public_url" placeholder="https://www.openrunner.com/route-details/…">
                         </div>
                         @error('openrunner_public_url')<div class="field-error">{{ $message }}</div>@enderror
                     </div>

@@ -44,7 +44,7 @@
                         <input type="file" wire:model="logo" accept="image/*" style="display:none">
                     </label>
                     <div class="f1" style="min-width:0">
-                        <div class="ifield"><input class="ifield-input" type="text" maxlength="255" wire:model="name" placeholder="Nom du club" style="font-weight:800;font-size:16px"></div>
+                        <div class="ifield"><input class="ifield-input" type="text" maxlength="255" wire:model.blur="name" placeholder="Nom du club" style="font-weight:800;font-size:16px"></div>
                         {{-- Nuancier des disciplines : --swim/--bike/--run sont des ALIAS de
                              --info/--brand/--accent (club-app.css). Il montre donc l'effet de la
                              palette éditée juste en dessous, dans l'ordre des disciplines et non
@@ -65,7 +65,7 @@
                      champ n'est pas prérempli, pour que « je n'ai rien saisi » reste lisible. --}}
                 <label class="field-label" style="margin-top:14px">Baseline</label>
                 <div class="ifield">
-                    <input class="ifield-input" type="text" maxlength="120" wire:model="tagline"
+                    <input class="ifield-input" type="text" maxlength="120" wire:model.blur="tagline"
                            placeholder="{{ \App\Models\ClubSettings::DEFAULT_TAGLINE }}">
                 </div>
                 <div class="meta" style="font-size:var(--text-xs);margin-top:4px">
@@ -101,7 +101,7 @@
                 </select>
 
                 <label class="field-label" style="margin-top:12px">Durée du lien d'invitation (jours)</label>
-                <div class="ifield"><input class="ifield-input" type="number" min="1" max="365" wire:model="invitation_link_days"></div>
+                <div class="ifield"><input class="ifield-input" type="number" min="1" max="365" wire:model.blur="invitation_link_days"></div>
 
                 <label class="field-label" style="margin-top:12px">Mois de bascule de saison</label>
                 <select class="input" wire:model="season_start_month">
@@ -173,29 +173,29 @@
                 </div>
 
                 <label class="field-label">Éditeur du site</label>
-                <div class="ifield"><input class="ifield-input" type="text" maxlength="500" wire:model="legal_publisher" placeholder="Association…, siège social…, SIRET/RNA…"></div>
+                <div class="ifield"><input class="ifield-input" type="text" maxlength="500" wire:model.blur="legal_publisher" placeholder="Association…, siège social…, SIRET/RNA…"></div>
                 @error('legal_publisher')<div class="meta" style="color:var(--danger);margin-top:6px">{{ $message }}</div>@enderror
 
                 <label class="field-label" style="margin-top:12px">Hébergeur</label>
-                <div class="ifield"><input class="ifield-input" type="text" maxlength="500" wire:model="legal_host" placeholder="Nom et adresse de l'hébergeur"></div>
+                <div class="ifield"><input class="ifield-input" type="text" maxlength="500" wire:model.blur="legal_host" placeholder="Nom et adresse de l'hébergeur"></div>
                 @error('legal_host')<div class="meta" style="color:var(--danger);margin-top:6px">{{ $message }}</div>@enderror
 
                 <label class="field-label" style="margin-top:12px">Directeur de la publication</label>
-                <div class="ifield"><input class="ifield-input" type="text" maxlength="255" wire:model="legal_director" placeholder="Président·e ou personne désignée"></div>
+                <div class="ifield"><input class="ifield-input" type="text" maxlength="255" wire:model.blur="legal_director" placeholder="Président·e ou personne désignée"></div>
                 @error('legal_director')<div class="meta" style="color:var(--danger);margin-top:6px">{{ $message }}</div>@enderror
 
                 <label class="field-label" style="margin-top:12px">Email de contact (RGPD)</label>
-                <div class="ifield"><input class="ifield-input" type="email" maxlength="255" wire:model="legal_contact_email" placeholder="contact@monclub.fr"></div>
+                <div class="ifield"><input class="ifield-input" type="email" maxlength="255" wire:model.blur="legal_contact_email" placeholder="contact@monclub.fr"></div>
                 @error('legal_contact_email')<div class="meta" style="color:var(--danger);margin-top:6px">{{ $message }}</div>@enderror
 
                 <label class="field-label" style="margin-top:12px">Fournisseur d'email transactionnel</label>
-                <div class="ifield"><input class="ifield-input" type="text" maxlength="255" wire:model="legal_mail_provider" placeholder="Nom du service d'envoi retenu"></div>
+                <div class="ifield"><input class="ifield-input" type="text" maxlength="255" wire:model.blur="legal_mail_provider" placeholder="Nom du service d'envoi retenu"></div>
                 @error('legal_mail_provider')<div class="meta" style="color:var(--danger);margin-top:6px">{{ $message }}</div>@enderror
 
                 {{-- AGPL-3.0 §13 : informer l'utilisateur d'un service en réseau de son droit
                      d'accès au code source de la version déployée. --}}
                 <label class="field-label" style="margin-top:12px">URL du code source <span style="font-weight:400;text-transform:none;letter-spacing:0">· obligation AGPL</span></label>
-                <div class="ifield"><input class="ifield-input" type="url" maxlength="255" wire:model="legal_source_url" placeholder="https://github.com/…"></div>
+                <div class="ifield"><input class="ifield-input" type="url" maxlength="255" wire:model.blur="legal_source_url" placeholder="https://github.com/…"></div>
                 @error('legal_source_url')<div class="meta" style="color:var(--danger);margin-top:6px">{{ $message }}</div>@enderror
 
                 <div class="flex" style="justify-content:flex-end;margin-top:16px">
@@ -326,7 +326,7 @@
         <x-dialog title="Bascule de saison" sub="Action irréversible · double validation" :danger="true" :width="440" close="$set('showBascule', false)">
             <x-banner kind="danger"><div>Tu vas <b>suspendre {{ $impact['athletes'] }} compte{{ $impact['athletes'] > 1 ? 's' : '' }} athlète</b> et <b>annuler {{ $impact['future_registrations'] }} inscription{{ $impact['future_registrations'] > 1 ? 's' : '' }} future{{ $impact['future_registrations'] > 1 ? 's' : '' }}</b>. Les comptes coach/admin ne sont pas affectés.</div></x-banner>
             <label class="field-label" style="margin-top:14px">Motif (visible dans le bandeau inscrit)</label>
-            <textarea class="input" style="margin-top:6px" rows="2" wire:model="basculeMotif" placeholder="Saison N — réactive ton accès depuis ton profil après réinscription."></textarea>
+            <textarea class="input" style="margin-top:6px" rows="2" wire:model.blur="basculeMotif" placeholder="Saison N — réactive ton accès depuis ton profil après réinscription."></textarea>
             {{-- Rangée cliquable (div, pas label) : un <label> enveloppant le <button> de x-check
                  propagerait le clic au bouton → double $toggle qui s'annule. Le toggle est porté
                  par la rangée ; le x-check est neutralisé aux clics (pointer-events:none) et sert

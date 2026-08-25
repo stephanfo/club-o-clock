@@ -49,7 +49,7 @@
                     <span>Motif (optionnel)</span>
                     <span class="meta" style="font-size:11px"><span x-text="n">0</span>/140</span>
                 </label>
-                <input class="input" maxlength="140" wire:model="aperoMotif" x-on:input="n = $event.target.value.length"
+                <input class="input" maxlength="140" wire:model.blur="aperoMotif" x-on:input="n = $event.target.value.length"
                        placeholder="ex. mon anniversaire, podium dimanche…">
             </div>
             <button wire:click="flagApero" wire:loading.attr="disabled" wire:target="flagApero" class="btn btn-pink btn-block"><x-chope :size="16" /> J'offre l'apéro aussi</button>

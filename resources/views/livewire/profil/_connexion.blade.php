@@ -50,14 +50,14 @@
                     <div>
                         <label class="field-label" for="pf-cur-pwd">Mot de passe actuel</label>
                         <input id="pf-cur-pwd" type="password" class="input" autocomplete="current-password"
-                            wire:model="current_password">
+                            wire:model.blur="current_password">
                         @error('current_password') <div class="meta" style="color:var(--danger);font-size:12px;margin-top:4px">{{ $message }}</div> @enderror
                     </div>
                 @endif
                 <div>
                     <label class="field-label" for="pf-new-pwd">Nouveau mot de passe</label>
                     <input id="pf-new-pwd" type="password" class="input" autocomplete="new-password"
-                        wire:model="password">
+                        wire:model.blur="password">
                     @error('password') <div class="meta" style="color:var(--danger);font-size:12px;margin-top:4px">{{ $message }}</div> @enderror
                     {{-- La règle est annoncée AVANT la saisie, et sort de PasswordPolicy : c'est la
                          même source que la validation, donc les deux ne peuvent plus diverger. --}}
@@ -66,7 +66,7 @@
                 <div>
                     <label class="field-label" for="pf-new-pwd2">Confirmer</label>
                     <input id="pf-new-pwd2" type="password" class="input" autocomplete="new-password"
-                        wire:model="password_confirmation">
+                        wire:model.blur="password_confirmation">
                 </div>
                 @if ($hasPassword)
                     <label class="flex ac g8" style="font-size:13px">

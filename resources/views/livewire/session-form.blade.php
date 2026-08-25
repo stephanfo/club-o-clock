@@ -123,7 +123,7 @@
                         </div>
                         <div>
                             <label class="field-label">Distance</label>
-                            <div class="ifield @error('distance') is-error @enderror"><input class="ifield-input" type="text" wire:model="distance" placeholder="ex. 750 m / 20 km / 5 km"></div>
+                            <div class="ifield @error('distance') is-error @enderror"><input class="ifield-input" type="text" wire:model.blur="distance" placeholder="ex. 750 m / 20 km / 5 km"></div>
                             @error('distance')<div class="field-error">{{ $message }}</div>@enderror
                         </div>
                     </div>
@@ -133,12 +133,12 @@
                 <div class="form-row-title">
                     <div>
                         <label class="field-label">Titre<x-req-mark /></label>
-                        <div class="ifield @error('title') is-error @enderror"><input class="ifield-input" type="text" wire:model="title" placeholder="Ex. Natation seuil"></div>
+                        <div class="ifield @error('title') is-error @enderror"><input class="ifield-input" type="text" wire:model.blur="title" placeholder="Ex. Natation seuil"></div>
                         @error('title')<div class="field-error">{{ $message }}</div>@enderror
                     </div>
                     <div>
                         <label class="field-label">Capacité{{ $isTraining ? '' : ' (optionnelle)' }}<x-struct-tag :show="$edit" /></label>
-                        <div class="ifield @error('capacity') is-error @enderror"><input class="ifield-input" type="number" min="1" wire:model="capacity" placeholder="16"></div>
+                        <div class="ifield @error('capacity') is-error @enderror"><input class="ifield-input" type="number" min="1" wire:model.blur="capacity" placeholder="16"></div>
                         @error('capacity')<div class="field-error">{{ $message }}</div>@enderror
                     </div>
                 </div>
@@ -147,12 +147,12 @@
                 <div class="form-row2">
                     <div>
                         <label class="field-label">Date et heure<x-req-mark /><x-struct-tag :show="$edit" /></label>
-                        <div class="ifield @error('start_at') is-error @enderror"><input class="ifield-input" type="datetime-local" wire:model="start_at"></div>
+                        <div class="ifield @error('start_at') is-error @enderror"><input class="ifield-input" type="datetime-local" wire:model.blur="start_at"></div>
                         @error('start_at')<div class="field-error">{{ $message }}</div>@enderror
                     </div>
                     <div>
                         <label class="field-label">Durée (min)<x-req-mark /><x-struct-tag :show="$edit" /></label>
-                        <div class="ifield @error('duration_min') is-error @enderror"><input class="ifield-input" type="number" min="1" wire:model="duration_min"></div>
+                        <div class="ifield @error('duration_min') is-error @enderror"><input class="ifield-input" type="number" min="1" wire:model.blur="duration_min"></div>
                         @error('duration_min')<div class="field-error">{{ $message }}</div>@enderror
                     </div>
                 </div>
@@ -180,20 +180,20 @@
                 {{-- Lieu libre (optionnel) --}}
                 <div>
                     <label class="field-label">Lieu libre (optionnel)</label>
-                    <div class="ifield"><input class="ifield-input" type="text" wire:model="location_text" placeholder="…ou précise une adresse"></div>
+                    <div class="ifield"><input class="ifield-input" type="text" wire:model.blur="location_text" placeholder="…ou précise une adresse"></div>
                 </div>
 
                 {{-- Lien externe (competition & club_event) --}}
                 @if (!$isTraining)
                     <div>
                         <label class="field-label">{{ $kind === 'competition' ? 'Lien organisateur' : 'Lien (optionnel)' }}</label>
-                        <div class="ifield @error('external_url') is-error @enderror"><x-icon name="link" :size="15" style="color:var(--info)" /><input class="ifield-input" type="url" wire:model="external_url" placeholder="https://…"></div>
+                        <div class="ifield @error('external_url') is-error @enderror"><x-icon name="link" :size="15" style="color:var(--info)" /><input class="ifield-input" type="url" wire:model.blur="external_url" placeholder="https://…"></div>
                         @error('external_url')<div class="field-error">{{ $message }}</div>@enderror
                     </div>
                     {{-- Album photos externe (§4.12.6) — simple lien, aucune intégration --}}
                     <div>
                         <label class="field-label">Album photos <span class="meta" style="text-transform:none;letter-spacing:0;font-weight:400">· optionnel</span></label>
-                        <div class="ifield @error('photos_album_url') is-error @enderror"><x-icon name="image" :size="15" style="color:var(--info)" /><input class="ifield-input" type="url" wire:model="photos_album_url" placeholder="https://photos.google.com/…"></div>
+                        <div class="ifield @error('photos_album_url') is-error @enderror"><x-icon name="image" :size="15" style="color:var(--info)" /><input class="ifield-input" type="url" wire:model.blur="photos_album_url" placeholder="https://photos.google.com/…"></div>
                         @error('photos_album_url')<div class="field-error">{{ $message }}</div>@enderror
                     </div>
                 @endif
@@ -240,7 +240,7 @@
                             <label class="field-label">Lien d'embed OpenRunner <span class="meta" style="text-transform:none;letter-spacing:0;font-weight:400">· URL <code style="font-family:monospace;font-size:12px">src</code></span></label>
                             <div class="ifield" :style="valid ? '' : 'border-color:var(--danger)'">
                                 <x-icon name="map" :size="15" ::style="valid ? 'color:var(--brand-700)' : 'color:var(--danger)'" style="flex:0 0 auto" />
-                                <input class="ifield-input" type="text" wire:model="route_openrunner_embed_url"
+                                <input class="ifield-input" type="text" wire:model.blur="route_openrunner_embed_url"
                                        x-on:input="embed = $event.target.value; check()"
                                        placeholder="https://www.openrunner.com/embed.html?code=…">
                             </div>
@@ -254,7 +254,7 @@
                         </div>
                         <div>
                             <label class="field-label">Lien public OpenRunner <span class="meta" style="text-transform:none;letter-spacing:0;font-weight:400">· optionnel</span></label>
-                            <div class="ifield"><x-icon name="link" :size="15" style="color:var(--info);flex:0 0 auto" /><input class="ifield-input" type="url" wire:model="route_openrunner_public_url" placeholder="https://www.openrunner.com/r/…"></div>
+                            <div class="ifield"><x-icon name="link" :size="15" style="color:var(--info);flex:0 0 auto" /><input class="ifield-input" type="url" wire:model.blur="route_openrunner_public_url" placeholder="https://www.openrunner.com/r/…"></div>
                             @error('route_openrunner_public_url')<div class="field-error">{{ $message }}</div>@enderror
                         </div>
 

@@ -65,7 +65,7 @@
             <x-banner kind="info">L'email doit appartenir à <b>{{ $invWard?->first_name }}</b> : c'est lui/elle qui activera le compte et choisira sa méthode de connexion.</x-banner>
             <div style="margin-top:14px">
                 <label class="field-label">Email de l'enfant</label>
-                <div class="ifield"><input class="ifield-input" type="email" wire:model="inviteDialog.email" placeholder="prenom@exemple.fr"></div>
+                <div class="ifield"><input class="ifield-input" type="email" wire:model.blur="inviteDialog.email" placeholder="prenom@exemple.fr"></div>
                 @error('inviteDialog.email')<div class="meta" style="color:var(--accent);margin-top:6px">{{ $message }}</div>@enderror
             </div>
             <x-slot:footer>
