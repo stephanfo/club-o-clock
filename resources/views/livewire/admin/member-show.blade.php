@@ -95,7 +95,7 @@
                                      ce geste, une coquille n'avait aucun chemin de correction et son
                                      invitation de 30 jours restait vivante chez un tiers. --}}
                                 @if ($editingEmail)
-                                    <div class="ifield" style="margin-top:12px"><x-icon name="mail" :size="15" class="muted" /><input class="ifield-input" type="email" wire:model="email" placeholder="email de connexion"></div>
+                                    <div class="ifield" style="margin-top:12px"><x-icon name="mail" :size="15" class="muted" /><input class="ifield-input" type="email" wire:model.blur="email" placeholder="email de connexion"></div>
                                     @error('email') <div class="meta" style="color:var(--danger);margin-top:8px">{{ $message }}</div> @enderror
                                     <div class="meta" style="margin-top:8px;line-height:1.5">Changer l'adresse révoque l'invitation en cours et les liens de connexion envoyés à l'ancienne.</div>
                                     <div class="flex ac g8" style="margin-top:12px">
@@ -141,7 +141,7 @@
                                 @elseif (! $u->email)
                                     {{-- P1 → P2 : ouverture du compte autonome (§4.2.1) --}}
                                     <div class="meta" style="margin-top:12px;line-height:1.5">Ouvre le compte autonome de l'enfant : saisis son email — l'email doit appartenir à l'enfant. Une invitation d'activation lui sera envoyée ; le lien de tutelle est conservé.</div>
-                                    <div class="ifield" style="margin-top:10px"><x-icon name="mail" :size="15" class="muted" /><input class="ifield-input" type="email" wire:model="wardEmail" placeholder="email de l'enfant"></div>
+                                    <div class="ifield" style="margin-top:10px"><x-icon name="mail" :size="15" class="muted" /><input class="ifield-input" type="email" wire:model.blur="wardEmail" placeholder="email de l'enfant"></div>
                                     @error('wardEmail')<div class="meta" style="margin-top:6px;color:var(--danger)">{{ $message }}</div>@enderror
                                     <button type="button" class="btn btn-primary btn-block" style="margin-top:10px" wire:click="inviteWard">
                                         <x-icon name="user" :size="15" /> Inviter à activer son compte
@@ -256,7 +256,7 @@
                             </div>
                             @if ($editingDob)
                                 <div class="flex ac g10" style="margin-top:12px">
-                                    <input type="date" class="input f1" wire:model="dob" max="{{ now()->toDateString() }}">
+                                    <input type="date" class="input f1" wire:model.blur="dob" max="{{ now()->toDateString() }}">
                                 </div>
                                 @error('dob') <div class="meta" style="color:var(--danger);margin-top:8px">{{ $message }}</div> @enderror
                                 <div class="flex ac g8" style="margin-top:12px">
@@ -369,7 +369,7 @@
                                         </div>
                                         @if ($editingQualId === $q->id)
                                             <div class="flex ac g8" style="margin-top:10px">
-                                                <input type="date" class="input f1" wire:model="editQualExpiry">
+                                                <input type="date" class="input f1" wire:model.blur="editQualExpiry">
                                                 <button type="button" class="btn btn-primary btn-sm" wire:click="saveQualExpiry">OK</button>
                                                 <button type="button" class="btn btn-ghost btn-sm" wire:click="cancelQualExpiry">Annuler</button>
                                             </div>
@@ -393,7 +393,7 @@
                                     {{-- Étape 2 : fixer la date d'expiration (au besoin) puis valider. --}}
                                     @if ($pendingQualId !== null)
                                         <div class="meta" style="margin:12px 0 6px">Expiration (optionnelle, modifiable ensuite via le crayon) :</div>
-                                        <input type="date" class="input" style="width:100%;margin-bottom:4px" wire:model="newQualExpiry">
+                                        <input type="date" class="input" style="width:100%;margin-bottom:4px" wire:model.blur="newQualExpiry">
                                         <div class="meta" style="margin-bottom:8px;font-size:12px">Vide = sans expiration.</div>
                                         @error('newQualExpiry')<div class="meta" style="margin-bottom:6px;color:var(--danger)">{{ $message }}</div>@enderror
                                         <div class="flex g8">
@@ -530,7 +530,7 @@
             </x-banner>
             <div style="margin-top:14px">
                 <label class="field-label">Pour confirmer, saisissez le nom complet : <b>{{ $u->fullName() }}</b></label>
-                <input class="input" style="margin-top:8px" wire:model="deleteConfirmName" placeholder="{{ $u->fullName() }}" autocomplete="off">
+                <input class="input" style="margin-top:8px" wire:model.blur="deleteConfirmName" placeholder="{{ $u->fullName() }}" autocomplete="off">
                 @error('deleteConfirmName')<div class="meta" style="color:var(--danger);margin-top:6px">{{ $message }}</div>@enderror
             </div>
             <x-slot:footer>
@@ -559,7 +559,7 @@
             </div>
             <div style="margin-top:14px">
                 <label class="field-label">Motif (optionnel, consigné au journal)</label>
-                <input class="input" style="margin-top:8px" wire:model="suspendMotif" placeholder="Licence non renouvelée…" autocomplete="off">
+                <input class="input" style="margin-top:8px" wire:model.blur="suspendMotif" placeholder="Licence non renouvelée…" autocomplete="off">
             </div>
             <x-slot:footer>
                 <button type="button" class="btn btn-ghost" wire:click="$set('confirmingSuspend', false)">Annuler</button>

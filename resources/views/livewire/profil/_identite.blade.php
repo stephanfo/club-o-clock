@@ -17,12 +17,12 @@
         <div style="display:flex;flex-direction:column;gap:10px">
             <div>
                 <label class="field-label" for="pf-first">Prénom</label>
-                <input id="pf-first" type="text" class="input" wire:model="first_name">
+                <input id="pf-first" type="text" class="input" wire:model.blur="first_name">
                 @error('first_name') <div class="meta" style="color:var(--danger);font-size:12px;margin-top:4px">{{ $message }}</div> @enderror
             </div>
             <div>
                 <label class="field-label" for="pf-last">Nom</label>
-                <input id="pf-last" type="text" class="input" wire:model="last_name">
+                <input id="pf-last" type="text" class="input" wire:model.blur="last_name">
                 @error('last_name') <div class="meta" style="color:var(--danger);font-size:12px;margin-top:4px">{{ $message }}</div> @enderror
             </div>
             <button type="button" wire:click="saveIdentity" class="btn btn-primary btn-sm" style="align-self:flex-start"

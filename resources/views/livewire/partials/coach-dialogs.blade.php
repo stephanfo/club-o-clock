@@ -187,7 +187,7 @@
         </x-banner>
         <div style="margin-top:14px">
             <label class="field-label">Motif (optionnel, pour l'override)</label>
-            <div class="ifield"><input class="ifield-input" type="text" wire:model="athleteQuotaConfirm.motif" placeholder="Ex. créneau libéré, demande coach…"></div>
+            <div class="ifield"><input class="ifield-input" type="text" wire:model.blur="athleteQuotaConfirm.motif" placeholder="Ex. créneau libéré, demande coach…"></div>
         </div>
         <x-slot:footer>
             <button type="button" class="btn btn-ghost" wire:click="cancelAthleteQuota">Annuler</button>

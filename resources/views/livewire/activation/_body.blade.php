@@ -15,7 +15,7 @@
     <div style="display:flex;flex-direction:column;gap:10px">
         <div>
             <label class="field-label" for="ac-pwd">Mot de passe</label>
-            <input id="ac-pwd" type="password" class="input" autocomplete="new-password" wire:model="password">
+            <input id="ac-pwd" type="password" class="input" autocomplete="new-password" wire:model.blur="password">
             @error('password') <div class="meta" style="color:var(--danger);font-size:12px;margin-top:4px">{{ $message }}</div> @enderror
             {{-- La règle est annoncée AVANT la saisie, et sort de PasswordPolicy : c'est la même
                  source que la validation, donc les deux ne peuvent plus diverger. --}}
@@ -23,7 +23,7 @@
         </div>
         <div>
             <label class="field-label" for="ac-pwd2">Confirmer</label>
-            <input id="ac-pwd2" type="password" class="input" autocomplete="new-password" wire:model="password_confirmation">
+            <input id="ac-pwd2" type="password" class="input" autocomplete="new-password" wire:model.blur="password_confirmation">
         </div>
         <button type="button" wire:click="definePassword" class="btn btn-primary btn-block"
             wire:loading.attr="disabled" wire:target="definePassword">

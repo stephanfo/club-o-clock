@@ -15,8 +15,8 @@
             <div style="flex-basis:100%;min-width:100%;display:flex;flex-direction:column;gap:10px">
                 {{-- Ligne 1 : nom + type --}}
                 <div class="flex g8 wrap" style="align-items:flex-end">
-                    <div class="f1" style="min-width:180px"><label class="field-label">Nom du lieu</label><div class="ifield"><input class="ifield-input" type="text" wire:model="form.name" autofocus></div></div>
-                    <div style="width:180px"><label class="field-label">Type</label><div class="ifield"><input class="ifield-input" type="text" wire:model="form.kind" placeholder="Piscine…"></div></div>
+                    <div class="f1" style="min-width:180px"><label class="field-label">Nom du lieu</label><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="form.name" autofocus></div></div>
+                    <div style="width:180px"><label class="field-label">Type</label><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="form.kind" placeholder="Piscine…"></div></div>
                 </div>
 
                 {{-- Ligne 2 : adresse en autocomplétion (suggestions style carte : titre + adresse + type) --}}
@@ -49,8 +49,8 @@
 
                 {{-- Ligne 3 : coordonnées (auto-remplies par la sélection, modifiables) --}}
                 <div class="flex g8 wrap" style="align-items:flex-end">
-                    <div style="width:160px"><label class="field-label">Latitude</label><div class="ifield"><input class="ifield-input" type="text" wire:model="form.latitude" placeholder="47.37"></div></div>
-                    <div style="width:160px"><label class="field-label">Longitude</label><div class="ifield"><input class="ifield-input" type="text" wire:model="form.longitude" placeholder="-1.17"></div></div>
+                    <div style="width:160px"><label class="field-label">Latitude</label><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="form.latitude" placeholder="47.37"></div></div>
+                    <div style="width:160px"><label class="field-label">Longitude</label><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="form.longitude" placeholder="-1.17"></div></div>
                 </div>
 
                 {{-- Aperçu cartographique : marqueur sur le lieu géocodé, recentré en direct via `location-located`. --}}
@@ -64,17 +64,17 @@
                 @endif
             </div>
         @else
-            <div class="f1" style="min-width:140px"><label class="field-label">Libellé</label><div class="ifield"><input class="ifield-input" type="text" wire:model="form.label" autofocus></div></div>
+            <div class="f1" style="min-width:140px"><label class="field-label">Libellé</label><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="form.label" autofocus></div></div>
             @if ($type === 'category')
-                <div style="width:90px"><label class="field-label">Âge min</label><div class="ifield"><input class="ifield-input" type="number" min="0" wire:model="form.age_min"></div></div>
-                <div style="width:90px"><label class="field-label">Âge max</label><div class="ifield"><input class="ifield-input" type="number" min="0" wire:model="form.age_max"></div></div>
+                <div style="width:90px"><label class="field-label">Âge min</label><div class="ifield"><input class="ifield-input" type="number" min="0" wire:model.blur="form.age_min"></div></div>
+                <div style="width:90px"><label class="field-label">Âge max</label><div class="ifield"><input class="ifield-input" type="number" min="0" wire:model.blur="form.age_max"></div></div>
             @endif
             @if ($type === 'quota_tag')
-                <div style="width:120px"><label class="field-label">Code</label><div class="ifield"><input class="ifield-input" type="text" wire:model="form.code" placeholder="piscine"></div></div>
-                <div style="width:100px"><label class="field-label">Max / sem.</label><div class="ifield"><input class="ifield-input" type="number" min="1" max="14" wire:model="form.max_per_week"></div></div>
+                <div style="width:120px"><label class="field-label">Code</label><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="form.code" placeholder="piscine"></div></div>
+                <div style="width:100px"><label class="field-label">Max / sem.</label><div class="ifield"><input class="ifield-input" type="number" min="1" max="14" wire:model.blur="form.max_per_week"></div></div>
             @endif
             @if ($type === 'qualification')
-                <div style="width:120px"><label class="field-label">Code court</label><div class="ifield"><input class="ifield-input" type="text" wire:model="form.code" placeholder="BNSSA"></div></div>
+                <div style="width:120px"><label class="field-label">Code court</label><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="form.code" placeholder="BNSSA"></div></div>
             @endif
         @endif
     </div>

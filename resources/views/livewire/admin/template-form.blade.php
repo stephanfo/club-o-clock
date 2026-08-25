@@ -53,7 +53,7 @@
 
                 <div>
                     <label class="field-label">Titre du modèle</label>
-                    <div class="ifield"><input class="ifield-input" type="text" wire:model="label" placeholder="Ex. Natation seuil"></div>
+                    <div class="ifield"><input class="ifield-input" type="text" wire:model.blur="label" placeholder="Ex. Natation seuil"></div>
                 </div>
 
                 {{-- Récurrence — le cœur d'un modèle --}}
@@ -72,11 +72,11 @@
                     <div class="tpl-row2">
                         <div>
                             <label class="field-label">Heure de début</label>
-                            <div class="ifield"><input class="ifield-input" type="time" wire:model="start_time_of_day"></div>
+                            <div class="ifield"><input class="ifield-input" type="time" wire:model.blur="start_time_of_day"></div>
                         </div>
                         <div>
                             <label class="field-label">Durée (min)</label>
-                            <div class="ifield"><input class="ifield-input" type="number" min="1" wire:model="duration_min"></div>
+                            <div class="ifield"><input class="ifield-input" type="number" min="1" wire:model.blur="duration_min"></div>
                         </div>
                         <div>
                             <label class="field-label">Date de début</label>
@@ -100,7 +100,7 @@
                     </div>
                     <div>
                         <label class="field-label">Capacité</label>
-                        <div class="ifield"><input class="ifield-input" type="number" min="1" wire:model="capacity" placeholder="16"></div>
+                        <div class="ifield"><input class="ifield-input" type="number" min="1" wire:model.blur="capacity" placeholder="16"></div>
                     </div>
                 </div>
 

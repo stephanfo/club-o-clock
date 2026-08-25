@@ -55,7 +55,7 @@ const tous = [];
 
   await page.click('button[aria-label="Modifier l\'email"]');
   await page.waitForTimeout(600);
-  const champ = page.locator('input[wire\\:model="email"]').first();
+  const champ = page.locator('input[wire\\:model="email"], input[wire\\:model\\.blur="email"]').first();
   s.check('le champ d\'édition apparaît', await champ.isVisible().catch(() => false));
   s.check('la conséquence est annoncée avant le clic',
     /révoque l'invitation en cours/i.test(await page.locator('body').innerText()));
@@ -77,13 +77,13 @@ const tous = [];
   const occupe = sql(`SELECT email FROM users WHERE id<>${cible} AND email IS NOT NULL LIMIT 1`);
   await page.click('button[aria-label="Modifier l\'email"]');
   await page.waitForTimeout(500);
-  await page.locator('input[wire\\:model="email"]').first().fill(occupe);
+  await page.locator('input[wire\\:model="email"], input[wire\\:model\\.blur="email"]').first().fill(occupe);
   await page.locator('button[wire\\:click="saveEmail"]').first().click();
   await page.waitForTimeout(1000);
   s.check('doublon refusé, adresse inchangée', sql(`SELECT email FROM users WHERE id=${cible}`) === corrige);
 
   // Remise en état : adresse d'origine (statut + vérification sont reposés par le service).
-  await page.locator('input[wire\\:model="email"]').first().fill(emailOrigine);
+  await page.locator('input[wire\\:model="email"], input[wire\\:model\\.blur="email"]').first().fill(emailOrigine);
   await page.locator('button[wire\\:click="saveEmail"]').first().click();
   await page.waitForTimeout(1000);
   s.check('état restauré', sql(`SELECT email FROM users WHERE id=${cible}`) === emailOrigine, emailOrigine);
@@ -125,7 +125,7 @@ const tous = [];
     s.check('le compteur d\'impact est annoncé', /0 inscription\(s\) future\(s\)/i.test(t), t.slice(0, 90));
     s.check('la réversibilité est annoncée', /réversible/i.test(t));
     await s.shot(page, 's20-suspension-dialog');
-    await dlg.locator('input[wire\\:model="suspendMotif"]').first().fill('Licence non renouvelée (E2E)');
+    await dlg.locator('input[wire\\:model="suspendMotif"], input[wire\\:model\\.blur="suspendMotif"]').first().fill('Licence non renouvelée (E2E)');
     await dlg.locator('button[wire\\:click="suspendAccess"]').first().click();
     await page.waitForTimeout(1200);
   }
