@@ -42,7 +42,7 @@ class TemplateForm extends Component
 
     public string $location_text = '';
 
-    public ?int $capacity = 16;
+    public ?int $capacity = null;
 
     public ?int $quota_tag_id = null;
 

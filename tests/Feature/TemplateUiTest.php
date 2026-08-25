@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Livewire\Admin\TemplateForm;
 use App\Livewire\Admin\TemplateList;
+use App\Models\Category;
 use App\Models\Discipline;
 use App\Models\Session;
 use App\Models\SessionTemplate;
@@ -183,6 +184,56 @@ class TemplateUiTest extends TestCase
             ->assertSet('relaunchId', null);
 
         $this->assertSame(8, Session::where('source_template_id', $tpl->id)->count());
+    }
+
+    public function test_capacity_left_empty_creates_unlimited_sessions(): void
+    {
+        // Régression : le défaut du formulaire valait 16, si bien qu'un modèle « sans limite »
+        // était impossible à créer sans vider le champ — et le vider ne suffisait pas (cf. test
+        // suivant). Capacité absente = illimitée (§4.10), sur le modèle comme sur ses séances.
+        $admin = User::factory()->admin()->create();
+        $disc = $this->discipline();
+
+        Livewire::actingAs($admin)->test(TemplateForm::class)
+            ->assertSet('capacity', null) // aucune capacité pré-remplie
+            ->set('label', 'Sortie club')
+            ->set('discipline_id', $disc->id)
+            ->set('day_of_week', 1)
+            ->set('start_time_of_day', '19:00')
+            ->set('generation_start_date', '2026-09-01')
+            ->set('generation_end_date', '2026-09-30')
+            ->call('save');
+
+        $tpl = SessionTemplate::first();
+        $this->assertNull($tpl->capacity);
+        // La génération recopie la valeur telle quelle : aucune séance ne reçoit de limite.
+        $this->assertSame(4, Session::where('source_template_id', $tpl->id)->count());
+        $this->assertSame(0, Session::where('source_template_id', $tpl->id)->whereNotNull('capacity')->count());
+    }
+
+    public function test_emptied_capacity_survives_a_server_roundtrip(): void
+    {
+        // Régression : le champ étant en wire:model deferred, vider la capacité puis cliquer une
+        // catégorie (aller-retour serveur) re-rendait la vue depuis l'état serveur et réaffichait
+        // la valeur d'origine — la saisie était perdue en silence. Le binding est désormais .blur.
+        $admin = User::factory()->admin()->create();
+        $disc = $this->discipline();
+        $cat = Category::create(['label' => 'Poussins', 'age_min' => 10, 'age_max' => 11, 'sort_order' => 1]);
+
+        Livewire::actingAs($admin)->test(TemplateForm::class)
+            ->set('label', 'Sortie club')
+            ->set('discipline_id', $disc->id)
+            ->set('day_of_week', 1)
+            ->set('start_time_of_day', '19:00')
+            ->set('generation_start_date', '2026-09-01')
+            ->set('generation_end_date', '2026-09-30')
+            ->set('capacity', 12)
+            ->set('capacity', null)      // l'utilisateur efface la capacité…
+            ->call('toggleCategory', $cat->id) // …puis clique une catégorie : aller-retour serveur
+            ->assertSet('capacity', null)      // la saisie ne doit pas avoir été écrasée
+            ->call('save');
+
+        $this->assertNull(SessionTemplate::first()->capacity);
     }
 
     public function test_non_admin_cannot_access_templates(): void
