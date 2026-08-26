@@ -5,6 +5,7 @@ namespace App\Notifications\Channels;
 use App\Mail\OutboxNotificationMail;
 use App\Models\NotificationOutbox;
 use App\Notifications\NotificationRenderer;
+use App\Notifications\NotificationType;
 use Illuminate\Support\Facades\Mail;
 
 // Livraison réelle du canal « email » (J8.6, cadrage §6.3). Rend la ligne en email transactionnel
@@ -26,8 +27,12 @@ class EmailChannel implements NotificationChannel
 
         $content = $this->renderer->render($line);
 
+        // Le pied de page dépend du type : une invitation traverse l'interrupteur et la pause,
+        // et n'est pas réglable au profil — le pied de page « notifications » y serait mensonger.
+        $transactional = NotificationType::tryFrom($line->type)?->transactional() ?? false;
+
         Mail::to($user->email)->send(
-            new OutboxNotificationMail($content['title'], $content['body'], $content['url']),
+            new OutboxNotificationMail($content['title'], $content['body'], $content['url'], $transactional),
         );
 
         return true;

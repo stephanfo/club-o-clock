@@ -116,9 +116,14 @@ class MemberList extends Component
             return;
         }
 
-        // On compte ce qui est RÉELLEMENT parti : un canal coupé ou une préférence en pause fait
-        // refuser l'envoi, et annoncer 500 invitations quand aucune n'a été mise en file serait un
-        // mensonge que rien ne viendrait corriger ensuite.
+        // On compte ce qui est RÉELLEMENT parti : annoncer 500 invitations quand aucune n'a été
+        // mise en file serait un mensonge que rien ne viendrait corriger ensuite.
+        //
+        // En pratique $refusees reste à 0 : awaitingInvitationQuery() a déjà filtré email renseigné,
+        // compte actif et non anonymisé, soit exactement les gardes de sendToMember() ; et
+        // l'invitation traverse l'interrupteur club comme la pause (cf. NotificationType::
+        // transactional()). Le compteur ne couvre plus qu'une course — une fiche modifiée entre la
+        // requête et l'envoi. On ne l'attribue donc à aucune cause précise : on ne la connaît pas.
         $misesEnFile = 0;
         $refusees = 0;
         foreach ($cibles as $membre) {
@@ -131,13 +136,13 @@ class MemberList extends Component
         }
 
         if ($misesEnFile === 0) {
-            session()->flash('warn', 'Aucune invitation n’a pu partir — vérifie le canal email (Admin → Réglages).');
+            session()->flash('warn', 'Aucune invitation n’a pu partir — vérifie les fiches concernées (email renseigné, compte actif).');
 
             return;
         }
 
         session()->flash('status', $misesEnFile.' invitation(s) mise(s) en file (Admin → Envois).'
-            .($refusees > 0 ? ' '.$refusees.' non envoyée(s) : canal ou préférence bloquant.' : ''));
+            .($refusees > 0 ? ' '.$refusees.' non envoyée(s) : fiche non joignable.' : ''));
     }
 
     /** Commit tout-ou-rien : ré-analyse le fichier puis crée/met à jour en lot (§4.2). */
@@ -168,8 +173,10 @@ class MemberList extends Component
                     $invitations->sendToMember($nouveau, auth()->user(), immediate: false);
                     $queued++;
                 } catch (RuntimeException) {
-                    // Canal coupé ou préférence bloquante : les fiches sont créées, on ne perd pas
-                    // l'import pour autant — mais on ne prétend pas avoir envoyé.
+                    // Fiche non joignable (email absent, compte inactif) : les fiches sont créées,
+                    // on ne perd pas l'import pour autant — mais on ne prétend pas avoir envoyé.
+                    // L'interrupteur club ne peut plus être en cause : l'invitation le traverse
+                    // (cf. NotificationType::transactional()).
                     $refusees++;
                 }
             }
@@ -179,7 +186,7 @@ class MemberList extends Component
         $this->perPage = 20;
         session()->flash('status', "Import terminé : {$result['created']} adhérent(s) créé(s), {$result['updated']} mis à jour."
             .($queued > 0 ? " {$queued} invitation(s) mise(s) en file (Admin → Envois)." : '')
-            .($refusees > 0 ? " {$refusees} invitation(s) non envoyée(s) : canal email coupé ou préférence bloquante." : ''));
+            .($refusees > 0 ? " {$refusees} invitation(s) non envoyée(s) : fiche non joignable (email, compte inactif)." : ''));
     }
 
     public function updated(string $name): void

@@ -304,4 +304,54 @@ class NotificationDeliveryTest extends TestCase
         $mail->assertSeeInHtml('Annulation de séance');
         $mail->assertSeeInHtml('https://club.test/seances/9');
     }
+
+    public function test_ordinary_mail_footer_points_to_the_profile_settings(): void
+    {
+        // Contrôle positif apparié du test suivant : le pied de page « notifications » reste servi
+        // à ce qui EST une notification réglable dans la matrice (§4.15.3).
+        $mail = new OutboxNotificationMail('Annulation de séance', 'Corps', 'https://club.test/s/9');
+
+        $mail->assertSeeInHtml('tout mettre en pause depuis ton profil');
+    }
+
+    public function test_transactional_mail_footer_does_not_promise_a_setting_that_does_not_exist(): void
+    {
+        // Une invitation traverse l'interrupteur club et la pause, et ne figure pas dans la matrice
+        // du profil : lui servir « tu peux tout mettre en pause depuis ton profil » serait faux sur
+        // les deux points, et enverrait l'adhérent chercher un réglage inexistant.
+        $mail = new OutboxNotificationMail('Invitation', 'Corps', 'https://club.test/invitation/x', transactional: true);
+
+        // Fragments sans apostrophe : assertSeeInHtml échappe la chaîne attendue (&#039;) alors que
+        // le corps rendu porte une apostrophe littérale — l'assertion échouerait sur un texte
+        // pourtant présent. On vise donc les deux moitiés porteuses de sens.
+        $mail->assertSeeInHtml('accès à ton compte');
+        $mail->assertSeeInHtml('pas concerné par tes réglages de notifications ni par la mise en pause');
+        $mail->assertDontSeeInHtml('tout mettre en pause depuis ton profil');
+    }
+
+    public function test_invitation_line_selects_the_transactional_footer(): void
+    {
+        // Le drapeau est dérivé du TYPE de la ligne, pas passé à la main : c'est le câblage réel
+        // (EmailChannel) qu'on vérifie ici, pas seulement la vue.
+        Mail::fake();
+        $user = User::factory()->create(['email' => 'invite@club.test']);
+
+        app(EmailChannel::class)->send(
+            $this->line(NotificationType::MemberInvitation, $user, ['token' => 'abc'], 'email')
+        );
+
+        Mail::assertSent(OutboxNotificationMail::class, fn (OutboxNotificationMail $mail) => $mail->transactional === true);
+    }
+
+    public function test_ordinary_line_selects_the_ordinary_footer(): void
+    {
+        Mail::fake();
+        $user = User::factory()->create(['email' => 'athlete2@club.test']);
+
+        app(EmailChannel::class)->send(
+            $this->line(NotificationType::SessionCancelled, $user, ['session_id' => 1], 'email')
+        );
+
+        Mail::assertSent(OutboxNotificationMail::class, fn (OutboxNotificationMail $mail) => $mail->transactional === false);
+    }
 }

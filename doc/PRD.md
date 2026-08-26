@@ -840,7 +840,10 @@ pouvoir franchir la porte.
 
 L'exemption porte sur le **consentement**, jamais sur la **joignabilité** : un destinataire sans
 adresse email, au compte inactif ou anonymisé, reste hors d'atteinte et l'invitation est refusée avec
-un motif explicite plutôt qu'ouverte à vide.
+un motif explicite plutôt qu'ouverte à vide. Ce refus vaut pour les **deux** origines d'invitation —
+celle de l'adhérent créé par le bureau (§4.1.3) comme celle du mineur autonomisé (§4.2.1) : ouvrir un
+jeton d'activation sur un compte injoignable écrirait une trace d'envoi pour un message que personne
+ne recevra.
 
 **Mode d'envoi** : par défaut, les notifications partent en **envoi différé par lots** (la latence de livraison reste bornée par la période de traitement). Une option **envoi immédiat** est proposée aux points de déclenchement (ex. modification de séance §4.7) et depuis l'écran de gestion des envois (§4.15.6), pour pousser sans attendre le lot suivant. L'évaluation des préférences (§4.15.3), de la pause (§4.15.4) et du routage parent/enfant (§4.15.5) est identique dans les deux modes.
 

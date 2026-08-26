@@ -209,7 +209,9 @@
                 <div class="eyebrow" style="margin-bottom:6px">Notifications</div>
                 <div class="meta" style="font-size:12px;margin-bottom:6px;line-height:1.4">
                     Coupe un canal pour tout le club. Les préférences individuelles restent en place et
-                    reprennent effet à la réactivation. Les emails de connexion ne sont jamais coupés.
+                    reprennent effet à la réactivation. Les emails porteurs d'un accès au compte ne sont
+                    jamais coupés : connexion (lien magique, mot de passe oublié) et invitations
+                    d'activation — sans elles, aucun nouvel adhérent ne pourrait entrer.
                 </div>
 
                 @foreach ([
@@ -229,7 +231,8 @@
                 @if (! $notif_push_enabled && ! $notif_email_enabled)
                     <x-banner kind="warn" style="margin-top:14px">
                         Les deux canaux sont coupés : plus aucune notification ne part. Les emails de
-                        connexion (lien magique) continuent de fonctionner.
+                        connexion (lien magique) et les invitations d'activation continuent de partir —
+                        ils portent l'accès au compte, pas une alerte.
                     </x-banner>
                 @endif
             </div>

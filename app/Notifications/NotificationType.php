@@ -78,7 +78,9 @@ enum NotificationType: string
      * partait déjà (§4.1.1), rendant le blocage inopérant autant qu'incohérent.
      *
      * Ne dispense PAS des gardes métier (email renseigné, compte actif, non anonymisé) : elles
-     * portent sur la joignabilité du destinataire, pas sur son consentement à être notifié.
+     * portent sur la joignabilité du destinataire, pas sur son consentement à être notifié. Elles
+     * vivent chez les appelants — InvitationService::sendToMember() et GuardianshipService::invite()
+     * —, pas ici : cet enum ne connaît pas de destinataire.
      */
     public function transactional(): bool
     {

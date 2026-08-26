@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ClubSettings;
 use App\Models\InvitationToken;
+use App\Models\NotificationOutbox;
 use App\Models\User;
 use App\Services\GuardianshipService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -107,6 +108,57 @@ class GuardianshipActivationTest extends TestCase
         $this->assertSame('enfant@club.test', $enfant->email);
         $this->assertDatabaseCount('invitation_tokens', 1);
         $this->assertDatabaseHas('audit_logs', ['action' => 'guardianship_invite_sent']);
+
+        // L'assertion qui porte réellement le correctif : la LIGNE d'outbox. Tout ce qui précède
+        // est écrit dans la transaction, AVANT le dispatch — une régression de l'exemption les
+        // laisserait tous verts pour un mail jamais parti.
+        $this->assertSame(1, NotificationOutbox::where('type', 'guardianship_invitation')
+            ->where('user_id', $enfant->id)->where('channel', 'email')->count());
+    }
+
+    public function test_autonomisation_is_refused_for_an_inactive_ward(): void
+    {
+        // L'exemption porte sur le consentement, jamais sur la joignabilité (§4.15.1) : un compte
+        // dont la suppression est engagée ne s'ouvre pas. Sans cette garde, on frappait un jeton de
+        // 30 jours et on écrivait un audit d'envoi pour un compte qu'on est en train d'effacer.
+        $admin = User::factory()->create(['roles' => ['admin']]);
+        $garant = User::factory()->create(['email' => 'parent3@club.test']);
+        $enfant = User::factory()->create([
+            'email' => null, 'is_minor' => true, 'guardian_id' => $garant->id,
+            'guardianship_linked_at' => now(), 'is_active' => false,
+        ]);
+
+        try {
+            app(GuardianshipService::class)->invite($enfant, $admin, 'inactif@club.test');
+            $this->fail('L\'autonomisation aurait dû être refusée.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('n\'est pas actif', $e->getMessage());
+        }
+
+        $this->assertDatabaseCount('invitation_tokens', 0);
+        $this->assertDatabaseMissing('audit_logs', ['action' => 'guardianship_invite_sent']);
+        $this->assertSame(0, NotificationOutbox::count());
+    }
+
+    public function test_autonomisation_is_refused_for_an_anonymised_ward(): void
+    {
+        $admin = User::factory()->create(['roles' => ['admin']]);
+        $garant = User::factory()->create(['email' => 'parent4@club.test']);
+        $enfant = User::factory()->create([
+            'email' => null, 'is_minor' => true, 'guardian_id' => $garant->id,
+            'guardianship_linked_at' => now(), 'anonymized_at' => now(),
+        ]);
+
+        try {
+            app(GuardianshipService::class)->invite($enfant, $admin, 'anon@club.test');
+            $this->fail('L\'autonomisation aurait dû être refusée.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('anonymisé', $e->getMessage());
+        }
+
+        $this->assertDatabaseCount('invitation_tokens', 0);
+        $this->assertDatabaseMissing('audit_logs', ['action' => 'guardianship_invite_sent']);
+        $this->assertSame(0, NotificationOutbox::count());
     }
 
     public function test_autonomisation_is_still_cancelled_without_an_email(): void

@@ -290,9 +290,11 @@ class MemberInvitationTest extends TestCase
         ClubSettings::current()->update(['notif_email_enabled' => false]);
         ClubSettings::flushCache();
 
+        // Contrôle positif : on assertit le succès affiché, pas l'absence d'un message que ce
+        // correctif vient de supprimer du code — cette absence-là serait vraie quoi qu'il arrive.
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $membre])
             ->call('sendInvitation')
-            ->assertDontSee('canal email du club est coupé');
+            ->assertSee('Invitation envoyée');
 
         // Le jeton est frappé ET la ligne existe : l'invitation part réellement.
         $this->assertDatabaseCount('invitation_tokens', 1);
@@ -306,7 +308,7 @@ class MemberInvitationTest extends TestCase
 
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $membre])
             ->call('sendInvitation')
-            ->assertDontSee('mis ses notifications en pause');
+            ->assertSee('Invitation envoyée');
 
         $this->assertDatabaseCount('invitation_tokens', 1);
         $this->assertSame(1, NotificationOutbox::where('type', 'member_invitation')->count());

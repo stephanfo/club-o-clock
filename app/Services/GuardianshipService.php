@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\InvitationToken;
 use App\Models\User;
 use App\Notifications\NotificationDispatcher;
 use App\Notifications\NotificationType;
@@ -33,6 +34,19 @@ class GuardianshipService
         $token = DB::transaction(function () use ($ward, $actor, $email) {
             if (! $ward->is_minor || $ward->guardian_id === null) {
                 throw new RuntimeException('L\'autonomisation ne concerne qu\'un mineur ayant un parent garant.');
+            }
+
+            // Mêmes gardes de joignabilité que InvitationService::sendToMember() — l'exemption de
+            // l'interrupteur et de la pause porte sur le CONSENTEMENT, jamais sur la joignabilité
+            // (§4.15.1). Sans elles, on ouvrait un compte autonome à un pupille anonymisé ou dont la
+            // suppression est engagée : jeton de 30 jours frappé, audit écrit, mail jamais lisible.
+            if ($ward->anonymized_at !== null) {
+                throw new RuntimeException('Ce compte a été anonymisé.');
+            }
+
+            // is_active couvre aussi la demande de suppression en cours (§4.3).
+            if (! $ward->is_active) {
+                throw new RuntimeException('Ce compte n\'est pas actif.');
             }
 
             if ($email !== null && trim($email) !== '') {
@@ -77,10 +91,21 @@ class GuardianshipService
 
         // Lien d'activation au pupille uniquement (dispatchTo : pas de routage vers le garant). Le
         // token clair voyage dans le payload jusqu'à l'envoi (ligne email seule, drainée puis purgée).
-        $this->notifier->dispatchTo(NotificationType::GuardianshipInvitation, $ward, [
+        $lines = $this->notifier->dispatchTo(NotificationType::GuardianshipInvitation, $ward, [
             'ward_id' => $ward->id,
             'token' => $token,
         ]);
+
+        // Même filet qu'InvitationService::sendToMember() : entre la garde ci-dessus et ici, l'état
+        // a pu bouger. Le jeton frappé pour rien repart — le laisser vivre bloquerait le rattrapage
+        // 30 jours durant, avec un audit qui affirme un envoi qui n'a pas eu lieu.
+        if ($lines->isEmpty()) {
+            InvitationToken::where('user_id', $ward->id)->whereNull('consumed_at')->delete();
+
+            throw new RuntimeException(
+                'Cet enfant ne peut pas recevoir l\'invitation : aucun canal ne peut la porter.'
+            );
+        }
 
         return $token;
     }
