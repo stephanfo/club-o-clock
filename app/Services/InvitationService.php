@@ -122,18 +122,21 @@ class InvitationService
         return $lines;
     }
 
-    /** Pourquoi l'invitation ne peut pas partir — message actionnable, pas un « échec d'envoi ». */
+    /**
+     * Pourquoi l'invitation ne peut pas partir — message actionnable, pas un « échec d'envoi ».
+     *
+     * Ne reste ici que ce qui tient à la JOIGNABILITÉ du destinataire : l'interrupteur club (§4.17)
+     * et la pause (§4.15.4) ne bloquent plus une invitation, qui porte un accès au compte et non une
+     * notification (cf. NotificationType::transactional()). Les gardes d'email/compte actif sont en
+     * amont dans sendToMember() — arriver ici sans email est donc impossible par ce chemin.
+     */
     private function motifNonDelivrable(User $user): string
     {
-        if (! ClubSettings::current()->channelEnabled('email')) {
-            return 'Le canal email du club est coupé (Admin → Réglages) : l\'invitation ne peut pas partir.';
+        if ($user->email === null) {
+            return 'Renseigne l\'email de l\'adhérent avant d\'envoyer l\'invitation.';
         }
 
-        if ($user->loadMissing('notificationPreferences')->notificationPreferences?->paused) {
-            return 'Cet adhérent a mis ses notifications en pause : l\'invitation ne peut pas partir.';
-        }
-
-        return 'Cet adhérent a désactivé ce type de notification : l\'invitation ne peut pas partir.';
+        return 'Cet adhérent ne peut pas recevoir l\'invitation : aucun canal ne peut la porter.';
     }
 
     /**

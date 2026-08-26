@@ -12,6 +12,11 @@ use Illuminate\Queue\SerializesModels;
 
 // Email transactionnel générique d'une notif d'outbox (J8.6). Contenu dérivé du type par
 // NotificationRenderer (titre = libellé, corps = description, bouton vers le lien profond).
+//
+// `$transactional` sélectionne le pied de page : un type transactionnel (invitation) traverse
+// l'interrupteur club et la pause (cf. NotificationType::transactional()) et n'est pas réglable
+// dans la matrice du profil — lui servir le pied de page « tu peux tout mettre en pause » serait
+// faux sur les deux points, et enverrait l'adhérent chercher un réglage qui n'existe pas.
 class OutboxNotificationMail extends Mailable
 {
     use Queueable, SerializesModels;
@@ -20,6 +25,7 @@ class OutboxNotificationMail extends Mailable
         public string $title,
         public string $body,
         public string $actionUrl,
+        public bool $transactional = false,
     ) {}
 
     public function envelope(): Envelope

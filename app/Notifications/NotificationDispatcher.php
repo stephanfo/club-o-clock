@@ -102,7 +102,9 @@ class NotificationDispatcher
         $prefs = $recipient->loadMissing('notificationPreferences')->notificationPreferences;
 
         // Pause globale (§4.15.4) : interrupteur master, coupe tous les canaux de ce destinataire.
-        if ($prefs?->paused) {
+        // Sauf les types transactionnels : la pause exprime « pas d'alertes en ce moment », pas
+        // « ferme-moi la porte de mon compte » — cf. NotificationType::transactional().
+        if ($prefs?->paused && ! $type->transactional()) {
             return [];
         }
 
@@ -114,7 +116,10 @@ class NotificationDispatcher
             // Interrupteur club (§4.17) : canal fermé → aucune ligne créée. Filtre en amont de la
             // préférence individuelle, donc l'outbox ne contient que ce qui est réellement
             // envoyable — pas de ligne marquée « envoyée » alors que rien n'est parti.
-            if (! $settings->channelEnabled($channel)) {
+            // Les types transactionnels passent outre : l'interrupteur ferme les NOTIFICATIONS, pas
+            // l'accès au compte (§4.15.1 exempte déjà les emails d'authentification pour la même
+            // raison). Le drain applique la même exemption, sinon la ligne partirait en `cancelled`.
+            if (! $settings->channelEnabled($channel) && ! $type->transactional()) {
                 return false;
             }
 
