@@ -64,6 +64,30 @@ enum NotificationType: string
         };
     }
 
+    /**
+     * Ce type porte-t-il un ACCÈS AU COMPTE plutôt qu'une information ?
+     *
+     * Les invitations transportent le lien d'activation : elles sont la porte d'entrée d'un adhérent
+     * dans l'instance (§4.1.3), pas une alerte à laquelle on s'abonne. À ce titre elles relèvent des
+     * emails d'authentification (§4.1.1, jamais concernés par l'interrupteur de canal) et non des
+     * notifications — d'où leur exemption de l'interrupteur club (§4.17) et de la pause (§4.15.4).
+     *
+     * Sans cette exemption, un club en push seul ne pouvait plus faire entrer personne : l'invitation
+     * était refusée, donc pas d'activation, donc pas de PWA installée, donc jamais de push. Le canal
+     * voulu restait inaccessible faute de pouvoir franchir la porte — alors que le lien magique, lui,
+     * partait déjà (§4.1.1), rendant le blocage inopérant autant qu'incohérent.
+     *
+     * Ne dispense PAS des gardes métier (email renseigné, compte actif, non anonymisé) : elles
+     * portent sur la joignabilité du destinataire, pas sur son consentement à être notifié.
+     */
+    public function transactional(): bool
+    {
+        return match ($this) {
+            self::MemberInvitation, self::GuardianshipInvitation => true,
+            default => false,
+        };
+    }
+
     /** Sous-titre explicatif affiché sous le libellé dans la matrice de préférences (§4.15.3). */
     public function description(): string
     {

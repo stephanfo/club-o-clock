@@ -119,6 +119,74 @@ class ClubNotificationChannelsTest extends TestCase
         $this->assertSame(1, NotificationOutbox::where('channel', 'email')->count());
     }
 
+    // ── Exemption des types transactionnels (§4.15.1) ──
+
+    public function test_invitation_crosses_the_closed_email_channel(): void
+    {
+        // L'invitation porte un accès au compte, pas une notification : l'interrupteur ne la
+        // concerne pas, au même titre que les emails d'authentification (§4.1.1).
+        $this->setSettings(['notif_email_enabled' => false]);
+        $user = User::factory()->create();
+
+        $this->dispatcher()->dispatchTo(NotificationType::MemberInvitation, $user);
+
+        $this->assertSame(1, NotificationOutbox::where('channel', 'email')->count());
+    }
+
+    public function test_guardianship_invitation_crosses_the_closed_email_channel(): void
+    {
+        $this->setSettings(['notif_email_enabled' => false]);
+        $user = User::factory()->create();
+
+        $this->dispatcher()->dispatchTo(NotificationType::GuardianshipInvitation, $user);
+
+        $this->assertSame(1, NotificationOutbox::where('channel', 'email')->count());
+    }
+
+    public function test_invitation_crosses_the_global_pause(): void
+    {
+        // La pause exprime « pas d'alertes en ce moment », pas « ferme-moi la porte de mon compte ».
+        $user = User::factory()->create();
+        NotificationPreferences::create(['user_id' => $user->id, 'matrix' => [], 'paused' => true]);
+
+        $this->dispatcher()->dispatchTo(NotificationType::MemberInvitation, $user);
+
+        $this->assertSame(1, NotificationOutbox::count());
+    }
+
+    public function test_a_paused_user_still_receives_no_ordinary_notification(): void
+    {
+        // Contrôle positif apparié : l'exemption ne doit pas avoir désarmé la pause elle-même.
+        $user = User::factory()->create();
+        NotificationPreferences::create(['user_id' => $user->id, 'matrix' => [], 'paused' => true]);
+
+        $this->dispatcher()->dispatch(NotificationType::SessionCancelled, $user);
+
+        $this->assertSame(0, NotificationOutbox::count());
+    }
+
+    public function test_a_non_transactional_email_only_type_is_still_suppressed(): void
+    {
+        // Contrôle positif apparié : AthleteReactivated est email seul comme l'invitation, mais
+        // n'est PAS transactionnel — il reste soumis à l'interrupteur. Borne l'exemption.
+        $this->setSettings(['notif_email_enabled' => false]);
+        $user = User::factory()->create();
+
+        $this->dispatcher()->dispatch(NotificationType::AthleteReactivated, $user);
+
+        $this->assertSame(0, NotificationOutbox::count());
+    }
+
+    public function test_invitation_still_needs_an_email_address(): void
+    {
+        // L'exemption porte sur le consentement, jamais sur la joignabilité.
+        $user = User::factory()->create(['email' => null]);
+
+        $this->dispatcher()->dispatchTo(NotificationType::MemberInvitation, $user);
+
+        $this->assertSame(0, NotificationOutbox::count());
+    }
+
     // ── Garde au drain ──
 
     public function test_drain_cancels_queued_line_whose_channel_was_closed_since(): void
@@ -160,6 +228,26 @@ class ClubNotificationChannelsTest extends TestCase
         // Statut terminal : la passe suivante ne la voit plus (elle ne cible que `pending`).
         $this->assertSame(0, $second['cancelled']);
         $this->assertSame(1, NotificationOutbox::where('status', 'cancelled')->count());
+    }
+
+    public function test_drain_sends_a_queued_invitation_despite_the_closed_channel(): void
+    {
+        // Miroir de l'exemption d'émission : sans lui, la ligne créée repartirait en `cancelled` et
+        // l'admin lirait « invitation envoyée » pour un mail jamais parti.
+        $fake = $this->fakeChannel();
+        $user = User::factory()->create();
+
+        $this->dispatcher()->dispatchTo(NotificationType::MemberInvitation, $user);
+        $this->setSettings(['notif_email_enabled' => false]);
+
+        $stats = app(OutboxDrainer::class)->drainDue();
+
+        $this->assertSame(1, $stats['sent']);
+        $this->assertSame(0, $stats['cancelled']);
+
+        $ligne = NotificationOutbox::firstOrFail();
+        $this->assertSame('sent', $ligne->status);
+        $this->assertSame([$ligne->id], $fake->sent);
     }
 
     // ── Réactivation ──

@@ -70,7 +70,15 @@ class OutboxDrainer
             // du canal, ou pendant la fenêtre de bascule. Annulées plutôt qu'envoyées — `cancelled`
             // est déjà un statut de l'outbox, donc la ligne reste consultable dans l'écran admin
             // des envois. Pas de retry : la cause n'est pas transitoire.
-            if (! $settings->channelEnabled($line->channel)) {
+            //
+            // Miroir exact de l'exemption du dispatcher : un type transactionnel (invitation) porte
+            // un accès au compte, pas une notification, et traverse donc l'interrupteur ici aussi.
+            // Sans ce miroir, l'invitation serait créée à l'émission puis annulée au drain — l'admin
+            // lirait « invitation envoyée » pour un mail jamais parti, avec un jeton vivant 30 jours
+            // qui exclut l'adhérent du rattrapage : précisément le bug que les gardes évitent.
+            $type = NotificationType::tryFrom($line->type);
+
+            if (! $settings->channelEnabled($line->channel) && ! $type?->transactional()) {
                 $line->update(['status' => 'cancelled']);
                 $stats['cancelled']++;
 

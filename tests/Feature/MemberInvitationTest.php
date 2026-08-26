@@ -10,6 +10,8 @@ use App\Models\ClubSettings;
 use App\Models\InvitationToken;
 use App\Models\NotificationOutbox;
 use App\Models\User;
+use App\Notifications\NotificationDispatcher;
+use App\Notifications\NotificationType;
 use App\Services\InvitationService;
 use App\Services\MemberService;
 use App\Support\MagicLink;
@@ -275,9 +277,14 @@ class MemberInvitationTest extends TestCase
             ->assertDontSee('Envoi limité à');
     }
 
-    // ── Un envoi que personne ne recevra n'est pas un envoi (§4.17) ──
+    // ── L'invitation porte un accès au compte, pas une notification (§4.15.1) ──
+    //
+    // Renversement assumé d'un comportement antérieur : l'interrupteur de canal (§4.17) et la pause
+    // (§4.15.4) refusaient l'invitation. Un club en push seul ne pouvait alors faire entrer
+    // personne — pas d'activation, donc pas de PWA, donc jamais de push — alors que le lien magique
+    // partait déjà. Le blocage était inopérant autant qu'incohérent.
 
-    public function test_invitation_is_refused_when_the_club_email_channel_is_off(): void
+    public function test_invitation_is_sent_even_when_the_club_email_channel_is_off(): void
     {
         [$admin, $membre] = $this->membreCree();
         ClubSettings::current()->update(['notif_email_enabled' => false]);
@@ -285,44 +292,53 @@ class MemberInvitationTest extends TestCase
 
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $membre])
             ->call('sendInvitation')
-            ->assertSee('canal email du club est coupé');
+            ->assertDontSee('canal email du club est coupé');
 
-        // Aucun jeton vivant : sinon l'adhérent restait exclu du rattrapage 30 jours durant, pour
-        // un mail jamais parti.
-        $this->assertDatabaseCount('invitation_tokens', 0);
-        $this->assertDatabaseCount('notification_outbox', 0);
+        // Le jeton est frappé ET la ligne existe : l'invitation part réellement.
+        $this->assertDatabaseCount('invitation_tokens', 1);
+        $this->assertSame(1, NotificationOutbox::where('type', 'member_invitation')->count());
     }
 
-    public function test_invitation_is_refused_when_the_member_paused_notifications(): void
+    public function test_invitation_is_sent_even_when_the_member_paused_notifications(): void
     {
         [$admin, $membre] = $this->membreCree();
         $membre->notificationPreferences()->create(['paused' => true, 'matrix' => []]);
 
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $membre])
             ->call('sendInvitation')
-            ->assertSee('mis ses notifications en pause');
+            ->assertDontSee('mis ses notifications en pause');
 
-        $this->assertDatabaseCount('invitation_tokens', 0);
+        $this->assertDatabaseCount('invitation_tokens', 1);
+        $this->assertSame(1, NotificationOutbox::where('type', 'member_invitation')->count());
     }
 
-    public function test_a_refused_invitation_leaves_the_member_in_the_awaiting_list(): void
+    public function test_an_ordinary_notification_is_still_blocked_by_the_closed_channel(): void
     {
-        // Contrôle positif apparié : le rattrapage doit toujours voir ce compte, puisque rien
-        // n'est parti. C'est précisément ce que le jeton fantôme empêchait.
-        [, $membre] = $this->membreCree();
+        // Contrôle positif apparié : l'exemption vise les invitations SEULES. Sans ce test, une
+        // exemption trop large (tous les types) passerait inaperçue.
+        $membre = User::factory()->create();
         ClubSettings::current()->update(['notif_email_enabled' => false]);
         ClubSettings::flushCache();
 
-        try {
-            app(InvitationService::class)->sendToMember($membre, $this->admin());
-        } catch (RuntimeException) {
-            // attendu
-        }
+        app(NotificationDispatcher::class)->dispatch(NotificationType::SessionCancelled, $membre);
 
-        $this->assertTrue(app(InvitationService::class)->awaitingInvitation()->contains('id', $membre->id));
+        $this->assertSame(0, NotificationOutbox::where('channel', 'email')->count());
     }
 
-    public function test_bulk_invitation_does_not_claim_success_when_nothing_can_be_sent(): void
+    public function test_a_sent_invitation_leaves_the_awaiting_list(): void
+    {
+        // Miroir du test d'origine : le rattrapage ne doit PLUS voir ce compte, puisque le jeton
+        // vivant est désormais légitime — l'invitation est bien partie.
+        [$admin, $membre] = $this->membreCree();
+        ClubSettings::current()->update(['notif_email_enabled' => false]);
+        ClubSettings::flushCache();
+
+        app(InvitationService::class)->sendToMember($membre, $admin);
+
+        $this->assertFalse(app(InvitationService::class)->awaitingInvitation()->contains('id', $membre->id));
+    }
+
+    public function test_bulk_invitation_queues_lines_when_the_email_channel_is_off(): void
     {
         $this->membreCree('un@club.test');
         ClubSettings::current()->update(['notif_email_enabled' => false]);
@@ -330,13 +346,12 @@ class MemberInvitationTest extends TestCase
 
         Livewire::actingAs($this->admin())->test(MemberList::class)
             ->call('sendPendingInvitations')
-            ->assertSee('Aucune invitation')
-            ->assertDontSee('mise(s) en file');
+            ->assertDontSee('Aucune invitation');
 
-        $this->assertDatabaseCount('notification_outbox', 0);
+        $this->assertSame(1, NotificationOutbox::where('type', 'member_invitation')->count());
     }
 
-    public function test_creating_a_member_reports_the_invitation_could_not_be_sent(): void
+    public function test_creating_a_member_sends_the_invitation_when_the_email_channel_is_off(): void
     {
         ClubSettings::current()->update(['notif_email_enabled' => false]);
         ClubSettings::flushCache();
@@ -346,11 +361,40 @@ class MemberInvitationTest extends TestCase
             ->set('dob', '1992-03-14')->set('email', 'chloe@club.test')
             ->call('create');
 
-        // La fiche est créée — on ne perd pas la saisie — mais aucun jeton fantôme n'est ouvert,
-        // et le compte reste dans la liste de rattrapage puisque rien n'est parti.
         $membre = User::where('email', 'chloe@club.test')->firstOrFail();
+        $this->assertDatabaseCount('invitation_tokens', 1);
+        $this->assertFalse(app(InvitationService::class)->awaitingInvitation()->contains('id', $membre->id));
+    }
+
+    // ── Les gardes métier, elles, tiennent toujours ──
+
+    public function test_invitation_is_still_refused_without_an_email(): void
+    {
+        [$admin, $membre] = $this->membreCree(null);
+
+        try {
+            app(InvitationService::class)->sendToMember($membre, $admin);
+            $this->fail('L\'invitation aurait dû être refusée.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('email', $e->getMessage());
+        }
+
         $this->assertDatabaseCount('invitation_tokens', 0);
-        $this->assertTrue(app(InvitationService::class)->awaitingInvitation()->contains('id', $membre->id));
+    }
+
+    public function test_invitation_is_still_refused_on_an_inactive_account(): void
+    {
+        [$admin, $membre] = $this->membreCree();
+        $membre->update(['is_active' => false]);
+
+        try {
+            app(InvitationService::class)->sendToMember($membre->fresh(), $admin);
+            $this->fail('L\'invitation aurait dû être refusée.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('actif', $e->getMessage());
+        }
+
+        $this->assertDatabaseCount('invitation_tokens', 0);
     }
 
     // ── Le lien magique seul est une activation (§4.1.1) ──

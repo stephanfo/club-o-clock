@@ -827,8 +827,20 @@ Chaque canal peut être **fermé à l'échelle du club** (§4.17) : un club n'a 
 techniques du push, ni de fournisseur d'email. L'interrupteur s'applique **en amont** des préférences
 individuelles (§4.15.3) — un canal fermé ne part pour personne, quelle que soit la matrice, et les
 préférences déjà exprimées sont conservées telles quelles pour une éventuelle réactivation. Les deux
-canaux peuvent être fermés simultanément ; les emails d'authentification (§4.1.1) ne sont jamais
-concernés, sans quoi la connexion deviendrait impossible.
+canaux peuvent être fermés simultanément.
+
+**Exemption des messages porteurs d'un accès au compte.** Ni l'interrupteur de canal ni la pause
+(§4.15.4) ne s'appliquent aux messages sans lesquels un adhérent ne peut ni entrer dans
+l'application, ni y revenir (ces messages ne figurent pas non plus dans la matrice §4.15.3) : les emails d'authentification (§4.1.1) et les **invitations
+d'activation** (§4.1.3, y compris celle du mineur autonomisé §4.2.1). Ces messages ne sont pas des
+notifications auxquelles on s'abonne — ce sont les portes d'entrée du compte. Un club en push seul
+qui ne pourrait plus inviter personne n'aurait aucun moyen de faire activer un compte, donc
+d'installer la PWA, donc de délivrer le moindre push : le canal voulu resterait inaccessible faute de
+pouvoir franchir la porte.
+
+L'exemption porte sur le **consentement**, jamais sur la **joignabilité** : un destinataire sans
+adresse email, au compte inactif ou anonymisé, reste hors d'atteinte et l'invitation est refusée avec
+un motif explicite plutôt qu'ouverte à vide.
 
 **Mode d'envoi** : par défaut, les notifications partent en **envoi différé par lots** (la latence de livraison reste bornée par la période de traitement). Une option **envoi immédiat** est proposée aux points de déclenchement (ex. modification de séance §4.7) et depuis l'écran de gestion des envois (§4.15.6), pour pousser sans attendre le lot suivant. L'évaluation des préférences (§4.15.3), de la pause (§4.15.4) et du routage parent/enfant (§4.15.5) est identique dans les deux modes.
 
@@ -859,6 +871,9 @@ concernés, sans quoi la connexion deviendrait impossible.
 - **Pas de durée auto** ni d'expiration. Si l'utilisateur oublie de la lever, c'est sa responsabilité (mention claire « tant que tu ne réactives pas, tu ne reçois rien »).
 - Distinct de la matrice fine : matrice = filtres permanents par type/canal ; pause = interrupteur master temporaire.
 - Pendant une pause, les événements applicatifs continuent ; seul le canal est suspendu.
+- **Hors pause** : les messages porteurs d'un accès au compte (§4.15.1) — emails d'authentification
+  et invitations d'activation. La pause exprime « pas d'alertes en ce moment », pas « ferme-moi la
+  porte de mon compte ».
 
 #### 4.15.5 Notifs parent / enfant
 Routage selon la phase (§4.2) :

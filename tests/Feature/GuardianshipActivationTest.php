@@ -86,10 +86,10 @@ class GuardianshipActivationTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_autonomisation_is_cancelled_when_no_channel_can_carry_the_invitation(): void
+    public function test_autonomisation_proceeds_when_the_club_email_channel_is_off(): void
     {
-        // Sans le lien, l'enfant a un compte dont il ignore l'existence et qu'il ne peut pas
-        // activer : l'autonomisation N'EST PAS l'ouverture d'un compte plus un mail en bonus.
+        // L'invitation de tutelle porte le lien d'activation, comme celle d'adhérent : elle relève
+        // de l'accès au compte (§4.15.1) et traverse l'interrupteur de canal (§4.17).
         $admin = User::factory()->create(['roles' => ['admin']]);
         $garant = User::factory()->create(['email' => 'parent@club.test']);
         $enfant = User::factory()->create([
@@ -100,14 +100,33 @@ class GuardianshipActivationTest extends TestCase
         ClubSettings::current()->update(['notif_email_enabled' => false]);
         ClubSettings::flushCache();
 
+        app(GuardianshipService::class)->invite($enfant, $admin, 'enfant@club.test');
+
+        // L'acte a bien eu lieu de bout en bout : email posé, jeton frappé, trace écrite.
+        $enfant->refresh();
+        $this->assertSame('enfant@club.test', $enfant->email);
+        $this->assertDatabaseCount('invitation_tokens', 1);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'guardianship_invite_sent']);
+    }
+
+    public function test_autonomisation_is_still_cancelled_without_an_email(): void
+    {
+        // Contrôle positif apparié : la garde d'annulation totale reste vivante pour ce qui tient
+        // à la joignabilité — sans email, l'enfant ne peut pas être invité.
+        $admin = User::factory()->create(['roles' => ['admin']]);
+        $garant = User::factory()->create(['email' => 'parent2@club.test']);
+        $enfant = User::factory()->create([
+            'email' => null, 'is_minor' => true, 'guardian_id' => $garant->id,
+            'guardianship_linked_at' => now(),
+        ]);
+
         try {
-            app(GuardianshipService::class)->invite($enfant, $admin, 'enfant@club.test');
+            app(GuardianshipService::class)->invite($enfant, $admin, null);
             $this->fail('L\'autonomisation aurait dû être refusée.');
         } catch (RuntimeException $e) {
-            $this->assertStringContainsString('canal email', $e->getMessage());
+            $this->assertStringContainsString('email', $e->getMessage());
         }
 
-        // Tout est annulé : ni email posé, ni jeton, ni trace d'un acte qui n'a pas eu lieu.
         $enfant->refresh();
         $this->assertNull($enfant->email);
         $this->assertDatabaseCount('invitation_tokens', 0);
