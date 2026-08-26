@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\Activation;
+use App\Models\ClubSettings;
 use App\Models\InvitationToken;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -33,6 +34,13 @@ class ActivationScreenTest extends TestCase
         ]);
 
         return $token;
+    }
+
+    /** Écrit un réglage du singleton. flushCache() car TestCase ne le vide qu'au setUp(). */
+    private function setSettings(array $attributes): void
+    {
+        ClubSettings::current()->update($attributes);
+        ClubSettings::flushCache();
     }
 
     public function test_activation_link_lands_on_the_welcome_screen(): void
@@ -111,5 +119,56 @@ class ActivationScreenTest extends TestCase
         $this->get('/invitation/'.$this->tokenFor($pupille))->assertRedirect(route('activation'));
 
         $this->assertSame($garant->id, $pupille->fresh()->guardian_id);
+    }
+
+    // ── Annonce des moyens de reconnexion (§4.1.3, §4.17) ──
+    // Le compte est déjà connecté ici : l'écran ANNONCE comment revenir, il n'authentifie pas.
+    // D'où l'absence volontaire de bouton `oauth.redirect`, vérifiée ci-dessous.
+
+    public function test_welcome_screen_announces_google_when_it_is_open(): void
+    {
+        config(['services.google.client_id' => 'client-test.apps.googleusercontent.com']);
+        $this->setSettings(['auth_google_enabled' => true]);
+        $u = $this->invite();
+
+        $this->get('/invitation/'.$this->tokenFor($u));
+
+        $this->get(route('activation'))
+            ->assertOk()
+            ->assertSee('Se connecter avec Google')
+            // La condition sur l'adresse reste visible : un Gmail personnel ≠ email club échoue
+            // au login, et l'échec silencieux serait plus frustrant que la mise en garde.
+            ->assertSee($u->email);
+    }
+
+    public function test_welcome_screen_hides_google_when_the_club_closed_it(): void
+    {
+        config(['services.google.client_id' => 'client-test.apps.googleusercontent.com']);
+        $this->setSettings(['auth_google_enabled' => false]);
+        $u = $this->invite();
+
+        $this->get('/invitation/'.$this->tokenFor($u));
+
+        $this->get(route('activation'))
+            ->assertOk()
+            ->assertDontSee('Se connecter avec Google')
+            // Contrôle positif : l'écran a bien rendu, l'absence n'est pas celle d'une page vide.
+            ->assertSee('Définir un mot de passe');
+    }
+
+    public function test_welcome_screen_never_offers_the_oauth_button(): void
+    {
+        // Le compte est DÉJÀ connecté : un aller-retour OAuth le ramènerait où il est, et son
+        // `intended(dashboard)` court-circuiterait l'occasion de poser un mot de passe.
+        config(['services.google.client_id' => 'client-test.apps.googleusercontent.com']);
+        $this->setSettings(['auth_google_enabled' => true]);
+        $u = $this->invite();
+
+        $this->get('/invitation/'.$this->tokenFor($u));
+
+        $this->get(route('activation'))
+            ->assertOk()
+            ->assertDontSee(route('oauth.redirect', 'google'), false)
+            ->assertSee('Se connecter avec Google');
     }
 }
