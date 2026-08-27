@@ -95,16 +95,19 @@ class MemberImportTest extends TestCase
         $pierre = User::where('email', 'pierre@club.fr')->firstOrFail();
 
         // Mineur P1 sans email, garant = parent du CSV (résolu en 2e passe).
-        $hugo = User::where('first_name', 'Hugo')->firstOrFail();
+        $hugo = User::where('first_name', 'Hugo')->where('last_name', 'Fortin')->firstOrFail();
         $this->assertNull($hugo->email);
         $this->assertTrue($hugo->is_minor);
         $this->assertSame($pierre->id, $hugo->guardian_id);
         // Catégorie dérivée du DOB (Poussin 8-13), pas de la colonne CSV.
         $this->assertSame('Poussin', $hugo->categories()->wherePivot('is_primary', true)->first()->label);
 
-        // Mineur P2 avec email, même garant.
-        $manon = User::where('first_name', 'Manon')->firstOrFail();
-        $this->assertSame('manon@club.fr', $manon->email);
+        // Mineur P2 avec email, même garant. Sélection par EMAIL, jamais par prénom seul :
+        // UserFactory tire `fake()->firstName()` avec un faker fr_FR, donc « Manon » sort ~1 fois
+        // sur 750 et `where('first_name', …)->firstOrFail()` attrapait alors le compte de factory.
+        // Test rouge au hasard des tirages, sur une PR sans rapport (vu en CI le 2026-08-27).
+        $manon = User::where('email', 'manon@club.fr')->firstOrFail();
+        $this->assertTrue($manon->is_minor);
         $this->assertSame($pierre->id, $manon->guardian_id);
     }
 
@@ -168,7 +171,7 @@ class MemberImportTest extends TestCase
 
         // Contrôle positif apparié : le mineur P1 (sans email) n'est PAS une autonomisation — il
         // reste sous l'accès du garant, rien ne lui est ouvert.
-        $hugo = User::where('first_name', 'Hugo')->firstOrFail();
+        $hugo = User::where('first_name', 'Hugo')->where('last_name', 'Fortin')->firstOrFail();
         $this->assertDatabaseMissing('audit_logs', [
             'action' => 'guardianship_invite_sent',
             'target_id' => $hugo->id,
@@ -186,7 +189,7 @@ class MemberImportTest extends TestCase
         $this->assertSame([], $report['errors']);
 
         $this->service()->commit($report, $admin);
-        $tom = User::where('first_name', 'Tom')->firstOrFail();
+        $tom = User::where('first_name', 'Tom')->where('last_name', 'Seul')->firstOrFail();
         $this->assertTrue($tom->is_minor);
         $this->assertNull($tom->guardian_id);
     }
