@@ -32,19 +32,39 @@
     </div>
 </div>
 
+{{-- Google (§4.17). Carte à part entière, au même niveau que le mot de passe : noyée dans le
+     paragraphe « continuer sans », l'option passait inaperçue et les invités croyaient Google absent.
+     PAS de bouton `oauth.redirect` ici — le compte est DÉJÀ connecté à ce stade, l'aller-retour
+     OAuth le ramènerait où il est, et son `intended(dashboard)` court-circuiterait cet écran (donc
+     l'occasion de poser un mot de passe). Le rattachement se fait tout seul au prochain login par
+     l'email vérifié (OAuthController::callback), qu'on se contente d'annoncer.
+     La condition sur l'adresse reste VISIBLE : un Gmail personnel ≠ email club échoue au login, et
+     l'échec silencieux serait plus frustrant que la mise en garde. --}}
+@if ($googleOn)
+    <div class="card card-pad">
+        <div class="flex ac g10" style="margin-bottom:10px">
+            <x-google-g :size="20" />
+            <div class="sect-title">Se connecter avec Google</div>
+        </div>
+        <div class="meta" style="line-height:1.5">
+            Rien à faire maintenant : au prochain passage, choisis <b>Continuer avec Google</b> sur
+            l'écran de connexion. Ton compte Google sera rattaché automatiquement, <b>à condition
+            que son adresse soit {{ $user->email }}</b>.
+        </div>
+    </div>
+@endif
+
 {{-- Continuer sans. On n'annonce que les moyens réellement ouverts par le club (§4.17). --}}
 <div class="card card-pad">
     <div class="sect-title" style="margin-bottom:10px">Continuer sans mot de passe</div>
     <div class="meta" style="line-height:1.5">
         @if ($magicOn)
             À chaque connexion, tu demanderas un <b>lien</b> envoyé à {{ $user->email }}.
-        @else
+        @elseif (! $googleOn)
             Tu devras définir un mot de passe pour te reconnecter — le club n'a pas ouvert la
             connexion par lien.
-        @endif
-        @if ($googleOn)
-            Tu peux aussi utiliser <b>Continuer avec Google</b> depuis l'écran de connexion, si
-            l'adresse de ton compte Google est {{ $user->email }} : le rattachement est automatique.
+        @else
+            Le club n'a pas ouvert la connexion par lien : tu entreras par Google ou par mot de passe.
         @endif
     </div>
     <button type="button" wire:click="skip" class="btn btn-ghost btn-block" style="margin-top:10px"
