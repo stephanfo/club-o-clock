@@ -204,6 +204,107 @@ class AuthMethodSwitchesTest extends TestCase
             ->assertSet('auth_magic_link_enabled', false);
     }
 
+    // ── Mineurs P1 : aucun credential, donc jamais bloquants (§4.2) ──
+
+    public function test_a_p1_minor_never_blocks_a_switch(): void
+    {
+        // §4.2 : en P1 l'enfant existe « sans credential d'auth, email nul » — le parent agit pour
+        // lui. Aucun accès à perdre, donc aucune coupure ne peut le verrouiller dehors. Les compter
+        // interdisait à tout club ayant des P1 de couper quoi que ce soit.
+        $parent = User::factory()->create(['email' => 'parent@demo.club', 'password' => 'password']);
+        User::factory()->create([
+            'email' => null, 'password' => null, 'is_active' => true,
+            'is_minor' => true, 'guardian_id' => $parent->id,
+        ]);
+
+        Livewire::actingAs($this->admin())
+            ->test(ClubSettingsForm::class)
+            ->call('toggleAuthMethod', 'magic_link')
+            ->assertSet('auth_magic_link_enabled', false);
+
+        ClubSettings::flushCache();
+        $this->assertFalse(ClubSettings::current()->auth_magic_link_enabled);
+    }
+
+    public function test_a_minor_without_a_guardian_never_blocks_a_switch_either(): void
+    {
+        // Mineur orphelin de tutelle (en attente de rattachement §4.2) : pas de garant, mais pas
+        // davantage de credential. Le critère est l'absence d'email, pas la présence d'un garant.
+        User::factory()->create([
+            'email' => null, 'password' => null, 'is_active' => true,
+            'is_minor' => true, 'guardian_id' => null,
+        ]);
+
+        Livewire::actingAs($this->admin())
+            ->test(ClubSettingsForm::class)
+            ->call('toggleAuthMethod', 'google')
+            ->assertSet('auth_google_enabled', false);
+    }
+
+    public function test_a_minor_with_a_linked_google_identity_still_blocks_the_switch(): void
+    {
+        // L'exemption P1 raisonne sur « pas d'email donc pas de credential » : elle doit consulter
+        // la table qui les stocke. Un mineur sans email mais avec un Google lié possède un accès
+        // RÉEL — OAuthController::callback résout sur `provider_uid` et connecte sans lire
+        // `users.email`. Couper Google lui retirerait son unique porte.
+        $user = User::factory()->create([
+            'email' => null, 'password' => null, 'is_active' => true,
+            'is_minor' => true, 'guardian_id' => null,
+        ]);
+        AuthIdentity::create([
+            'user_id' => $user->id, 'provider' => 'google', 'provider_uid' => 'g-mineur',
+            'email_at_link' => 'ado@demo.club', 'linked_at' => Carbon::now(),
+        ]);
+
+        Livewire::actingAs($this->admin())
+            ->test(ClubSettingsForm::class)
+            ->call('toggleAuthMethod', 'google')
+            ->assertSet('auth_google_enabled', true)
+            ->assertSee('plus aucun moyen de se connecter');
+
+        ClubSettings::flushCache();
+        $this->assertTrue(ClubSettings::current()->auth_google_enabled);
+    }
+
+    public function test_a_p2_minor_still_blocks_the_switch_it_depends_on(): void
+    {
+        // Contrôle positif de la garde : en P2 l'enfant A son propre email et se connecte seul
+        // (§4.2.1). Couper le lien magique le verrouillerait pour de bon — le refus doit tenir.
+        $parent = User::factory()->create(['email' => 'parent2@demo.club', 'password' => 'password']);
+        User::factory()->create([
+            'email' => 'ado@demo.club', 'password' => null, 'is_active' => true,
+            'is_minor' => true, 'guardian_id' => $parent->id,
+        ]);
+
+        Livewire::actingAs($this->admin())
+            ->test(ClubSettingsForm::class)
+            ->call('toggleAuthMethod', 'magic_link')
+            ->assertSet('auth_magic_link_enabled', true)
+            ->assertSee('plus aucun moyen de se connecter');
+
+        ClubSettings::flushCache();
+        $this->assertTrue(ClubSettings::current()->auth_magic_link_enabled);
+    }
+
+    public function test_an_adult_without_email_still_blocks_the_switch(): void
+    {
+        // Second contrôle positif : c'est bien la MINORITÉ qui exempte, pas l'absence d'email.
+        // Un adulte sans email ni mot de passe dépend réellement de son identité Google.
+        $user = User::factory()->create([
+            'email' => null, 'password' => null, 'is_active' => true, 'is_minor' => false,
+        ]);
+        AuthIdentity::create([
+            'user_id' => $user->id, 'provider' => 'google', 'provider_uid' => 'g-adulte',
+            'email_at_link' => 'adulte@demo.club', 'linked_at' => Carbon::now(),
+        ]);
+
+        Livewire::actingAs($this->admin())
+            ->test(ClubSettingsForm::class)
+            ->call('toggleAuthMethod', 'google')
+            ->assertSet('auth_google_enabled', true)
+            ->assertSee('plus aucun moyen de se connecter');
+    }
+
     public function test_disabling_google_is_refused_for_an_account_that_only_has_google(): void
     {
         // Pas d'email, pas de mot de passe : seule une identité Google donne accès à ce compte.

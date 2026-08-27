@@ -86,6 +86,27 @@ class AuthMethodService
      *
      * Un mot de passe suffit toujours à sauver un compte (le login MDP n'est jamais coupé).
      *
+     * Les mineurs en P1 sont HORS de ce décompte : le PRD §4.2 les définit comme existant « sans
+     * credential d'auth, email nul » — le parent agit pour eux depuis « mes enfants ». Ils n'ont
+     * aucun accès à perdre, donc aucune coupure ne peut les verrouiller dehors. Les compter
+     * interdisait à tout club ayant des P1 de couper quoi que ce soit, avec un refus nommant des
+     * enfants qui ne se connectent pas. Même raison que l'exclusion des comptes inactifs et
+     * anonymisés : on ne protège que des accès qui existent.
+     *
+     * Le critère est `is_minor` + `email IS NULL`, PAS la présence d'un garant : un mineur orphelin
+     * de tutelle (guardian_id nul, en attente de rattachement §4.2) n'a pas davantage de credential.
+     * C'est l'absence d'email qui sépare P1 de P2 (§4.2.1 « la transition P1→P2 crée le credential
+     * et renseigne l'email ») : un P2 a son propre email, se connecte seul, et reste protégé ici.
+     *
+     * L'exemption exige EN PLUS l'absence d'identité OAuth — défense en profondeur, l'état n'ayant
+     * aucun chemin applicatif aujourd'hui : le linking ne peut pas le créer (le callback passe par
+     * findByEmail, qui ne trouve jamais un compte sans email) et retirer l'email d'un P2 déjà lié
+     * est refusé par MemberShow::saveEmail. Mais updateEmail() accepte `null` et gère ce cas : la
+     * garde ne doit pas dépendre d'une validation située ailleurs. Sans cette clause, le prédicat
+     * affirmait « pas d'email donc pas de credential » sans consulter la table qui les stocke,
+     * alors qu'une identité liée reste utilisable (le callback résout sur `provider_uid` et
+     * connecte sans lire `users.email`).
+     *
      * @return Collection<int,User>
      */
     public function lockedOutBy(bool $magicLink, bool $google): Collection
@@ -93,7 +114,11 @@ class AuthMethodService
         $query = User::query()
             ->where('is_active', true)
             ->whereNull('anonymized_at')
-            ->whereNull('password');
+            ->whereNull('password')
+            // P1 (§4.2) : mineur sans email NI identité OAuth = aucun credential, rien à verrouiller.
+            ->whereNot(fn ($q) => $q->where('is_minor', true)
+                ->whereNull('email')
+                ->whereDoesntHave('authIdentities'));
 
         // Chaque moyen encore ouvert RETIRE de la liste les comptes qui peuvent l'emprunter.
         if ($magicLink) {
