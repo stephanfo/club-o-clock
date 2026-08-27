@@ -98,6 +98,15 @@ class AuthMethodService
      * C'est l'absence d'email qui sépare P1 de P2 (§4.2.1 « la transition P1→P2 crée le credential
      * et renseigne l'email ») : un P2 a son propre email, se connecte seul, et reste protégé ici.
      *
+     * L'exemption exige EN PLUS l'absence d'identité OAuth — défense en profondeur, l'état n'ayant
+     * aucun chemin applicatif aujourd'hui : le linking ne peut pas le créer (le callback passe par
+     * findByEmail, qui ne trouve jamais un compte sans email) et retirer l'email d'un P2 déjà lié
+     * est refusé par MemberShow::saveEmail. Mais updateEmail() accepte `null` et gère ce cas : la
+     * garde ne doit pas dépendre d'une validation située ailleurs. Sans cette clause, le prédicat
+     * affirmait « pas d'email donc pas de credential » sans consulter la table qui les stocke,
+     * alors qu'une identité liée reste utilisable (le callback résout sur `provider_uid` et
+     * connecte sans lire `users.email`).
+     *
      * @return Collection<int,User>
      */
     public function lockedOutBy(bool $magicLink, bool $google): Collection
@@ -106,8 +115,10 @@ class AuthMethodService
             ->where('is_active', true)
             ->whereNull('anonymized_at')
             ->whereNull('password')
-            // P1 (§4.2) : mineur sans email = pas de credential, aucun accès à verrouiller.
-            ->whereNot(fn ($q) => $q->where('is_minor', true)->whereNull('email'));
+            // P1 (§4.2) : mineur sans email NI identité OAuth = aucun credential, rien à verrouiller.
+            ->whereNot(fn ($q) => $q->where('is_minor', true)
+                ->whereNull('email')
+                ->whereDoesntHave('authIdentities'));
 
         // Chaque moyen encore ouvert RETIRE de la liste les comptes qui peuvent l'emprunter.
         if ($magicLink) {
