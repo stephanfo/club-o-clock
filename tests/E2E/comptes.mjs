@@ -126,6 +126,16 @@ const tous = [];
     s.check('la réversibilité est annoncée', /réversible/i.test(t));
     await s.shot(page, 's20-suspension-dialog');
     await dlg.locator('input[wire\\:model="suspendMotif"], input[wire\\:model\\.blur="suspendMotif"]').first().fill('Licence non renouvelée (E2E)');
+
+    // Accusé de réception (§4.17) : le bouton n'est armé que la case cochée. Contrôle NÉGATIF d'abord
+    // — « le bouton n'agit pas » ne vaudrait rien sans le contrôle positif qui suit.
+    s.check('bouton non armé tant que la case n\'est pas cochée',
+      await dlg.locator('button[wire\\:click="suspendAccess"]').count() === 0);
+    await dlg.locator('[wire\\:click="$toggle(\'suspendCheck\')"]').first().click();
+    await page.waitForTimeout(600);
+    s.check('la case cochée arme le bouton',
+      await dlg.locator('button[wire\\:click="suspendAccess"]').count() === 1);
+
     await dlg.locator('button[wire\\:click="suspendAccess"]').first().click();
     await page.waitForTimeout(1200);
   }

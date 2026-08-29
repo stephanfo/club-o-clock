@@ -129,6 +129,7 @@ class ParentSubjectTest extends TestCase
 
         Livewire::actingAs($parent)->test(ParentChildren::class)
             ->call('openSever', $p2->id)
+            ->set('severCheck', true)
             ->call('confirmSever')
             ->assertSet('severDialog', null);
 

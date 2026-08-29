@@ -289,6 +289,7 @@ class SeasonTest extends TestCase
 
         $composant = Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $membre])
             ->set('suspendMotif', 'Licence non renouvelée')
+            ->set('suspendCheck', true)
             ->call('suspendAccess')
             ->assertHasNoErrors();
 

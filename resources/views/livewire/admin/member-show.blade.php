@@ -424,7 +424,7 @@
                                  un compte en cours de suppression — il est déjà désactivé. --}}
                             @elseif ($u->hasRole('athlete') && $u->is_active && ! $u->anonymized_at && ! $pending)
                                 <button type="button" class="btn btn-ghost btn-block" style="margin-bottom:12px;color:var(--warning)"
-                                    wire:click="$set('confirmingSuspend', true)">
+                                    wire:click="openSuspendConfirm">
                                     <x-icon name="user-minus" :size="15" /> Suspendre l'accès athlète
                                 </button>
                             @endif
@@ -561,9 +561,17 @@
                 <label class="field-label">Motif (optionnel, consigné au journal)</label>
                 <input class="input" style="margin-top:8px" wire:model.blur="suspendMotif" placeholder="Licence non renouvelée…" autocomplete="off">
             </div>
+            {{-- Accusé de réception avant d'armer le bouton (motif « bascule de saison » §4.17) : la
+                 suspension annule les inscriptions futures et fait remonter des tiers depuis la file,
+                 qui sont notifiés — l'envoi ne se dédit pas. --}}
+            <div class="flex ac g10" style="margin-top:14px;font-size:14px;cursor:pointer" wire:click="$toggle('suspendCheck')">
+                <x-check :on="$suspendCheck" tabindex="-1" style="pointer-events:none" />
+                <span>Je comprends que {{ $futureRegs }} inscription(s) future(s) seront annulées et les athlètes concernés prévenus.</span>
+            </div>
             <x-slot:footer>
                 <button type="button" class="btn btn-ghost" wire:click="$set('confirmingSuspend', false)">Annuler</button>
-                <button type="button" class="btn btn-danger" wire:click="suspendAccess"
+                <button type="button" class="btn btn-danger{{ $suspendCheck ? '' : ' is-disabled' }}"
+                    @if ($suspendCheck) wire:click="suspendAccess" @endif
                     wire:loading.attr="disabled" wire:target="suspendAccess">Suspendre l'accès</button>
             </x-slot:footer>
         </x-dialog>
