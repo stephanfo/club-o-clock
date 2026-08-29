@@ -249,6 +249,30 @@ Le paquet `playwright` du `node_modules` monté est du JavaScript pur, donc util
 conteneur ; les navigateurs, eux, viennent de l'image (`PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`),
 jamais du cache de la machine.
 
+### Rejouer en conditions de production
+
+Le poste tourne en `APP_DEBUG=true`, la production en `false` — et ce n'est pas cosmétique : Livewire
+sert son bundle **non minifié** dans le premier cas, **minifié** dans le second, et une erreur
+JavaScript n'y porte alors ni le même message ni la même trace. Pour rejouer le harnais dans les
+conditions du serveur, sans toucher au conteneur de travail :
+
+```bash
+docker run -d --name cluboclock-app-prod --network cluboclock \
+  -v "$PWD":/app -w /app \
+  -e DB_HOST=cluboclock-mysql -e DB_PORT=3306 -e APP_DEBUG=false \
+  -e MAIL_MAILER=log \
+  -e 'NOTIF_EMAIL_DRIVER=App\Notifications\Channels\LogChannel' \
+  -e 'NOTIF_PUSH_DRIVER=App\Notifications\Channels\LogChannel' \
+  cluboclock-php:8.4 php artisan serve --host=0.0.0.0 --port=8000 --no-reload
+```
+
+Pas de `-p` : ce conteneur n'a pas à être joignable depuis la machine. On lui adosse le harnais avec
+`--network container:cluboclock-app-prod` au lieu de `cluboclock-app`. `APP_ENV` reste `local`, sans
+quoi `auth.php` et `sql.php` refusent de s'exécuter.
+
+**Garder `APP_DEBUG=false` hors du conteneur de travail** : en `false`, Laravel remplace la page
+d'erreur détaillée par un 500 muet, ce qui rend le développement pénible.
+
 ### Scénarios destructifs
 
 ```bash

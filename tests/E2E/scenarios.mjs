@@ -52,6 +52,7 @@ const tous = [];
   // Remise en état : on annule l'inscription et on le remet coach.
   sql(`DELETE FROM registrations WHERE session_id=${s8} AND user_id=${mathieu}`);
   sql(`INSERT IGNORE INTO session_coach (session_id, user_id) VALUES (${s8},${mathieu})`);
+  s.checkJs(page);
   purgeJournaux(journaux);
   const restaure = sql(`SELECT COUNT(*) n FROM session_coach WHERE session_id=${s8} AND user_id=${mathieu}`);
   s.check('état restauré après test', restaure === '1');
