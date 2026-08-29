@@ -85,6 +85,7 @@ Générée sur **6 semaines glissantes** à partir du lundi de la semaine du see
 | `romain@demo.club` | Romain Bonnet | Master. |
 | `laura@demo.club` | Laura Dupuis | Master. |
 | `kevin@demo.club` | Kévin Lambert | 🔴 **Accès athlète suspendu** (`athlete_access_suspended`) — ne peut plus s'inscrire, compte toujours actif. |
+| `brigitte@demo.club` | Brigitte Ancienne | 🔴 **Accès athlète suspendu** — ancienne adhérente non renouvelée ; sert de cible à la **réactivation** sans toucher à Kévin. |
 
 ---
 
@@ -146,7 +147,7 @@ rattaché** (`guardian_id` nul). C'est le seul cas de ce type dans le jeu. Il se
 | Coach simple | `vincent@demo.club` (et 5 autres) |
 | **Multi-rôle** (coach + athlete) | `mathieu@demo.club` |
 | Athlète adulte | `marie@demo.club` (et 16 autres) |
-| **Accès athlète suspendu** | `kevin@demo.club` |
+| **Accès athlète suspendu** | `kevin@demo.club`, `brigitte@demo.club` (ancienne adhérente non renouvelée) |
 | **Mineur P1** (sans compte, géré par garant) | Lucie Garnier (via `florence@demo.club`), Jade Faure (via `sandrine@demo.club`) |
 | **Mineur P2** (compte propre + garant) | `theo.mercier@demo.club` (garant `olivier@demo.club`), `noah.faure@demo.club` (garant `sandrine@demo.club`) |
 | **Garant de 2 enfants (P1 + P2), athlète lui-même** | `sandrine@demo.club` |
@@ -155,9 +156,8 @@ rattaché** (`guardian_id` nul). C'est le seul cas de ce type dans le jeu. Il se
 | Mineur autonome | `hugo@demo.club`, `lea@demo.club`, … |
 | **Mineur sans garant** (rattachement / ré-association admin §4.2) | Timéo Vidal (fiche admin — pas de compte) |
 | **Auteur de débrief** | `marie@demo.club`, `lucas@demo.club` |
-| **Compte désactivé** (`is_active = false`, login refusé) | `brigitte@demo.club` |
-| **Suppression RGPD demandée** (tampon 7 j en cours, annulable) | `gilles@demo.club` |
-| **Suppression RGPD éligible** (tampon écoulé → bandeau admin) | `daniel@demo.club` |
+| **Suppression RGPD demandée** (tampon 7 j en cours, annulable ; `is_active = false` → login refusé) | `gilles@demo.club` |
+| **Suppression RGPD éligible** (tampon écoulé → bandeau admin ; `is_active = false`) | `daniel@demo.club` |
 | **Surclassement** (2 catégories) | `noah.faure@demo.club` |
 
 ---

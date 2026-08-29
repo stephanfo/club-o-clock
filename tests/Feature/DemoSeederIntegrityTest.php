@@ -153,4 +153,36 @@ class DemoSeederIntegrityTest extends TestCase
         // c'est précisément ce que le compte donne à voir.
         $this->assertTrue($sandrine->hasRole('athlete'), 'Sandrine doit rester athlète du club.');
     }
+
+    /**
+     * `isActive = false` est réservé au tampon de suppression (§4.3) — la bascule de saison a son
+     * propre drapeau, séparé (§4.4). Un compte seedé hors de ce cadre fabriquait un état que
+     * l'application ne sait ni produire ni défaire : la liste comme la fiche l'affichaient
+     * « ● actif » (leurs pastilles se dérivent de la suspension et de la suppression, jamais de
+     * isActive) alors que les quatre voies de connexion le refusaient. Constaté sur
+     * brigitte@demo.club, formulé sur tout le jeu pour couvrir les ajouts futurs.
+     */
+    public function test_aucun_compte_inactif_hors_tampon_de_suppression(): void
+    {
+        $this->seed(CatalogSeeder::class);
+        $this->seed(DemoSeeder::class);
+
+        $incoherents = User::query()
+            ->where('is_active', false)
+            ->whereNull('deletion_requested_at')
+            ->whereNull('anonymized_at')
+            ->pluck('email')
+            ->all();
+
+        $this->assertSame([], $incoherents,
+            'Comptes inactifs sans demande de suppression (état invisible dans l\'admin) : '
+            .implode(', ', $incoherents));
+
+        // Contrôle positif : le tampon RGPD, lui, pose bien isActive=false — sans quoi l'assertion
+        // ci-dessus passerait aussi sur un jeu où plus personne n'est inactif.
+        $this->assertFalse(
+            (bool) User::where('email', 'gilles@demo.club')->firstOrFail()->is_active,
+            'Gilles (suppression demandée) doit être inactif : c\'est le seul cas légitime.'
+        );
+    }
 }

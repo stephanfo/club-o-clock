@@ -203,7 +203,7 @@
 - [ ] Catégories d'âge : bornes sans chevauchement (une modification en collision est refusée).
 
 ### 8.2 Adhérents (PRD §4.17.1)
-- [ ] Recherche + filtres (rôle, accès) ; compteurs ; **Brigitte** apparaît « désactivée ».
+- [ ] Recherche + filtres (rôle, accès) ; compteurs ; **Brigitte** et **Kévin** portent « ○ suspendu » et sortent du filtre « Actifs ».
 - [ ] Créer un adhérent adulte (email requis) et un **mineur P1** (email facultatif, garant obligatoire).
 - [ ] Fiche adhérent : **modifier la date de naissance** → catégorie recalculée, surclassement conservé (tester sur Noah) ; date future ou < 1900 refusée.
 - [ ] Ajouter/retirer un rôle (coach) → tracé au journal.
