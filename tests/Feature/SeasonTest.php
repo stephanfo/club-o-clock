@@ -282,6 +282,30 @@ class SeasonTest extends TestCase
         $this->assertSame(0, AuditLog::where('action', 'account_deactivated')->count());
     }
 
+    /**
+     * Garde SERVEUR de l'accusé de réception (§4.17) : le bouton grisé ne protège que le clic. Et la
+     * case ne survit pas au dialog — ni par le bouton « Annuler », ni par le voile, ni par Échap, qui
+     * passent tous par dismissSuspendConfirm(), comme pour l'annulation de séance et la tutelle.
+     */
+    public function test_suspending_without_ticking_the_box_does_nothing(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $membre = User::factory()->create(['roles' => ['athlete'], 'email' => 'c@d.test']);
+
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $membre])
+            ->call('openSuspendConfirm')
+            ->assertSet('suspendCheck', false)
+            ->call('suspendAccess')
+            ->assertSet('confirmingSuspend', true)      // le dialog reste ouvert
+            ->set('suspendCheck', true)
+            ->call('dismissSuspendConfirm')
+            ->assertSet('suspendCheck', false)          // la case ne survit pas à la fermeture
+            ->call('openSuspendConfirm')
+            ->assertSet('suspendCheck', false);
+
+        $this->assertFalse($membre->fresh()->athlete_access_suspended);
+    }
+
     public function test_member_show_suspends_then_reactivates(): void
     {
         $admin = User::factory()->admin()->create();

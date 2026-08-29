@@ -446,10 +446,23 @@
                  `.stop` sur le check empêche le clic de remonter à la rangée et de re-basculer. --}}
             <div class="flex ac g10" style="margin-top:14px;font-size:14px;cursor:pointer" wire:click="$toggle('cancelCheck')">
                 <x-check :on="$cancelCheck" wire:click.stop="$toggle('cancelCheck')" aria-labelledby="txt-annuler-seance" />
-                {{-- Suffixe calculé et non `@if` en ligne : Blade ne reconnaît pas une directive collée
-                     à un caractère de mot (son parseur exige un non-mot avant le @). --}}
+                {{-- Phrase calculée et non `@if` en ligne : Blade ne reconnaît pas une directive collée
+                     à un caractère de mot (son parseur exige un non-mot avant le @).
+                     Trois formes, parce qu'une seule mentait dans deux cas sur trois : « 0 inscrit·e·s
+                     seront prévenu·e·s » demandait d'accuser réception d'un envoi qui n'aura pas lieu,
+                     et « 1 inscrit·e·s » est faux. Sur une séance vide, la case n'a plus qu'un objet —
+                     l'irréversibilité — et disparaîtrait donc si la séance n'avait pas commencé ; on la
+                     garde quand même : un bouton rouge tantôt armé tantôt non, sans raison visible,
+                     serait plus déroutant que la case. --}}
+                @php($n = $participating->count())
+                @php($phrase = match (true) {
+                    // « que aucun » ne s'élide pas : la phrase entière est calculée, connecteur compris.
+                    $n === 0 => 'Je comprends qu\'aucun·e inscrit·e ne sera prévenu·e (séance sans inscription)',
+                    $n === 1 => 'Je comprends que 1 inscrit·e sera prévenu·e',
+                    default => 'Je comprends que '.$n.' inscrit·e·s seront prévenu·e·s',
+                })
                 @php($suffixe = $session->hasStarted() ? " et que l'annulation sera définitive" : '')
-                <span id="txt-annuler-seance">Je comprends que {{ $participating->count() }} inscrit·e·s seront prévenu·e·s{{ $suffixe }}.</span>
+                <span id="txt-annuler-seance">{{ $phrase }}{{ $suffixe }}.</span>
             </div>
 
             <x-slot:footer>

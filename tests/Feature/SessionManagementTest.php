@@ -248,6 +248,47 @@ class SessionManagementTest extends TestCase
             ->assertSet('cancelCheck', false);
     }
 
+    /**
+     * Le libellé de l'accusé compte des personnes : il doit compter juste, y compris aux deux bornes.
+     * « 0 inscrit·e·s seront prévenu·e·s » demandait d'accuser réception d'un envoi qui n'aura pas
+     * lieu, et « 1 inscrit·e·s » n'est pas du français.
+     */
+    public function test_the_acknowledgement_counts_participants_correctly(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $service = app(RegistrationService::class);
+
+        $vide = $this->sessionAt($coach, Carbon::now()->addWeek(), 60);
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $vide])
+            ->call('openCancelConfirm')->html();
+        $this->assertStringContainsString('aucun·e inscrit·e ne sera prévenu·e', $html);
+        // Assertion cadrée sur la phrase d'accusé : la fiche affiche par ailleurs, légitimement, une
+        // pastille « 0 inscrit·e·s » — une assertion sur la page entière la prendrait pour le défaut.
+        $this->assertStringNotContainsString('0 inscrit', $this->accuse($html));
+
+        $un = $this->targetCategory($this->sessionAt($coach, Carbon::now()->addWeek(), 60));
+        $service->register($un, $a = $this->athlete(), $a);
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $un->fresh()])
+            ->call('openCancelConfirm')->html();
+        $this->assertStringContainsString('1 inscrit·e sera prévenu·e', $html);
+
+        // Contrôle positif : au pluriel, la phrase reste celle qu'annonce la convention (§4.17).
+        $service->register($un, $b = $this->athlete(), $b);
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $un->fresh()])
+            ->call('openCancelConfirm')->html();
+        $this->assertStringContainsString('2 inscrit·e·s seront prévenu·e·s', $html);
+    }
+
+    /** Le seul contenu de la phrase d'accusé du dialog d'annulation (repérée par l'id de son <span>). */
+    private function accuse(string $html): string
+    {
+        $this->assertMatchesRegularExpression('/id="txt-annuler-seance"[^>]*>(.*?)<\/span>/s', $html,
+            'la phrase d\'accusé de réception est absente du dialog');
+        preg_match('/id="txt-annuler-seance"[^>]*>(.*?)<\/span>/s', $html, $m);
+
+        return $m[1];
+    }
+
     public function test_the_confirmation_wording_names_the_definitive_effect_once_started(): void
     {
         $coach = User::factory()->coach()->create();
@@ -256,8 +297,10 @@ class SessionManagementTest extends TestCase
         $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $enCours])
             ->call('openCancelConfirm')->html();
 
-        $this->assertStringContainsString('Je comprends que', $html);
-        $this->assertStringContainsString('définitive', $html);
+        // « Je comprends » sans le « que » : sur une séance sans inscription, la phrase s'élide en
+        // « Je comprends qu'aucun·e inscrit·e… » (cf. test_the_acknowledgement_counts_participants_correctly).
+        $this->assertStringContainsString('Je comprends', $this->accuse($html));
+        $this->assertStringContainsString('définitive', $this->accuse($html));
     }
 
     // ── Borne d'annulation : la fin du créneau, pas le début (§4.7) ──

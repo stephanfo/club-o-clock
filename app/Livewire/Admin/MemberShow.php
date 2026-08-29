@@ -358,6 +358,17 @@ class MemberShow extends Component
         $this->confirmingSuspend = true;
     }
 
+    /**
+     * Ferme le dialog en désarmant la case — bouton « Annuler », clic sur le voile, touche Échap.
+     * Pendant de dismissCancelConfirm() et cancelSever() : la case ne doit pas survivre au dialog,
+     * même si openSuspendConfirm() la remettrait à zéro à la réouverture.
+     */
+    public function dismissSuspendConfirm(): void
+    {
+        $this->confirmingSuspend = false;
+        $this->suspendCheck = false;
+    }
+
     public function suspendAccess(SeasonService $season): void
     {
         // Accusé de réception explicite (motif §4.17) : la suspension annule les inscriptions futures

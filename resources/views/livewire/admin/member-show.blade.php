@@ -542,7 +542,7 @@
 
     {{-- ── Modale : suspension individuelle de l'accès athlète (§4.4) ── --}}
     @if ($confirmingSuspend)
-        <x-dialog title="Suspendre l'accès athlète" :danger="true" :width="460" close="$set('confirmingSuspend', false)">
+        <x-dialog title="Suspendre l'accès athlète" :danger="true" :width="460" close="dismissSuspendConfirm">
             <div style="display:flex;flex-direction:column;gap:12px">
                 <x-conseq-row icon="calendar" label="{{ $futureRegs }} inscription(s) future(s)" tone="warn">
                     Annulée(s) immédiatement. Les places libérées repartent à la file d'attente, et les
@@ -570,10 +570,13 @@
                  `.stop` sur le check empêche le clic de remonter à la rangée et de re-basculer. --}}
             <div class="flex ac g10" style="margin-top:14px;font-size:14px;cursor:pointer" wire:click="$toggle('suspendCheck')">
                 <x-check :on="$suspendCheck" wire:click.stop="$toggle('suspendCheck')" aria-labelledby="txt-suspendre-acces" />
-                <span id="txt-suspendre-acces">Je comprends que {{ $futureRegs }} inscription(s) future(s) seront annulées et les athlètes concernés prévenus.</span>
+                {{-- « les athlètes remontés de la file » et non « les athlètes concernés » : le
+                     suspendu, lui, n'est PAS notifié (§4.4 — bannière in-app, pas d'email). Les seuls
+                     envois viennent des promotions déclenchées par les places libérées. --}}
+                <span id="txt-suspendre-acces">Je comprends que {{ $futureRegs }} inscription(s) future(s) seront annulées, et que les athlètes remontés depuis les files d'attente en seront prévenus.</span>
             </div>
             <x-slot:footer>
-                <button type="button" class="btn btn-ghost" wire:click="$set('confirmingSuspend', false)">Annuler</button>
+                <button type="button" class="btn btn-ghost" wire:click="dismissSuspendConfirm">Annuler</button>
                 <button type="button" class="btn btn-danger{{ $suspendCheck ? '' : ' is-disabled' }}"
                     @if ($suspendCheck) wire:click="suspendAccess" @endif
                     wire:loading.attr="disabled" wire:target="suspendAccess">Suspendre l'accès</button>
