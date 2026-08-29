@@ -107,6 +107,7 @@ class SessionManagementTest extends TestCase
         ]);
 
         Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])
+            ->set('cancelCheck', true)
             ->call('cancel');
         $this->assertNotNull($session->fresh()->cancelled_at);
         $this->assertDatabaseHas('audit_logs', ['action' => 'cancel_session', 'session_id' => $session->id]);
@@ -208,5 +209,188 @@ class SessionManagementTest extends TestCase
             ->assertForbidden();
 
         $this->assertNotNull($session->fresh()->cancelled_at);
+    }
+
+    // ── Accusé de réception : le bouton n'est armé que la case cochée (§4.17) ──
+
+    public function test_cancelling_without_ticking_the_box_does_nothing(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Future', 'discipline_id' => $this->discipline()->id,
+            'start_at' => Carbon::now()->addWeek(), 'duration_min' => 60, 'created_by' => $coach->id,
+        ]);
+
+        // Garde SERVEUR : le bouton grisé ne protège que le clic, pas une action forgée.
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])
+            ->call('openCancelConfirm')
+            ->assertSet('cancelCheck', false)
+            ->call('cancel')
+            ->assertSet('confirmingCancel', true);   // le dialog reste ouvert
+
+        $this->assertNull($session->fresh()->cancelled_at);
+    }
+
+    public function test_the_box_is_never_pre_ticked_when_reopening(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Future', 'discipline_id' => $this->discipline()->id,
+            'start_at' => Carbon::now()->addWeek(), 'duration_min' => 60, 'created_by' => $coach->id,
+        ]);
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])
+            ->call('openCancelConfirm')
+            ->set('cancelCheck', true)
+            ->call('dismissCancelConfirm')
+            ->assertSet('cancelCheck', false)
+            ->call('openCancelConfirm')
+            ->assertSet('cancelCheck', false);
+    }
+
+    public function test_the_confirmation_wording_names_the_definitive_effect_once_started(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $enCours = $this->sessionAt($coach, Carbon::now()->subMinutes(5), 60);
+
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $enCours])
+            ->call('openCancelConfirm')->html();
+
+        $this->assertStringContainsString('Je comprends que', $html);
+        $this->assertStringContainsString('définitive', $html);
+    }
+
+    // ── Borne d'annulation : la fin du créneau, pas le début (§4.7) ──
+
+    private function sessionAt(User $coach, Carbon $start, int $duree = 60): Session
+    {
+        return Session::create([
+            'kind' => 'training', 'title' => 'Créneau', 'discipline_id' => $this->discipline()->id,
+            'start_at' => $start, 'duration_min' => $duree, 'created_by' => $coach->id,
+        ]);
+    }
+
+    public function test_a_session_can_still_be_cancelled_once_started(): void
+    {
+        // Orage à 18h35 sur un créneau de 18h30 : le coach annule sur place, les inscrits sont prévenus.
+        $coach = User::factory()->coach()->create();
+        $session = $this->sessionAt($coach, Carbon::now()->subMinutes(5), 60);
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])
+            ->set('cancelCheck', true)
+            ->call('cancel')
+            ->assertHasNoErrors();
+
+        $this->assertNotNull($session->fresh()->cancelled_at);
+    }
+
+    public function test_a_finished_session_cannot_be_cancelled(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $session = $this->sessionAt($coach, Carbon::now()->subMinutes(90), 60);   // terminée depuis 30 min
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])
+            ->set('cancelCheck', true)
+            ->call('cancel')
+            ->assertForbidden();
+
+        $this->assertNull($session->fresh()->cancelled_at);
+    }
+
+    public function test_the_cancel_action_disappears_once_the_slot_is_over(): void
+    {
+        $coach = User::factory()->coach()->create();
+
+        // Contrôle positif : pendant le créneau, l'action est offerte dans les DEUX coquilles.
+        $enCours = $this->sessionAt($coach, Carbon::now()->subMinutes(5), 60);
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $enCours])->html();
+        $this->assertStringContainsString('openCancelConfirm', $this->coquilleMobile($html));
+        $this->assertStringContainsString('openCancelConfirm', $html);
+
+        $terminee = $this->sessionAt($coach, Carbon::now()->subMinutes(90), 60);
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $terminee])->html();
+        $this->assertStringNotContainsString('openCancelConfirm', $html);
+    }
+
+    public function test_the_confirmation_announces_that_a_started_session_cannot_be_restored(): void
+    {
+        $coach = User::factory()->coach()->create();
+
+        $future = $this->sessionAt($coach, Carbon::now()->addWeek(), 60);
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $future])
+            ->call('openCancelConfirm')->html();
+        $this->assertStringContainsString('Réversible', $html);
+        $this->assertStringNotContainsString('Irréversible', $html);
+
+        $enCours = $this->sessionAt($coach, Carbon::now()->subMinutes(5), 60);
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $enCours])
+            ->call('openCancelConfirm')->html();
+        $this->assertStringContainsString('Irréversible', $html);
+        $this->assertStringContainsString('elle ne pourra pas être réactivée', $html);
+    }
+
+    /**
+     * Portion mobile du rendu (la fiche porte DEUX coquilles, .fiche-mobile et .fiche-desktop, dans
+     * le même HTML : une assertion sur la page entière ne dirait pas laquelle porte l'action).
+     */
+    private function coquilleMobile(string $html): string
+    {
+        $debut = strpos($html, 'fiche-mobile');
+        $fin = strpos($html, 'fiche-desktop');
+        $this->assertNotFalse($debut, 'coquille mobile absente du rendu');
+        $this->assertNotFalse($fin, 'coquille desktop absente du rendu');
+
+        return substr($html, $debut, $fin - $debut);
+    }
+
+    public function test_cancel_action_is_reachable_on_mobile(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Future', 'discipline_id' => $this->discipline()->id,
+            'start_at' => Carbon::now()->addWeek(), 'duration_min' => 60, 'created_by' => $coach->id,
+        ]);
+
+        $mobile = $this->coquilleMobile(
+            Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])->html()
+        );
+
+        $this->assertStringContainsString('openCancelConfirm', $mobile);
+        // Contrôle positif : « Inscrire un athlète » y était déjà — l'annulation était la seule
+        // action d'encadrement à ne vivre que dans la colonne desktop.
+        $this->assertStringContainsString('openAthletePicker', $mobile);
+    }
+
+    public function test_cancel_action_is_hidden_on_mobile_for_an_athlete(): void
+    {
+        $athlete = User::factory()->create();
+        $coach = User::factory()->coach()->create();
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Future', 'discipline_id' => $this->discipline()->id,
+            'start_at' => Carbon::now()->addWeek(), 'duration_min' => 60, 'created_by' => $coach->id,
+        ]);
+
+        $mobile = $this->coquilleMobile(
+            Livewire::actingAs($athlete)->test(SessionShow::class, ['session' => $session])->html()
+        );
+
+        $this->assertStringNotContainsString('openCancelConfirm', $mobile);
+    }
+
+    public function test_cancel_action_is_absent_on_mobile_for_a_cancelled_session(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Annulée', 'discipline_id' => $this->discipline()->id,
+            'start_at' => Carbon::now()->addWeek(), 'duration_min' => 60, 'created_by' => $coach->id,
+        ]);
+        $session->forceFill(['cancelled_at' => Carbon::now()])->save();
+
+        $mobile = $this->coquilleMobile(
+            Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session->fresh()])->html()
+        );
+
+        $this->assertStringNotContainsString('openCancelConfirm', $mobile);
+        $this->assertStringContainsString('restore', $mobile);   // contrôle positif : la restauration, elle, y est
     }
 }

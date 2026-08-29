@@ -397,6 +397,7 @@ Modèle unique avec un **discriminator `kind`**.
 
 #### Annulation d'une séance
 - **Qui** : n'importe quel coach + admin.
+- **Quand** : tant que le **créneau n'est pas terminé** (`startAt + durationMin`). La borne est la fin et non le début : une séance annulée sur place — orage, gymnase fermé — l'est quelques minutes après l'heure, et les inscrits doivent être prévenus. Passé la fin, la séance a **eu lieu** : l'annuler l'effacerait rétroactivement des statistiques de fréquentation et notifierait les inscrits d'une annulation sans objet. Pendant du garde-fou de restauration ci-dessous, qui borne au début — entre le début et la fin du créneau, l'annulation est donc **définitive**, et la confirmation l'annonce.
 - **Effet immédiat** : statut séance `cancelled`, **libère le quota** de tous les `participating` (déclenche mécanisme B §4.10), inscriptions passent en `cancelled` (soft flag), notif aux inscrits **toujours envoyée** (pas de case à cocher — événement trop structurant), `AuditLog cancel_session`.
 
 #### Réversibilité — restauration d'une séance annulée

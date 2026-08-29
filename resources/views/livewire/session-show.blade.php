@@ -161,6 +161,23 @@
             <div x-show="tab === 'infos'">
                 <div style="display:flex;flex-direction:column;gap:var(--space-4)">
                 @include('livewire.partials.fiche-infos', ['session' => $session, 'tz' => $tz])
+                {{-- Gestion — miroir du bloc « Gestion » de la colonne desktop. L'annulation était la
+                     SEULE action d'encadrement absente du mobile : restaurer (barre collante),
+                     inscrire un athlète (onglet Inscrits) et remplir la file quota (onglet Waitlist)
+                     y sont déjà. Asymétrie, pas un choix — la fiche séance est mobile-first, à la
+                     différence des écrans admin assumés desktop.
+                     Hors de la barre collante : elle porte le CTA d'inscription, et un bouton rouge
+                     qui notifie tous les inscrits n'a rien à faire à côté, au pouce. --}}
+                @unless ($session->isCancelled())
+                    @can('cancel', $session)
+                        <div>
+                            <div class="eyebrow" style="margin-bottom:6px">Gestion</div>
+                            <button wire:click="openCancelConfirm" class="btn btn-danger btn-block">
+                                <x-icon name="x" :size="15" /> Annuler la séance
+                            </button>
+                        </div>
+                    @endcan
+                @endunless
                 </div>
             </div>
             {{-- Encadrement — onglet masqué si vide hors staff (cf. $tabs) : ne rendre le panneau
@@ -359,9 +376,14 @@
                                         </div>
                                     @endunless
                                 @endif
-                                <button wire:click="openCancelConfirm" class="btn btn-danger btn-block">
-                                    <x-icon name="x" :size="15" /> Annuler la séance
-                                </button>
+                                {{-- @can('cancel') et non le @can('update') du bloc : la policy porte la
+                                     borne de fin de créneau (§4.7), le bouton disparaît de lui-même
+                                     quand la séance a eu lieu. --}}
+                                @can('cancel', $session)
+                                    <button wire:click="openCancelConfirm" class="btn btn-danger btn-block">
+                                        <x-icon name="x" :size="15" /> Annuler la séance
+                                    </button>
+                                @endcan
                             @endcan
                         @endif
                     </div>
@@ -393,15 +415,37 @@
     {{-- Dialog « Annuler la séance » (§4.7) — action structurante : dialog avec conséquences,
          pas un confirm() natif (revue UX 2026-07-11, constat n°4). --}}
     @if ($confirmingCancel)
-        <x-dialog title="Annuler la séance" sub="{{ $session->title }}" danger :width="460" close="dismissCancelConfirm">
+        {{-- 520 et non 460 : « Garder la séance » + « Annuler la séance » ne laissaient que 33px de
+             marge dans le pied — assez en Chromium, pas en Safari, qui rend les capitales un peu
+             plus larges et faisait passer les boutons à la ligne. --}}
+        <x-dialog title="Annuler la séance" sub="{{ $session->title }}" danger :width="520" close="dismissCancelConfirm">
             <div style="display:flex;flex-direction:column;gap:12px">
                 <x-conseq-row icon="bell" label="Inscrits" tone="warn">Tous les inscrits sont notifiés de l'annulation.</x-conseq-row>
                 <x-conseq-row icon="bar-chart" label="Quotas">La séance ne compte plus dans les quotas — les files des autres séances sont débloquées.</x-conseq-row>
-                <x-conseq-row icon="rotate-ccw" label="Réversible">Tu peux réactiver la séance tant qu'elle n'a pas commencé — inscriptions et apéros sont rétablis.</x-conseq-row>
+                {{-- La restauration est bornée au DÉBUT (§4.7) tandis que l'annulation l'est à la fin :
+                     entre les deux, annuler est définitif. Annoncer « Réversible » y était trompeur. --}}
+                @if ($session->hasStarted())
+                    <x-conseq-row icon="alert-triangle" label="Irréversible" tone="danger">La séance a commencé : elle ne pourra pas être réactivée.</x-conseq-row>
+                @else
+                    <x-conseq-row icon="rotate-ccw" label="Réversible">Tu peux réactiver la séance tant qu'elle n'a pas commencé — inscriptions et apéros sont rétablis.</x-conseq-row>
+                @endif
             </div>
+            {{-- Accusé de réception avant d'armer le bouton (motif « bascule de saison » §4.17) :
+                 l'envoi aux inscrits ne se dédit pas, et l'annulation est définitive dès que le
+                 créneau a commencé. Le libellé gradue, la case reste toujours présente — un bouton
+                 tantôt actif tantôt grisé sans raison visible serait plus déroutant. --}}
+            <div class="flex ac g10" style="margin-top:14px;font-size:14px;cursor:pointer" wire:click="$toggle('cancelCheck')">
+                <x-check :on="$cancelCheck" tabindex="-1" style="pointer-events:none" />
+                {{-- Suffixe calculé et non `@if` en ligne : Blade ne reconnaît pas une directive collée
+                     à un caractère de mot (son parseur exige un non-mot avant le @). --}}
+                @php($suffixe = $session->hasStarted() ? " et que l'annulation sera définitive" : '')
+                <span>Je comprends que {{ $participating->count() }} inscrit·e·s seront prévenu·e·s{{ $suffixe }}.</span>
+            </div>
+
             <x-slot:footer>
                 <button type="button" class="btn btn-ghost" wire:click="dismissCancelConfirm">Garder la séance</button>
-                <button type="button" class="btn btn-danger" wire:click="cancel" wire:loading.attr="disabled" wire:target="cancel">
+                <button type="button" class="btn btn-danger{{ $cancelCheck ? '' : ' is-disabled' }}"
+                        @if ($cancelCheck) wire:click="cancel" @endif wire:loading.attr="disabled" wire:target="cancel">
                     <x-icon name="x" :size="14" /> Annuler la séance
                 </button>
             </x-slot:footer>
