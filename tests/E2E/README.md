@@ -119,7 +119,45 @@ jamais `user_id=5`.
 ## État de la base
 
 Les scénarios **restaurent l'état** qu'ils modifient (S1 remet Mathieu encadrant, S8 restaure la
-waitlist de Marie, S17 remet le promu en file quota et purge l'`AuditLog` qu'il a produit).
+waitlist de Marie, S17 remet toute la file quota en place et purge ce qu'il a écrit aux journaux).
+
+### Le garde-fou : `run.mjs` refuse un run qui laisse des traces
+
+La règle existait, rien ne la vérifiait — et une remise en état incomplète ne se voit que des runs
+plus tard, quand un scénario part d'un jeu appauvri. Parfois jamais : l'assertion devient simplement
+moins exigeante, et reste verte.
+
+`run.mjs` photographie donc l'état du jeu **avant** et **après** (comptes, séances, inscriptions par
+statut, files, promotions, apéros, file d'envoi, journaux), et **fait échouer le run** sur le moindre
+écart, en nommant le compteur qui a bougé :
+
+```
+❌ DÉRIVE DU JEU DE DÉMO — un scénario n'a pas restauré ce qu'il a modifié :
+  journal d'audit : 10 → 12
+  file quota dépassé : 2 → 1
+```
+
+Deux fuites réelles ont été trouvées ainsi, toutes deux invisibles depuis le début :
+
+- **S17 ne restaurait qu'un promu sur deux.** `fillQuota` promeut **toute** la file quota d'un coup
+  (§4.10.4) ; la remise en état ne portait que sur le premier. Le jeu de démo perdait une entrée de
+  file quota à **chaque** run, définitivement.
+- **Les notifications de promotion restaient « en attente ».** Ce n'est pas cosmétique : le prochain
+  passage du cron les aurait **réellement envoyées**, pour des promotions défaites depuis.
+
+### Restaurer aussi les journaux
+
+Une action passe par l'interface : elle écrit dans `audit_logs`, `activity_logs` et
+`notification_outbox`. Deux helpers de [`lib.mjs`](lib.mjs) encadrent le scénario :
+
+```js
+const journaux = repereJournaux();   // au début : hauteur des trois journaux
+…
+purgeJournaux(journaux);             // à la remise en état : n'efface QUE ce que le run a produit
+```
+
+La coupe se fait **par id**, jamais par type d'action : c'est le seul critère qui distingue à coup
+sûr les lignes du run de celles que le jeu de démo contient déjà.
 
 > **Une interruption casse la restauration.** Si un scénario plante (timeout Playwright, précondition
 > absente), le code de remise en état qui suit ne s'exécute pas et la base garde l'état modifié — le

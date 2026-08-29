@@ -6,7 +6,7 @@
 // de conséquences s'ouvre et annonce le bon compteur, et que l'adhérent suspendu constate lui-même
 // la perte de l'action d'inscription.
 
-import { launch, session, sql, seanceFuture, BASE, DESKTOP, MOBILE, Scenario } from './lib.mjs';
+import { launch, session, sql, seanceFuture, BASE, DESKTOP, MOBILE, Scenario, repereJournaux, purgeJournaux } from './lib.mjs';
 
 const browser = await launch();
 const tous = [];
@@ -43,6 +43,7 @@ const tous = [];
 // ── S19 · Correction de l'email de connexion depuis la fiche (§4.1.3) ─
 {
   const s = new Scenario('S19 · Correction de l\'email depuis la fiche adhérent');
+  const journaux = repereJournaux();   // le changement d'email est tracé DEUX fois : aller et retour
 
   const cible = sql("SELECT id FROM users WHERE email IS NOT NULL AND is_minor=0 AND anonymized_at IS NULL AND NOT JSON_CONTAINS(roles,'\"admin\"') ORDER BY id LIMIT 1");
   const emailOrigine = sql(`SELECT email FROM users WHERE id=${cible}`);
@@ -86,7 +87,12 @@ const tous = [];
   await page.locator('input[wire\\:model="email"], input[wire\\:model\\.blur="email"]').first().fill(emailOrigine);
   await page.locator('button[wire\\:click="saveEmail"]').first().click();
   await page.waitForTimeout(1000);
+  purgeJournaux(journaux);
   s.check('état restauré', sql(`SELECT email FROM users WHERE id=${cible}`) === emailOrigine, emailOrigine);
+  s.check('journaux restaurés (audit, activité, envois)',
+          sql(`SELECT (SELECT COUNT(*) FROM audit_logs WHERE id>${journaux.audit})
+                    + (SELECT COUNT(*) FROM activity_logs WHERE id>${journaux.activite})
+                    + (SELECT COUNT(*) FROM notification_outbox WHERE id>${journaux.envois}) n`) === '0');
 
   await ctx.close();
   tous.push(s.report());
