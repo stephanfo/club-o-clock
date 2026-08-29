@@ -24,6 +24,13 @@ php artisan db:seed --class=DemoSeeder     # jeu de démo attendu par les scéna
 npx playwright install chromium            # une seule fois
 ```
 
+### Sans rien installer : tout en conteneurs
+
+Serveur, base et navigateurs peuvent tourner en conteneurs, ce qui évite d'installer PHP, MySQL et
+les navigateurs de Playwright sur la machine. Recette complète — construction des images, réseau,
+seed, et la subtilité du partage de pile réseau qui rend `BASE` joignable —, dans
+[doc/DOCKER_LOCAL.md](../../doc/DOCKER_LOCAL.md) §4.
+
 ## Exécution
 
 ```bash

@@ -19,6 +19,7 @@ s'adresse à toi si tu vas héberger, exploiter et faire vivre l'application pou
 | **Comprendre les choix techniques** et ce qu'ils coûtent | [Cadrage technique](CADRAGE_TECHNIQUE.md) |
 | **Recetter ton instance** avant l'ouverture aux adhérents | [Plan de tests — membres](PLAN_TESTS_MEMBRES.md) |
 | **Contribuer** au projet | [Guide de contribution](../CONTRIBUTING.md) |
+| **Monter un poste de développement** sans rien installer | [Poste de développement en conteneurs](DOCKER_LOCAL.md) |
 
 ## Les documents
 
@@ -51,6 +52,9 @@ s'adresse à toi si tu vas héberger, exploiter et faire vivre l'application pou
 ### Contribuer
 
 - **[Guide de contribution](../CONTRIBUTING.md)** — porte de qualité, conventions, périmètre.
+- **[Poste de développement en conteneurs](DOCKER_LOCAL.md)** — faire tourner l'application, la
+  porte de qualité et les tests navigateur sans installer PHP, MySQL ni les navigateurs sur sa
+  machine. **Outil de poste uniquement** : la cible de déploiement reste le mutualisé sans Docker.
 - **[Politique de sécurité](../SECURITY.md)** — signaler une vulnérabilité.
 - **[Journal des versions](../CHANGELOG.md)** — ce qui change à chaque version.
 

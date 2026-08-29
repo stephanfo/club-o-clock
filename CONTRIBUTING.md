@@ -59,6 +59,11 @@ php artisan migrate:fresh --seed
 php artisan db:seed --class=DemoSeeder
 ```
 
+> **Sans rien installer sur ta machine ?** [doc/DOCKER_LOCAL.md](doc/DOCKER_LOCAL.md) décrit un poste
+> entièrement conteneurisé — PHP et ses extensions, MySQL, les navigateurs de Playwright — à partir
+> de deux `Dockerfile` versionnés. C'est un **outil de poste** : la cible de déploiement du projet
+> reste le mutualisé sans Docker.
+
 ### Faire évoluer le schéma
 
 La source de vérité est **[database/migrations/](https://github.com/stephanfo/club-o-clock/tree/main/database/migrations/)**. Une évolution passe par une
@@ -125,7 +130,9 @@ navigateur — l'y intégrer rendrait la porte de qualité fragile pour de mauva
 référence de non-régression reste PHPUnit. Détails et conventions d'écriture :
 [tests/E2E/README.md](https://github.com/stephanfo/club-o-clock/blob/main/tests/E2E/README.md).
 
-Playwright est en `devDependencies` : jamais installé ni exécuté sur l'hébergement mutualisé.
+Playwright est en `devDependencies` : jamais installé ni exécuté sur l'hébergement mutualisé. Pour
+l'exécuter sans installer de navigateur sur ta machine, voir
+[doc/DOCKER_LOCAL.md](doc/DOCKER_LOCAL.md) §4.
 
 ### Attentes sur le code
 

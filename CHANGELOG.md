@@ -120,6 +120,18 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   y est couvert de bout en bout : bouton actif et désactivé, promotion effective, `AuditLog` émis.
   Volontairement **hors de `composer check`** : la porte de qualité reste PHPUnit.
   Voir [`tests/E2E/README.md`](https://github.com/stephanfo/club-o-clock/blob/main/tests/E2E/README.md).
+- **Poste de développement en conteneurs** ([`doc/DOCKER_LOCAL.md`](doc/DOCKER_LOCAL.md), et deux
+  `Dockerfile` versionnés dans `docker/`) : de quoi lancer l'application, la porte de qualité et le
+  harnais navigateur **sans installer PHP, MySQL ni les navigateurs** sur sa machine — seuls Git,
+  Docker et Node restent nécessaires. Le mode d'emploi consigne les deux pièges qui coûtent le plus
+  de temps : le harnais E2E code son adresse en dur et exige donc de partager la pile réseau du
+  conteneur applicatif, et le paquet `default-mysql-client` de Debian installe en réalité le client
+  MariaDB — `schema:dump` lancé là produit un dump MySQL que l'intégration continue rejette. Le
+  garde-fou qui empêche un envoi réel vers les adresses du jeu de démonstration est posé sur le
+  conteneur, jamais dans le `.env`.
+
+  Ça ne change **rien à la cible de déploiement** : l'application se déploie toujours sur un
+  hébergement mutualisé, sans Docker.
 - **Supervision du traitement automatique** : l'écran des envois indique si le cron tourne encore.
   Sans lui, une tâche planifiée interrompue (quota d'hébergement, chemin PHP changé, crontab perdue
   au transfert) laissait les notifications s'accumuler sans qu'aucun signe ne l'annonce — le premier

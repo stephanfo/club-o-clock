@@ -45,6 +45,11 @@ cd club-o-clock
 composer setup
 ```
 
+> **Tu préfères ne rien installer sur ta machine ?** PHP et ses extensions, MySQL et les navigateurs
+> de test peuvent tourner en conteneurs : [Poste de développement en conteneurs](DOCKER_LOCAL.md).
+> C'est un outil de poste — la cible de déploiement reste le mutualisé sans Docker, comme dit plus
+> haut.
+
 `composer setup` enchaîne : `composer install`, création du `.env`, génération de la clé
 applicative, migrations, `storage:link` et build front. **Configure la base dans `.env` avant** de
 le lancer, sinon l'étape `migrate` échoue :

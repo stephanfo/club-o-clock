@@ -7,6 +7,7 @@ Instructions pour Claude Code (ou tout autre assistant de code) sur ce dépôt.
 - **Spec produit** : [doc/PRD.md](doc/PRD.md). Toute fonctionnalité demandée doit être référencée dans le périmètre V1 (§3.1) ; si elle est en hors-V1 (§3.2), le signaler **avant** de coder.
 - **Cadrage technique** : [doc/CADRAGE_TECHNIQUE.md](doc/CADRAGE_TECHNIQUE.md) — source de vérité pour tout choix technique, et pour les raisons de chaque arbitrage.
 - **Installation & déploiement** : [doc/INSTALL.md](doc/INSTALL.md).
+- **Poste de développement en conteneurs** : [doc/DOCKER_LOCAL.md](doc/DOCKER_LOCAL.md) — comment lancer l'app, la porte de qualité et le harnais E2E sans installer PHP/MySQL/navigateurs, à partir des `Dockerfile` de [docker/](docker/).
 - **Contribution** : [CONTRIBUTING.md](CONTRIBUTING.md) — porte de qualité, conventions de commit, périmètre.
 
 ## État du projet
@@ -49,6 +50,12 @@ node tests/E2E/run.mjs                        # 20 scénarios non destructifs
 node tests/E2E/destructif.mjs --oui-je-sais   # RGPD, tutelle, bascule de saison — reconstruit la base
 ```
 
+> Sur un poste conteneurisé, ces trois commandes et la porte de qualité se jouent sans PHP ni
+> navigateur installés : recettes exactes dans [doc/DOCKER_LOCAL.md](doc/DOCKER_LOCAL.md). Deux
+> pièges y sont documentés — le harnais E2E exige `--network container:cluboclock-app` (`lib.mjs`
+> code `http://127.0.0.1:8000` en dur), et le `default-mysql-client` de Debian est en réalité le
+> client MariaDB, donc `schema:dump` n'y produit pas un dump MySQL valide.
+
 **Ne pas l'ajouter à `composer check`** (serveur + base + navigateur requis : la porte deviendrait fragile). La référence de non-régression reste PHPUnit.
 
 **Jamais d'id de séance en dur dans un scénario.** Le jeu de démo est relatif à `now()`, mais la position d'une séance par rapport à l'instant du run dépend du jour et de l'heure — un id figé rend le scénario vert ou rouge selon le moment. Sélectionner par les propriétés via `seance(where)` / `seanceFuture(where)` de [tests/E2E/lib.mjs](tests/E2E/lib.mjs). Idem pour les comptes : par email, jamais par `user_id`.
@@ -84,7 +91,7 @@ Le design system existe : tout écran doit lui être fidèle.
 
 ### Stack technique
 
-- **La stack est tranchée.** Toute proposition divergente (autre framework, SPA découplée, NoSQL, Docker, Node long-running, WebSocket serveur…) doit être **discutée explicitement** avant écriture — le cadrage documente pourquoi ces options sont écartées (contraintes du mutualisé, maintenance par un bénévole solo, AGPL/RGPD).
+- **La stack est tranchée.** Toute proposition divergente (autre framework, SPA découplée, NoSQL, Docker **comme cible de déploiement**, Node long-running, WebSocket serveur…) doit être **discutée explicitement** avant écriture — le cadrage documente pourquoi ces options sont écartées (contraintes du mutualisé, maintenance par un bénévole solo, AGPL/RGPD).
 - Le **PRD reste agnostique de la stack** : ne pas y injecter de techno. Une implication technique d'une exigence produit s'y formule en **exigence non-fonctionnelle** (ex. *« évaluation du quota en temps quasi-constant »*) ; le *comment* vit dans le cadrage.
 
 ### Modèle
