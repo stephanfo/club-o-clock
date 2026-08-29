@@ -9,7 +9,7 @@ premier démarrage réel avec ton club.
 
 **Ce guide couvre** : prérequis · installation locale · configuration (email, Google OAuth,
 notifications push) · premier démarrage · déploiement sur mutualisé puis sur VPS · instance de
-démonstration · flux réseau sortants · maintenance · dépannage.
+démonstration · flux réseau sortants · maintenance et mise à jour · dépannage.
 
 ---
 
@@ -811,17 +811,63 @@ Sur un club réel, l'ordre de grandeur reste la seconde — ce n'est pas une op�
 **Ne pas oublier `storage/app/`** : la base restaurée référence des fichiers (logo, parcours GPX) qui
 n'y sont pas. Une restauration complète, c'est la base **et** l'archive `storage`.
 
-**Mise à jour** : `git pull` puis la checklist du §5.3 (ou §6). Consulter le
-[CHANGELOG](../CHANGELOG.md) avant, en particulier pour les notes de version majeure.
+### 9.2 Mise à jour d'une instance existante
 
-**Commandes utiles** :
+Le geste le plus fréquent après la première installation — et celui où l'on saute le plus
+facilement une étape, parce qu'il *ressemble* à un déploiement mais n'en reprend pas les réflexes.
+Dérouler les six temps dans l'ordre.
+
+**1. Lire le [CHANGELOG](../CHANGELOG.md) d'abord.** Il signale les changements de comportement (ce
+que des utilisateurs ne pourront plus faire) et les notes de version majeure. C'est aussi là que se
+trouve ce qu'il faudra annoncer au club.
+
+**2. Sauvegarder avant de toucher à quoi que ce soit** — base **et** `storage/app/` (cf. §9). Non
+négociable dès que la mise à jour embarque une migration : une migration ne se défait pas.
+
+**3. Récupérer le code, puis REBUILDER LE FRONT en local.**
+
+```bash
+git pull
+npm ci && npm run build          # ⚠ l'étape qu'on oublie
+```
+
+> 🚨 **C'est le point de chute de cette procédure.** Le code PHP et les vues voyagent par Git ; les
+> bundles CSS/JS, **non** (`public/build/` est gitignoré, cf. §5.1). Sauter le rebuild déploie le
+> HTML du nouveau code avec le style de l'ancien, **sans aucune erreur** — cf. §10, « Le code est
+> déployé mais le style ne suit pas ». `npm ci` et non `npm install` : le lockfile a pu bouger.
+>
+> `npm run build` inscrit une empreinte dans le bundle, ce qui rend l'oubli détectable au temps 6.
+
+**4. Transférer** (cf. §5.2) : l'arbre du projet **et** `public/build/`, en **supprimant d'abord le
+dossier distant** pour ne pas accumuler les anciens bundles. Ne jamais écraser `.env` ni `storage/`
+— ils appartiennent au serveur.
+
+**5. Dérouler la checklist SSH du §5.3 en entier** (ou §6 sur VPS). Intégralement, y compris
+`migrate --force` : transférer des fichiers ne joue pas les migrations, et une migration oubliée
+tombe en 500 **après authentification**, donc invisible depuis la page d'accueil.
+
+**6. Vérifier**, dans cet ordre :
+
+```bash
+php artisan migrate:status           # plus aucune ligne « Pending »
+php artisan front:check-drift        # le bundle transféré correspond aux sources
+```
+
+puis le contrôle du bundle réellement servi (§10) et le chargement d'une **vraie page authentifiée**
+— pas seulement l'accueil.
+
+> ℹ️ **`composer check` n'a pas sa place ici.** C'est une porte de développement : elle exige les
+> dépendances de dev, absentes d'une installation `--no-dev`, et son groupe de tests destructifs
+> **efface la base**. Sur une instance en service, les contrôles de mise à jour sont ceux du temps 6.
+
+### 9.3 Commandes utiles
 
 ```bash
 php artisan club:vapid-keys        # (re)générer les clés push
 php artisan notifications:drain    # forcer l'envoi de la file
 php artisan weather:refresh        # rafraîchir le cache météo
 php artisan optimize:clear         # purger tous les caches
-composer check                     # pint + phpstan + tests (avant contribution)
+composer check                     # porte de dev : style, analyse, dérives, tests — JAMAIS en prod
 ```
 
 > Les deux commandes qui **sortent sur le réseau** (`notifications:drain`, `weather:refresh`) peuvent
