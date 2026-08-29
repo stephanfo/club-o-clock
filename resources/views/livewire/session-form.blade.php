@@ -436,10 +436,28 @@
 
     {{-- Dialog de confirmation à la sauvegarde (§4.7) : 3 issues + envoi prioritaire. --}}
     @if ($showSaveDialog)
-        <x-dialog title="Notifier les inscrits ?" sub="Un champ structurant a changé" :width="460" close="dismissSaveDialog">
-            <x-banner kind="info">
-                <div>Tu as modifié un <b>champ structurant</b> (date, horaire, lieu, capacité, tag quota ou catégories). Les <b>inscrits</b> de cette séance peuvent être prévenus (push + email).</div>
-            </x-banner>
+        <x-dialog title="Notifier les inscrits ?"
+                  :sub="$pendingStructural ? 'Un champ structurant a changé' : 'Le contenu de la séance a changé'"
+                  {{-- 520 et non la base de 460 : ce dialog est le seul à porter DEUX CTA longs côte à
+                       côte (« Sauvegarder en silence » 222px + « Oui, prévenir » 160px). À 460 il ne
+                       restait que 28px de marge — assez en Chromium, pas en Safari, qui rend les
+                       capitales un peu plus larges et faisait passer le pied à la ligne. --}}
+                  :width="520" close="dismissSaveDialog">
+            {{-- Les canaux annoncés sont ceux que le club a réellement ouverts (§4.17) : promettre
+                 « push + email » en dur mentait dès qu'un canal était coupé dans les réglages. Ce
+                 n'est qu'un plafond — la pause et la matrice individuelle (§4.15) réduisent encore,
+                 d'où « peuvent être prévenus … selon leurs préférences ». --}}
+            @if ($notifChannels === [])
+                <x-banner kind="warn">
+                    <div>Aucun canal de notification n'est ouvert dans les <b>réglages du club</b> : les
+                        <b>inscrits</b> ne peuvent pas être prévenus de cette modification.</div>
+                </x-banner>
+            @else
+                <x-banner kind="info">
+                    <div>@if ($pendingStructural)Tu as modifié un <b>champ structurant</b> (date, horaire, lieu, capacité, tag quota ou catégories).@else Tu as modifié le <b>contenu</b> de la séance (texte ou parcours).@endif
+                        Les <b>inscrits</b> de cette séance peuvent être prévenus <b>{{ $notifChannelsLabel }}</b>, selon leurs préférences de notification.</div>
+                </x-banner>
+            @endif
 
             <div class="card card-pad card-soft" style="margin:12px 0;display:flex;flex-direction:column;gap:8px">
                 <div class="eyebrow">Changements détectés</div>
@@ -453,15 +471,24 @@
                 @endforeach
             </div>
 
-            <label class="flex ac g8" style="cursor:pointer">
-                <x-check :on="$notify_priority" wire:click="$toggle('notify_priority')" />
-                <span style="font-size:13px"><b>Envoi prioritaire</b> — pousser tout de suite, sans attendre l'envoi groupé.</span>
-            </label>
+            {{-- Sans canal ouvert, l'envoi n'existe pas : proposer d'en régler la priorité n'aurait
+                 aucun sens (et laisserait croire que quelque chose va partir). --}}
+            @if ($notifChannels !== [])
+                <label class="flex ac g8" style="cursor:pointer">
+                    <x-check :on="$notify_priority" wire:click="$toggle('notify_priority')" />
+                    <span style="font-size:13px"><b>Envoi prioritaire</b> — pousser tout de suite, sans attendre l'envoi groupé.</span>
+                </label>
+            @endif
 
+            {{-- wire:target sur LES DEUX actions : un clic grise la paire. L'envoi prioritaire draine
+                 les emails en synchrone dans la requête — plusieurs secondes sur le mutualisé. --}}
             <x-slot:footer>
-                <button type="button" class="btn btn-ghost" wire:click="saveSilently">Sauvegarder en silence</button>
-                <button type="button" class="btn btn-primary" wire:click="saveAndNotify">
-                    <x-icon name="bell" :size="15" /> Oui — push + email
+                <button type="button" class="btn btn-ghost" wire:click="saveSilently"
+                        wire:loading.attr="disabled" wire:target="saveSilently,saveAndNotify">Sauvegarder en silence</button>
+                <button type="button" class="btn btn-primary" wire:click="saveAndNotify"
+                        wire:loading.attr="disabled" wire:target="saveSilently,saveAndNotify"
+                        @disabled($notifChannels === [])>
+                    <x-icon name="bell" :size="15" /> Oui, prévenir
                 </button>
             </x-slot:footer>
         </x-dialog>

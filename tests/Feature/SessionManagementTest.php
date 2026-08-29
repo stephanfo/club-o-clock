@@ -107,6 +107,7 @@ class SessionManagementTest extends TestCase
         ]);
 
         Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])
+            ->set('cancelCheck', true)
             ->call('cancel');
         $this->assertNotNull($session->fresh()->cancelled_at);
         $this->assertDatabaseHas('audit_logs', ['action' => 'cancel_session', 'session_id' => $session->id]);
@@ -208,5 +209,284 @@ class SessionManagementTest extends TestCase
             ->assertForbidden();
 
         $this->assertNotNull($session->fresh()->cancelled_at);
+    }
+
+    // ── Accusé de réception : le bouton n'est armé que la case cochée (§4.17) ──
+
+    public function test_cancelling_without_ticking_the_box_does_nothing(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Future', 'discipline_id' => $this->discipline()->id,
+            'start_at' => Carbon::now()->addWeek(), 'duration_min' => 60, 'created_by' => $coach->id,
+        ]);
+
+        // Garde SERVEUR : le bouton grisé ne protège que le clic, pas une action forgée.
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])
+            ->call('openCancelConfirm')
+            ->assertSet('cancelCheck', false)
+            ->call('cancel')
+            ->assertSet('confirmingCancel', true);   // le dialog reste ouvert
+
+        $this->assertNull($session->fresh()->cancelled_at);
+    }
+
+    public function test_the_box_is_never_pre_ticked_when_reopening(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Future', 'discipline_id' => $this->discipline()->id,
+            'start_at' => Carbon::now()->addWeek(), 'duration_min' => 60, 'created_by' => $coach->id,
+        ]);
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])
+            ->call('openCancelConfirm')
+            ->set('cancelCheck', true)
+            ->call('dismissCancelConfirm')
+            ->assertSet('cancelCheck', false)
+            ->call('openCancelConfirm')
+            ->assertSet('cancelCheck', false);
+    }
+
+    /**
+     * Le libellé de l'accusé compte des personnes : il doit compter juste, y compris aux deux bornes.
+     * « 0 inscrit·e·s seront prévenu·e·s » demandait d'accuser réception d'un envoi qui n'aura pas
+     * lieu, et « 1 inscrit·e·s » n'est pas du français.
+     */
+    public function test_the_acknowledgement_counts_participants_correctly(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $service = app(RegistrationService::class);
+
+        $vide = $this->sessionAt($coach, Carbon::now()->addWeek(), 60);
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $vide])
+            ->call('openCancelConfirm')->html();
+        $this->assertStringContainsString('aucun·e inscrit·e ne sera prévenu·e', $html);
+        // Assertion cadrée sur la phrase d'accusé : la fiche affiche par ailleurs, légitimement, une
+        // pastille « 0 inscrit·e·s » — une assertion sur la page entière la prendrait pour le défaut.
+        $this->assertStringNotContainsString('0 inscrit', $this->accuse($html));
+
+        $un = $this->targetCategory($this->sessionAt($coach, Carbon::now()->addWeek(), 60));
+        $service->register($un, $a = $this->athlete(), $a);
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $un->fresh()])
+            ->call('openCancelConfirm')->html();
+        $this->assertStringContainsString('1 inscrit·e sera prévenu·e', $html);
+
+        // Contrôle positif : au pluriel, la phrase reste celle qu'annonce la convention (§4.17).
+        $service->register($un, $b = $this->athlete(), $b);
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $un->fresh()])
+            ->call('openCancelConfirm')->html();
+        $this->assertStringContainsString('2 inscrit·e·s seront prévenu·e·s', $html);
+    }
+
+    /** Le seul contenu de la phrase d'accusé du dialog d'annulation (repérée par l'id de son <span>). */
+    private function accuse(string $html): string
+    {
+        $this->assertMatchesRegularExpression('/id="txt-annuler-seance"[^>]*>(.*?)<\/span>/s', $html,
+            'la phrase d\'accusé de réception est absente du dialog');
+        preg_match('/id="txt-annuler-seance"[^>]*>(.*?)<\/span>/s', $html, $m);
+
+        return $m[1];
+    }
+
+    public function test_the_confirmation_wording_names_the_definitive_effect_once_started(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $enCours = $this->sessionAt($coach, Carbon::now()->subMinutes(5), 60);
+
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $enCours])
+            ->call('openCancelConfirm')->html();
+
+        // « Je comprends » sans le « que » : sur une séance sans inscription, la phrase s'élide en
+        // « Je comprends qu'aucun·e inscrit·e… » (cf. test_the_acknowledgement_counts_participants_correctly).
+        $this->assertStringContainsString('Je comprends', $this->accuse($html));
+        $this->assertStringContainsString('définitive', $this->accuse($html));
+    }
+
+    // ── Borne d'annulation : la fin du créneau, pas le début (§4.7) ──
+
+    private function sessionAt(User $coach, Carbon $start, int $duree = 60): Session
+    {
+        return Session::create([
+            'kind' => 'training', 'title' => 'Créneau', 'discipline_id' => $this->discipline()->id,
+            'start_at' => $start, 'duration_min' => $duree, 'created_by' => $coach->id,
+        ]);
+    }
+
+    public function test_a_session_can_still_be_cancelled_once_started(): void
+    {
+        // Orage à 18h35 sur un créneau de 18h30 : le coach annule sur place, les inscrits sont prévenus.
+        $coach = User::factory()->coach()->create();
+        $session = $this->sessionAt($coach, Carbon::now()->subMinutes(5), 60);
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])
+            ->set('cancelCheck', true)
+            ->call('cancel')
+            ->assertHasNoErrors();
+
+        $this->assertNotNull($session->fresh()->cancelled_at);
+    }
+
+    public function test_a_finished_session_cannot_be_cancelled(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $session = $this->sessionAt($coach, Carbon::now()->subMinutes(90), 60);   // terminée depuis 30 min
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])
+            ->set('cancelCheck', true)
+            ->call('cancel')
+            ->assertForbidden();
+
+        $this->assertNull($session->fresh()->cancelled_at);
+    }
+
+    public function test_the_cancel_action_disappears_once_the_slot_is_over(): void
+    {
+        $coach = User::factory()->coach()->create();
+
+        // Contrôle positif : pendant le créneau, l'action est offerte dans les DEUX coquilles.
+        $enCours = $this->sessionAt($coach, Carbon::now()->subMinutes(5), 60);
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $enCours])->html();
+        $this->assertStringContainsString('openCancelConfirm', $this->coquilleMobile($html));
+        $this->assertStringContainsString('openCancelConfirm', $html);
+
+        $terminee = $this->sessionAt($coach, Carbon::now()->subMinutes(90), 60);
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $terminee])->html();
+        $this->assertStringNotContainsString('openCancelConfirm', $html);
+    }
+
+    public function test_the_confirmation_announces_that_a_started_session_cannot_be_restored(): void
+    {
+        $coach = User::factory()->coach()->create();
+
+        $future = $this->sessionAt($coach, Carbon::now()->addWeek(), 60);
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $future])
+            ->call('openCancelConfirm')->html();
+        $this->assertStringContainsString('Réversible', $html);
+        $this->assertStringNotContainsString('Irréversible', $html);
+
+        $enCours = $this->sessionAt($coach, Carbon::now()->subMinutes(5), 60);
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $enCours])
+            ->call('openCancelConfirm')->html();
+        $this->assertStringContainsString('Irréversible', $html);
+        $this->assertStringContainsString('elle ne pourra pas être réactivée', $html);
+    }
+
+    /**
+     * Portion mobile du rendu (la fiche porte DEUX coquilles, .fiche-mobile et .fiche-desktop, dans
+     * le même HTML : une assertion sur la page entière ne dirait pas laquelle porte l'action).
+     */
+    private function coquilleMobile(string $html): string
+    {
+        $debut = strpos($html, 'fiche-mobile');
+        $fin = strpos($html, 'fiche-desktop');
+        $this->assertNotFalse($debut, 'coquille mobile absente du rendu');
+        $this->assertNotFalse($fin, 'coquille desktop absente du rendu');
+
+        return substr($html, $debut, $fin - $debut);
+    }
+
+    /** Portion desktop du rendu — pendant de coquilleMobile(), pour les mêmes raisons. */
+    private function coquilleDesktop(string $html): string
+    {
+        $debut = strpos($html, 'fiche-desktop');
+        $this->assertNotFalse($debut, 'coquille desktop absente du rendu');
+
+        return substr($html, $debut);
+    }
+
+    /**
+     * L'intertitre « Gestion » coiffe trois actions, toutes devenues indisponibles sur un créneau
+     * terminé : inscrire un athlète et remplir la file s'arrêtent au début, l'annulation à la fin.
+     * Sans garde, la colonne desktop rendait un titre seul, sans rien dessous.
+     */
+    public function test_the_gestion_heading_is_not_rendered_without_any_action(): void
+    {
+        $coach = User::factory()->coach()->create();
+
+        // Contrôle positif : pendant le créneau, l'intertitre coiffe bien l'annulation.
+        $enCours = $this->sessionAt($coach, Carbon::now()->subMinutes(5), 60);
+        $desktop = $this->coquilleDesktop(
+            Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $enCours])->html()
+        );
+        $this->assertStringContainsString('Gestion', $desktop);
+        $this->assertStringContainsString('openCancelConfirm', $desktop);
+
+        $terminee = $this->sessionAt($coach, Carbon::now()->subMinutes(90), 60);
+        $desktop = $this->coquilleDesktop(
+            Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $terminee])->html()
+        );
+        $this->assertStringNotContainsString('Gestion', $desktop);
+    }
+
+    /**
+     * La rangée d'accusé de réception est un <div> cliquable — non focusable. Le x-check qu'elle
+     * porte est, lui, un vrai <button> : il doit porter le toggle pour que la case, donc le bouton
+     * qu'elle arme, reste atteignable au clavier seul.
+     */
+    public function test_the_acknowledgement_box_is_operable_without_a_mouse(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $session = $this->sessionAt($coach, Carbon::now()->addWeek(), 60);
+
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])
+            ->call('openCancelConfirm')->html();
+
+        $this->assertMatchesRegularExpression(
+            '/<button[^>]+wire:click\.stop="\$toggle\((&#039;|\x27)cancelCheck/',
+            $html,
+            'la case doit être un bouton portant elle-même le toggle'
+        );
+    }
+
+    public function test_cancel_action_is_reachable_on_mobile(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Future', 'discipline_id' => $this->discipline()->id,
+            'start_at' => Carbon::now()->addWeek(), 'duration_min' => 60, 'created_by' => $coach->id,
+        ]);
+
+        $mobile = $this->coquilleMobile(
+            Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])->html()
+        );
+
+        $this->assertStringContainsString('openCancelConfirm', $mobile);
+        // Contrôle positif : « Inscrire un athlète » y était déjà — l'annulation était la seule
+        // action d'encadrement à ne vivre que dans la colonne desktop.
+        $this->assertStringContainsString('openAthletePicker', $mobile);
+    }
+
+    public function test_cancel_action_is_hidden_on_mobile_for_an_athlete(): void
+    {
+        $athlete = User::factory()->create();
+        $coach = User::factory()->coach()->create();
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Future', 'discipline_id' => $this->discipline()->id,
+            'start_at' => Carbon::now()->addWeek(), 'duration_min' => 60, 'created_by' => $coach->id,
+        ]);
+
+        $mobile = $this->coquilleMobile(
+            Livewire::actingAs($athlete)->test(SessionShow::class, ['session' => $session])->html()
+        );
+
+        $this->assertStringNotContainsString('openCancelConfirm', $mobile);
+    }
+
+    public function test_cancel_action_is_absent_on_mobile_for_a_cancelled_session(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Annulée', 'discipline_id' => $this->discipline()->id,
+            'start_at' => Carbon::now()->addWeek(), 'duration_min' => 60, 'created_by' => $coach->id,
+        ]);
+        $session->forceFill(['cancelled_at' => Carbon::now()])->save();
+
+        $mobile = $this->coquilleMobile(
+            Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session->fresh()])->html()
+        );
+
+        $this->assertStringNotContainsString('openCancelConfirm', $mobile);
+        $this->assertStringContainsString('restore', $mobile);   // contrôle positif : la restauration, elle, y est
     }
 }

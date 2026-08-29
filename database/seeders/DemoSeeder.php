@@ -1017,13 +1017,22 @@ class DemoSeeder extends Seeder
             ],
         );
 
-        // Compte DÉSACTIVÉ (is_active=false) : n'apparaît plus dans les pickers, login refusé.
+        // Ancienne adhérente qui n'a pas renouvelé : ACCÈS ATHLÈTE SUSPENDU (§4.4), compte actif.
+        // Pendant de Kévin côté fiche admin — c'est sur elle qu'on exerce la réactivation sans
+        // toucher à Kévin, dont plusieurs scénarios E2E dépendent (S3, S15).
+        //
+        // Surtout PAS is_active=false, comme c'était le cas ici : le PRD réserve ce drapeau au
+        // tampon de suppression (§4.3), et la bascule de saison a le sien, séparé (§4.4). Aucune
+        // pastille ne se dérive de is_active — la liste comme la fiche affichaient donc « ● actif »
+        // un compte dont les quatre voies de connexion étaient fermées, et que le filtre « Actifs »
+        // écartait pourtant sans rien en dire. Un état que l'application ne sait ni produire ni
+        // défaire.
         $brigitte = User::updateOrCreate(
             ['email' => 'brigitte@demo.club'],
             [
                 'first_name' => 'Brigitte', 'last_name' => 'Ancienne', 'dob' => '1971-03-05',
                 'password' => Hash::make('password'), 'roles' => ['athlete'],
-                'is_active' => false, 'email_verified_at' => now(),
+                'is_active' => true, 'athlete_access_suspended' => true, 'email_verified_at' => now(),
             ],
         );
 
@@ -1039,7 +1048,11 @@ class DemoSeeder extends Seeder
                 'is_active' => true, 'email_verified_at' => now(),
             ],
         );
-        $gilles->forceFill(['deletion_requested_at' => $now->copy()->subDays(2)])->save();
+        // is_active=false EN MÊME TEMPS que la date : c'est le couple posé par
+        // MemberService::requestDeletion() (§4.3). Poser la date seule fabriquait un compte en
+        // tampon de suppression qui pouvait encore se connecter — l'inverse de ce que la démo
+        // prétend montrer.
+        $gilles->forceFill(['deletion_requested_at' => $now->copy()->subDays(2), 'is_active' => false])->save();
         $daniel = User::updateOrCreate(
             ['email' => 'daniel@demo.club'],
             [
@@ -1048,7 +1061,7 @@ class DemoSeeder extends Seeder
                 'is_active' => true, 'email_verified_at' => now(),
             ],
         );
-        $daniel->forceFill(['deletion_requested_at' => $now->copy()->subDays(9)])->save();
+        $daniel->forceFill(['deletion_requested_at' => $now->copy()->subDays(9), 'is_active' => false])->save();
 
         // Ces trois comptes du pack testeurs sont des athlètes à part entière (dob + rôle) : ils
         // doivent avoir leur catégorie, sinon leur fiche affiche « aucune catégorie » à tort.

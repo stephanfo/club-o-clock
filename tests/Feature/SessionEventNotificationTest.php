@@ -69,7 +69,7 @@ class SessionEventNotificationTest extends TestCase
     {
         [$coach, $session] = $this->trainingWithParticipants(3);
 
-        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])->call('cancel');
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])->set('cancelCheck', true)->call('cancel');
 
         // 3 inscrits × (push + email) = 6 lignes session_cancelled.
         $this->assertSame(6, NotificationOutbox::where('type', 'session_cancelled')->count());
@@ -93,7 +93,7 @@ class SessionEventNotificationTest extends TestCase
             'start_at' => Carbon::now()->addWeek(), 'duration_min' => 60, 'created_by' => $coach->id,
         ]);
 
-        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])->call('cancel');
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])->set('cancelCheck', true)->call('cancel');
 
         $this->assertSame(0, NotificationOutbox::count());
     }
@@ -275,6 +275,91 @@ class SessionEventNotificationTest extends TestCase
             ->assertSet('showSaveDialog', false);
 
         $this->assertSame(60, $session->fresh()->duration_min);
+    }
+
+    // ── Ce que le dialog ANNONCE (§4.17) : canaux réellement ouverts, nature du changement ──
+
+    /** Ouvre le dialog sur un changement structurant et renvoie le HTML rendu. */
+    private function dialogHtmlForStructuralChange(): string
+    {
+        [$coach, $session] = $this->trainingWithParticipants(1);
+
+        return Livewire::actingAs($coach)->test(SessionForm::class, ['session' => $session])
+            ->set('duration_min', 90)
+            ->call('save')
+            ->assertSet('showSaveDialog', true)
+            ->html();
+    }
+
+    public function test_dialog_ne_promet_que_les_canaux_ouverts_par_le_club(): void
+    {
+        ClubSettings::current()->update(['notif_email_enabled' => false]);
+
+        $html = $this->dialogHtmlForStructuralChange();
+
+        $this->assertStringContainsString('par push', $html);
+        $this->assertStringNotContainsString('par email', $html);
+    }
+
+    public function test_dialog_avertit_et_desactive_le_bouton_quand_aucun_canal_nest_ouvert(): void
+    {
+        ClubSettings::current()->update(['notif_push_enabled' => false, 'notif_email_enabled' => false]);
+
+        $html = $this->dialogHtmlForStructuralChange();
+
+        $this->assertStringContainsString('Aucun canal de notification', $html);
+        // Le bouton « prévenir » reste visible (l'admin doit comprendre pourquoi), mais inactivable.
+        // `disabled` nu (attribut booléen rendu par @disabled), pas `="disabled"` — que porterait
+        // aussi le wire:loading.attr voisin : on exige l'attribut, précédé d'un blanc et fermant la balise.
+        $this->assertMatchesRegularExpression('/wire:click="saveAndNotify"[^>]*\sdisabled\s*>/s', $html);
+    }
+
+    public function test_dialog_distingue_changement_de_contenu_et_champ_structurant(): void
+    {
+        $this->assertStringContainsString('Un champ structurant a changé', $this->dialogHtmlForStructuralChange());
+
+        [$coach, $session] = $this->trainingWithParticipants(1);
+        $html = Livewire::actingAs($coach)->test(SessionForm::class, ['session' => $session])
+            ->set('content_markdown', '# Plan de séance')
+            ->call('save')
+            ->assertSet('pendingStructural', false)
+            ->html();
+
+        $this->assertStringContainsString('Le contenu de la séance a changé', $html);
+        $this->assertStringNotContainsString('Un champ structurant a changé', $html);
+    }
+
+    // ── Le dialog ne survit pas au départ vers la fiche ──
+    //
+    // `wire:navigate` mémorise la page quittée AVEC le dernier snapshot du composant : un
+    // showSaveDialog resté à true rouvrait la modale, déjà validée, à chaque retour arrière.
+
+    public function test_save_and_notify_referme_le_dialog_avant_de_rediriger(): void
+    {
+        [$coach, $session] = $this->trainingWithParticipants(1);
+
+        Livewire::actingAs($coach)->test(SessionForm::class, ['session' => $session])
+            ->set('duration_min', 90)
+            ->call('save')
+            ->assertSet('showSaveDialog', true)
+            ->call('saveAndNotify')
+            ->assertSet('showSaveDialog', false)
+            ->assertSet('pendingChanges', [])
+            ->assertSet('pendingStructural', false)
+            ->assertSet('notify_priority', false)
+            ->assertRedirect(route('sessions.show', $session));
+    }
+
+    public function test_save_silently_referme_le_dialog_avant_de_rediriger(): void
+    {
+        [$coach, $session] = $this->trainingWithParticipants(1);
+
+        Livewire::actingAs($coach)->test(SessionForm::class, ['session' => $session])
+            ->set('duration_min', 90)
+            ->call('save')
+            ->call('saveSilently')
+            ->assertSet('showSaveDialog', false)
+            ->assertSet('pendingChanges', []);
     }
 
     // ── Création compétition / événement club : annonce event_created (§4.7) ──

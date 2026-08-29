@@ -31,10 +31,18 @@ class SessionPolicy
         return $user->hasRole('coach') || $user->hasRole('admin');
     }
 
-    /** Annulation : coach ou admin (§4.7). */
+    /**
+     * Annulation : coach ou admin, tant que le CRÉNEAU n'est pas terminé (§4.7).
+     *
+     * La borne est la fin (`startAt + durationMin`) et non le début : une séance annulée sur place
+     * — orage, gymnase fermé — l'est quelques minutes après l'heure, et les inscrits doivent être
+     * prévenus. Passé la fin, la séance a eu lieu : l'annuler l'effacerait rétroactivement des
+     * statistiques (StatsService exclut partout `cancelled_at`) et notifierait les inscrits d'une
+     * annulation sans objet. Pendant du garde-fou de restore(), qui borne au début.
+     */
     public function cancel(User $user, Session $session): bool
     {
-        return $this->update($user, $session);
+        return $this->update($user, $session) && ! $session->hasEnded();
     }
 
     /** Restauration : coach/admin ET tant que startAt n'est pas dépassé (§4.7 garde-fou). */

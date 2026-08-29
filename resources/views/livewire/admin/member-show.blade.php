@@ -424,7 +424,7 @@
                                  un compte en cours de suppression — il est déjà désactivé. --}}
                             @elseif ($u->hasRole('athlete') && $u->is_active && ! $u->anonymized_at && ! $pending)
                                 <button type="button" class="btn btn-ghost btn-block" style="margin-bottom:12px;color:var(--warning)"
-                                    wire:click="$set('confirmingSuspend', true)">
+                                    wire:click="openSuspendConfirm">
                                     <x-icon name="user-minus" :size="15" /> Suspendre l'accès athlète
                                 </button>
                             @endif
@@ -542,7 +542,7 @@
 
     {{-- ── Modale : suspension individuelle de l'accès athlète (§4.4) ── --}}
     @if ($confirmingSuspend)
-        <x-dialog title="Suspendre l'accès athlète" :danger="true" :width="460" close="$set('confirmingSuspend', false)">
+        <x-dialog title="Suspendre l'accès athlète" :danger="true" :width="460" close="dismissSuspendConfirm">
             <div style="display:flex;flex-direction:column;gap:12px">
                 <x-conseq-row icon="calendar" label="{{ $futureRegs }} inscription(s) future(s)" tone="warn">
                     Annulée(s) immédiatement. Les places libérées repartent à la file d'attente, et les
@@ -561,9 +561,24 @@
                 <label class="field-label">Motif (optionnel, consigné au journal)</label>
                 <input class="input" style="margin-top:8px" wire:model.blur="suspendMotif" placeholder="Licence non renouvelée…" autocomplete="off">
             </div>
+            {{-- Accusé de réception avant d'armer le bouton (motif « bascule de saison » §4.17) : la
+                 suspension annule les inscriptions futures et fait remonter des tiers depuis la file,
+                 qui sont notifiés — l'envoi ne se dédit pas. --}}
+            {{-- Le toggle est porté par la RANGÉE (pour la souris, toute la ligne est cliquable) et
+                 aussi par le x-check, qui est un vrai <button> : sans quoi rien dans le dialog n'est
+                 focusable au clavier et la case — donc le bouton qu'elle arme — devient inatteignable.
+                 `.stop` sur le check empêche le clic de remonter à la rangée et de re-basculer. --}}
+            <div class="flex ac g10" style="margin-top:14px;font-size:14px;cursor:pointer" wire:click="$toggle('suspendCheck')">
+                <x-check :on="$suspendCheck" wire:click.stop="$toggle('suspendCheck')" aria-labelledby="txt-suspendre-acces" />
+                {{-- « les athlètes remontés de la file » et non « les athlètes concernés » : le
+                     suspendu, lui, n'est PAS notifié (§4.4 — bannière in-app, pas d'email). Les seuls
+                     envois viennent des promotions déclenchées par les places libérées. --}}
+                <span id="txt-suspendre-acces">Je comprends que {{ $futureRegs }} inscription(s) future(s) seront annulées, et que les athlètes remontés depuis les files d'attente en seront prévenus.</span>
+            </div>
             <x-slot:footer>
-                <button type="button" class="btn btn-ghost" wire:click="$set('confirmingSuspend', false)">Annuler</button>
-                <button type="button" class="btn btn-danger" wire:click="suspendAccess"
+                <button type="button" class="btn btn-ghost" wire:click="dismissSuspendConfirm">Annuler</button>
+                <button type="button" class="btn btn-danger{{ $suspendCheck ? '' : ' is-disabled' }}"
+                    @if ($suspendCheck) wire:click="suspendAccess" @endif
                     wire:loading.attr="disabled" wire:target="suspendAccess">Suspendre l'accès</button>
             </x-slot:footer>
         </x-dialog>

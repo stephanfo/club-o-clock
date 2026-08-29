@@ -9,6 +9,39 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Corrigé
 
+- **Les modales débordaient de la fenêtre, boutons du pied hors écran.** Visible sur Safari
+  seulement, et donc invisible du harnais E2E qui tourne sous Chromium : le voile de la modale ne
+  déclarait pas de hauteur, WebKit renonçait alors à borner la boîte, et le surplus sortait **des
+  deux côtés à la fois** — titre en haut, boutons en bas — sans rien de rattrapable au défilement.
+  La modale tient désormais dans la fenêtre sur tous les navigateurs, seul son corps défile, les
+  encoches de téléphone sont réservées, et le fond ne défile plus derrière elle. Les pieds portant
+  **trois** actions (« Quota dépassé ») les empilent au lieu de les serrer jusqu'à les couper.
+
+- **Une modale déjà validée réapparaissait au retour arrière.** Après avoir enregistré une séance
+  et choisi de prévenir les inscrits, tout retour sur le formulaire — bouton du navigateur, geste,
+  chevron — rouvrait la modale de confirmation, déjà validée et la séance déjà enregistrée. La
+  navigation instantanée photographie la page quittée pour la rejouer au retour ; la modale était
+  encore à l'écran au moment de la photo. Elle est désormais refermée avant, des deux côtés.
+  *(Aucun envoi en double n'était possible : la garde d'idempotence tenait déjà. Le défaut était
+  déroutant, pas destructeur.)*
+
+- **La confirmation d'enregistrement d'une séance promettait des canaux fermés.** Elle annonçait
+  « push + email » en dur, y compris quand le bureau avait coupé l'un des deux — ou les deux — dans
+  les réglages du club. Elle énonce maintenant les seuls canaux réellement ouverts, et remplace le
+  bouton par un avertissement quand plus aucun envoi n'est possible. Elle annonçait aussi « un champ
+  structurant a changé » alors qu'elle s'ouvre également sur un simple changement de contenu (texte,
+  parcours) : les deux cas sont désormais distingués.
+
+- **La fiche d'un parent garant tombait en erreur côté admin.** Le bloc « Pupilles » affiche la
+  catégorie d'âge de chaque enfant, mais celle-ci n'était pas chargée avec la fiche. Le défaut ne se
+  déclenchait que sur un garant d'**au moins deux** enfants, ce qui l'avait rendu invisible jusqu'ici.
+
+- **Le jeu de démonstration affichait « actif » un compte injoignable.** Une ancienne adhérente y
+  était marquée désactivée alors qu'aucun écran ne dérive de pastille de ce drapeau : la liste et la
+  fiche la donnaient « active » pendant que le filtre « Actifs » l'écartait sans rien en dire. Elle
+  porte maintenant l'accès athlète suspendu, qui est l'état que l'application sait produire et
+  défaire. Un test refuse désormais tout compte désactivé hors procédure de suppression.
+
 - **Le planificateur ne tournait pas sur hébergement mutualisé.** La documentation prescrivait un
   cron `* * * * *`, qu'OVH ne permet pas : une exécution par heure au maximum, à une minute imposée
   par l'hébergeur, et une tâche qui ne peut pointer qu'un fichier PHP sans arguments. Deux
@@ -24,7 +57,47 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   à la passe suivante au lieu de la perdre. Un test balaie les 60 minutes de démarrage possibles et
   échoue si une tâche redevient dépendante d'une minute absolue.
 
+### Modifié
+
+- ⚠️ **Une séance dont le créneau est terminé ne peut plus être annulée.** La borne est la **fin**
+  (début + durée) et non le début : une séance annulée sur place — orage, gymnase fermé — l'est
+  souvent quelques minutes après l'heure, et les inscrits doivent être prévenus. Passé la fin, la
+  séance a **eu lieu** : l'annuler l'effacerait rétroactivement des statistiques de fréquentation et
+  notifierait les inscrits d'une annulation sans objet. Le bouton disparaît alors de lui-même.
+
+  *Changement de comportement pour les coachs : annuler une séance passée « pour faire le ménage »
+  n'est plus possible.* Entre le début et la fin du créneau, l'annulation reste possible mais devient
+  **définitive** — la restauration, elle, est bornée au début — et la confirmation l'annonce
+  désormais explicitement au lieu de promettre une réversibilité qui n'existait plus.
+
+- **Trois gestes destructifs demandent un accusé de réception.** Annuler une séance, suspendre
+  l'accès athlète d'un adhérent et rompre une tutelle notifient des tiers sans possibilité de se
+  dédire. Comme la bascule de saison le faisait déjà, le bouton n'est armé qu'une fois cochée une
+  case qui **chiffre** la conséquence (« Je comprends que 12 inscrit·e·s seront prévenu·e·s »). La
+  garde est **serveur** : un bouton grisé contourné ne déclenche rien.
+
 ### Ajouté
+
+- **Un garde-fou contre le déploiement d'un affichage périmé.** Les fichiers que le navigateur lit
+  vraiment ne sont pas ceux qu'on écrit : une moulinette (`npm run build`) compresse les seconds en
+  premiers, et seuls les premiers partent en ligne — hors Git, par transfert séparé. Oublier de
+  relancer la moulinette ne provoquait **aucune erreur** : le site tournait avec l'ancien affichage,
+  et rien ne le signalait. C'est arrivé pendant le développement de cette version.
+
+  `npm run build` inscrit désormais dans le résultat l'empreinte des fichiers dont il sort, et
+  `composer check` la confronte aux fichiers actuels — en nommant ceux qui ont bougé depuis. Même
+  principe que le contrôle qui existait déjà pour la structure de la base. Un bundle *sans*
+  empreinte est refusé lui aussi : ne pas savoir d'où il sort ne doit pas se lire comme une garantie
+  qu'il est à jour. Le contrôle est rejouable sur le serveur après transfert.
+
+- **Annuler une séance depuis un téléphone.** L'annulation était la seule action d'encadrement
+  absente du format mobile — restaurer, inscrire un athlète et remplir la file quota y étaient déjà.
+  Elle rejoint le bloc « Gestion » de l'onglet Infos. Volontairement hors de la barre d'action
+  collante : un bouton rouge qui prévient tous les inscrits n'a rien à faire sous le pouce, à côté
+  du bouton d'inscription.
+
+- **La touche Échap ferme la modale ouverte.** Sauf l'éditeur de débrief, où une touche mal placée
+  ferait perdre le texte en cours.
 
 - **Icônes PWA personnalisables par le club.** Elles étaient des fichiers du dépôt
   (`public/icons/`) : un club qui les remplaçait entrait en conflit à chaque `git pull`,
@@ -47,6 +120,18 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   y est couvert de bout en bout : bouton actif et désactivé, promotion effective, `AuditLog` émis.
   Volontairement **hors de `composer check`** : la porte de qualité reste PHPUnit.
   Voir [`tests/E2E/README.md`](https://github.com/stephanfo/club-o-clock/blob/main/tests/E2E/README.md).
+- **Poste de développement en conteneurs** ([`doc/DOCKER_LOCAL.md`](doc/DOCKER_LOCAL.md), et deux
+  `Dockerfile` versionnés dans `docker/`) : de quoi lancer l'application, la porte de qualité et le
+  harnais navigateur **sans installer PHP, MySQL ni les navigateurs** sur sa machine — seuls Git,
+  Docker et Node restent nécessaires. Le mode d'emploi consigne les deux pièges qui coûtent le plus
+  de temps : le harnais E2E code son adresse en dur et exige donc de partager la pile réseau du
+  conteneur applicatif, et le paquet `default-mysql-client` de Debian installe en réalité le client
+  MariaDB — `schema:dump` lancé là produit un dump MySQL que l'intégration continue rejette. Le
+  garde-fou qui empêche un envoi réel vers les adresses du jeu de démonstration est posé sur le
+  conteneur, jamais dans le `.env`.
+
+  Ça ne change **rien à la cible de déploiement** : l'application se déploie toujours sur un
+  hébergement mutualisé, sans Docker.
 - **Supervision du traitement automatique** : l'écran des envois indique si le cron tourne encore.
   Sans lui, une tâche planifiée interrompue (quota d'hébergement, chemin PHP changé, crontab perdue
   au transfert) laissait les notifications s'accumuler sans qu'aucun signe ne l'annonce — le premier

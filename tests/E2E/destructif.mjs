@@ -57,6 +57,15 @@ const tous = [];
     const dlg = page.locator('.dialog, [role="dialog"]').first();
     s.check('dialog de confirmation (action notifiant des tiers)', await dlg.isVisible().catch(() => false));
     await s.shot(page, 'd2-rupture-dialog');
+    // Accusé de réception (§4.17) : le bouton n'est armé que la case cochée. Contrôle NÉGATIF
+    // d'abord — « le bouton n'agit pas » ne vaudrait rien sans le contrôle positif qui suit.
+    s.check('bouton non armé tant que la case n\'est pas cochée',
+      await dlg.locator('button[wire\\:click="confirmSever"]').count() === 0);
+    await dlg.locator('[wire\\:click="$toggle(\'severCheck\')"]').first().click();
+    await page.waitForTimeout(600);
+    s.check('la case cochée arme le bouton',
+      await dlg.locator('button[wire\\:click="confirmSever"]').count() === 1);
+
     const confirmer = dlg.getByRole('button', { name: /rompre|confirmer/i }).first();
     if (await confirmer.count()) { await confirmer.click(); await page.waitForTimeout(1800); }
 

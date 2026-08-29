@@ -1,4 +1,4 @@
-import { launch, session, fiche, sql, seance, seanceFuture, barreMobile, Scenario, MOBILE, DESKTOP, BASE } from './lib.mjs';
+import { launch, session, fiche, sql, seance, seanceFuture, barreMobile, Scenario, MOBILE, DESKTOP, BASE, repereJournaux, purgeJournaux } from './lib.mjs';
 
 const browser = await launch();
 const tous = [];
@@ -18,6 +18,7 @@ const tous = [];
                   WHERE k.session_id=sessions.id AND uc.user_id=${mathieu})`);
 
   const s = new Scenario(`S1 · Mathieu bascule coach → athlète (séance ${s8})`);
+  const journaux = repereJournaux();   // la bascule écrit dans les trois journaux (cf. purgeJournaux)
   const { ctx, page } = await session(browser, 'mathieu@demo.club', MOBILE);
   await fiche(page, s8);
 
@@ -51,8 +52,13 @@ const tous = [];
   // Remise en état : on annule l'inscription et on le remet coach.
   sql(`DELETE FROM registrations WHERE session_id=${s8} AND user_id=${mathieu}`);
   sql(`INSERT IGNORE INTO session_coach (session_id, user_id) VALUES (${s8},${mathieu})`);
+  purgeJournaux(journaux);
   const restaure = sql(`SELECT COUNT(*) n FROM session_coach WHERE session_id=${s8} AND user_id=${mathieu}`);
   s.check('état restauré après test', restaure === '1');
+  s.check('journaux restaurés (audit, activité, envois)',
+          sql(`SELECT (SELECT COUNT(*) FROM audit_logs WHERE id>${journaux.audit})
+                    + (SELECT COUNT(*) FROM activity_logs WHERE id>${journaux.activite})
+                    + (SELECT COUNT(*) FROM notification_outbox WHERE id>${journaux.envois}) n`) === '0');
 
   tous.push(s.report());
   await ctx.close();

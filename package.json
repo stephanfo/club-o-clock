@@ -5,7 +5,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "vite build",
+        "build": "vite build && php artisan front:stamp",
         "dev": "vite",
         "doc:dev": "vitepress dev site",
         "doc:build": "vitepress build site",

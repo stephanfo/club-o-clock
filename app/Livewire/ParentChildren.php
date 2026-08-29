@@ -31,6 +31,9 @@ class ParentChildren extends Component
     /** Dialog « Rompre la tutelle » (P2→P3, §4.2.2) : ward_id ou null. */
     public ?int $severDialog = null;
 
+    /** Case « j'ai compris » du dialog de rupture — arme le bouton (motif §4.17). */
+    public bool $severCheck = false;
+
     public function mount(): void
     {
         abort_unless(SubjectContext::isGuardian(auth()->user()), 403);
@@ -83,24 +86,29 @@ class ParentChildren extends Component
 
     public function openSever(int $wardId): void
     {
+        $this->severCheck = false;
         $this->severDialog = $this->ward($wardId)->id;
     }
 
     public function confirmSever(GuardianshipService $service): void
     {
-        if ($this->severDialog === null) {
+        // Accusé de réception explicite (motif §4.17) : la rupture notifie le parent ET l'enfant,
+        // et l'envoi ne se dédit pas. Garde serveur, pas seulement bouton grisé.
+        if ($this->severDialog === null || ! $this->severCheck) {
             return;
         }
         $ward = $this->ward($this->severDialog);
 
         $service->sever($ward, auth()->user());
         $this->severDialog = null;
+        $this->severCheck = false;
         session()->flash('status', 'Tutelle rompue — '.$ward->first_name.' est désormais autonome.');
     }
 
     public function cancelSever(): void
     {
         $this->severDialog = null;
+        $this->severCheck = false;
     }
 
     public function render(QuotaService $quota)

@@ -63,6 +63,18 @@ class Session extends Model
         return $this->start_at->isPast();
     }
 
+    /** Fin du créneau = début + durée. Borne de l'annulation (§4.7) et pendant de hasStarted(). */
+    public function endsAt(): Carbon
+    {
+        return $this->start_at->copy()->addMinutes($this->duration_min);
+    }
+
+    /** Créneau terminé → la séance a eu lieu : elle n'est plus annulable (§4.7). */
+    public function hasEnded(): bool
+    {
+        return $this->endsAt()->isPast();
+    }
+
     /** Inscrits actifs (sur la collection chargée si dispo, sinon requête). */
     public function participatingCount(): int
     {

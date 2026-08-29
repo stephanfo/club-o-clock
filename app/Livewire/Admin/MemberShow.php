@@ -68,6 +68,9 @@ class MemberShow extends Component
     // repris tel quel dans l'AuditLog comme pour le geste de masse.
     public bool $confirmingSuspend = false;
 
+    /** Case « j'ai compris » du dialog de suspension — arme le bouton (motif §4.17). */
+    public bool $suspendCheck = false;
+
     public string $suspendMotif = '';
 
     public function mount(User $user): void
@@ -348,12 +351,37 @@ class MemberShow extends Component
      * il libère des places et fait remonter des tiers depuis la file d'attente — qui, eux, sont
      * notifiés. C'est le critère de la convention (destructif ou notifiant des tiers).
      */
+    /** Ouvre le dialog de suspension en désarmant la case : jamais pré-cochée d'une fois sur l'autre. */
+    public function openSuspendConfirm(): void
+    {
+        $this->suspendCheck = false;
+        $this->confirmingSuspend = true;
+    }
+
+    /**
+     * Ferme le dialog en désarmant la case — bouton « Annuler », clic sur le voile, touche Échap.
+     * Pendant de dismissCancelConfirm() et cancelSever() : la case ne doit pas survivre au dialog,
+     * même si openSuspendConfirm() la remettrait à zéro à la réouverture.
+     */
+    public function dismissSuspendConfirm(): void
+    {
+        $this->confirmingSuspend = false;
+        $this->suspendCheck = false;
+    }
+
     public function suspendAccess(SeasonService $season): void
     {
+        // Accusé de réception explicite (motif §4.17) : la suspension annule les inscriptions futures
+        // et fait remonter des tiers depuis la file, qui sont notifiés. Garde serveur.
+        if (! $this->suspendCheck) {
+            return;
+        }
+
         $annulees = $season->suspendAthlete($this->user, auth()->user(), trim($this->suspendMotif) ?: null);
 
         $this->user->refresh();
         $this->confirmingSuspend = false;
+        $this->suspendCheck = false;
         $this->suspendMotif = '';
 
         session()->flash('status', 'Accès athlète suspendu'
@@ -500,7 +528,11 @@ class MemberShow extends Component
 
     public function render()
     {
-        $this->user->loadMissing(['categories', 'qualifications', 'guardian', 'wards']);
+        // `wards.categories` et non `wards` seul : le bloc « Pupilles » affiche la catégorie d'âge de
+        // CHAQUE enfant ($ward->primaryCategory(), qui lit $ward->categories). Sans l'imbrication, la
+        // fiche d'un parent garant tombait sur « Attempted to lazy load [categories] » — la garde
+        // preventLazyLoading rend l'oubli fatal, et il ne se voyait que sur les comptes à pupilles.
+        $this->user->loadMissing(['categories', 'qualifications', 'guardian', 'wards.categories']);
 
         $primary = $this->user->primaryCategory();
         $surclassements = $this->user->surclassements();

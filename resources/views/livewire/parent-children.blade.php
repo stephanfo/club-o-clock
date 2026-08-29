@@ -85,9 +85,21 @@
             <x-banner kind="danger">
                 Effet immédiat : tu ne recevras plus ses notifications, tu ne verras plus son historique et tu ne pourras plus l'inscrire. Cette action est tracée et vous serez notifiés tous les deux.
             </x-banner>
+            {{-- Accusé de réception avant d'armer le bouton (motif « bascule de saison » §4.17) :
+                 la rupture notifie les DEUX comptes, et l'envoi ne se dédit pas. --}}
+            {{-- Le toggle est porté par la RANGÉE (pour la souris, toute la ligne est cliquable) et
+                 aussi par le x-check, qui est un vrai <button> : sans quoi rien dans le dialog n'est
+                 focusable au clavier et la case — donc le bouton qu'elle arme — devient inatteignable.
+                 `.stop` sur le check empêche le clic de remonter à la rangée et de re-basculer. --}}
+            <div class="flex ac g10" style="margin-top:14px;font-size:14px;cursor:pointer" wire:click="$toggle('severCheck')">
+                <x-check :on="$severCheck" wire:click.stop="$toggle('severCheck')" aria-labelledby="txt-rompre-tutelle" />
+                <span id="txt-rompre-tutelle">Je comprends que {{ $sevWard?->first_name }} et moi serons prévenu·e·s de la rupture.</span>
+            </div>
             <x-slot:footer>
                 <button type="button" class="btn btn-ghost" wire:click="cancelSever">Annuler</button>
-                <button type="button" class="btn btn-danger" wire:click="confirmSever" wire:loading.attr="disabled" wire:target="confirmSever"><x-icon name="log-out" :size="14" /> Rompre la tutelle</button>
+                <button type="button" class="btn btn-danger{{ $severCheck ? '' : ' is-disabled' }}"
+                        @if ($severCheck) wire:click="confirmSever" @endif
+                        wire:loading.attr="disabled" wire:target="confirmSever"><x-icon name="log-out" :size="14" /> Rompre la tutelle</button>
             </x-slot:footer>
         </x-dialog>
     @endif

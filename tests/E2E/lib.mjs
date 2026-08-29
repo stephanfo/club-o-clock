@@ -31,6 +31,37 @@ export function sql(query) {
 }
 
 /**
+ * Repère la hauteur des journaux AVANT une action, pour n'effacer ensuite que ce que le scénario a
+ * lui-même produit — voir purgeJournaux().
+ *
+ * @returns {{audit: string, activite: string, envois: string}}
+ */
+export function repereJournaux() {
+  return {
+    audit: sql('SELECT IFNULL(MAX(id),0) v FROM audit_logs'),
+    activite: sql('SELECT IFNULL(MAX(id),0) v FROM activity_logs'),
+    envois: sql('SELECT IFNULL(MAX(id),0) v FROM notification_outbox'),
+  };
+}
+
+/**
+ * Efface les traces de journal postérieures au repère. Deuxième moitié de la règle « restaurer
+ * l'état » : un scénario qui remet les inscriptions en place mais laisse ses lignes de journal fait
+ * gonfler le jeu de démo run après run — et, pour la file d'envoi, ce n'est pas cosmétique : des
+ * lignes « en attente » oubliées partent VRAIMENT au prochain passage du cron, pour des actions
+ * qui ont été défaites.
+ *
+ * On coupe par id et non par type : c'est le seul critère qui distingue à coup sûr ce que le run a
+ * créé de ce que le jeu de démo contient déjà. Supprimer par action effacerait aussi les entrées
+ * seedées portant la même action.
+ */
+export function purgeJournaux(repere) {
+  sql(`DELETE FROM audit_logs WHERE id > ${repere.audit}`);
+  sql(`DELETE FROM activity_logs WHERE id > ${repere.activite}`);
+  sql(`DELETE FROM notification_outbox WHERE id > ${repere.envois}`);
+}
+
+/**
  * Id de LA séance qui satisfait `where`, la plus proche dans le temps. Lève si aucune ne convient.
  *
  * Les séances du jeu de démo sont placées relativement à `now()` (DemoSeeder), mais leur position

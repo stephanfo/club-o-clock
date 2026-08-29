@@ -155,6 +155,7 @@ export default defineConfig({
         text: 'Contribuer',
         items: [
           { text: 'Guide de contribution', link: '/CONTRIBUTING' },
+          { text: 'Poste de développement en conteneurs', link: '/doc/DOCKER_LOCAL' },
           { text: 'Politique de sécurité', link: '/SECURITY' },
           { text: 'Journal des versions', link: '/CHANGELOG' },
         ],

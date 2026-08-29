@@ -7,6 +7,7 @@ Instructions pour Claude Code (ou tout autre assistant de code) sur ce dépôt.
 - **Spec produit** : [doc/PRD.md](doc/PRD.md). Toute fonctionnalité demandée doit être référencée dans le périmètre V1 (§3.1) ; si elle est en hors-V1 (§3.2), le signaler **avant** de coder.
 - **Cadrage technique** : [doc/CADRAGE_TECHNIQUE.md](doc/CADRAGE_TECHNIQUE.md) — source de vérité pour tout choix technique, et pour les raisons de chaque arbitrage.
 - **Installation & déploiement** : [doc/INSTALL.md](doc/INSTALL.md).
+- **Poste de développement en conteneurs** : [doc/DOCKER_LOCAL.md](doc/DOCKER_LOCAL.md) — comment lancer l'app, la porte de qualité et le harnais E2E sans installer PHP/MySQL/navigateurs, à partir des `Dockerfile` de [docker/](docker/).
 - **Contribution** : [CONTRIBUTING.md](CONTRIBUTING.md) — porte de qualité, conventions de commit, périmètre.
 
 ## État du projet
@@ -21,9 +22,11 @@ Stack — **monolithe Laravel 13** sur hébergement mutualisé + **MariaDB/MySQL
 >
 > Les deux existent parce que la CI joue la suite sur les **deux SGBD** que le projet annonce supporter : **MySQL 8.4**, celui de la production (OVH Pro), et **MariaDB 11.4** pour les clubs déployant ailleurs. Chaque dump doit être régénéré **sur son propre moteur** — `mysqldump` et `mariadb-dump` écrivent des dialectes différents, et régénérer l'un depuis l'autre produit un fichier illisible par la CI. En local, `DB_CONNECTION` choisit le moteur ; les deux tournent en conteneur.
 
+**Front** : `public/build/` est un artefact dérivé, **gitignoré** et transféré hors Git (INSTALL.md §5.1) — à la différence du dump de schéma, parce que Vite hashe ses noms de sortie et qu'un dépôt public accumulerait chaque build indéfiniment. Contrepartie : toute modification de `resources/css/` ou `resources/js/` exige un `npm run build`, sans quoi le serveur sert l'ancien CSS/JS **sans la moindre erreur**. `front:check-drift` (dans `composer check`) refuse cet état ; ne pas contourner en tamponnant un bundle périmé.
+
 ## Porte de qualité
 
-**Toute modification doit passer `composer check`** (pint + phpstan niveau 5 + suite de tests) :
+**Toute modification doit passer `composer check`** (pint + phpstan niveau 5 + contrôles de dérive + suite de tests) :
 
 ```bash
 composer check
@@ -47,6 +50,12 @@ node tests/E2E/run.mjs                        # 20 scénarios non destructifs
 node tests/E2E/destructif.mjs --oui-je-sais   # RGPD, tutelle, bascule de saison — reconstruit la base
 ```
 
+> Sur un poste conteneurisé, ces trois commandes et la porte de qualité se jouent sans PHP ni
+> navigateur installés : recettes exactes dans [doc/DOCKER_LOCAL.md](doc/DOCKER_LOCAL.md). Deux
+> pièges y sont documentés — le harnais E2E exige `--network container:cluboclock-app` (`lib.mjs`
+> code `http://127.0.0.1:8000` en dur), et le `default-mysql-client` de Debian est en réalité le
+> client MariaDB, donc `schema:dump` n'y produit pas un dump MySQL valide.
+
 **Ne pas l'ajouter à `composer check`** (serveur + base + navigateur requis : la porte deviendrait fragile). La référence de non-régression reste PHPUnit.
 
 **Jamais d'id de séance en dur dans un scénario.** Le jeu de démo est relatif à `now()`, mais la position d'une séance par rapport à l'instant du run dépend du jour et de l'heure — un id figé rend le scénario vert ou rouge selon le moment. Sélectionner par les propriétés via `seance(where)` / `seanceFuture(where)` de [tests/E2E/lib.mjs](tests/E2E/lib.mjs). Idem pour les comptes : par email, jamais par `user_id`.
@@ -67,7 +76,11 @@ Le design system existe : tout écran doit lui être fidèle.
 ## Conventions UI
 
 - **Feedback d'action** : `flash('status', …)` = succès/info (vert), `flash('warn', …)` = refus/erreur (orange). Rendu par `<x-flash-float />` à la racine de **chaque écran Livewire** (jamais dans le layout : il ne re-rend pas sur une action). Ne pas réintroduire `flash('toast')` ni de bannières inline persistantes.
-- **Confirmations** : `wire:confirm` natif pour l'anodin réversible (se désinscrire, délier un appareil…) ; `<x-dialog danger>` avec conséquences (`x-conseq-row`) pour le destructif ou ce qui notifie des tiers (annuler une séance, rompre une tutelle).
+- **Confirmations, trois niveaux** — le geste choisit son niveau, pas l'écran :
+  1. `wire:confirm` natif pour l'**anodin réversible** (se désinscrire, délier un appareil…).
+  2. `<x-dialog danger>` avec conséquences (`x-conseq-row`) pour le **destructif** (annuler des envois, supprimer un parcours).
+  3. Le même dialog **plus un accusé de réception** — `<x-check>` armant le bouton — quand l'action **notifie des tiers sans pouvoir se dédire**, ou devient irréversible : annuler une séance, suspendre un accès athlète, rompre une tutelle, bascule de saison. La case **chiffre** la conséquence (« Je comprends que 12 inscrit·e·s seront prévenu·e·s »), n'est **jamais pré-cochée** (la méthode d'ouverture la remet à zéro), et le refus est gardé **côté serveur** — le bouton grisé ne suffit pas, l'état vient du client.
+  Le toggle se porte **à la fois** sur la rangée (toute la ligne cliquable à la souris) et sur le `<x-check>`, qui est un vrai `<button>` — sinon rien n'est focusable et la case, donc le bouton qu'elle arme, devient inatteignable au clavier. `.stop` sur le check, sans quoi le clic remonte à la rangée et re-bascule.
 - **Formats de date** (heure club, `isoFormat`) : liste/contexte dense = `ddd D MMM` · pleine page/titre = `dddd D MMMM` · heure toujours `HH:mm` · mois seul = `MMMM YYYY`.
 - **Admin sur mobile : assumé desktop.** Pas d'entrée de navigation admin sur mobile — ces écrans ne sont pas conçus pour ce format ; ne pas en ajouter sans les repenser.
 - **CTA d'action serveur** : toujours `wire:loading.attr="disabled"` + `wire:target` (latence du mutualisé, anti double-tap).
@@ -78,7 +91,7 @@ Le design system existe : tout écran doit lui être fidèle.
 
 ### Stack technique
 
-- **La stack est tranchée.** Toute proposition divergente (autre framework, SPA découplée, NoSQL, Docker, Node long-running, WebSocket serveur…) doit être **discutée explicitement** avant écriture — le cadrage documente pourquoi ces options sont écartées (contraintes du mutualisé, maintenance par un bénévole solo, AGPL/RGPD).
+- **La stack est tranchée.** Toute proposition divergente (autre framework, SPA découplée, NoSQL, Docker **comme cible de déploiement**, Node long-running, WebSocket serveur…) doit être **discutée explicitement** avant écriture — le cadrage documente pourquoi ces options sont écartées (contraintes du mutualisé, maintenance par un bénévole solo, AGPL/RGPD).
 - Le **PRD reste agnostique de la stack** : ne pas y injecter de techno. Une implication technique d'une exigence produit s'y formule en **exigence non-fonctionnelle** (ex. *« évaluation du quota en temps quasi-constant »*) ; le *comment* vit dans le cadrage.
 
 ### Modèle

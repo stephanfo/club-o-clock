@@ -331,12 +331,14 @@
             <label class="field-label" style="margin-top:14px">Motif (visible dans le bandeau inscrit)</label>
             <textarea class="input" style="margin-top:6px" rows="2" wire:model.blur="basculeMotif" placeholder="Saison N — réactive ton accès depuis ton profil après réinscription."></textarea>
             {{-- Rangée cliquable (div, pas label) : un <label> enveloppant le <button> de x-check
-                 propagerait le clic au bouton → double $toggle qui s'annule. Le toggle est porté
-                 par la rangée ; le x-check est neutralisé aux clics (pointer-events:none) et sert
-                 uniquement d'indicateur visuel. --}}
+                 propagerait le clic au bouton → double $toggle qui s'annule. Le toggle est donc porté
+                 par la rangée, pour que toute la ligne réponde à la souris, ET par le x-check, qui est
+                 un vrai <button> : sans lui rien n'est focusable ici et la case — donc le bouton
+                 qu'elle arme — devient inatteignable au clavier. `.stop` empêche le clic sur le check
+                 de remonter à la rangée et de re-basculer. --}}
             <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">
-                <div class="flex ac g10" style="font-size:14px;cursor:pointer" wire:click="$toggle('basculeCheck1')"><x-check :on="$basculeCheck1" tabindex="-1" style="pointer-events:none" /> Je comprends que {{ $impact['athletes'] }} comptes seront suspendus</div>
-                <div class="flex ac g10" style="font-size:14px;cursor:pointer" wire:click="$toggle('basculeCheck2')"><x-check :on="$basculeCheck2" tabindex="-1" style="pointer-events:none" /> Je comprends que {{ $impact['future_registrations'] }} inscriptions seront annulées</div>
+                <div class="flex ac g10" style="font-size:14px;cursor:pointer" wire:click="$toggle('basculeCheck1')"><x-check :on="$basculeCheck1" wire:click.stop="$toggle('basculeCheck1')" aria-labelledby="txt-bascule-1" /> <span id="txt-bascule-1">Je comprends que {{ $impact['athletes'] }} comptes seront suspendus</span></div>
+                <div class="flex ac g10" style="font-size:14px;cursor:pointer" wire:click="$toggle('basculeCheck2')"><x-check :on="$basculeCheck2" wire:click.stop="$toggle('basculeCheck2')" aria-labelledby="txt-bascule-2" /> <span id="txt-bascule-2">Je comprends que {{ $impact['future_registrations'] }} inscriptions seront annulées</span></div>
             </div>
             @error('bascule')<div class="meta" style="color:var(--danger);margin-top:8px">{{ $message }}</div>@enderror
             <x-slot:footer>

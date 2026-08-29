@@ -127,7 +127,11 @@
 - [ ] Le créateur (`createdBy`) n'est pas modifiable.
 
 ### 3.2 Annulation / restauration (PRD §4.7, §4.10.6)
-- [ ] Annuler une séance future **avec inscrits** → bandeau « annulée », notification à chaque inscrit (Alertes/Envois), flag apéro éventuel « parké ».
+- [ ] Annuler une séance future **avec inscrits** → dialog : le bouton rouge est **inerte tant que la case n'est pas cochée** (contrôle positif : la cocher l'arme) ; le libellé **chiffre** les inscrits prévenus. Confirmer → bandeau « annulée », notification à chaque inscrit (Alertes/Envois), flag apéro éventuel « parké ».
+- [ ] Rouvrir le dialog après l'avoir fermé → la case est **décochée** (jamais mémorisée d'une fois sur l'autre).
+- [ ] Sur une séance **en cours** (créneau commencé, pas terminé) : l'annulation reste possible, mais la conséquence affichée passe de « Réversible » à **« Irréversible »** et la case le dit.
+- [ ] Sur une séance **terminée** (créneau écoulé) : le bouton « Annuler la séance » **a disparu**, mobile comme desktop — et l'intertitre « Gestion » ne reste pas seul si aucune autre action n'est disponible.
+- [ ] **Au téléphone** : l'annulation est atteignable depuis l'onglet Infos (bloc « Gestion »), et **pas** dans la barre d'action collante.
 - [ ] **Restaurer** la séance → inscriptions rétablies telles quelles, flag apéro de retour, notification de réactivation.
 - [ ] La séance annulée **ne compte plus** dans le quota des inscrits (un inscrit peut se réinscrire ailleurs sur le même tag).
 
@@ -182,7 +186,7 @@
 - [ ] Sélecteur à **3 pilules** : Moi / Jade / Noah.
 - [ ] Sandrine s'inscrit **pour elle-même** (sujet « Moi ») ; puis bascule sur **Jade** et l'inscrit ; puis sur **Noah** — trois inscriptions distinctes, chacune au bon nom.
 - [ ] « Mes enfants » : deux cartes (Jade P1 avec « Accès autonome », Noah P2 avec « Rompre la tutelle »). Noah affiche **Cadets** + surclassement **Juniors** sur sa fiche adhérent (visible côté admin).
-- [ ] `[auto:D2]` **Rompre la tutelle** de Noah → dialog de confirmation → Noah disparaît de « Mes enfants » et du sélecteur ; notification aux **deux** ; Noah (P3) reste connecté et autonome. *(Recharger le seed ensuite si besoin de rejouer.)*
+- [ ] `[auto:D2]` **Rompre la tutelle** de Noah → dialog de confirmation, bouton inerte tant que la case d'accusé de réception n'est pas cochée → Noah disparaît de « Mes enfants » et du sélecteur ; notification aux **deux** ; Noah (P3) reste connecté et autonome. *(Recharger le seed ensuite si besoin de rejouer.)*
 
 ---
 
@@ -203,12 +207,12 @@
 - [ ] Catégories d'âge : bornes sans chevauchement (une modification en collision est refusée).
 
 ### 8.2 Adhérents (PRD §4.17.1)
-- [ ] Recherche + filtres (rôle, accès) ; compteurs ; **Brigitte** apparaît « désactivée ».
+- [ ] Recherche + filtres (rôle, accès) ; compteurs ; **Brigitte** et **Kévin** portent « ○ suspendu » et sortent du filtre « Actifs ».
 - [ ] Créer un adhérent adulte (email requis) et un **mineur P1** (email facultatif, garant obligatoire).
 - [ ] Fiche adhérent : **modifier la date de naissance** → catégorie recalculée, surclassement conservé (tester sur Noah) ; date future ou < 1900 refusée.
 - [ ] Ajouter/retirer un rôle (coach) → tracé au journal.
 - [ ] **Qualifications** : en ajouter une **avec date d'expiration** (champ optionnel à l'ajout) ; **crayon** sur une ligne existante → poser/modifier/effacer l'expiration ; passer une date au passé → badge « expirée » sur la fiche adhérent ET dans l'onglet Encadrement des séances qu'il encadre.
-- [ ] **Suspendre** un athlète, vérifier qu'il ne peut plus s'inscrire, puis le **réactiver**.
+- [ ] **Suspendre** un athlète (`marie@demo.club` — Kévin et Brigitte le sont déjà) : le dialog chiffre les inscriptions futures annulées et le bouton n'est armé qu'une fois la case cochée. Vérifier qu'il ne peut plus s'inscrire, puis le **réactiver**.
 - [ ] **Pupilles** : ouvrir la fiche de `sandrine@demo.club` → carte « Pupilles » listant Jade (P1) et Noah (P2), liens cliquables vers leurs fiches.
 - [ ] **Tutelle côté admin** : fiche de Théo Mercier → carte Tutelle (garant affiché, rupture P2→P3 possible) ; fiche de Lucie → invitation P1→P2. Fiche d'un **mineur sans garant** (ex. `hugo@demo.club`) → avertissement « sans parent garant » + **« Lier ce garant »** (choisir un adulte actif) → le lien apparaît, tracé au journal d'audit.
 

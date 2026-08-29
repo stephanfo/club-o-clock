@@ -16,21 +16,35 @@ trait ManagesLifecycle
      *  → dialog stylé avec conséquences, pas un confirm() natif). */
     public bool $confirmingCancel = false;
 
+    /** Case « j'ai compris » du dialog d'annulation — arme le bouton (motif §4.17 bascule de saison). */
+    public bool $cancelCheck = false;
+
     public function openCancelConfirm(): void
     {
         $this->authorize('cancel', $this->session);
+        $this->cancelCheck = false;   // jamais pré-cochée : la case n'a de valeur que relue
         $this->confirmingCancel = true;
     }
 
     public function dismissCancelConfirm(): void
     {
         $this->confirmingCancel = false;
+        $this->cancelCheck = false;
     }
 
     public function cancel(RegistrationService $service, AperoService $apero, SessionNotificationService $notifier): void
     {
         $this->authorize('cancel', $this->session);
+
+        // Accusé de réception explicite (motif « bascule de saison », §4.17) : l'annulation notifie
+        // TOUS les inscrits sans possibilité de dédire l'envoi, et devient définitive dès que le
+        // créneau a commencé. Garde SERVEUR et pas seulement bouton grisé — l'état vient du client.
+        if (! $this->cancelCheck) {
+            return;
+        }
+
         $this->confirmingCancel = false;
+        $this->cancelCheck = false;
 
         if ($this->session->isCancelled()) {
             return;

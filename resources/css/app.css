@@ -554,7 +554,46 @@ a.scard { text-decoration: none; color: inherit; }
 /* position:fixed (le proto le fige à absolute car chaque écran vivait dans un cadre « device » ;
    en app plein écran, absolute cale le scrim sur son conteneur → le dialog s'ouvre en haut de page
    et il faut scroller. fixed le recentre sur le viewport quel que soit le scroll). */
-.scrim { position: fixed; z-index: 1200; }
+/* height (et non la hauteur DÉDUITE de inset:0) : sans hauteur écrite, WebKit refuse de résoudre le
+   `max-height: 100%` de .dialog et le traite comme `none` — la modale prend la hauteur de son
+   contenu et `align-items:center` fait sortir le surplus des DEUX côtés à la fois (titre en haut,
+   boutons en bas), sans rien de rattrapable au scroll puisque seul .dialog-body défile. Constaté sur
+   Safari desktop ; Chromium résout la hauteur, le harnais E2E ne voit donc rien.
+   100dvh et non 100vh : barre d'URL mobile rétractable (même raison que .fiche-scroll-m).
+   `bottom:auto` : ne pas sur-contraindre le bloc avec top + bottom + height.
+   Le padding reprend les 18px du design en réservant les safe-area iOS — max() et non addition :
+   sur un écran sans encoche l'inset vaut 0 et on retombe exactement sur la valeur du proto.
+   `safe center` : si la modale dépasse malgré tout (fenêtre très basse), elle se cale en haut au lieu
+   de déborder symétriquement — le titre redevient atteignable. Ignoré par les navigateurs qui ne
+   connaissent pas le mot-clé, qui retombent sur le `center` de club-app.css. */
+.scrim {
+    position: fixed; z-index: 1200;
+    bottom: auto; height: 100dvh;
+    padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
+    align-items: safe center;
+}
+/* En-tête et pied sont des items flex : sans flex:0 0 auto ils se font écraser par un corps long au
+   lieu de garder leur taille. Le corps prend le reste et est le seul à défiler (min-height:0 sans
+   quoi un item flex refuse de descendre sous la taille de son contenu). */
+.dialog-head, .dialog-foot { flex: 0 0 auto; }
+/* Pied empilé (prop footStack de <x-dialog>) : trois actions ou plus ne tiennent pas en rangée dans
+   une modale de 460-520px, et les serrer les rendrait de toute façon illisibles. Sélecteur en deux
+   classes pour primer sur le `column-reverse` mobile de .dialog-foot sans dépendre de l'ordre du
+   fichier. `column` et NON `column-reverse` : un pied à 2 boutons est écrit (secondaire, principal)
+   et l'inversion remonte le principal ; à 3 choix, le markup est déjà écrit dans l'ordre de lecture
+   voulu — recommandé, dérogation, abandon — et l'inverser mettrait l'action la plus lourde en tête. */
+.dialog-foot.dialog-foot-stack { flex-direction: column; align-items: stretch; }
+.dialog-foot.dialog-foot-stack .btn { width: 100%; justify-content: center; }
+
+/* flex-wrap : le pied est justifié en FIN (club-app.css). Un contenu trop large pour la modale n'y
+   déborde donc pas vers la droite mais vers la GAUCHE, hors du cadre — et `.dialog` étant en
+   overflow:hidden, le bouton secondaire s'y faisait couper net (constaté sur la modale de séance,
+   deux CTA de 230px dans 420px utiles). Le retour à la ligne remplace la troncature. */
+.dialog-foot { flex-wrap: wrap; }
+.dialog-body { flex: 1 1 auto; min-height: 0; }
+/* Fond figé tant qu'une modale est ouverte : sinon la molette sur le scrim fait défiler la page
+   derrière. `:has` est déjà la convention du fichier (cf. .app-main:has(…)). */
+body:has(.scrim) { overflow: hidden; }
 
 /* Largeur des modales sur desktop. Le proto calait toutes les .dialog à 380px (pensé mobile) ;
    sur grand écran ça laisse beaucoup de vide. On relève la base à 460px (aligné sur les width

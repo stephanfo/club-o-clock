@@ -1,6 +1,6 @@
 // Scénarios complémentaires — parcours critiques et cas limites (PLAN_TESTS.md §1 à §8).
 // NON destructifs : chaque scénario restaure ce qu'il modifie. Voir destructif.mjs pour le reste.
-import { launch, session, fiche, sql, seance, seanceFuture, barreMobile, Scenario, MOBILE, DESKTOP, BASE } from './lib.mjs';
+import { launch, session, fiche, sql, seance, seanceFuture, barreMobile, Scenario, MOBILE, DESKTOP, BASE, repereJournaux, purgeJournaux } from './lib.mjs';
 
 const browser = await launch();
 const tous = [];
@@ -253,6 +253,7 @@ const tous = [];
       AND NOT EXISTS (SELECT 1 FROM registrations r2 WHERE r2.session_id=sessions.id AND r2.user_id=${noah})`);
 
   const s = new Scenario(`S16 · Séance pleine (${pleine}) — rejoindre puis quitter la file`);
+  const journaux = repereJournaux();
   const cap = sql(`SELECT capacity c FROM sessions WHERE id=${pleine}`);
   const pris = sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${pleine} AND status='participating'`);
   s.check('prérequis : séance saturée', Number(pris) >= Number(cap), `${pris}/${cap}`);
@@ -275,8 +276,13 @@ const tous = [];
 
   // Remise en état.
   sql(`DELETE FROM registrations WHERE session_id=${pleine} AND user_id=${noah}`);
+  purgeJournaux(journaux);
   s.check('état restauré',
          sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${pleine} AND user_id=${noah}`) === '0');
+  s.check('journaux restaurés (audit, activité, envois)',
+          sql(`SELECT (SELECT COUNT(*) FROM audit_logs WHERE id>${journaux.audit})
+                    + (SELECT COUNT(*) FROM activity_logs WHERE id>${journaux.activite})
+                    + (SELECT COUNT(*) FROM notification_outbox WHERE id>${journaux.envois}) n`) === '0');
   tous.push(s.report());
   await ctx.close();
 }
@@ -349,6 +355,21 @@ async function ongletMobile(page, nom) {
             sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${bloquee} AND user_id=${cobaye}`) === '0');
   }
 
+  // Instantané AVANT l'action, pour une remise en état complète.
+  //
+  // `fillQuota` promeut TOUTE la file quota d'un coup (§4.10.4), pas seulement le premier : la
+  // restauration ne portait que sur `promu` et laissait les autres en `participating`. Mesuré sur
+  // une base fraîchement seedée : la file contenait marie ET laura, laura était restaurée, marie
+  // restait promue — le jeu de démo perdait une entrée de file quota à CHAQUE run, définitivement,
+  // et le run suivant partait donc d'un jeu appauvri.
+  const fileAvant = sql(`SELECT IFNULL(GROUP_CONCAT(user_id ORDER BY user_id), '') v FROM registrations
+      WHERE session_id=${sq} AND status='waitlist' AND waitlist_reason='quota_exceeded'`) || '0';
+
+  // Repère dans la file d'envoi : la promotion notifie les promus. Sans repère, on ne saurait pas
+  // distinguer les lignes créées par CE run de celles que le jeu de démo contient déjà — et on ne
+  // peut pas purger toute la table sans détruire une partie du jeu.
+  const journaux = repereJournaux();
+
   // — Cas positif, DESKTOP : le bouton est actif et la promotion s'exécute —
   const { ctx, page } = await session(browser, coachSq, DESKTOP);
   await fiche(page, sq);
@@ -391,10 +412,23 @@ async function ongletMobile(page, nom) {
   await ctx.close();
 
   // — Remise en état, puis vérification du rendu MOBILE sur l'état restauré —
-  sql(`UPDATE registrations SET status='waitlist', waitlist_reason='quota_exceeded', promoted_at=NULL, promoted_by=NULL WHERE session_id=${sq} AND user_id=(SELECT id FROM users WHERE email='${promu}')`);
-  sql(`DELETE FROM audit_logs WHERE action='promote_quota_exceeded' AND session_id=${sq}`);
+  // TOUTE la file, et pas le seul `promu` : cf. l'instantané plus haut.
+  sql(`UPDATE registrations SET status='waitlist', waitlist_reason='quota_exceeded', promoted_at=NULL, promoted_by=NULL
+       WHERE session_id=${sq} AND user_id IN (${fileAvant})`);
+  purgeJournaux(journaux);
+
   const restaure = sql(`SELECT CONCAT(status,'/',IFNULL(waitlist_reason,'-'),'/',IFNULL(promoted_by,'-')) v FROM registrations WHERE session_id=${sq} AND user_id=(SELECT id FROM users WHERE email='${promu}')`);
   s.check('état restauré', restaure === 'waitlist/quota_exceeded/-', restaure);
+  const fileApres = sql(`SELECT IFNULL(GROUP_CONCAT(user_id ORDER BY user_id), '') v FROM registrations
+      WHERE session_id=${sq} AND status='waitlist' AND waitlist_reason='quota_exceeded'`);
+  s.check('état restauré : TOUTE la file quota, pas seulement le promu',
+          fileApres === fileAvant, `${fileApres || 'vide'} (attendu ${fileAvant})`);
+  s.check('état restauré : aucune trace de promotion sur les inscriptions de la file',
+          sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${sq} AND user_id IN (${fileAvant}) AND promoted_at IS NOT NULL`) === '0');
+  s.check('journaux restaurés (audit, activité, envois)',
+          sql(`SELECT (SELECT COUNT(*) FROM audit_logs WHERE id>${journaux.audit})
+                    + (SELECT COUNT(*) FROM activity_logs WHERE id>${journaux.activite})
+                    + (SELECT COUNT(*) FROM notification_outbox WHERE id>${journaux.envois}) n`) === '0');
 
   {
     const { ctx, page } = await session(browser, coachSq, MOBILE);

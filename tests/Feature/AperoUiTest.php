@@ -139,6 +139,7 @@ class AperoUiTest extends TestCase
         app(AperoService::class)->flag($s, $u);
 
         Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s])
+            ->set('cancelCheck', true)
             ->call('cancel');
         $this->assertNotNull(AperoFlag::where('session_id', $s->id)->first()->parked_at);
 

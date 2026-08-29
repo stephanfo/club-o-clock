@@ -174,7 +174,9 @@
 {{-- ── Dialog quota dépassé (§4.9.7 cas b) : (a) file quota / (b) override ── --}}
 @if ($athleteQuotaConfirm)
     @php($aqUser = \App\Models\User::find($athleteQuotaConfirm['user_id']))
-    <x-dialog title="Quota dépassé" sub="Choisis la suite de l'inscription" :width="476" close="cancelAthleteQuota">
+    {{-- footStack : trois issues (file quota / override / abandon) totalisant 552px de boutons — la
+         rangée sortait du cadre et se faisait couper. Empilées, elles se lisent dans l'ordre voulu. --}}
+    <x-dialog title="Quota dépassé" sub="Choisis la suite de l'inscription" :width="476" foot-stack close="cancelAthleteQuota">
         <x-banner kind="warn">
             <div>
                 @if (! empty($athleteQuotaConfirm['count']) || $athleteQuotaConfirm['count'] === 0)
@@ -190,9 +192,9 @@
             <div class="ifield"><input class="ifield-input" type="text" wire:model.blur="athleteQuotaConfirm.motif" placeholder="Ex. créneau libéré, demande coach…"></div>
         </div>
         <x-slot:footer>
-            <button type="button" class="btn btn-ghost" wire:click="cancelAthleteQuota">Annuler</button>
             <button type="button" class="btn btn-dark" wire:click="confirmAthleteQuota(false)">Placer en file quota</button>
             <button type="button" class="btn btn-danger" wire:click="confirmAthleteQuota(true)">Forcer l'inscription</button>
+            <button type="button" class="btn btn-ghost" wire:click="cancelAthleteQuota">Annuler</button>
         </x-slot:footer>
     </x-dialog>
 @endif
