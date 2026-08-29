@@ -67,7 +67,11 @@ Le design system existe : tout écran doit lui être fidèle.
 ## Conventions UI
 
 - **Feedback d'action** : `flash('status', …)` = succès/info (vert), `flash('warn', …)` = refus/erreur (orange). Rendu par `<x-flash-float />` à la racine de **chaque écran Livewire** (jamais dans le layout : il ne re-rend pas sur une action). Ne pas réintroduire `flash('toast')` ni de bannières inline persistantes.
-- **Confirmations** : `wire:confirm` natif pour l'anodin réversible (se désinscrire, délier un appareil…) ; `<x-dialog danger>` avec conséquences (`x-conseq-row`) pour le destructif ou ce qui notifie des tiers (annuler une séance, rompre une tutelle).
+- **Confirmations, trois niveaux** — le geste choisit son niveau, pas l'écran :
+  1. `wire:confirm` natif pour l'**anodin réversible** (se désinscrire, délier un appareil…).
+  2. `<x-dialog danger>` avec conséquences (`x-conseq-row`) pour le **destructif** (annuler des envois, supprimer un parcours).
+  3. Le même dialog **plus un accusé de réception** — `<x-check>` armant le bouton — quand l'action **notifie des tiers sans pouvoir se dédire**, ou devient irréversible : annuler une séance, suspendre un accès athlète, rompre une tutelle, bascule de saison. La case **chiffre** la conséquence (« Je comprends que 12 inscrit·e·s seront prévenu·e·s »), n'est **jamais pré-cochée** (la méthode d'ouverture la remet à zéro), et le refus est gardé **côté serveur** — le bouton grisé ne suffit pas, l'état vient du client.
+  Le toggle se porte **à la fois** sur la rangée (toute la ligne cliquable à la souris) et sur le `<x-check>`, qui est un vrai `<button>` — sinon rien n'est focusable et la case, donc le bouton qu'elle arme, devient inatteignable au clavier. `.stop` sur le check, sans quoi le clic remonte à la rangée et re-bascule.
 - **Formats de date** (heure club, `isoFormat`) : liste/contexte dense = `ddd D MMM` · pleine page/titre = `dddd D MMMM` · heure toujours `HH:mm` · mois seul = `MMMM YYYY`.
 - **Admin sur mobile : assumé desktop.** Pas d'entrée de navigation admin sur mobile — ces écrans ne sont pas conçus pour ce format ; ne pas en ajouter sans les repenser.
 - **CTA d'action serveur** : toujours `wire:loading.attr="disabled"` + `wire:target` (latence du mutualisé, anti double-tap).

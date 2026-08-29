@@ -212,6 +212,8 @@ Le **parent OU l'admin** saisit l'email de l'enfant → invitation envoyée (30j
 - Le parent garant.
 - L'admin.
 
+**Confirmation forte** avant clic : modale avec conséquences et **case à cocher d'accusé de réception** — la notification part aux deux comptes et ne se dédit pas (cf. motif §4.4).
+
 **Effet immédiat** : lien supprimé, entrée `AuditLog` `guardianship_severed`, notif unique aux deux destinataires pour information, l'enfant passe en P3.
 
 Pas de rappel automatique aux 18 ans civils en V1 (risque RGPD résiduel assumé).
@@ -255,6 +257,9 @@ Bouton admin **« Désactiver tous les athlètes pour la nouvelle saison »** (p
 - `AuditLog` : **1 entrée globale** `bulk_athlete_deactivation` avec compteur affecté et motif optionnel (pas d'entrées individuelles).
 - **Pas d'email automatique de suspension de masse** : geste routinier annuel communiqué hors-app (briefing, mail du président, AG).
 - **Bannière in-app persistante** à la prochaine connexion d'un athlète suspendu : *« Ton accès athlète est suspendu pour le démarrage de la saison [N]. Contacte l'admin pour réactivation. Tes inscriptions futures ont été annulées. »*. Affichée tant que `athleteAccessSuspended = true`.
+
+#### Suspension individuelle
+Pendant de la réactivation ci-dessous, sur la fiche utilisateur : bouton **« Suspendre l'accès athlète »** (adhérent actif, hors procédure de suppression). Mêmes effets que la suspension en masse mais sur **un** compte — flag posé, inscriptions futures annulées avec promotions en cascade, motif optionnel consigné, `AuditLog`. Même **confirmation forte** : compteur d'inscriptions concernées et case à cocher d'accusé de réception, les athlètes promus depuis la file étant, eux, notifiés.
 
 #### Réactivation individuelle
 Sur la fiche utilisateur, bouton **« Réactiver l'accès athlète »** :
@@ -398,6 +403,7 @@ Modèle unique avec un **discriminator `kind`**.
 #### Annulation d'une séance
 - **Qui** : n'importe quel coach + admin.
 - **Quand** : tant que le **créneau n'est pas terminé** (`startAt + durationMin`). La borne est la fin et non le début : une séance annulée sur place — orage, gymnase fermé — l'est quelques minutes après l'heure, et les inscrits doivent être prévenus. Passé la fin, la séance a **eu lieu** : l'annuler l'effacerait rétroactivement des statistiques de fréquentation et notifierait les inscrits d'une annulation sans objet. Pendant du garde-fou de restauration ci-dessous, qui borne au début — entre le début et la fin du créneau, l'annulation est donc **définitive**, et la confirmation l'annonce.
+- **Confirmation forte** avant clic : modale avec conséquences et **case à cocher d'accusé de réception** chiffrant les inscrits prévenus (cf. motif §4.4) ; le libellé annonce en plus le caractère **définitif** dès que le créneau a commencé.
 - **Effet immédiat** : statut séance `cancelled`, **libère le quota** de tous les `participating` (déclenche mécanisme B §4.10), inscriptions passent en `cancelled` (soft flag), notif aux inscrits **toujours envoyée** (pas de case à cocher — événement trop structurant), `AuditLog cancel_session`.
 
 #### Réversibilité — restauration d'une séance annulée
@@ -960,7 +966,7 @@ Distincte de la page Paramètres :
   - Accès athlète (actif / suspendu / tous).
   - Rôles (multi parmi `athlete`, `coach`, `admin`, `parent_garant` — pseudo-rôle dérivé du lien de tutelle).
   - Statut suppression (aucun / en cours de tampon / éligible / tous).
-- **Actions sur la fiche d'un user** : éditer email + date de naissance + rôles + catégories + qualifications, réactiver accès athlète, supprimer le compte (avec bouton **« Confirmer la suppression définitive »** distinct qui apparaît / devient cliquable uniquement à partir de J+7 ; bouton **« Annuler la demande de suppression »** disponible pendant le tampon).
+- **Actions sur la fiche d'un user** : éditer email + date de naissance + rôles + catégories + qualifications, **suspendre** / réactiver l'accès athlète (cf. §4.4), supprimer le compte (avec bouton **« Confirmer la suppression définitive »** distinct qui apparaît / devient cliquable uniquement à partir de J+7 ; bouton **« Annuler la demande de suppression »** disponible pendant le tampon).
 - **Bouton « Ajouter un adhérent »** : formulaire one-shot (cf. §4.1.3).
 
 ### 4.18 Traçabilité : `AuditLog` et `ActivityLog`
