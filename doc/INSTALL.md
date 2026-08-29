@@ -342,8 +342,21 @@ que le résultat.**
 
 ```bash
 npm ci
-npm run build      # → public/build/ (+ manifest.json)
+npm run build      # → public/build/ (+ manifest.json + .front-stamp.json)
 ```
+
+> 🛟 **Le garde-fou anti-bundle-périmé.** `npm run build` inscrit dans le bundle l'empreinte des
+> sources dont il sort (`.front-stamp.json`), et `composer check` la confronte aux sources
+> actuelles — c'est l'étape `front:check-drift`, pendant exact de `schema:check-drift` pour la base.
+> Modifier un CSS ou un JS **sans** rebuilder fait donc **échouer la porte de qualité**, en nommant
+> les fichiers en cause, au lieu de laisser partir un bundle périmé sans un seul message.
+>
+> L'empreinte voyage avec le bundle : après transfert, `php artisan front:check-drift` en SSH
+> confirme que le serveur porte bien un bundle cohérent (cf. §5.3).
+>
+> Un dépôt sans `public/build/` — clone frais, CI — passe le contrôle : il n'y a rien à mettre en
+> doute. Mais un bundle **sans empreinte** échoue : « on ne sait pas de quelles sources il sort » ne
+> doit jamais se lire comme « il est à jour ».
 
 | Dossier | Généré par | Transfert |
 |---|---|---|
@@ -434,6 +447,7 @@ php artisan migrate --force                       # ⚠ obligatoire dès qu'une 
 php artisan vendor:publish --tag=livewire:assets --force
 php artisan optimize:clear                        # purge les caches de l'ancien code
 php artisan config:cache && php artisan route:cache && php artisan view:cache
+php artisan front:check-drift                     # le bundle transféré correspond-il aux sources ?
 
 # Le planificateur ne doit JAMAIS être joignable par HTTP (§5.4) : 404 attendu.
 curl -s -o /dev/null -w '%{http_code}\n' https://<domaine>/cron.php
@@ -892,7 +906,19 @@ ajouté sort alors sans aucun style, y compris sans les règles qui devaient le 
 C'est un échec **silencieux** : aucune erreur, aucun 404, la page se charge normalement. Même
 mécanique que la perte des données géo d'un GPX face à un bundle JS périmé.
 
-Le contrôle tient en une commande — le hash servi doit être celui du dernier `npm run build` :
+**Deux contrôles, à ne pas confondre — ils échouent pour des raisons différentes.**
+
+*Le bundle local est-il à jour vis-à-vis des sources ?* (l'oubli de `npm run build`) :
+
+```bash
+php artisan front:check-drift        # inclus dans composer check
+```
+
+Il nomme les fichiers modifiés depuis le dernier build. Le même appel **en SSH sur le serveur**
+répond pour le bundle transféré, puisque l'empreinte voyage avec lui.
+
+*Le bundle transféré est-il celui du serveur ?* (l'oubli du rsync) — le hash servi doit être celui
+du dernier `npm run build` :
 
 ```bash
 curl -sS -A "Mozilla/5.0" https://<domaine>/login | grep -oE '/build/assets/app-[^"]+\.css'

@@ -78,6 +78,18 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Ajouté
 
+- **Un garde-fou contre le déploiement d'un affichage périmé.** Les fichiers que le navigateur lit
+  vraiment ne sont pas ceux qu'on écrit : une moulinette (`npm run build`) compresse les seconds en
+  premiers, et seuls les premiers partent en ligne — hors Git, par transfert séparé. Oublier de
+  relancer la moulinette ne provoquait **aucune erreur** : le site tournait avec l'ancien affichage,
+  et rien ne le signalait. C'est arrivé pendant le développement de cette version.
+
+  `npm run build` inscrit désormais dans le résultat l'empreinte des fichiers dont il sort, et
+  `composer check` la confronte aux fichiers actuels — en nommant ceux qui ont bougé depuis. Même
+  principe que le contrôle qui existait déjà pour la structure de la base. Un bundle *sans*
+  empreinte est refusé lui aussi : ne pas savoir d'où il sort ne doit pas se lire comme une garantie
+  qu'il est à jour. Le contrôle est rejouable sur le serveur après transfert.
+
 - **Annuler une séance depuis un téléphone.** L'annulation était la seule action d'encadrement
   absente du format mobile — restaurer, inscrire un athlète et remplir la file quota y étaient déjà.
   Elle rejoint le bloc « Gestion » de l'onglet Infos. Volontairement hors de la barre d'action

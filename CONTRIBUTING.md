@@ -86,7 +86,7 @@ DB_CONNECTION=mariadb php artisan schema:dump
 **Toute PR doit passer `composer check`** — c'est le prérequis, pas une formalité :
 
 ```bash
-composer check      # pint (style) + phpstan (niveau 5) + suite de tests
+composer check      # pint (style) + phpstan (niveau 5) + dérive schéma/front + suite de tests
 ```
 
 Les trois séparément, si tu veux itérer plus vite :

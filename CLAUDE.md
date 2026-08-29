@@ -21,9 +21,11 @@ Stack — **monolithe Laravel 13** sur hébergement mutualisé + **MariaDB/MySQL
 >
 > Les deux existent parce que la CI joue la suite sur les **deux SGBD** que le projet annonce supporter : **MySQL 8.4**, celui de la production (OVH Pro), et **MariaDB 11.4** pour les clubs déployant ailleurs. Chaque dump doit être régénéré **sur son propre moteur** — `mysqldump` et `mariadb-dump` écrivent des dialectes différents, et régénérer l'un depuis l'autre produit un fichier illisible par la CI. En local, `DB_CONNECTION` choisit le moteur ; les deux tournent en conteneur.
 
+**Front** : `public/build/` est un artefact dérivé, **gitignoré** et transféré hors Git (INSTALL.md §5.1) — à la différence du dump de schéma, parce que Vite hashe ses noms de sortie et qu'un dépôt public accumulerait chaque build indéfiniment. Contrepartie : toute modification de `resources/css/` ou `resources/js/` exige un `npm run build`, sans quoi le serveur sert l'ancien CSS/JS **sans la moindre erreur**. `front:check-drift` (dans `composer check`) refuse cet état ; ne pas contourner en tamponnant un bundle périmé.
+
 ## Porte de qualité
 
-**Toute modification doit passer `composer check`** (pint + phpstan niveau 5 + suite de tests) :
+**Toute modification doit passer `composer check`** (pint + phpstan niveau 5 + contrôles de dérive + suite de tests) :
 
 ```bash
 composer check

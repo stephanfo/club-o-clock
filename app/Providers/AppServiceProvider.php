@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Notifications\Push\MinishlinkWebPushSender;
 use App\Notifications\Push\WebPushSender;
 use App\Support\DemoMode;
+use App\Support\FrontBuild;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Event;
@@ -22,6 +23,11 @@ class AppServiceProvider extends ServiceProvider
     {
         // Envoi Web Push réel (J8.6) ; les tests rebindent une fake sans réseau ni clés VAPID.
         $this->app->bind(WebPushSender::class, MinishlinkWebPushSender::class);
+
+        // Empreinte du bundle front (front:stamp / front:check-drift). Lié plutôt qu'instancié dans
+        // les commandes pour que les tests puissent viser une arborescence jetable : le contrôle
+        // écrit et compare des fichiers, il n'a rien à faire dans le vrai public/build/.
+        $this->app->bind(FrontBuild::class, fn () => FrontBuild::make());
 
         // Instance de démonstration (OS7) : les garde-fous d'envoi sont imposés ici, avant
         // que quoi que ce soit ne résolve `mail.default` ou un canal de notification. Une

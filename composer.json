@@ -67,6 +67,7 @@
             "vendor/bin/pint --test",
             "vendor/bin/phpstan analyse --no-progress --memory-limit=1G",
             "@php artisan schema:check-drift",
+            "@php artisan front:check-drift",
             "@test",
             "@test-destructif"
         ],
