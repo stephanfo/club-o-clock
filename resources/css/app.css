@@ -571,7 +571,6 @@ a.scard { text-decoration: none; color: inherit; }
     bottom: auto; height: 100dvh;
     padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
     align-items: safe center;
-    overscroll-behavior: contain;
 }
 /* En-tête et pied sont des items flex : sans flex:0 0 auto ils se font écraser par un corps long au
    lieu de garder leur taille. Le corps prend le reste et est le seul à défiler (min-height:0 sans

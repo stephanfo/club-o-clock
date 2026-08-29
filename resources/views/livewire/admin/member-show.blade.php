@@ -564,9 +564,13 @@
             {{-- Accusé de réception avant d'armer le bouton (motif « bascule de saison » §4.17) : la
                  suspension annule les inscriptions futures et fait remonter des tiers depuis la file,
                  qui sont notifiés — l'envoi ne se dédit pas. --}}
+            {{-- Le toggle est porté par la RANGÉE (pour la souris, toute la ligne est cliquable) et
+                 aussi par le x-check, qui est un vrai <button> : sans quoi rien dans le dialog n'est
+                 focusable au clavier et la case — donc le bouton qu'elle arme — devient inatteignable.
+                 `.stop` sur le check empêche le clic de remonter à la rangée et de re-basculer. --}}
             <div class="flex ac g10" style="margin-top:14px;font-size:14px;cursor:pointer" wire:click="$toggle('suspendCheck')">
-                <x-check :on="$suspendCheck" tabindex="-1" style="pointer-events:none" />
-                <span>Je comprends que {{ $futureRegs }} inscription(s) future(s) seront annulées et les athlètes concernés prévenus.</span>
+                <x-check :on="$suspendCheck" wire:click.stop="$toggle('suspendCheck')" aria-labelledby="txt-suspendre-acces" />
+                <span id="txt-suspendre-acces">Je comprends que {{ $futureRegs }} inscription(s) future(s) seront annulées et les athlètes concernés prévenus.</span>
             </div>
             <x-slot:footer>
                 <button type="button" class="btn btn-ghost" wire:click="$set('confirmingSuspend', false)">Annuler</button>

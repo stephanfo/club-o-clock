@@ -343,6 +343,59 @@ class SessionManagementTest extends TestCase
         return substr($html, $debut, $fin - $debut);
     }
 
+    /** Portion desktop du rendu — pendant de coquilleMobile(), pour les mêmes raisons. */
+    private function coquilleDesktop(string $html): string
+    {
+        $debut = strpos($html, 'fiche-desktop');
+        $this->assertNotFalse($debut, 'coquille desktop absente du rendu');
+
+        return substr($html, $debut);
+    }
+
+    /**
+     * L'intertitre « Gestion » coiffe trois actions, toutes devenues indisponibles sur un créneau
+     * terminé : inscrire un athlète et remplir la file s'arrêtent au début, l'annulation à la fin.
+     * Sans garde, la colonne desktop rendait un titre seul, sans rien dessous.
+     */
+    public function test_the_gestion_heading_is_not_rendered_without_any_action(): void
+    {
+        $coach = User::factory()->coach()->create();
+
+        // Contrôle positif : pendant le créneau, l'intertitre coiffe bien l'annulation.
+        $enCours = $this->sessionAt($coach, Carbon::now()->subMinutes(5), 60);
+        $desktop = $this->coquilleDesktop(
+            Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $enCours])->html()
+        );
+        $this->assertStringContainsString('Gestion', $desktop);
+        $this->assertStringContainsString('openCancelConfirm', $desktop);
+
+        $terminee = $this->sessionAt($coach, Carbon::now()->subMinutes(90), 60);
+        $desktop = $this->coquilleDesktop(
+            Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $terminee])->html()
+        );
+        $this->assertStringNotContainsString('Gestion', $desktop);
+    }
+
+    /**
+     * La rangée d'accusé de réception est un <div> cliquable — non focusable. Le x-check qu'elle
+     * porte est, lui, un vrai <button> : il doit porter le toggle pour que la case, donc le bouton
+     * qu'elle arme, reste atteignable au clavier seul.
+     */
+    public function test_the_acknowledgement_box_is_operable_without_a_mouse(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $session = $this->sessionAt($coach, Carbon::now()->addWeek(), 60);
+
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])
+            ->call('openCancelConfirm')->html();
+
+        $this->assertMatchesRegularExpression(
+            '/<button[^>]+wire:click\.stop="\$toggle\((&#039;|\x27)cancelCheck/',
+            $html,
+            'la case doit être un bouton portant elle-même le toggle'
+        );
+    }
+
     public function test_cancel_action_is_reachable_on_mobile(): void
     {
         $coach = User::factory()->coach()->create();

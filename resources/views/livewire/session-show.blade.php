@@ -357,6 +357,11 @@
                             @endif
 
                             @can('update', $session)
+                                {{-- L'intertitre suit les actions et ne se rend pas seul : depuis que
+                                     l'annulation est bornée à la fin du créneau, une séance passée
+                                     sans inscription à déplacer ne laissait qu'un « Gestion » vide. --}}
+                                @php($aDesActions = $canEnrollOther || $wlQuota->isNotEmpty() || auth()->user()->can('cancel', $session))
+                                @if ($aDesActions)
                                 <div class="eyebrow" style="margin:14px 0 6px">Gestion</div>
                                 {{-- Inscription d'un athlète par le bureau (§4.9.7). --}}
                                 @if ($canEnrollOther)
@@ -384,6 +389,7 @@
                                         <x-icon name="x" :size="15" /> Annuler la séance
                                     </button>
                                 @endcan
+                                @endif
                             @endcan
                         @endif
                     </div>
@@ -434,12 +440,16 @@
                  l'envoi aux inscrits ne se dédit pas, et l'annulation est définitive dès que le
                  créneau a commencé. Le libellé gradue, la case reste toujours présente — un bouton
                  tantôt actif tantôt grisé sans raison visible serait plus déroutant. --}}
+            {{-- Le toggle est porté par la RANGÉE (pour la souris, toute la ligne est cliquable) et
+                 aussi par le x-check, qui est un vrai <button> : sans quoi rien dans le dialog n'est
+                 focusable au clavier et la case — donc le bouton qu'elle arme — devient inatteignable.
+                 `.stop` sur le check empêche le clic de remonter à la rangée et de re-basculer. --}}
             <div class="flex ac g10" style="margin-top:14px;font-size:14px;cursor:pointer" wire:click="$toggle('cancelCheck')">
-                <x-check :on="$cancelCheck" tabindex="-1" style="pointer-events:none" />
+                <x-check :on="$cancelCheck" wire:click.stop="$toggle('cancelCheck')" aria-labelledby="txt-annuler-seance" />
                 {{-- Suffixe calculé et non `@if` en ligne : Blade ne reconnaît pas une directive collée
                      à un caractère de mot (son parseur exige un non-mot avant le @). --}}
                 @php($suffixe = $session->hasStarted() ? " et que l'annulation sera définitive" : '')
-                <span>Je comprends que {{ $participating->count() }} inscrit·e·s seront prévenu·e·s{{ $suffixe }}.</span>
+                <span id="txt-annuler-seance">Je comprends que {{ $participating->count() }} inscrit·e·s seront prévenu·e·s{{ $suffixe }}.</span>
             </div>
 
             <x-slot:footer>

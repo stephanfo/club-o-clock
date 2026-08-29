@@ -1022,10 +1022,11 @@ class DemoSeeder extends Seeder
         // toucher à Kévin, dont plusieurs scénarios E2E dépendent (S3, S15).
         //
         // Surtout PAS is_active=false, comme c'était le cas ici : le PRD réserve ce drapeau au
-        // tampon de suppression (§4.3), et la bascule de saison a le sien, séparé (§4.4). Aucun
-        // écran ne lit is_active seul — la liste comme la fiche affichaient donc « ● actif » un
-        // compte dont les quatre voies de connexion étaient fermées, un état que l'application
-        // elle-même ne sait ni produire ni défaire.
+        // tampon de suppression (§4.3), et la bascule de saison a le sien, séparé (§4.4). Aucune
+        // pastille ne se dérive de is_active — la liste comme la fiche affichaient donc « ● actif »
+        // un compte dont les quatre voies de connexion étaient fermées, et que le filtre « Actifs »
+        // écartait pourtant sans rien en dire. Un état que l'application ne sait ni produire ni
+        // défaire.
         $brigitte = User::updateOrCreate(
             ['email' => 'brigitte@demo.club'],
             [
