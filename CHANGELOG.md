@@ -9,6 +9,16 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Corrigé
 
+- **Chaque clic dans une modale levait une erreur JavaScript.** Invisible à l'écran — rien ne cassait,
+  l'action se faisait —, mais la console de chaque utilisateur recevait une `SyntaxError` à chaque
+  bouton de pied de modale. Le composant portait un `wire:click.stop` **sans valeur** : Livewire
+  évalue tout `wire:<événement>` comme `$wire.` suivi de l'expression, donc ici `$wire.` tout court.
+  C'est Alpine qui arrêtait réellement la propagation vers le voile ; l'attribut Livewire posé à côté
+  n'ajoutait que l'erreur. Défaut présent depuis l'écriture du composant, sorti au grand jour à la
+  première mise en production. Deux garde-fous l'empêchent de revenir : un test refuse tout
+  `wire:` sans valeur dans une modale rendue, et le harnais navigateur **échoue désormais sur toute
+  erreur JavaScript en console** — il cliquait jusqu'ici sans jamais la regarder.
+
 - **Les modales débordaient de la fenêtre, boutons du pied hors écran.** Visible sur Safari
   seulement, et donc invisible du harnais E2E qui tourne sous Chromium : le voile de la modale ne
   déclarait pas de hauteur, WebKit renonçait alors à borner la boîte, et le surplus sortait **des

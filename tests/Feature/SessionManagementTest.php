@@ -279,6 +279,36 @@ class SessionManagementTest extends TestCase
         $this->assertStringContainsString('2 inscrit·e·s seront prévenu·e·s', $html);
     }
 
+    /**
+     * Aucun `wire:<événement>` sans valeur dans une modale rendue.
+     *
+     * Livewire évalue tout `wire:<événement>` comme `"$wire." + expression` (wire-wildcard.js) : sans
+     * valeur, il évalue littéralement `$wire.`, ce qui lève une SyntaxError À CHAQUE clic remontant
+     * jusqu'à l'élément — donc à chaque clic sur un bouton de pied de modale. Rien ne casse à l'écran,
+     * l'erreur ne vit que dans la console : elle a survécu à toute la recette et aux 20 scénarios E2E,
+     * et n'a été vue qu'une fois l'application en production.
+     *
+     * C'est `x-on:click.stop` (Alpine) qui arrête réellement la propagation vers le voile ; le
+     * `wire:click.stop` posé à côté n'ajoutait que l'erreur.
+     */
+    public function test_a_dialog_renders_no_valueless_wire_event(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $session = $this->sessionAt($coach, Carbon::now()->addWeek(), 60);
+
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $session])
+            ->call('openCancelConfirm')->html();
+
+        // Contrôle positif : la modale est bien rendue, et elle porte bien des wire:click VALUÉS —
+        // sans quoi l'assertion négative passerait sur une page qui n'a simplement pas de modale.
+        $this->assertStringContainsString('dialog', $html);
+        $this->assertStringContainsString('wire:click="dismissCancelConfirm"', $html);
+
+        // Un wire:click valué est suivi de `=` ; un wire:click nu est suivi d'un blanc ou de `>`.
+        $this->assertDoesNotMatchRegularExpression('/wire:click(\.[a-z-]+)*[\s>]/', $html,
+            'un wire:click sans valeur fait évaluer « $wire. » à Livewire, donc une SyntaxError à chaque clic');
+    }
+
     /** Le seul contenu de la phrase d'accusé du dialog d'annulation (repérée par l'id de son <span>). */
     private function accuse(string $html): string
     {

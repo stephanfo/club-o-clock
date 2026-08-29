@@ -185,6 +185,7 @@ const tous = [];
   sql(`DELETE FROM audit_logs WHERE target_id=${cible} AND action IN ('account_deactivated','account_activated')`);
   s.check('état restauré (journal et file d\'envoi nettoyés)',
     sql(`SELECT COUNT(*) FROM audit_logs WHERE target_id=${cible} AND action='account_deactivated'`) === '0');
+  s.checkJs(page);
 
   await ctx.close();
   tous.push(s.report());

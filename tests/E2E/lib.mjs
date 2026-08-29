@@ -16,6 +16,15 @@ export async function session(browser, email, viewport = MOBILE) {
     viewport, isMobile: viewport.width < 768, hasTouch: viewport.width < 768,
   });
   const page = await ctx.newPage();
+
+  // Toute erreur JS non rattrapée est mémorisée sur la page, pour que le scénario puisse l'exiger
+  // absente (`s.checkJs(page)`). Le harnais a longtemps cliqué sans regarder la console : une
+  // SyntaxError partait à CHAQUE clic dans une modale — Livewire évalue `"$wire." + expression`,
+  // et le `wire:click.stop` sans valeur du composant dialog lui faisait évaluer `$wire.` tout court.
+  // Vingt scénarios verts, l'erreur dans la console de chaque utilisateur.
+  page.__erreursJs = [];
+  page.on('pageerror', (e) => page.__erreursJs.push(e.message));
+
   await page.goto(url, { waitUntil: 'networkidle' });
   return { ctx, page };
 }
@@ -95,6 +104,11 @@ export class Scenario {
   constructor(nom) { this.nom = nom; this.r = []; }
   check(label, ok, detail = '') { this.r.push({ label, ok: !!ok, detail }); return !!ok; }
   async shot(page, nom) { await page.screenshot({ path: SHOTS + nom + '.png' }); }
+  /** Aucune erreur JS non rattrapée depuis l'ouverture de la page (cf. session()). */
+  checkJs(page) {
+    const e = page.__erreursJs ?? [];
+    return this.check('aucune erreur JavaScript en console', e.length === 0, e.slice(0, 2).join(' | '));
+  }
   report() {
     const bad = this.r.filter(x => !x.ok);
     console.log(`\n━━━ ${this.nom} ━━━`);

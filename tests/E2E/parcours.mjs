@@ -85,6 +85,7 @@ const tous = [];
     const annuler = dlg.getByRole('button', { name: /annuler/i }).first();
     if (await annuler.count()) { await annuler.click(); await page.waitForTimeout(800); }
   }
+  s.checkJs(page);
   const apresAnnul = sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${cible} AND user_id=${marie}`);
   s.check('annulation : aucune inscription créée', apresAnnul === '0', `n=${apresAnnul}`);
 
@@ -276,6 +277,7 @@ const tous = [];
 
   // Remise en état.
   sql(`DELETE FROM registrations WHERE session_id=${pleine} AND user_id=${noah}`);
+  s.checkJs(page);
   purgeJournaux(journaux);
   s.check('état restauré',
          sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${pleine} AND user_id=${noah}`) === '0');
