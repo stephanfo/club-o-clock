@@ -239,7 +239,8 @@
     {{-- Dialog « Annuler des envois » — irréversible et silencieux pour les destinataires :
          dialog stylé avec portée explicite (revue UX 2026-07-11, constat n°4). --}}
     @if ($cancelConfirm)
-        <x-dialog title="Annuler les envois" danger :width="440" close="dismissCancel"
+        {{-- 520 : « Garder les envois » + « Annuler les envois » ne laissaient que 2px de marge. --}}
+        <x-dialog title="Annuler les envois" danger :width="520" close="dismissCancel"
                   sub="{{ ['all' => 'Tous les envois en attente correspondant aux filtres courants.', 'selected' => $cancellableSelected.' envoi(s) en attente sur '.count($selected).' sélectionné(s).', 'detail' => 'Cet envoi uniquement.'][$cancelConfirm] }}">
             <x-banner kind="danger">
                 Action irréversible : les envois annulés ne partiront jamais et les destinataires ne sont pas prévenus. Seuls les envois encore « en attente » sont concernés.

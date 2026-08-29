@@ -5,5 +5,7 @@ import './wysiwyg';
 import './gpx';
 // Retour contextuel du chevron de topbar : expose window.clubBack (retour historique + repli href).
 import './back';
+// Modales : fermeture par Échap, et garde contre la modale rejouée par le retour arrière de wire:navigate.
+import './dialog';
 // Web Push : expose window.clubPush (souscription PushManager + sync serveur) — onglet Notifs (J8.6).
 import './push';
