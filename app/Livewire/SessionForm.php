@@ -95,7 +95,7 @@ class SessionForm extends Component
     public ?int $route_id = null;
 
     // Dialog de confirmation à la sauvegarde (§4.7) — n'apparaît qu'en édition d'une séance ayant
-    // des inscrits actifs quand un champ structurant a changé.
+    // des inscrits actifs quand un champ structurant OU de contenu a changé.
     public bool $showSaveDialog = false;
 
     /** Case « envoi prioritaire » (§4.7) — pousse la notif tout de suite au lieu d'attendre le lot. */
@@ -103,6 +103,13 @@ class SessionForm extends Component
 
     /** @var list<array{label:string,before:string,after:string}> diff affiché dans le dialog */
     public array $pendingChanges = [];
+
+    /**
+     * Le dialog ouvert porte-t-il au moins un changement STRUCTURANT ? Le dialog s'ouvre aussi sur un
+     * simple changement de contenu (texte, parcours) : sans ce drapeau il annonçait « un champ
+     * structurant a changé » et énumérait date/horaire/lieu… alors que rien de tout cela n'avait bougé.
+     */
+    public bool $pendingStructural = false;
 
     public function mount(?Session $session = null): void
     {
@@ -330,9 +337,11 @@ class SessionForm extends Component
         // En édition d'une séance avec inscrits actifs, un changement structurant OU de contenu (§4.7)
         // ouvre le dialog 3 choix (annuler / silence / notifier) au lieu de sauvegarder directement.
         if (! $isCreating && $this->hasActiveParticipants()) {
-            $changes = [...$this->structuralChanges($data), ...$this->contentChanges($data)];
+            $structural = $this->structuralChanges($data);
+            $changes = [...$structural, ...$this->contentChanges($data)];
             if ($changes !== []) {
                 $this->pendingChanges = $changes;
+                $this->pendingStructural = $structural !== [];
                 $this->showSaveDialog = true;
 
                 return null;
@@ -390,9 +399,7 @@ class SessionForm extends Component
     /** (a) Annuler les changements : ferme le dialog, rien n'est persisté, le formulaire est préservé. */
     public function dismissSaveDialog(): void
     {
-        $this->showSaveDialog = false;
-        $this->pendingChanges = [];
-        $this->notify_priority = false;
+        $this->resetSaveDialog();
     }
 
     /** Inscrits actifs (`participating`) sur la séance éditée — cible des notifs d'événement séance. */
@@ -551,9 +558,26 @@ class SessionForm extends Component
 
     private function toShow()
     {
+        // Refermer AVANT le redirect : `wire:navigate` mémorise la page quittée pour la rejouer au
+        // retour arrière, et Livewire y inscrit le dernier snapshot du composant (écouteur
+        // `alpine:navigating` → inscribeSnapshotAndEffectsOnElement). Un dialog encore ouvert ici
+        // revenait donc à l'écran, déjà validé, dès qu'on revenait sur le formulaire. Le DOM
+        // photographié, lui, est nettoyé côté client (resources/js/dialog.js) : la réponse d'un
+        // redirect ne re-rend pas la vue.
+        $this->resetSaveDialog();
+
         session()->flash('status', 'Séance enregistrée.');
 
         return $this->redirect(route('sessions.show', $this->session), navigate: true);
+    }
+
+    /** Remet le dialog de sauvegarde au repos (fermeture, abandon, ou départ vers la fiche). */
+    private function resetSaveDialog(): void
+    {
+        $this->showSaveDialog = false;
+        $this->pendingChanges = [];
+        $this->pendingStructural = false;
+        $this->notify_priority = false;
     }
 
     /**
@@ -643,6 +667,10 @@ class SessionForm extends Component
             // qualifications eager-load : alimente l'agrégation temps réel du bloc « Qualifications
             // combinées » (QualificationDisplay::aggregate, §4.11.4) au fil de la sélection des coachs.
             'coaches' => User::whereJsonContains('roles', 'coach')->with('qualifications')->orderBy('last_name')->get(),
+            // Canaux ouverts au club (§4.17) : le dialog de sauvegarde promettait « push + email » en
+            // dur, y compris quand le bureau avait coupé un canal — ou les deux.
+            'notifChannels' => ClubSettings::current()->enabledChannels(),
+            'notifChannelsLabel' => ClubSettings::current()->enabledChannelsLabel(),
         ]);
     }
 }

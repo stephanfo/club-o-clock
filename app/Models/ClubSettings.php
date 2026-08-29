@@ -77,6 +77,37 @@ class ClubSettings extends Model
     }
 
     /**
+     * Canaux ouverts à l'échelle du club, dans l'ordre d'affichage. Dérivé de channelEnabled() pour
+     * garder une source unique (et non une relecture des colonnes).
+     *
+     * C'est un PLAFOND, pas une garantie de livraison : la pause globale et la matrice individuelle
+     * (§4.15) réduisent encore, destinataire par destinataire. À réserver aux libellés qui annoncent
+     * « par quoi » un envoi *peut* partir — pour savoir ce qui partira vraiment à quelqu'un, c'est
+     * NotificationDispatcher::deliverableChannels().
+     *
+     * @return list<'push'|'email'>
+     */
+    public function enabledChannels(): array
+    {
+        return array_values(array_filter(
+            ['push', 'email'],
+            fn (string $channel) => $this->channelEnabled($channel),
+        ));
+    }
+
+    /**
+     * Libellé des canaux ouverts, à insérer dans une phrase (« … peuvent être prévenus par email »).
+     * Chaîne vide si le bureau a tout coupé : l'appelant doit alors dire qu'aucun envoi n'est
+     * possible, pas construire une phrase bancale.
+     */
+    public function enabledChannelsLabel(): string
+    {
+        $labels = array_map(fn (string $c) => $c === 'push' ? 'par push' : 'par email', $this->enabledChannels());
+
+        return implode(' et ', $labels);
+    }
+
+    /**
      * URL de la vignette carrée du logo pour un petit affichage (topbar, lockup) — générée à
      * l'upload par ClubBrandingService (plan open source OS2). $size doit être une des tailles
      * générées (64 ou 128) ; une taille absente retombe sur l'original (moins net, jamais cassé).
