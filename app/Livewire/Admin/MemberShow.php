@@ -517,7 +517,11 @@ class MemberShow extends Component
 
     public function render()
     {
-        $this->user->loadMissing(['categories', 'qualifications', 'guardian', 'wards']);
+        // `wards.categories` et non `wards` seul : le bloc « Pupilles » affiche la catégorie d'âge de
+        // CHAQUE enfant ($ward->primaryCategory(), qui lit $ward->categories). Sans l'imbrication, la
+        // fiche d'un parent garant tombait sur « Attempted to lazy load [categories] » — la garde
+        // preventLazyLoading rend l'oubli fatal, et il ne se voyait que sur les comptes à pupilles.
+        $this->user->loadMissing(['categories', 'qualifications', 'guardian', 'wards.categories']);
 
         $primary = $this->user->primaryCategory();
         $surclassements = $this->user->surclassements();

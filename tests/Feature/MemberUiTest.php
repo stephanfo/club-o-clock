@@ -44,6 +44,26 @@ class MemberUiTest extends TestCase
             ->assertDontSee('Camille Durand');
     }
 
+    /**
+     * Le bloc « Pupilles » affiche la catégorie d'âge de chaque enfant : $ward->primaryCategory()
+     * lit $ward->categories, qui n'était pas eager-loadé. Sous preventLazyLoading, la fiche d'un
+     * parent garant plantait — et seulement celle-là, d'où le défaut passé inaperçu.
+     */
+    public function test_show_of_a_guardian_renders_its_wards_categories(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $cat = Category::create(['label' => 'Benjamins', 'age_min' => 12, 'age_max' => 13, 'sort_order' => 1]);
+
+        $parent = User::factory()->create(['dob' => '1982-06-25']);
+        $ward = User::factory()->create(['first_name' => 'Jade', 'dob' => '2013-04-02', 'guardian_id' => $parent->id]);
+        $ward->categories()->attach($cat->id, ['is_primary' => true]);
+
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $parent])
+            ->assertOk()
+            ->assertSee('Jade')
+            ->assertSee('Benjamins');
+    }
+
     public function test_show_toggle_role_persists_and_toasts(): void
     {
         $admin = User::factory()->admin()->create();
