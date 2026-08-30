@@ -96,7 +96,8 @@ class TemplateForm extends Component
         return [
             'label' => ['required', 'string', 'max:255'],
             'kind' => ['required', 'in:training,competition,club_event'],
-            'discipline_id' => [$this->kind === 'club_event' ? 'nullable' : 'required', 'exists:disciplines,id'],
+            // Discipline : entraînement UNIQUEMENT, comme sur la séance (§4.7).
+            'discipline_id' => [$this->kind === 'training' ? 'required' : 'nullable', 'exists:disciplines,id'],
             'day_of_week' => ['required', 'integer', 'between:1,7'],
             'start_time_of_day' => ['required', 'date_format:H:i'],
             'duration_min' => ['required', 'integer', 'min:1', 'max:1440'],
@@ -179,7 +180,7 @@ class TemplateForm extends Component
         $payload = [
             'label' => $data['label'],
             'kind' => $data['kind'],
-            'discipline_id' => $data['discipline_id'],
+            'discipline_id' => $data['kind'] === 'training' ? $data['discipline_id'] : null,
             'day_of_week' => $data['day_of_week'],
             'start_time_of_day' => $data['start_time_of_day'],
             'duration_min' => $data['duration_min'],

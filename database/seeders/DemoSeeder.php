@@ -799,11 +799,12 @@ class DemoSeeder extends Seeder
 
         // Builder : crée une compétition + inscrit 5 athlètes adultes (insertion directe du statut
         // participating — séance passée → RegistrationService::register refuserait).
-        $makeCompetition = function (Carbon $start, string $title) use ($enchaine, $piscine, $triathlonM, $adulte, $master, $vincent, $admin, $athletes, $routesByLevel): Session {
+        $makeCompetition = function (Carbon $start, string $title) use ($piscine, $triathlonM, $adulte, $master, $vincent, $admin, $athletes, $routesByLevel): Session {
             $comp = Session::create([
                 'kind' => 'competition',
                 'title' => $title,
-                'discipline_id' => $enchaine->id,
+                // Pas de discipline : réservée aux entraînements (§4.7). Une compétition se
+                // qualifie par son type d'épreuve, et sa couleur vient du repli par `kind`.
                 'start_at' => $start,
                 'duration_min' => 240,
                 'location_id' => $piscine->id,

@@ -92,7 +92,10 @@
                     </div>
                 </div>
 
-                {{-- Discipline — chips à puces (training only) --}}
+                {{-- Discipline — chips à puces. Entraînement UNIQUEMENT (PRD §4.7) : une compétition
+                     se qualifie par son type d'épreuve, un événement club par rien du tout. La règle
+                     de validation suit le même découpage — un champ obligatoire côté serveur mais
+                     absent de l'écran rendrait la publication impossible. --}}
                 @if ($isTraining)
                     <div>
                         <label class="field-label">Discipline<x-req-mark /></label>

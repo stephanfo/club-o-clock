@@ -158,8 +158,10 @@ class SessionForm extends Component
         return [
             'kind' => ['required', 'in:training,competition,club_event'],
             'title' => ['required', 'string', 'max:255'],
-            // discipline obligatoire training/competition, optionnelle club_event (§4.7).
-            'discipline_id' => [$this->kind === 'club_event' ? 'nullable' : 'required', 'exists:disciplines,id'],
+            // Discipline : entraînement UNIQUEMENT (§4.7). Une compétition se qualifie par son type
+            // d'épreuve, un événement club par rien — le sélecteur ne leur est d'ailleurs pas
+            // proposé, exiger le champ y rendrait la publication impossible.
+            'discipline_id' => [$this->kind === 'training' ? 'required' : 'nullable', 'exists:disciplines,id'],
             'start_at' => ['required', 'date'],
             'duration_min' => ['required', 'integer', 'min:1', 'max:1440'],
             'location_id' => ['nullable', 'exists:locations,id'],
@@ -616,7 +618,10 @@ class SessionForm extends Component
         $payload = [
             'kind' => $data['kind'],
             'title' => $data['title'],
-            'discipline_id' => $data['discipline_id'],
+            // Discipline dans le bloc « spécifiques au kind » ci-dessous plutôt qu'ici : une bascule
+            // Entraînement → Compétition en cours de saisie ne doit pas laisser derrière elle la
+            // discipline choisie avant la bascule.
+            'discipline_id' => $data['kind'] === 'training' ? $data['discipline_id'] : null,
             'start_at' => Carbon::parse($data['start_at'], $tz),
             'duration_min' => $data['duration_min'],
             'location_id' => $data['location_id'],

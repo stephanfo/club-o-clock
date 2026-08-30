@@ -109,6 +109,29 @@ class TemplateUiTest extends TestCase
         $this->assertSame(4, Session::where('source_template_id', $tpl->id)->count());
     }
 
+    /**
+     * Revue de code — TemplateForm::save() nullifie discipline_id hors training à l'enregistrement,
+     * mais TemplateList::generate()/relaunch() rejouent un template EXISTANT sans repasser par cette
+     * validation. Un modèle competition créé avant ce garde-fou (discipline_id encore renseigné en
+     * base) ne doit pas propager sa discipline aux séances générées (§4.7 : discipline = training
+     * uniquement).
+     */
+    public function test_generating_from_a_competition_template_drops_a_lingering_discipline(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $disc = $this->discipline();
+        $tpl = SessionTemplate::factory()->create([
+            'created_by' => $admin->id, 'kind' => 'competition', 'discipline_id' => $disc->id,
+            'day_of_week' => 1, 'generation_start_date' => '2026-09-01', 'generation_end_date' => '2026-09-07',
+        ]);
+
+        Livewire::actingAs($admin)->test(TemplateList::class)->call('generate', $tpl->id);
+
+        $session = Session::where('source_template_id', $tpl->id)->firstOrFail();
+        $this->assertSame('competition', $session->kind);
+        $this->assertNull($session->discipline_id);
+    }
+
     // Double-tap sur « Générer & enregistrer » : sans wire:loading le second clic partait avant
     // le retour du premier, et generate() créant les Session sans déduplication, la plage était
     // générée deux fois. Les séances en double sont persistantes (§4.8).

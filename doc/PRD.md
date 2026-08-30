@@ -326,9 +326,9 @@ Pattern commun : seed au déploiement, **renommage rétroactif** (référence pa
 | **Lieux** (§4.13.4) | Coachs au fil de l'eau, admin gère/archive | aucun | 0 ou 1 par Session + champ libre `locationText` |
 
 #### 4.6.1 Disciplines
-- Référencées par `Session.disciplineId` et `SessionTemplate.disciplineId`.
+- Référencées par `Session.disciplineId` et `SessionTemplate.disciplineId` — sur les `training` uniquement (§4.7).
 - **Coachs créent au fil de l'eau** depuis le sélecteur de séance (raccourci « + Nouvelle discipline »). Admin gère/archive depuis les paramètres club.
-- **Garde-fou minimum 1 active** : l'archivage et la suppression de la **dernière discipline active** sont bloqués (UI + serveur). Garantit qu'une création de `training` ou `competition` (où `discipline` est obligatoire) reste toujours possible.
+- **Garde-fou minimum 1 active** : l'archivage et la suppression de la **dernière discipline active** sont bloqués (UI + serveur). Garantit qu'une création de `training` (seul `kind` où `discipline` est obligatoire, §4.7) reste toujours possible.
 - `AuditLog discipline_modified` à chaque opération.
 - Le filtre planning « discipline » liste les disciplines actives + les archivées référencées sur la fenêtre affichée.
 
@@ -350,7 +350,7 @@ Modèle unique avec un **discriminator `kind`**.
 #### Champs communs
 - `kind` (`training` | `competition` | `club_event`).
 - `title`.
-- `disciplineId` (FK Discipline ; **obligatoire** pour `training` et `competition`, nullable pour `club_event`).
+- `disciplineId` (FK Discipline ; **obligatoire** pour `training`, **absente** des `competition` et `club_event` — une compétition se qualifie par son `eventTypeId`, un événement club par rien). Le sélecteur n'est proposé que sur `training` ; changer de `kind` en cours de saisie efface la discipline déjà choisie.
 - `startAt`, `durationMin`.
 - `locationId?` + `locationText?` (le `locationText` peut surcharger un `Location` choisi).
 - `capacity?` (optionnelle).
@@ -426,7 +426,7 @@ Tant que `startAt` n'est pas dépassé, un coach ou admin peut **réactiver** la
 **Périmètre d'accès** : **admin uniquement** pour la création / édition / archivage d'un `SessionTemplate`. Justification : un template produit N `Session` à l'enregistrement (impact potentiel sur des dizaines de séances) — geste de pilotage de saison. Les coachs continuent de créer librement des `Session` standalone.
 
 #### Champs du template
-`label`, `kind` (essentiellement `training` en V1), `disciplineId`, `dayOfWeek` (1..7), `startTimeOfDay`, `durationMin`, `locationId?`/`locationText?`, `capacity?`, `quotaTagId?`, `categoryIds[]`, **`defaultCoachIds[]`** (pré-affectation), `generationStartDate`, **`generationEndDate` (obligatoire — pas de récurrence infinie)**, `createdBy` (= admin), `status` (`active` / `archived`).
+`label`, `kind` (essentiellement `training` en V1), `disciplineId` (mêmes règles que sur la séance, §4.7 : `training` uniquement), `dayOfWeek` (1..7), `startTimeOfDay`, `durationMin`, `locationId?`/`locationText?`, `capacity?`, `quotaTagId?`, `categoryIds[]`, **`defaultCoachIds[]`** (pré-affectation), `generationStartDate`, **`generationEndDate` (obligatoire — pas de récurrence infinie)**, `createdBy` (= admin), `status` (`active` / `archived`).
 
 #### Comportement à l'enregistrement
 - Le système **génère immédiatement N `Session` indépendantes**.
@@ -1077,9 +1077,9 @@ Vue logique des entités. **Volontairement agnostique** à la techno de stockage
   - `club_event` : `agenda` (markdown), `externalUrl?`, `photosAlbumUrl?`.
   - Parcours : `routeOpenrunnerEmbedUrl?`, `routeOpenrunnerPublicUrl?`, `routeOpenrunnerId?` (dérivé du `code` opaque, non exposé), `route?` (référence `0..1` vers un **`GpxRoute`** — cf. §4.20 ; remplace les anciens `routeGpxFile?` / `routeStats?` portés par la séance).
 - **`Registration`** (rattachée à une `Session`) : `userId`, `status` (`participating` | `waitlist` | `cancelled`), `waitlistReason?` (`capacity` | `quota_exceeded`), `waitlistPosition?`, `registeredAt`, `promotedAt?`, `promotedBy?`, `overrideBy?`, `overrideReason?`.
-- **`SessionTemplate`** : `id`, `label`, `kind`, `disciplineId`, `dayOfWeek` (1..7), `startTimeOfDay`, `durationMin`, `locationId?` / `locationText?`, `capacity?`, `quotaTagId?`, `categoryIds[]`, `defaultCoachIds[]`, `generationStartDate`, `generationEndDate` (**obligatoires**), `createdBy` (= admin), `status` (`active` / `archived`). Aucun lien retour comportemental vers les `Session` générées.
+- **`SessionTemplate`** : `id`, `label`, `kind`, `disciplineId?`, `dayOfWeek` (1..7), `startTimeOfDay`, `durationMin`, `locationId?` / `locationText?`, `capacity?`, `quotaTagId?`, `categoryIds[]`, `defaultCoachIds[]`, `generationStartDate`, `generationEndDate` (**obligatoires**), `createdBy` (= admin), `status` (`active` / `archived`). Aucun lien retour comportemental vers les `Session` générées.
 - **`QuotaTag`** : `code`, `label`, `maxPerWeek`, `archivedAt?`. Universel — aucune restriction de discipline.
-- **`Discipline`** : `id`, `label`, `archivedAt?`. Référencée par `Session.disciplineId` et `SessionTemplate.disciplineId`. Garde-fou : la dernière discipline active ne peut être ni archivée ni supprimée.
+- **`Discipline`** : `id`, `label`, `archivedAt?`. Référencée par `Session.disciplineId` et `SessionTemplate.disciplineId`, sur les `training` uniquement (§4.7). Garde-fou : la dernière discipline active ne peut être ni archivée ni supprimée.
 - **`EventType`** : `id`, `label`, `archivedAt?`. Référencé par `Session.eventTypeId` (uniquement pour `kind = competition`). Garde-fou : le dernier type actif ne peut être ni archivé ni supprimé (cf. §4.6.2 — note ouverte sur ce point).
 - **`Qualification`** : `id`, `label`, `code?`, `archivedAt?`.
 - **`UserQualification`** (M:N) : `userId`, `qualificationId`, `expiresAt?`, `attributedAt`, `attributedBy`. Unicité `(userId, qualificationId)` — les renouvellements mettent à jour `expiresAt` plutôt que créer une nouvelle ligne.

@@ -38,7 +38,9 @@
 
             {{-- ═══ Colonne principale ═══ --}}
             <div class="tpl-main">
-                {{-- Discipline — chips à puces --}}
+                {{-- Discipline — chips à puces, entraînement uniquement (§4.7), comme sur le
+                     formulaire de séance. --}}
+                @if ($kind === 'training')
                 <div>
                     <label class="field-label">Discipline</label>
                     <div class="flex g6 wrap">
@@ -50,6 +52,7 @@
                         @endforeach
                     </div>
                 </div>
+                @endif
 
                 <div>
                     <label class="field-label">Titre du modèle</label>

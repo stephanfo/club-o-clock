@@ -103,7 +103,12 @@ class TemplateGenerationService
                 $session = Session::create([
                     'kind' => $template->kind,
                     'title' => $template->label,
-                    'discipline_id' => $template->discipline_id,
+                    // Discipline : entraînement uniquement (§4.7), même garde que quota_tag_id
+                    // ci-dessous. TemplateForm::save() nullifie déjà le champ à l'enregistrement,
+                    // mais generate()/relaunch() (TemplateList) rejouent un template existant sans
+                    // repasser par cette validation — un modèle competition/club_event créé avant ce
+                    // garde-fou propagerait sinon sa discipline aux séances générées.
+                    'discipline_id' => $template->kind === 'training' ? $template->discipline_id : null,
                     // Heure locale club : on construit l'instant dans $tz (comme SessionForm). Le
                     // mutateur start_at du modèle le convertit en UTC à l'écriture → la séance
                     // générée à 19:00 s'affiche à 19:00 partout, cohérente avec la saisie manuelle.

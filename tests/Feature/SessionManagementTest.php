@@ -7,6 +7,7 @@ use App\Livewire\SessionForm;
 use App\Livewire\SessionShow;
 use App\Models\Category;
 use App\Models\Discipline;
+use App\Models\EventType;
 use App\Models\Session;
 use App\Models\User;
 use App\Services\RegistrationService;
@@ -96,6 +97,76 @@ class SessionManagementTest extends TestCase
             ->set('event_type_id', null)
             ->call('save')
             ->assertHasErrors('event_type_id');
+    }
+
+    /**
+     * La discipline est un attribut du seul entraînement (PRD §4.7) : le sélecteur n'est rendu que
+     * là. Le contrôle positif sur `training` est indispensable — sans lui, l'assertion d'absence
+     * resterait verte si le bloc disparaissait de l'écran pour une tout autre raison.
+     */
+    public function test_discipline_selector_is_training_only(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $disc = $this->discipline();
+
+        $component = Livewire::actingAs($coach)->test(SessionForm::class)
+            ->call('setKind', 'training')
+            ->assertSeeHtml("\$set('discipline_id', {$disc->id})");
+
+        $component->call('setKind', 'competition')
+            ->assertDontSeeHtml("\$set('discipline_id', {$disc->id})");
+
+        $component->call('setKind', 'club_event')
+            ->assertDontSeeHtml("\$set('discipline_id', {$disc->id})");
+    }
+
+    /**
+     * Le pendant serveur : exiger la discipline sur une compétition rendait la publication
+     * impossible, l'écran n'offrant pas le champ.
+     */
+    public function test_competition_publishes_without_discipline(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $this->discipline();
+        $type = EventType::create(['label' => 'Triathlon', 'sort_order' => 0]);
+
+        Livewire::actingAs($coach)->test(SessionForm::class)
+            ->call('setKind', 'competition')
+            ->set('title', 'Triathlon du lac')
+            ->set('event_type_id', $type->id)
+            ->set('start_at', Carbon::now()->addWeek()->format('Y-m-d\TH:i'))
+            ->set('duration_min', 120)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('sessions', [
+            'title' => 'Triathlon du lac', 'kind' => 'competition', 'discipline_id' => null,
+        ]);
+    }
+
+    /**
+     * Bascule de kind en cours de saisie : la discipline choisie sous « Entraînement » ne doit pas
+     * être écrite en base une fois passé sur « Compétition » — elle n'y est plus ni visible ni
+     * modifiable, et piloterait pourtant la couleur de la séance.
+     */
+    public function test_switching_kind_drops_the_discipline_already_chosen(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $disc = $this->discipline();
+        $type = EventType::create(['label' => 'Trail', 'sort_order' => 0]);
+
+        Livewire::actingAs($coach)->test(SessionForm::class)
+            ->call('setKind', 'training')
+            ->set('discipline_id', $disc->id)
+            ->call('setKind', 'competition')
+            ->set('title', 'Trail des crêtes')
+            ->set('event_type_id', $type->id)
+            ->set('start_at', Carbon::now()->addWeek()->format('Y-m-d\TH:i'))
+            ->set('duration_min', 120)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('sessions', ['title' => 'Trail des crêtes', 'discipline_id' => null]);
     }
 
     public function test_coach_can_cancel_and_restore_future_session(): void
