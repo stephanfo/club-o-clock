@@ -85,11 +85,13 @@ class StatsService
         $filled = $sessions->sum('participating_count');
         $fillRate = $capacity > 0 ? (int) round($filled / $capacity * 100) : null;
 
-        $competitions = $this->applySessionFilters(
-            Session::query()->where('kind', 'competition')->whereNull('cancelled_at')
-                ->whereBetween('start_at', [$f['from'], $f['to']]),
-            $f
-        )->count();
+        // Filtre discipline volontairement absent : une compétition n'en porte jamais (§4.7), le
+        // sélecteur global la ferait sinon toujours retomber à 0 dès qu'une discipline précise est
+        // choisie. Seul le filtre catégorie — commun aux 3 kind — s'applique.
+        $competitions = Session::query()->where('kind', 'competition')->whereNull('cancelled_at')
+            ->whereBetween('start_at', [$f['from'], $f['to']])
+            ->when(! empty($f['category_id']), fn (Builder $q) => $q->whereHas('categories', fn (Builder $c) => $c->whereKey($f['category_id'])))
+            ->count();
 
         return [
             'active' => (clone $active)->count(),

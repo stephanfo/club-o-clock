@@ -117,6 +117,21 @@ class StatsServiceTest extends TestCase
         $this->assertSame(50, $this->stats()->headline($f)['fill_rate']); // natation seule : 5/10
     }
 
+    /**
+     * Revue de code — une compétition ne porte jamais de discipline (§4.7) : le filtre discipline
+     * du dashboard ne doit pas s'appliquer au compteur « compétitions », sans quoi il retomberait
+     * systématiquement à 0 dès qu'une discipline précise est sélectionnée.
+     */
+    public function test_discipline_filter_does_not_zero_out_the_competition_count(): void
+    {
+        Session::create(['kind' => 'competition', 'title' => 'Triathlon L',
+            'start_at' => Carbon::now()->subDays(2), 'duration_min' => 120, 'created_by' => User::factory()->coach()->create()->id]);
+
+        $f = ['from' => $this->season()['from'], 'to' => $this->season()['to'], 'discipline_id' => $this->swim->id, 'category_id' => null];
+
+        $this->assertSame(1, $this->stats()->headline($f)['competitions']);
+    }
+
     public function test_top_sessions_ranked_by_fill(): void
     {
         $low = $this->training($this->swim, 10, Carbon::now()->subDays(6));
