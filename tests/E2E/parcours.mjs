@@ -462,7 +462,7 @@ async function ongletMobile(page, nom) {
 // ── S21 · Alertes d'un garant lui-même athlète (PRD §4.15.5) ──────────
 // Sandrine est le cas exact que le rendu générique rendait illisible : garante de deux enfants ET
 // athlète. Ses notifications et celles de ses enfants arrivent sur le même compte — rien ne les
-// distinguait. On pose trois alertes déterministes plutôt que d'espérer les bonnes dans le jeu de
+// distinguait. On pose deux alertes déterministes plutôt que d'espérer les bonnes dans le jeu de
 // démo, et on les retire ensuite (règle « restaurer l'état »).
 {
   const s = new Scenario('S21 · Alertes — un garant distingue les siennes de celles de ses enfants');

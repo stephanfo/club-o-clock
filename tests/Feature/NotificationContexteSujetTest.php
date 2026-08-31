@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ClubSettings;
 use App\Models\NotificationOutbox;
 use App\Models\Session;
 use App\Models\User;
@@ -281,6 +282,82 @@ class NotificationContexteSujetTest extends TestCase
             ->where('type', NotificationType::GuardianshipSevered->value)
             ->firstOrFail();
         $this->assertSame('Lien de tutelle rompu', $this->renderer()->render($ligneEnfant)['title']);
+    }
+
+    public function test_la_reactivation_lue_par_le_garant_ne_tutoie_pas_le_parent(): void
+    {
+        [$garant, $enfant] = $this->famille();
+        $ligne = $this->ligne(NotificationType::AthleteReactivated, $garant, [
+            'user_id' => $enfant->id, 'subject_id' => $enfant->id, 'subject_first_name' => 'Hugo',
+        ]);
+
+        // « Ton accès athlète est réactivé » désignait le parent, qui lit, et non l'enfant, dont
+        // l'accès a bougé. C'est le seul type sans séance qui remonte au garant.
+        $this->assertSame("L'accès athlète de Hugo est réactivé", $this->renderer()->render($ligne)['body']);
+    }
+
+    public function test_la_reactivation_lue_par_l_interesse_garde_son_tutoiement(): void
+    {
+        $membre = User::factory()->create();
+        $ligne = $this->ligne(NotificationType::AthleteReactivated, $membre, ['user_id' => $membre->id]);
+
+        // Contrôle apparié au test précédent : sans sujet distinct, la description du type convient.
+        $this->assertSame('Ton accès athlète est réactivé', $this->renderer()->render($ligne)['body']);
+    }
+
+    public function test_la_reactivation_sans_prenom_reste_juste(): void
+    {
+        [$garant, $enfant] = $this->famille();
+        // Ligne `failed` rejouée après purge du prénom : vague, mais jamais adressée au mauvais.
+        $ligne = $this->ligne(NotificationType::AthleteReactivated, $garant, [
+            'user_id' => $enfant->id, 'subject_id' => $enfant->id,
+        ]);
+
+        $this->assertSame("L'accès athlète de ton enfant est réactivé", $this->renderer()->render($ligne)['body']);
+    }
+
+    // ── Récapitulatif de série (§4.8) : volume et plage déjà au payload ──
+
+    private function recap(User $coach, array $payload): NotificationOutbox
+    {
+        return $this->ligne(NotificationType::CoachTemplateRecap, $coach, ['template_id' => 3] + $payload);
+    }
+
+    public function test_le_recap_dit_le_volume_et_la_plage(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $ligne = $this->recap($coach, ['count' => 5, 'from' => '2026-09-06', 'to' => '2026-11-30']);
+
+        $this->assertSame('5 séances · 6 sept. → 30 nov.', $this->renderer()->render($ligne)['body']);
+    }
+
+    public function test_le_recap_d_une_seule_seance_reste_au_singulier(): void
+    {
+        $coach = User::factory()->coach()->create();
+        // Bornes absentes : le volume seul, plutôt qu'une plage bancale.
+        $ligne = $this->recap($coach, ['count' => 1]);
+
+        $this->assertSame('1 séance', $this->renderer()->render($ligne)['body']);
+    }
+
+    public function test_les_bornes_du_recap_ne_glissent_pas_dans_un_fuseau_negatif(): void
+    {
+        // Guadeloupe (UTC−4) est proposée dans les réglages du club. Les bornes sont des dates NUES
+        // (`toDateString()`) : les traiter comme des instants les ramenait à la veille 20 h, donc au
+        // jour précédent — les deux bornes du récap étaient fausses.
+        ClubSettings::current()->update(['timezone' => 'America/Guadeloupe']);
+
+        $coach = User::factory()->coach()->create();
+        $ligne = $this->recap($coach, ['count' => 5, 'from' => '2026-09-06', 'to' => '2026-11-30']);
+
+        $this->assertSame('5 séances · 6 sept. → 30 nov.', $this->renderer()->render($ligne)['body']);
+
+        // Contrôle positif apparié : le fuseau EST bien appliqué là où il doit l'être, sur un vrai
+        // instant. Sans lui, l'assertion ci-dessus passerait aussi si le réglage était ignoré.
+        $seance = $this->seance();  // 18:00 à Paris = 12:00 en Guadeloupe
+        $ligneSeance = $this->ligne(NotificationType::SessionCancelled, $coach, $seance->payloadNotification());
+
+        $this->assertSame('Natation jeunes · sam. 5 sept. · 12:00', $this->renderer()->render($ligneSeance)['body']);
     }
 
     // ── Bout en bout : de l'annulation de séance à la page Alertes ──

@@ -553,6 +553,12 @@ doit être *dit* voyage donc dans le payload, posé par l'émetteur :
   `session_start_at` part en **ISO8601 UTC** — jamais en wall-clock, cf. l'attribut `start_at` — et le
   rendu applique le fuseau du club.
 
+Le payload transporte donc **deux natures de date, à ne pas confondre au rendu** : un *instant*
+(`session_start_at`) se repose au fuseau du club, une *date de calendrier* (les bornes `from`/`to`
+du récapitulatif de série, écrites en `toDateString()`) s'affiche telle quelle. Convertir la seconde
+comme la première la fait reculer d'un jour dès que le fuseau du club est négatif — minuit UTC
+devient la veille 20 h à Guadeloupe, proposée dans les réglages.
+
 **Corollaire non négociable : chaque enrichissement est conditionné à la présence de sa clé** et
 retombe sur le libellé/description du type. Ce n'est pas une précaution de migration mais un
 invariant permanent : une invitation n'a jamais de séance, une ligne `failed` se rejoue longtemps

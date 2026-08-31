@@ -11,8 +11,9 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 - **La notification de réactivation d'un accès athlète menait le parent au mauvais écran.** Quand
   c'est un enfant mineur qui est réactivé, c'est son garant qui reçoit le message — « Ton accès
-  athlète est réactivé » l'envoyait sur **son** tableau de bord à lui, où rien n'avait changé. Elle
-  nomme désormais l'enfant et ouvre « Mes enfants ». La notification de rupture de tutelle nomme elle
+  athlète est réactivé » l'envoyait sur **son** tableau de bord à lui, où rien n'avait changé — et le
+  tutoyait, lui, pour un accès qui n'était pas le sien. Elle nomme désormais l'enfant, dit « L'accès
+  athlète de Jade est réactivé » et ouvre « Mes enfants ». La notification de rupture de tutelle nomme elle
   aussi l'enfant concerné, ce qui manquait à un parent garant de plusieurs enfants ; elle continue de
   mener au profil de chacun — surtout pas à « Mes enfants », d'où le lien vient justement de
   disparaître.

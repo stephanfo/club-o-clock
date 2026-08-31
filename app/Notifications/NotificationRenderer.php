@@ -32,7 +32,7 @@ class NotificationRenderer
 
         return [
             'title' => $this->titleFor($type, $payload, $subjectId),
-            'body' => $this->bodyFor($type, $payload),
+            'body' => $this->bodyFor($type, $payload, $subjectId),
             'url' => $this->urlFor($type, $payload, $line, $subjectId),
         ];
     }
@@ -71,8 +71,12 @@ class NotificationRenderer
      *
      * @param  array<string,mixed>  $payload
      */
-    private function bodyFor(NotificationType $type, array $payload): string
+    private function bodyFor(NotificationType $type, array $payload, ?int $subjectId): string
     {
+        if ($subjectId !== null && $type === NotificationType::AthleteReactivated) {
+            return $this->reactivationBody($payload);
+        }
+
         if (isset($payload['session_title'])) {
             $quand = $this->formatDate($payload['session_start_at'] ?? null);
 
@@ -93,6 +97,27 @@ class NotificationRenderer
     }
 
     /**
+     * Réactivation d'accès lue par le GARANT : la description du type tutoie le sujet (elle sert
+     * d'abord de sous-titre dans la matrice de préférences, où le lecteur EST le sujet). Adressée
+     * au parent, « Ton accès athlète est réactivé » désigne la mauvaise personne — celle qui lit.
+     *
+     * Seul type concerné : les autres notifications qui remontent au garant portent une séance, dont
+     * le corps prend la place de la description. Un nouveau type sans séance devra passer ici.
+     *
+     * @param  array<string,mixed>  $payload
+     */
+    private function reactivationBody(array $payload): string
+    {
+        $prenom = $payload['subject_first_name'] ?? null;
+
+        // Repli sans prénom : le titre nomme déjà l'enfant, mais une ligne `failed` rejouée après
+        // purge n'a plus que l'identifiant — mieux vaut vague que faux.
+        return $prenom === null
+            ? 'L\'accès athlète de ton enfant est réactivé'
+            : 'L\'accès athlète de '.$prenom.' est réactivé';
+    }
+
+    /**
      * Date/heure d'une séance au fuseau du club (« sam. 6 sept. · 18:00 »). Conventions CLAUDE.md :
      * contexte dense → `ddd D MMM`, heure → `HH:mm`. La locale est explicite : le rendu se fait au
      * drain, hors requête, et ne doit pas dépendre d'APP_LOCALE.
@@ -104,23 +129,35 @@ class NotificationRenderer
         return $date === null ? null : $date->isoFormat('ddd D MMM').' · '.$date->format('H:i');
     }
 
-    /** Jour seul, pour les bornes d'une plage de génération (« 6 sept. »). */
+    /**
+     * Jour seul, pour les bornes d'une plage de génération (« 6 sept. »).
+     *
+     * Ces bornes sont des dates NUES (`toDateString()`), pas des instants : les convertir au fuseau
+     * du club les faisait reculer d'un jour dès que ce fuseau est négatif — minuit UTC devient la
+     * veille 20 h à Guadeloupe, proposée dans les réglages. Une date sans heure n'a pas de fuseau.
+     */
     private function formatDay(mixed $iso): ?string
     {
-        return $this->parse($iso)?->isoFormat('D MMM');
+        return $this->parse($iso, instant: false)?->isoFormat('D MMM');
     }
 
-    /** Un payload malformé (ligne ancienne, saisie tierce) ne doit jamais faire échouer un envoi. */
-    private function parse(mixed $iso): ?Carbon
+    /**
+     * Un payload malformé (ligne ancienne, saisie tierce) ne doit jamais faire échouer un envoi.
+     *
+     * `$instant` distingue les deux natures de date qui transitent par le payload : un point dans
+     * le temps (le début d'une séance, stocké en UTC) se REPOSE au fuseau du club ; une date de
+     * calendrier (une borne de plage) s'affiche telle quelle.
+     */
+    private function parse(mixed $iso, bool $instant = true): ?Carbon
     {
         if (! is_string($iso) || $iso === '') {
             return null;
         }
 
         try {
-            return Carbon::parse($iso)
-                ->setTimezone(ClubSettings::current()->timezone)
-                ->locale('fr');
+            $date = Carbon::parse($iso);
+
+            return ($instant ? $date->setTimezone(ClubSettings::current()->timezone) : $date)->locale('fr');
         } catch (\Throwable) {
             return null;
         }
