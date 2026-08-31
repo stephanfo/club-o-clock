@@ -2,13 +2,23 @@
 
 namespace App\Notifications;
 
+use App\Models\ClubSettings;
 use App\Models\NotificationOutbox;
+use Illuminate\Support\Carbon;
 
 // Rend une ligne d'outbox en contenu présentable (titre, corps, lien profond), partagé par les
 // canaux réels (push + email) — un seul endroit pour dériver l'affichage du couple type + payload.
-// Rendu GÉNÉRIQUE (décision J8.6) : titre = libellé du type, corps = description du type, lien
-// déduit de l'id porté par le payload. Aucun chargement d'entité à l'envoi (robuste, pas de N+1 au
-// drain) ; l'entité peut avoir disparu entre l'émission et l'envoi sans casser la notification.
+//
+// Rendu AUTOPORTEUR : le payload transporte tout ce qu'il faut dire (le sujet quand ce n'est pas le
+// destinataire, la séance quand il y en a une), figé à l'ÉMISSION. Aucun chargement d'entité ici
+// (décision J8.6, cadrage §7.14) : le drain ne fait aucune requête, et l'entité peut avoir disparu
+// entre l'émission et l'envoi sans casser la notification.
+//
+// Corollaire : CHAQUE enrichissement est conditionné à la présence de sa clé, et retombe sur le
+// libellé/description du type. Ce n'est pas une précaution de migration mais un invariant — une
+// invitation n'a jamais de séance, une ligne `failed` se rejoue longtemps après, et une clé supposée
+// présente jetterait au drain, où la notification n'arriverait jamais (cf. le bug EnrolledByCoach
+// couvert par test_every_notification_type_renders_without_error).
 class NotificationRenderer
 {
     /**
@@ -18,12 +28,102 @@ class NotificationRenderer
     {
         $type = NotificationType::from($line->type);
         $payload = $line->payload ?? [];
+        $subjectId = $this->subjectId($line);
 
         return [
-            'title' => $type->label(),
-            'body' => $type->description(),
-            'url' => $this->urlFor($type, $payload),
+            'title' => $this->titleFor($type, $payload, $subjectId),
+            'body' => $this->bodyFor($type, $payload),
+            'url' => $this->urlFor($type, $payload, $line, $subjectId),
         ];
+    }
+
+    /**
+     * Sujet de la notification quand ce n'est PAS le destinataire (routage parent/enfant §4.15.5).
+     * Null dès que les deux coïncident : un parent garant lui-même athlète doit voir au premier coup
+     * d'œil laquelle de ses notifications le concerne, lui, et laquelle concerne son enfant.
+     */
+    private function subjectId(NotificationOutbox $line): ?int
+    {
+        $subjectId = $line->payload['subject_id'] ?? null;
+
+        return ($subjectId !== null && $subjectId !== $line->user_id) ? (int) $subjectId : null;
+    }
+
+    /**
+     * Titre = libellé du type, préfixé du prénom du sujet le cas échéant. Le prénom va au TITRE et
+     * non au corps : l'écran de notifications de l'OS empile les titres et tronque les corps, donc
+     * c'est la seule place où « pour qui » survit à l'empilement.
+     *
+     * @param  array<string,mixed>  $payload
+     */
+    private function titleFor(NotificationType $type, array $payload, ?int $subjectId): string
+    {
+        $prenom = $subjectId !== null ? ($payload['subject_first_name'] ?? null) : null;
+
+        return $prenom !== null ? $prenom.' · '.$type->label() : $type->label();
+    }
+
+    /**
+     * Corps = le contexte concret quand le payload le porte, la description du type sinon.
+     *
+     * La description générique (« Date, horaire ou lieu modifiés ») est redondante avec le titre
+     * (« Modification de séance ») : dire QUELLE séance et QUAND vaut mieux que la répéter.
+     *
+     * @param  array<string,mixed>  $payload
+     */
+    private function bodyFor(NotificationType $type, array $payload): string
+    {
+        if (isset($payload['session_title'])) {
+            $quand = $this->formatDate($payload['session_start_at'] ?? null);
+
+            return $quand === null ? $payload['session_title'] : $payload['session_title'].' · '.$quand;
+        }
+
+        // Récap de série (§4.8) : pas de séance unique, mais un volume et une plage déjà en payload.
+        if ($type === NotificationType::CoachTemplateRecap && isset($payload['count'])) {
+            $plage = $this->formatDay($payload['from'] ?? null);
+            $fin = $this->formatDay($payload['to'] ?? null);
+
+            $resume = $payload['count'].' '.($payload['count'] > 1 ? 'séances' : 'séance');
+
+            return ($plage !== null && $fin !== null) ? $resume.' · '.$plage.' → '.$fin : $resume;
+        }
+
+        return $type->description();
+    }
+
+    /**
+     * Date/heure d'une séance au fuseau du club (« sam. 6 sept. · 18:00 »). Conventions CLAUDE.md :
+     * contexte dense → `ddd D MMM`, heure → `HH:mm`. La locale est explicite : le rendu se fait au
+     * drain, hors requête, et ne doit pas dépendre d'APP_LOCALE.
+     */
+    private function formatDate(mixed $iso): ?string
+    {
+        $date = $this->parse($iso);
+
+        return $date === null ? null : $date->isoFormat('ddd D MMM').' · '.$date->format('H:i');
+    }
+
+    /** Jour seul, pour les bornes d'une plage de génération (« 6 sept. »). */
+    private function formatDay(mixed $iso): ?string
+    {
+        return $this->parse($iso)?->isoFormat('D MMM');
+    }
+
+    /** Un payload malformé (ligne ancienne, saisie tierce) ne doit jamais faire échouer un envoi. */
+    private function parse(mixed $iso): ?Carbon
+    {
+        if (! is_string($iso) || $iso === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($iso)
+                ->setTimezone(ClubSettings::current()->timezone)
+                ->locale('fr');
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
@@ -31,7 +131,7 @@ class NotificationRenderer
      *
      * @param  array<string,mixed>  $payload
      */
-    private function urlFor(NotificationType $type, array $payload): string
+    private function urlFor(NotificationType $type, array $payload, NotificationOutbox $line, ?int $subjectId): string
     {
         return match ($type) {
             // Tout ce qui réfère une séance pointe sur sa fiche.
@@ -46,7 +146,7 @@ class NotificationRenderer
             NotificationType::NewDebrief,
             NotificationType::CoachRegistration,
             NotificationType::CoachAssigned => isset($payload['session_id'])
-                ? route('sessions.show', $payload['session_id'])
+                ? route('sessions.show', $this->sessionParams($payload['session_id'], $subjectId))
                 : route('planning'),
 
             // Récap d'une série : pas de séance unique → planning.
@@ -60,8 +160,42 @@ class NotificationRenderer
                 ? route('invitation.activate', $payload['token'])
                 : route('login'),
 
+            // Rupture de tutelle : chaque partie va sur SON profil. Surtout pas « Mes enfants » côté
+            // garant — le lien vient d'être coupé, l'enfant n'y figure plus, et l'écran serait au
+            // mieux déroutant, au pire vide.
             NotificationType::GuardianshipSevered => route('profil'),
-            NotificationType::AthleteReactivated => route('dashboard'),
+
+            // Réactivation d'accès (§4.4) : lue par le garant d'un mineur, elle parle de l'enfant.
+            // L'envoyer sur le dashboard du parent ne lui montrait rien de ce qui a changé.
+            NotificationType::AthleteReactivated => $this->reactivationTarget($payload, $line),
         };
+    }
+
+    /**
+     * Paramètres de la fiche de séance. `?as=` amène le parent sur la fiche AVEC l'enfant pour
+     * sujet : sans lui, il arrivait sur une fiche qui parlait de lui alors que la notification
+     * parlait de son enfant, et devait rebasculer à la main. SessionShow::mount() valide le ward et
+     * redirige vers l'URL canonique.
+     *
+     * @return array<int|string,mixed>
+     */
+    private function sessionParams(mixed $sessionId, ?int $subjectId): array
+    {
+        return $subjectId === null ? [$sessionId] : [$sessionId, 'as' => $subjectId];
+    }
+
+    /**
+     * `athlete_reactivated` porte l'id du membre réactivé dans `user_id` (clé de payload, à ne pas
+     * confondre avec la colonne `user_id` de la ligne, qui porte le DESTINATAIRE). Les deux
+     * diffèrent quand c'est le garant qui est notifié pour son enfant (§4.15.5).
+     *
+     * @param  array<string,mixed>  $payload
+     */
+    private function reactivationTarget(array $payload, NotificationOutbox $line): string
+    {
+        $membre = $payload['user_id'] ?? null;
+        $pourUnEnfant = $membre !== null && $line->user_id !== null && (int) $membre !== $line->user_id;
+
+        return $pourUnEnfant ? route('children') : route('dashboard');
     }
 }

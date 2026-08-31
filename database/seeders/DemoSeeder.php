@@ -25,6 +25,7 @@ use App\Services\TemplateGenerationService;
 use App\Support\AgeCategory;
 use App\Support\Markup;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
@@ -903,11 +904,27 @@ class DemoSeeder extends Seeder
         // (P2) Historique notifications : une partie des lignes outbox (annulation, promotions,
         // inscriptions par coach…) passe en « sent » — l'écran Alertes n'est pas vide au 1er login,
         // et l'écran admin Envois montre les deux états sent/pending.
-        NotificationOutbox::query()
+        //
+        // La bascule est directe (pas de drain : rien ne doit partir depuis un seeder), donc elle
+        // court-circuite la purge qu'opère OutboxDrainer. On la rejoue à la main, sinon le jeu de
+        // démo laisserait des prénoms d'enfants sur des lignes envoyées et donnerait à lire une
+        // règle inverse de celle que l'application applique.
+        $aBasculer = NotificationOutbox::query()
             ->where('status', 'pending')
             ->orderBy('id')
             ->limit((int) ceil(NotificationOutbox::where('status', 'pending')->count() * 0.6))
-            ->update(['status' => 'sent', 'sent_at' => $now->copy()->subHours(2)]);
+            ->get();
+
+        foreach ($aBasculer as $ligne) {
+            $ligne->update([
+                'status' => 'sent',
+                'sent_at' => $now->copy()->subHours(2),
+                'payload' => Arr::except($ligne->payload ?? [], [
+                    ...NotificationOutbox::SENSITIVE_PAYLOAD_KEYS,
+                    ...NotificationOutbox::VOLATILE_PAYLOAD_KEYS,
+                ]),
+            ]);
+        }
 
         // (P3) Qualifications coachs (PRD §4.11.4) : agrégées sur la fiche séance, badge expiration.
         $qualifs = Qualification::pluck('id', 'code');

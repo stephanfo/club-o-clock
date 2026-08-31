@@ -165,7 +165,14 @@ class GuardianshipService
         // Notif unique aux DEUX parties (§4.2.2), chacune adressée explicitement (le lien est rompu).
         $this->notifier->dispatchTo(NotificationType::GuardianshipSevered, $ward, ['ward_id' => $ward->id]);
         if ($guardian !== null) {
-            $this->notifier->dispatchTo(NotificationType::GuardianshipSevered, $guardian, ['ward_id' => $ward->id]);
+            // Le sujet est posé à la main : dispatchTo() n'applique pas le routage parent/enfant,
+            // donc il n'a pas de sujet à déduire. Sans lui, un garant de plusieurs enfants recevait
+            // « Lien de tutelle rompu » sans savoir lequel.
+            $this->notifier->dispatchTo(NotificationType::GuardianshipSevered, $guardian, [
+                'ward_id' => $ward->id,
+                'subject_id' => $ward->id,
+                'subject_first_name' => $ward->first_name,
+            ]);
         }
     }
 

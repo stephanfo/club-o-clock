@@ -459,6 +459,55 @@ async function ongletMobile(page, nom) {
   tous.push(s.report());
 }
 
+// ── S21 · Alertes d'un garant lui-même athlète (PRD §4.15.5) ──────────
+// Sandrine est le cas exact que le rendu générique rendait illisible : garante de deux enfants ET
+// athlète. Ses notifications et celles de ses enfants arrivent sur le même compte — rien ne les
+// distinguait. On pose trois alertes déterministes plutôt que d'espérer les bonnes dans le jeu de
+// démo, et on les retire ensuite (règle « restaurer l'état »).
+{
+  const s = new Scenario('S21 · Alertes — un garant distingue les siennes de celles de ses enfants');
+  const repere = repereJournaux();
+
+  const sandrine = Number(sql("SELECT id FROM users WHERE email='sandrine@demo.club'"));
+  const jade = Number(sql("SELECT id FROM users WHERE first_name='Jade' AND guardian_id=" + sandrine));
+  const cible = seanceFuture();
+  const titre = sql(`SELECT title FROM sessions WHERE id=${cible}`);
+
+  // Ouvrir la page marque TOUT lu : sans ce relevé, le run laisserait le jeu de démo sans badge
+  // d'alertes non lues — une trace invisible, et le premier écran du pitch appauvri.
+  const nonLues = sql(`SELECT IFNULL(GROUP_CONCAT(id),'') v FROM notification_outbox WHERE user_id=${sandrine} AND read_at IS NULL`);
+
+  const alerte = (payload) => sql(
+    "INSERT INTO notification_outbox (type, channel, payload, user_id, status, attempts, sent_at, created_at, updated_at) "
+    + `VALUES ('session_cancelled', 'push', '${payload}', ${sandrine}, 'sent', 1, NOW(), NOW(), NOW())`
+  );
+
+  alerte(`{"session_id":${cible},"subject_id":${jade},"subject_first_name":"Jade"}`); // pour son enfant
+  alerte(`{"session_id":${cible}}`);                                                  // pour elle-même
+
+  const { ctx, page } = await session(browser, 'sandrine@demo.club', MOBILE);
+  await page.goto(`${BASE}/alertes`, { waitUntil: 'networkidle' });
+  const txt = await page.locator('body').innerText();
+
+  s.check('l\'alerte de l\'enfant est nommée', /Jade · Annulation de séance/.test(txt));
+  s.check('la séance concernée est nommée', txt.includes(titre), titre);
+  // Assertion négative appariée au contrôle positif ci-dessus : la liste n'est pas vide, et sa
+  // propre alerte y figure bien — sans être attribuée à quelqu'un d'autre.
+  s.check('sa propre alerte reste sans prénom', !/Sandrine · Annulation/.test(txt)
+    && (txt.match(/Annulation de séance/g) ?? []).length >= 2);
+  s.checkJs(page);
+  await s.shot(page, 's21-alertes-garant-mobile');
+
+  await page.setViewportSize(DESKTOP);
+  await page.reload({ waitUntil: 'networkidle' });
+  await s.shot(page, 's21-alertes-garant-desktop');
+  await ctx.close();
+
+  purgeJournaux(repere);
+  if (nonLues) sql(`UPDATE notification_outbox SET read_at=NULL WHERE id IN (${nonLues})`);
+  tous.push(s.report());
+}
+
 await browser.close();
 const ok = tous.every(Boolean);
 console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES PARCOURS PASSENT' : '❌ AU MOINS UN PARCOURS ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);

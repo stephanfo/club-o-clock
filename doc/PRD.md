@@ -893,6 +893,10 @@ Routage selon la phase (§4.2) :
 
 La matrice §4.15.3 est **propre à chaque utilisateur**. Le parent gère ses opt-outs sur son compte, l'enfant (P2) gère les siens. Le parent ne peut pas modifier les préférences de l'enfant.
 
+**Identification du sujet.** Une notification adressée au garant **nomme l'enfant qu'elle concerne**, et son lien ouvre l'application **sur cet enfant comme sujet consulté** (§4.2). Un parent est fréquemment adhérent lui-même et garant de plusieurs enfants : ses notifications et les leurs arrivent sur le même compte, dans la même boîte. Sans cette identification, deux notifications de deux enfants — ou celle du parent et celle de son enfant — sont indiscernables, et le lien mène à un écran qui parle de la mauvaise personne.
+
+**Contenu attendu.** Une notification est **autoporteuse** : elle dit *qui* elle concerne (ci-dessus), *quoi* (son type) et, quand elle porte sur une séance, *laquelle* et *quand*. Elle doit rester compréhensible sans ouvrir l'application — c'est ce qui décide de la garder activée.
+
 #### 4.15.6 Gestion des envois sortants (bureau)
 Écran **bureau / admin** donnant la main sur la **file des notifications sortantes** (`NotificationOutbox`, §5.1), pour superviser et rattraper les envois sans attendre le traitement automatique.
 

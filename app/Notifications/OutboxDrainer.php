@@ -101,13 +101,17 @@ class OutboxDrainer
             }
 
             if ($delivered) {
-                // Le secret a servi : il n'a plus rien à faire en base. On ne purge QUE sur `sent` —
+                // Le secret a servi : il n'a plus rien à faire en base. Même sort pour le contexte
+                // volatil (prénom du sujet), qui n'a servi qu'au rendu. On ne purge QUE sur `sent` —
                 // une ligne `failed` reste rejouable depuis l'écran d'envois, la vider produirait un
-                // lien mort au rejeu.
+                // lien mort et un titre amputé au rejeu.
                 $line->update([
                     'status' => 'sent',
                     'sent_at' => Carbon::now(),
-                    'payload' => Arr::except($line->payload ?? [], NotificationOutbox::SENSITIVE_PAYLOAD_KEYS),
+                    'payload' => Arr::except($line->payload ?? [], [
+                        ...NotificationOutbox::SENSITIVE_PAYLOAD_KEYS,
+                        ...NotificationOutbox::VOLATILE_PAYLOAD_KEYS,
+                    ]),
                 ]);
                 $stats['sent']++;
 

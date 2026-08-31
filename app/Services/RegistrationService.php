@@ -176,7 +176,7 @@ class RegistrationService
         // §4.9.7 « Notif à l'athlète » : la cible inscrite par le bureau est prévenue (push + email).
         // Distinct de l'override (§4.10.5) qui émet CoachOverride depuis overrideRegister().
         if ($byStaff) {
-            $this->notifier->dispatch(NotificationType::EnrolledByCoach, $target, ['session_id' => $session->id]);
+            $this->notifier->dispatch(NotificationType::EnrolledByCoach, $target, $session->payloadNotification());
         }
 
         return $registration;
@@ -234,7 +234,7 @@ class RegistrationService
         });
 
         // Après commit : l'athlète inscrit d'office est prévenu (§4.10.5, type coach_override).
-        $this->notifier->dispatch(NotificationType::CoachOverride, $target, ['session_id' => $session->id]);
+        $this->notifier->dispatch(NotificationType::CoachOverride, $target, $session->payloadNotification());
 
         return $registration;
     }
@@ -620,12 +620,14 @@ class RegistrationService
         foreach ($promoted as $reg) {
             // Les promus viennent de requêtes hétérogènes (waitlist, quota_exceeded, autres
             // séances) qui ne préchargent pas toutes user → chargement explicite si absent.
-            $reg->loadMissing('user');
+            // `session` de même : le payload dit QUELLE séance s'est libérée, et une promotion
+            // muette sur ce point est celle où l'athlète a le plus besoin de savoir laquelle.
+            $reg->loadMissing('user', 'session');
             if ($reg->user !== null) {
                 $this->notifier->dispatch(
                     NotificationType::WaitlistPromoted,
                     $reg->user,
-                    ['session_id' => $reg->session_id],
+                    $reg->session?->payloadNotification() ?? ['session_id' => $reg->session_id],
                 );
             }
         }
