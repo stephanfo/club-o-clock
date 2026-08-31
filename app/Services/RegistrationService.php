@@ -9,6 +9,7 @@ use App\Notifications\NotificationDispatcher;
 use App\Notifications\NotificationType;
 use App\Support\Logging\ActivityLogger;
 use App\Support\Logging\AuditLogger;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -615,14 +616,19 @@ class RegistrationService
         $this->notifyPromoted($promoted);
     }
 
+    /** @param  list<Registration>  $promoted */
     private function notifyPromoted(array $promoted): void
     {
-        foreach ($promoted as $reg) {
-            // Les promus viennent de requêtes hétérogènes (waitlist, quota_exceeded, autres
-            // séances) qui ne préchargent pas toutes user → chargement explicite si absent.
-            // `session` de même : le payload dit QUELLE séance s'est libérée, et une promotion
-            // muette sur ce point est celle où l'athlète a le plus besoin de savoir laquelle.
-            $reg->loadMissing('user', 'session');
+        // Les promus viennent de requêtes hétérogènes (waitlist, quota_exceeded, autres séances)
+        // qui ne préchargent pas toutes `user`, ni `session` — dont le payload a besoin pour dire
+        // QUELLE séance s'est libérée, l'information dont l'athlète a le plus besoin ici.
+        //
+        // Chargement en LOT, hors boucle : un déblocage de file quota (§4.10.4) promeut tout le
+        // monde d'un coup, et un loadMissing par ligne rendait le nombre d'allers-retours
+        // proportionnel au nombre de promus — sur mutualisé, c'est ce qui se sent.
+        $lignes = EloquentCollection::make($promoted)->loadMissing('user', 'session');
+
+        foreach ($lignes as $reg) {
             if ($reg->user !== null) {
                 $this->notifier->dispatch(
                     NotificationType::WaitlistPromoted,

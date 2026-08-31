@@ -503,6 +503,7 @@ la transaction), **paresseux** (calculé à l'affichage), ou **explicitement exc
 | Reset quota hebdo (§4.10.6) | ❌ **Non** | PRD : *« pas de cron de reset »* — recalcul naturel sur la semaine courante. |
 | Suppression comptes J+7 (§4.3) | ❌ **Non** | PRD : *« pas de job auto »* — clic admin ; signaux passifs à l'affichage. |
 | Alerte séance sans coach (§4.11.2) | ❌ **Non** | PRD : *« pas de cron / scheduler »* — détection in-context. |
+| **Élagage de l'`outbox`** (§7.14) | ❌ **Non — à ouvrir en V2** | La file ne se vide **jamais** : rien n'efface les lignes `sent`, ni les `failed` abandonnées. Sans effet fonctionnel (le drain ne relit pas une ligne envoyée), mais deux dettes s'accumulent — le volume, et le prénom du sujet conservé sur les `failed`, qu'on ne purge pas pour les garder rejouables. Même rôle que `club:prune-tokens` sur les jetons ; demande d'abord de trancher une durée de rétention. |
 | Rappels avant séance, bascule d'âge, purge journaux (§4.15.2, §4.2, §4.18.4) | ❌ **Non** | Explicitement exclus du V1. |
 
 ### 7.14 Stratégie de notification : `outbox` + drain (PRD §4.15)
@@ -815,6 +816,11 @@ et compromis ops **assumés et documentés** plutôt qu'ignorés.
 - **Pas de temps réel** : rafraîchissement manuel (déjà autorisé PRD).
 - **Ops manuelles** : déploiement, vérification des dumps, surveillance du volume objets/logs reposent
   sur la discipline du mainteneur.
+- **Rétention de la file d'envoi** : l'`outbox` croît sans borne, aucune tâche ne l'élague (§7.13).
+  Assumé en V1 — le volume d'un club reste modeste et rien ne dysfonctionne. À rouvrir pour la
+  minimisation RGPD : le prénom du sujet est purgé au passage à `sent` (§7.14), mais survit sur une ligne
+  `failed`, volontairement gardée rejouable — ce qui n'a plus de sens passé quelques mois. Décision
+  préalable : la durée de rétention, par état (`sent` / `failed`).
 - **Conditions déclenchant une migration vers VPS / PaaS UE** (Scaleway, Clever Cloud, OVH VPS…) :
   besoin de **temps réel** (SSE/WebSocket), **PITR réel**, **preview-par-PR** automatisée, montée en
   **volume d'objets** justifiant un S3, ou charge cron dépassant les limites du mutualisé. Le monolithe

@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\RegistrationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Tests\Concerns\EnrollableCategory;
 use Tests\TestCase;
 
@@ -77,6 +78,41 @@ class RegistrationNotificationTest extends TestCase
         $this->assertSame(2, $promoted);
         // 2 promus × (push + email) = 4 lignes.
         $this->assertSame(4, NotificationOutbox::where('type', 'waitlist_promoted')->count());
+    }
+
+    public function test_le_deblocage_d_une_file_ne_multiplie_pas_les_lectures_de_seance(): void
+    {
+        // Les promus sont notifiés en lot, et le payload de chacun porte la séance : le nombre de
+        // lectures de `sessions` ne doit donc PAS suivre le nombre de promus. Invisible à deux,
+        // sensible sur un déblocage de file entière — et le mutualisé n'a pas de marge.
+        $this->assertSame($this->lecturesDeSeance(2), $this->lecturesDeSeance(6));
+    }
+
+    /** Nombre de SELECT sur `sessions` pendant le déblocage d'une file de $promus athlètes. */
+    private function lecturesDeSeance(int $promus): int
+    {
+        $s = $this->makeSession(capacity: null);
+        $coach = User::factory()->coach()->create();
+
+        for ($i = 0; $i < $promus; $i++) {
+            Registration::create([
+                'session_id' => $s->id, 'user_id' => $this->athlete()->id,
+                'status' => 'waitlist', 'waitlist_reason' => 'quota_exceeded',
+                'registered_at' => Carbon::now(),
+            ]);
+        }
+
+        // Écoute posée APRÈS la mise en place : seul le déblocage lui-même est compté.
+        $lectures = 0;
+        DB::listen(function ($requete) use (&$lectures) {
+            if (str_contains($requete->sql, 'from `sessions`')) {
+                $lectures++;
+            }
+        });
+
+        $this->service()->fillFromQuotaExceeded($s, $coach);
+
+        return $lectures;
     }
 
     public function test_override_notifies_target(): void

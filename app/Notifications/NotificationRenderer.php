@@ -226,6 +226,11 @@ class NotificationRenderer
      * confondre avec la colonne `user_id` de la ligne, qui porte le DESTINATAIRE). Les deux
      * diffèrent quand c'est le garant qui est notifié pour son enfant (§4.15.5).
      *
+     * Oui, `subject_id` répond à la même question et est déjà calculé plus haut : ce n'est PAS un
+     * oubli de nettoyage. `user_id` est antérieur au sujet et couvre en plus les lignes émises avant
+     * lui, encore en file ou en échec rejouable, qui n'ont pas de `subject_id`. Unifier sur le sujet
+     * enverrait ces lignes-là sur le mauvais écran — précisément le défaut corrigé ici.
+     *
      * @param  array<string,mixed>  $payload
      */
     private function reactivationTarget(array $payload, NotificationOutbox $line): string
