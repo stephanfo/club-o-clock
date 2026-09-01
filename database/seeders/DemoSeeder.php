@@ -140,7 +140,7 @@ class DemoSeeder extends Seeder
             [
                 'first_name' => 'Mathieu',
                 'last_name' => 'Coach',
-                'dob' => '1986-03-14',
+                'dob' => $this->naissancePour(38, '03-14'), // Adulte
                 'password' => Hash::make('password'),
                 'roles' => ['coach', 'athlete'],
                 'is_active' => true,
@@ -402,30 +402,31 @@ class DemoSeeder extends Seeder
         // dob renseignée pour que la catégorie principale dérivée s'affiche (cf. AgeCategory).
         // Âges étalés pour couvrir Benjamins → Master (mineurs inclus).
         $athletes = [];
+        // [prénom, nom, email, âge de saison (§4.5), anniversaire 'MM-JJ'] — un ÂGE, pas une date.
+        // La catégorie en commentaire est donc vraie à chaque saison : cf. naissancePour().
         $athDefs = [
-            // [prénom, nom, email, date de naissance]  → catégorie au 31/08 de fin de saison
-            ['Marie', 'Dupont', 'marie@demo.club', '1995-04-12'],       // Adulte
-            ['Lucas', 'Martin', 'lucas@demo.club', '2002-11-23'],       // Adulte
-            ['Sophie', 'Bernard', 'sophie@demo.club', '1980-07-05'],    // Master
-            ['Hugo', 'Petit', 'hugo@demo.club', '2011-03-08'],          // Benjamins
-            ['Léa', 'Robert', 'lea@demo.club', '2012-09-19'],           // Benjamins
-            ['Nathan', 'Richard', 'nathan@demo.club', '2010-01-30'],    // Minimes
-            ['Chloé', 'Durand', 'chloe@demo.club', '2009-06-14'],       // Minimes
-            ['Enzo', 'Moreau', 'enzo@demo.club', '2008-12-02'],         // Cadets
-            ['Manon', 'Laurent', 'manon@demo.club', '2007-08-21'],      // Cadets
-            ['Tom', 'Simon', 'tom@demo.club', '2006-05-17'],            // Juniors
-            ['Inès', 'Michel', 'ines@demo.club', '2005-10-09'],         // Juniors
-            ['Hugo', 'Lefebvre', 'hugol@demo.club', '1998-02-25'],      // Adulte
-            ['Camille', 'Leroy', 'camille@demo.club', '1992-11-11'],    // Adulte
-            ['Maxime', 'Roux', 'maxime@demo.club', '1989-07-03'],       // Adulte
-            ['Julie', 'David', 'julie@demo.club', '2000-04-28'],        // Adulte
-            ['Antoine', 'Bertrand', 'antoine@demo.club', '1996-09-06'], // Adulte
-            ['Sarah', 'Morel', 'sarah@demo.club', '2001-12-19'],        // Adulte
-            ['Paul', 'Fournier', 'paul@demo.club', '1975-03-22'],       // Master
-            ['Émilie', 'Girard', 'emilie@demo.club', '1983-08-15'],     // Master
-            ['Romain', 'Bonnet', 'romain@demo.club', '1978-01-07'],     // Master
-            ['Laura', 'Dupuis', 'laura@demo.club', '1969-05-30'],       // Master
-            ['Kévin', 'Lambert', 'kevin@demo.club', '1994-10-12'],      // Adulte
+            ['Marie', 'Dupont', 'marie@demo.club', 31, '04-12'],       // Adulte
+            ['Lucas', 'Martin', 'lucas@demo.club', 24, '11-23'],       // Adulte
+            ['Sophie', 'Bernard', 'sophie@demo.club', 46, '07-05'],    // Master
+            ['Hugo', 'Petit', 'hugo@demo.club', 13, '03-08'],          // Benjamins
+            ['Léa', 'Robert', 'lea@demo.club', 12, '09-19'],           // Benjamins
+            ['Nathan', 'Richard', 'nathan@demo.club', 15, '01-30'],    // Minimes
+            ['Chloé', 'Durand', 'chloe@demo.club', 14, '06-14'],       // Minimes
+            ['Enzo', 'Moreau', 'enzo@demo.club', 17, '12-02'],         // Cadets
+            ['Manon', 'Laurent', 'manon@demo.club', 16, '08-21'],      // Cadets
+            ['Tom', 'Simon', 'tom@demo.club', 19, '05-17'],            // Juniors
+            ['Inès', 'Michel', 'ines@demo.club', 18, '10-09'],         // Juniors
+            ['Hugo', 'Lefebvre', 'hugol@demo.club', 28, '02-25'],      // Adulte
+            ['Camille', 'Leroy', 'camille@demo.club', 34, '11-11'],    // Adulte
+            ['Maxime', 'Roux', 'maxime@demo.club', 37, '07-03'],       // Adulte
+            ['Julie', 'David', 'julie@demo.club', 26, '04-28'],        // Adulte
+            ['Antoine', 'Bertrand', 'antoine@demo.club', 30, '09-06'], // Adulte
+            ['Sarah', 'Morel', 'sarah@demo.club', 25, '12-19'],        // Adulte
+            ['Paul', 'Fournier', 'paul@demo.club', 51, '03-22'],       // Master
+            ['Émilie', 'Girard', 'emilie@demo.club', 43, '08-15'],     // Master
+            ['Romain', 'Bonnet', 'romain@demo.club', 48, '01-07'],     // Master
+            ['Laura', 'Dupuis', 'laura@demo.club', 57, '05-30'],       // Master
+            ['Kévin', 'Lambert', 'kevin@demo.club', 32, '10-12'],      // Adulte
         ];
         $activeCats = Category::query()->whereNull('archived_at')->get();
 
@@ -434,7 +435,8 @@ class DemoSeeder extends Seeder
         // « Je participe » serait proposé puis refusé en CATEGORY_MISMATCH.
         $this->attachPrimaryCategory($mathieu, $activeCats);
 
-        foreach ($athDefs as [$fn, $ln, $email, $dob]) {
+        foreach ($athDefs as [$fn, $ln, $email, $age, $anniversaire]) {
+            $dob = $this->naissancePour($age, $anniversaire);
             // updateOrCreate (pas firstOrCreate) : corrige aussi les comptes démo déjà seedés sans dob.
             $athlete = User::updateOrCreate(
                 ['email' => $email],
@@ -476,7 +478,7 @@ class DemoSeeder extends Seeder
             [
                 'first_name' => 'Florence',
                 'last_name' => 'Garnier',
-                'dob' => '1984-02-17',
+                'dob' => $this->naissancePour(42, '02-17'), // Master
                 'password' => Hash::make('password'),
                 'roles' => ['athlete'],
                 'is_active' => true,
@@ -494,7 +496,7 @@ class DemoSeeder extends Seeder
                 'email' => null,
                 'password' => null,
                 'email_verified_at' => null,
-                'dob' => '2012-05-09',
+                'dob' => $this->naissancePour(13, '05-09'), // Benjamins
                 'roles' => ['athlete'],
                 'is_active' => true,
                 'is_minor' => true,
@@ -511,7 +513,7 @@ class DemoSeeder extends Seeder
             [
                 'first_name' => 'Olivier',
                 'last_name' => 'Mercier',
-                'dob' => '1981-09-30',
+                'dob' => $this->naissancePour(45, '09-30'),
                 'password' => Hash::make('password'),
                 'roles' => [],
                 'is_active' => true,
@@ -527,7 +529,7 @@ class DemoSeeder extends Seeder
             [
                 'first_name' => 'Théo',
                 'last_name' => 'Mercier',
-                'dob' => '2010-11-04',
+                'dob' => $this->naissancePour(15, '11-04'), // Minimes
                 'password' => Hash::make('password'),
                 'roles' => ['athlete'],
                 'is_active' => true,
@@ -546,7 +548,7 @@ class DemoSeeder extends Seeder
             [
                 'first_name' => 'Sandrine',
                 'last_name' => 'Faure',
-                'dob' => '1982-06-25',
+                'dob' => $this->naissancePour(44, '06-25'), // Master
                 'password' => Hash::make('password'),
                 'roles' => ['athlete'],
                 'is_active' => true,
@@ -562,7 +564,7 @@ class DemoSeeder extends Seeder
                 'email' => null,
                 'password' => null,
                 'email_verified_at' => null,
-                'dob' => '2013-04-02',
+                'dob' => $this->naissancePour(12, '04-02'), // Benjamins
                 'roles' => ['athlete'],
                 'is_active' => true,
                 'is_minor' => true,
@@ -576,7 +578,7 @@ class DemoSeeder extends Seeder
             [
                 'first_name' => 'Noah',
                 'last_name' => 'Faure',
-                'dob' => '2009-01-18',
+                'dob' => $this->naissancePour(17, '01-18'), // Cadets
                 'password' => Hash::make('password'),
                 'roles' => ['athlete'],
                 'is_active' => true,
@@ -601,7 +603,7 @@ class DemoSeeder extends Seeder
                 'email' => null,
                 'password' => null,
                 'email_verified_at' => null,
-                'dob' => '2012-09-14',
+                'dob' => $this->naissancePour(14, '09-14'), // Minimes
                 'roles' => ['athlete'],
                 'is_active' => true,
                 'is_minor' => true,
@@ -1048,7 +1050,7 @@ class DemoSeeder extends Seeder
         $brigitte = User::updateOrCreate(
             ['email' => 'brigitte@demo.club'],
             [
-                'first_name' => 'Brigitte', 'last_name' => 'Ancienne', 'dob' => '1971-03-05',
+                'first_name' => 'Brigitte', 'last_name' => 'Ancienne', 'dob' => $this->naissancePour(55, '03-05'), // Master
                 'password' => Hash::make('password'), 'roles' => ['athlete'],
                 'is_active' => true, 'athlete_access_suspended' => true, 'email_verified_at' => now(),
             ],
@@ -1061,7 +1063,7 @@ class DemoSeeder extends Seeder
         $gilles = User::updateOrCreate(
             ['email' => 'gilles@demo.club'],
             [
-                'first_name' => 'Gilles', 'last_name' => 'Partant', 'dob' => '1987-12-01',
+                'first_name' => 'Gilles', 'last_name' => 'Partant', 'dob' => $this->naissancePour(39, '12-01'), // Adulte
                 'password' => Hash::make('password'), 'roles' => ['athlete'],
                 'is_active' => true, 'email_verified_at' => now(),
             ],
@@ -1074,7 +1076,7 @@ class DemoSeeder extends Seeder
         $daniel = User::updateOrCreate(
             ['email' => 'daniel@demo.club'],
             [
-                'first_name' => 'Daniel', 'last_name' => 'Sorti', 'dob' => '1965-06-18',
+                'first_name' => 'Daniel', 'last_name' => 'Sorti', 'dob' => $this->naissancePour(61, '06-18'), // Master
                 'password' => Hash::make('password'), 'roles' => ['athlete'],
                 'is_active' => true, 'email_verified_at' => now(),
             ],
@@ -1098,10 +1100,19 @@ class DemoSeeder extends Seeder
             }
         }
 
-        // Athlète SURCLASSÉ (§4.5) : Noah (Cadets) rattaché aussi à Juniors (non-principale).
-        $juniors = Category::where('label', 'Juniors')->first();
-        if ($juniors) {
-            $noah->categories()->syncWithoutDetaching([$juniors->id => ['is_primary' => false]]);
+        // Athlète SURCLASSÉ (§4.5) : Noah (Cadets) rattaché aussi à la catégorie du dessus, en
+        // non-principale. Celle-ci se DÉRIVE de sa catégorie réelle et n'est jamais nommée en dur :
+        // une catégorie écrite ici finit, au fil des saisons, par être aussi sa principale — et le
+        // syncWithoutDetaching, en repassant le pivot à is_primary=false, la lui retire. Un athlète
+        // sans catégorie principale ne peut plus s'inscrire à rien (CATEGORY_MISMATCH partout).
+        $noah->load('categories');
+        $surclassement = $activeCats
+            ->filter(fn (Category $c) => $c->age_min > ($noah->primaryCategory()?->age_max ?? PHP_INT_MAX))
+            ->sortBy('age_min')
+            ->first();
+
+        if ($surclassement !== null) {
+            $noah->categories()->syncWithoutDetaching([$surclassement->id => ['is_primary' => false]]);
         }
 
         // Séance en LIEU TEXTE LIBRE (location_text, sans Location géocodée → pas de carte ni météo).
@@ -1153,6 +1164,41 @@ class DemoSeeder extends Seeder
      *
      * @param  Collection<int, Category>  $activeCats
      */
+    /**
+     * Date de naissance donnant l'âge de saison voulu (§4.5), pour la saison EN COURS.
+     *
+     * Le jeu de démo est relatif à `now()` — ses séances comme ses âges. Une date de naissance
+     * écrite en dur, elle, vieillit : chaque 1er septembre, tout le monde monte d'une catégorie.
+     * Les jeunes du jeu finissent adultes, les séances jeunes se vident, et les cas que la démo
+     * prétend montrer se dissolvent sans qu'aucun test ne s'en aperçoive — jusqu'à celui du
+     * 1er septembre 2026, où le cadet surclassé est devenu junior et a perdu sa catégorie.
+     *
+     * L'année de naissance est trouvée par ajustement plutôt que par formule : `seasonAge()`
+     * décroît exactement de 1 quand l'année de naissance croît de 1, donc un tour suffit — et le
+     * calcul reste juste quel que soit le mois d'ouverture de saison du club (§4.17), sans avoir
+     * à le redériver ici.
+     *
+     * @param  int  $age  âge atteint à la fin de la saison en cours — celui qui décide de la catégorie
+     * @param  string  $anniversaire  'MM-JJ' (jamais le 29/02), pour que les fiches ne se ressemblent pas
+     */
+    private function naissancePour(int $age, string $anniversaire): string
+    {
+        [$mois, $jour] = array_map('intval', explode('-', $anniversaire));
+        $annee = Carbon::now()->year - $age;
+        $dob = Carbon::create($annee, $mois, $jour);
+
+        for ($i = 0; $i < 3; $i++) {
+            $ecart = AgeCategory::seasonAge($dob) - $age;
+            if ($ecart === 0) {
+                break;
+            }
+            $annee += $ecart;
+            $dob = Carbon::create($annee, $mois, $jour);
+        }
+
+        return $dob->toDateString();
+    }
+
     private function attachPrimaryCategory(User $user, Collection $activeCats): void
     {
         if ($user->dob === null || ! $user->hasRole('athlete')) {
