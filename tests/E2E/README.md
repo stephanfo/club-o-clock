@@ -69,6 +69,12 @@ lancement accidentel. Ne pas remplacer la reconstruction par un simple `db:seed`
 crée les séances sans garde d'unicité, donc un re-seed seul empile un jeu complet de doublons
 (mesuré : 74 → 147 séances).
 
+Cette reconstruction **rejoue les migrations** au lieu de charger le dump de schéma — d'où le
+`--schema-path` pointant un fichier absent, commenté dans le script. Charger un dump passe par le
+client `mysql`/`mariadb` en ligne de commande, que l'image E2E ne fournit pas ; le rejeu coûte
+moins d'une seconde et se comporte pareil partout. Ne pas le « corriger » en retirant le drapeau :
+le harnais mourrait alors sur `sh: 1: mysql: not found`, **après** avoir détruit la base.
+
 ## Sécurité
 
 `auth.php` ouvre une session **sans mot de passe** (magic link à usage unique) et `sql.php` exécute

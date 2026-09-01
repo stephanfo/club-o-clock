@@ -215,10 +215,34 @@ await browser.close();
 // Reconstruction COMPLÈTE, pas un simple re-seed : DemoSeeder crée les séances
 // avec Session::create() sans garde d'unicité, donc un db:seed seul empile un jeu
 // entier de doublons (mesuré : 74 → 147 séances).
+//
+// `--schema-path` désigne volontairement un fichier ABSENT. Laravel ne charge le dump de schéma
+// que si le chemin existe (MigrateCommand::loadSchemaState) : lui en désigner un qui n'existe pas
+// est le seul moyen qu'offre le framework de dire « rejoue les migrations ». Il le faut parce que
+// charger le dump passe par le client `mysql` (ou `mariadb`) en ligne de commande, absent de
+// l'image E2E — qui fournit des navigateurs et un PHP CLI, pas un poste de base de données. L'y
+// ajouter reviendrait à choisir le moteur à la place du poste : les deux paquets clients se
+// déclarent mutuellement incompatibles chez Debian/Ubuntu. Coût du rejeu : ~0,4 s pour 41
+// migrations, et le même chemin sur toutes les machines. Que dump et migrations produisent la
+// même structure est par ailleurs garanti par `schema:check-drift`, dans `composer check`.
+const SANS_DUMP = '--schema-path=chemin/inexistant/pour-ignorer-le-dump';
+
 console.log('\n♻️  Reconstruction du jeu de démo (migrate:fresh + seeders)…');
-execFileSync('php', ['artisan', 'migrate:fresh', '--force'], { cwd: PROJ, stdio: 'inherit' });
-execFileSync('php', ['artisan', 'db:seed', '--class=CatalogSeeder', '--force'], { cwd: PROJ, stdio: 'inherit' });
-execFileSync('php', ['artisan', 'db:seed', '--class=DemoSeeder', '--force'], { cwd: PROJ, stdio: 'inherit' });
+try {
+  execFileSync('php', ['artisan', 'migrate:fresh', '--force', SANS_DUMP], { cwd: PROJ, stdio: 'inherit' });
+  execFileSync('php', ['artisan', 'db:seed', '--class=CatalogSeeder', '--force'], { cwd: PROJ, stdio: 'inherit' });
+  execFileSync('php', ['artisan', 'db:seed', '--class=DemoSeeder', '--force'], { cwd: PROJ, stdio: 'inherit' });
+} catch (e) {
+  // Ce script vient de détruire la base : échouer ici la laisse inutilisable pour TOUT run suivant,
+  // y compris non destructif. Le dire et donner la sortie de secours, plutôt que rendre une trace
+  // Node dont on ne déduit ni ce qui manque, ni dans quel état on se retrouve.
+  console.error(`\n❌ RECONSTRUCTION IMPOSSIBLE — la base reste incomplète : ${e.message.split('\n')[0]}`);
+  console.error('   Remettre en état à la main, depuis un poste disposant de PHP et de la base :');
+  console.error('   php artisan migrate:fresh --force && php artisan db:seed --class=CatalogSeeder --force \\');
+  console.error('     && php artisan db:seed --class=DemoSeeder --force');
+  process.exit(1);
+}
+
 const noah = sql("SELECT IFNULL(guardian_id,'aucun') g FROM users WHERE email='noah.faure@demo.club'");
 console.log(`   tutelle de Noah après re-seed : ${noah}`);
 
