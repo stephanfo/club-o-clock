@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Models\Category;
 use App\Models\ClubSettings;
 use App\Models\Registration;
 use App\Models\User;
+use App\Support\AgeCategory;
 use Database\Seeders\CatalogSeeder;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -113,6 +116,63 @@ class DemoSeederIntegrityTest extends TestCase
 
         $this->assertSame([], $sansCategorie,
             'Athlètes de démo sans catégorie principale : '.implode(', ', $sansCategorie));
+    }
+
+    /**
+     * Le jeu de démo vieillit, et il vieillit en silence. Ses dates de naissance étaient écrites en
+     * dur : chaque 1er septembre — la bascule de saison §4.4 — tout le monde montait d'une catégorie.
+     * Le 01/09/2026, la CI est tombée sur le cas terminal : Noah, cadet surclassé en juniors, est
+     * devenu junior pour de bon, et le rattachement de surclassement (qui pose is_primary=false) lui
+     * a retiré sa catégorie principale — un athlète que la démo propose et que le serveur refuse.
+     *
+     * Le test se place TROIS saisons plus loin : ce que la démo prétend montrer doit encore tenir.
+     * Il échouait sur le seeder d'avant à `travel(0)` près, puisque c'est l'échec constaté ce jour-là.
+     */
+    public function test_les_cas_de_demo_tiennent_saison_apres_saison(): void
+    {
+        $this->travel(3)->years();
+
+        $this->seed(CatalogSeeder::class);
+        $this->seed(DemoSeeder::class);
+
+        // Les catégories annoncées en commentaire du seeder — et sur lesquelles reposent les
+        // scénarios E2E (Marie ne voit que l'adulte, Enzo que le jeune).
+        foreach ([
+            'marie@demo.club' => 'Adulte',
+            'sophie@demo.club' => 'Master',
+            'hugo@demo.club' => 'Benjamins',
+            'enzo@demo.club' => 'Cadets',
+            'ines@demo.club' => 'Juniors',
+            'noah.faure@demo.club' => 'Cadets',
+        ] as $email => $categorie) {
+            $athlete = User::where('email', $email)->firstOrFail();
+
+            $this->assertSame($categorie, $athlete->primaryCategory()?->label,
+                "{$email} ne porte plus la catégorie que le seeder annonce : le jeu de démo a vieilli.");
+        }
+
+        // Le surclassé : DEUX catégories, dont exactement une principale. C'est le pivot que
+        // l'ancien rattachement en dur écrasait dès que la catégorie du dessus devenait la sienne.
+        $noah = User::where('email', 'noah.faure@demo.club')->firstOrFail();
+        $categories = $noah->categories->sortBy('age_min');
+
+        $this->assertSame(['Cadets', 'Juniors'], $categories->pluck('label')->values()->all(),
+            'Le surclassement doit rattacher la catégorie du dessus, en plus de la principale.');
+        $this->assertCount(1, $categories->filter(fn (Category $c) => (bool) $c->pivot->is_primary),
+            'Un athlète surclassé garde une et une seule catégorie principale.');
+        $this->assertTrue($noah->is_minor,
+            'Noah démontre la tutelle P2 (mineur avec compte propre) : il doit rester mineur.');
+
+        // Contrôle apparié : le drapeau posé à la main par le seeder ne doit jamais diverger de
+        // l'âge de saison dérivé par l'application (§4.5) — dans un sens comme dans l'autre.
+        $divergents = User::whereNotNull('dob')->get()
+            ->filter(fn (User $u) => $u->is_minor !== AgeCategory::isMinor(Carbon::parse($u->dob)))
+            ->map(fn (User $u) => $u->email ?? $u->fullName())
+            ->values()
+            ->all();
+
+        $this->assertSame([], $divergents,
+            'Comptes de démo dont is_minor contredit la date de naissance : '.implode(', ', $divergents));
     }
 
     public function test_les_comptes_proposes_a_la_connexion_existent_tous(): void

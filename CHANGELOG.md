@@ -9,6 +9,18 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Corrigé
 
+- **Le jeu de démonstration vieillissait d'une catégorie par an.** Ses dates de naissance étaient
+  écrites en dur : à chaque 1er septembre, la bascule d'année sportive faisait monter tout le monde
+  d'un cran. Les « benjamins » du jeu sont devenus cadets, puis juniors, et les séances jeunes se
+  sont vidées de leurs inscrits — sans le moindre message, puisque rien n'était faux, seulement
+  périmé. Au 1er septembre 2026, le cas limite est tombé : l'athlète surclassé de la démo a rejoint
+  pour de bon la catégorie dans laquelle il n'était que surclassé, et le rattachement qui le
+  démontrait — posé en « non-principale » — lui a retiré sa **seule** catégorie. Un compte que la
+  démo propose et que le serveur refuse partout. Les âges sont désormais exprimés relativement à la
+  saison en cours, comme le sont déjà les séances du jeu, et le surclassement se dérive de la
+  catégorie réelle au lieu d'être nommé en dur. Un test place la démo trois saisons plus loin et
+  vérifie que ce qu'elle prétend montrer tient toujours.
+
 - **La notification de réactivation d'un accès athlète menait le parent au mauvais écran.** Quand
   c'est un enfant mineur qui est réactivé, c'est son garant qui reçoit le message — « Ton accès
   athlète est réactivé » l'envoyait sur **son** tableau de bord à lui, où rien n'avait changé — et le
