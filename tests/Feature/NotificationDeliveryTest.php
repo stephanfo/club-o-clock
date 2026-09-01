@@ -103,6 +103,17 @@ class NotificationDeliveryTest extends TestCase
         $this->assertStringEndsWith('/dashboard', app(NotificationRenderer::class)->render($reactivated)['url']);
     }
 
+    /** Lue par le GARANT (§4.15.5), la réactivation parle de l'enfant : le dashboard du parent ne
+     *  lui montrait rien de ce qui avait changé. Cas complémentaire du test ci-dessus, qui garde le
+     *  cas « lu par l'intéressé ». Détail complet dans NotificationContexteSujetTest. */
+    public function test_render_links_reactivated_to_children_when_read_by_the_guardian(): void
+    {
+        $guardian = User::factory()->create();
+        $line = $this->line(NotificationType::AthleteReactivated, $guardian, ['user_id' => $guardian->id + 1]);
+
+        $this->assertStringEndsWith('/enfants', app(NotificationRenderer::class)->render($line)['url']);
+    }
+
     // ── Canal push (PushChannel + couture WebPushSender) ──
 
     private function fakeSender(): object

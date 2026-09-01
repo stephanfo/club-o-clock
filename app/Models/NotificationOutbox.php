@@ -26,8 +26,20 @@ class NotificationOutbox extends Model
      * l'affichage. Un jeton d'invitation en clair vaut la prise du compte de l'adhérent : le laisser
      * dormir dans la table et le rendre lisible dans le tiroir admin donnait à tout admin, pour
      * toujours, de quoi entrer dans n'importe quel compte invité.
+     *
+     * Purgées à l'envoi comme VOLATILE_PAYLOAD_KEYS, mais en plus MASQUÉES à l'affichage.
      */
     public const SENSITIVE_PAYLOAD_KEYS = ['token'];
+
+    /**
+     * Clés de payload qui ont fini leur office une fois la ligne envoyée. Distinctes des secrets :
+     * elles ne sont PAS masquées dans le tiroir admin — un prénom n'est pas un jeton, le masquer
+     * rendrait l'écran des envois illisible pour la seule ligne où il aide (celle qui n'est pas
+     * partie). Elles sont simplement retirées au passage à `sent` (minimisation RGPD §4.19) : le
+     * prénom du sujet n'a servi qu'à composer le titre, et la page Alertes le re-résout depuis
+     * `subject_id`, qui reste. Un nom d'enfant ne dort donc pas indéfiniment dans la file.
+     */
+    public const VOLATILE_PAYLOAD_KEYS = ['subject_first_name'];
 
     protected $fillable = [
         'type', 'channel', 'payload', 'user_id', 'status', 'attempts', 'available_at', 'sent_at', 'read_at',

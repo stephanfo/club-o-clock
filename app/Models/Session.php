@@ -52,6 +52,25 @@ class Session extends Model
         );
     }
 
+    /**
+     * Contexte de séance figé dans le payload d'une notification (§4.15.2), pour que le push et
+     * l'email disent QUELLE séance sans rien charger à l'envoi (cadrage §7.14 : le drain ne fait
+     * aucune requête, et une séance supprimée entre l'émission et l'envoi ne casse rien).
+     *
+     * `start_at` part en ISO8601 UTC, jamais en wall-clock : c'est le piège documenté ci-dessus,
+     * et le rendu applique le fuseau du club à l'affichage.
+     *
+     * @return array{session_id:int,session_title:string,session_start_at:string}
+     */
+    public function payloadNotification(): array
+    {
+        return [
+            'session_id' => $this->id,
+            'session_title' => $this->title,
+            'session_start_at' => $this->start_at->toIso8601String(),
+        ];
+    }
+
     public function isCancelled(): bool
     {
         return $this->cancelled_at !== null;

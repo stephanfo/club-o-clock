@@ -9,7 +9,11 @@ use Illuminate\Support\Collection;
  * Sujet consulté par un parent garant (PRD §4.2, proto shell.jsx SubjectSwitcher).
  * Le parent reste LUI-MÊME connecté (jamais d'impersonation) ; le « sujet » est la personne
  * dont on consulte/gère les activités : soi, ou un enfant garanti. Persisté en session,
- * il ne pilote que l'Accueil, le Planning et l'inscription depuis la fiche — ni Alertes ni Moi.
+ * il pilote l'Accueil, le Planning et l'inscription depuis la fiche — pas « Moi ».
+ *
+ * Les Alertes ne le pilotent pas mais le REFLÈTENT : une notification concernant un enfant porte
+ * son prénom et son lien profond pose le sujet via `?as=` (§4.15.5). Sans quoi un parent lui-même
+ * athlète ne pouvait pas distinguer ses notifications de celles de ses enfants.
  */
 class SubjectContext
 {

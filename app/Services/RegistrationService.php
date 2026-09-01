@@ -9,6 +9,7 @@ use App\Notifications\NotificationDispatcher;
 use App\Notifications\NotificationType;
 use App\Support\Logging\ActivityLogger;
 use App\Support\Logging\AuditLogger;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -176,7 +177,7 @@ class RegistrationService
         // §4.9.7 « Notif à l'athlète » : la cible inscrite par le bureau est prévenue (push + email).
         // Distinct de l'override (§4.10.5) qui émet CoachOverride depuis overrideRegister().
         if ($byStaff) {
-            $this->notifier->dispatch(NotificationType::EnrolledByCoach, $target, ['session_id' => $session->id]);
+            $this->notifier->dispatch(NotificationType::EnrolledByCoach, $target, $session->payloadNotification());
         }
 
         return $registration;
@@ -234,7 +235,7 @@ class RegistrationService
         });
 
         // Après commit : l'athlète inscrit d'office est prévenu (§4.10.5, type coach_override).
-        $this->notifier->dispatch(NotificationType::CoachOverride, $target, ['session_id' => $session->id]);
+        $this->notifier->dispatch(NotificationType::CoachOverride, $target, $session->payloadNotification());
 
         return $registration;
     }
@@ -615,17 +616,24 @@ class RegistrationService
         $this->notifyPromoted($promoted);
     }
 
+    /** @param  list<Registration>  $promoted */
     private function notifyPromoted(array $promoted): void
     {
-        foreach ($promoted as $reg) {
-            // Les promus viennent de requêtes hétérogènes (waitlist, quota_exceeded, autres
-            // séances) qui ne préchargent pas toutes user → chargement explicite si absent.
-            $reg->loadMissing('user');
+        // Les promus viennent de requêtes hétérogènes (waitlist, quota_exceeded, autres séances)
+        // qui ne préchargent pas toutes `user`, ni `session` — dont le payload a besoin pour dire
+        // QUELLE séance s'est libérée, l'information dont l'athlète a le plus besoin ici.
+        //
+        // Chargement en LOT, hors boucle : un déblocage de file quota (§4.10.4) promeut tout le
+        // monde d'un coup, et un loadMissing par ligne rendait le nombre d'allers-retours
+        // proportionnel au nombre de promus — sur mutualisé, c'est ce qui se sent.
+        $lignes = EloquentCollection::make($promoted)->loadMissing('user', 'session');
+
+        foreach ($lignes as $reg) {
             if ($reg->user !== null) {
                 $this->notifier->dispatch(
                     NotificationType::WaitlistPromoted,
                     $reg->user,
-                    ['session_id' => $reg->session_id],
+                    $reg->session?->payloadNotification() ?? ['session_id' => $reg->session_id],
                 );
             }
         }

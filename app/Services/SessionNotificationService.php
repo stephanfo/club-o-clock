@@ -42,7 +42,7 @@ class SessionNotificationService
             }
 
             $created = $created->merge(
-                $this->dispatcher->dispatch($type, $registration->user, ['session_id' => $session->id])
+                $this->dispatcher->dispatch($type, $registration->user, $session->payloadNotification())
             );
         }
 
@@ -72,8 +72,10 @@ class SessionNotificationService
             ->with(['guardian.notificationPreferences', 'notificationPreferences'])
             ->get();
 
+        $payload = $session->payloadNotification();
+
         foreach ($audience as $user) {
-            $this->dispatcher->dispatch(NotificationType::EventCreated, $user, ['session_id' => $session->id]);
+            $this->dispatcher->dispatch(NotificationType::EventCreated, $user, $payload);
         }
     }
 }

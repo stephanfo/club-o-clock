@@ -44,10 +44,39 @@ class NotificationDispatcher
         }
 
         foreach ($recipients as $recipient) {
-            $created = $created->merge($this->linesFor($type, $recipient, $channels, $payload));
+            $created = $created->merge(
+                $this->linesFor($type, $recipient, $channels, $this->withSubject($payload, $subject, $recipient))
+            );
         }
 
         return $created;
+    }
+
+    /**
+     * Identifie le SUJET quand il n'est pas le destinataire — routage parent/enfant (§4.15.5).
+     *
+     * Sans cette clé, un parent garant lui-même athlète recevait « une séance à laquelle tu es
+     * inscrit·e est annulée » sans pouvoir dire s'il s'agissait de la sienne ou de celle de son
+     * enfant, et atterrissait sur une fiche qui parlait de lui.
+     *
+     * Le prénom est FIGÉ ici plutôt que résolu à l'envoi : le drain ne charge aucune entité
+     * (cadrage §7.14). Il est purgé au passage à `sent` (NotificationOutbox::VOLATILE_PAYLOAD_KEYS)
+     * — la page Alertes le re-résout depuis `subject_id`, qui reste.
+     *
+     * @param  array<string,mixed>  $payload
+     * @return array<string,mixed>
+     */
+    private function withSubject(array $payload, User $subject, User $recipient): array
+    {
+        if ($subject->id === $recipient->id) {
+            return $payload;
+        }
+
+        return [
+            ...$payload,
+            'subject_id' => $subject->id,
+            'subject_first_name' => $subject->first_name,
+        ];
     }
 
     /**

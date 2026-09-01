@@ -44,6 +44,12 @@ class SessionShow extends Component
         // (ignore silencieusement un id non garanti), donc lire ?as= en clair est sûr.
         // Puis redirection vers l'URL canonique (sans ?as=) : sinon reload / back-forward
         // re-basculeraient le sujet global sans geste délibéré (?as= ne doit vivre qu'un clic).
+        //
+        // Ce qui est éphémère, c'est le PARAMÈTRE, pas son effet : la bascule de sujet est écrite
+        // en session et DURE — après un clic sur la notification d'un enfant (§4.15.5), le planning
+        // et l'inscription du parent restent sur cet enfant jusqu'au prochain coup de sélecteur.
+        // C'est voulu : le sujet courant est affiché en permanence, et enchaîner sur le planning de
+        // l'enfant est le geste naturel après une annulation le concernant.
         if (auth()->check() && ($as = request()->integer('as'))) {
             SubjectContext::set(auth()->user(), $as);
             $this->redirect(route('sessions.show', $session), navigate: true);

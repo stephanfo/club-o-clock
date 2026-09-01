@@ -37,7 +37,7 @@ seed, et la subtilité du partage de pile réseau qui rend `BASE` joignable —,
 node tests/E2E/run.mjs          # les 3 suites non destructives (verdict agrégé)
 
 node tests/E2E/scenarios.mjs    # S1–S5   gardes d'inscription et bascule de rôle
-node tests/E2E/parcours.mjs     # S7–S17  parcours métier et cloisonnement
+node tests/E2E/parcours.mjs     # S7–S17, S21  parcours métier, cloisonnement, alertes parent
 node tests/E2E/comptes.mjs      # S18–S20 messages d'auth, correction d'email, suspension d'accès
 node tests/E2E/responsive.mjs   # S6      bascule mobile/desktop
 ```
@@ -95,6 +95,7 @@ des requêtes brutes. Les deux **refusent de s'exécuter si `APP_ENV != local`**
 | S15 | Sélecteur d'athlètes | suspendu et déjà-inscrits exclus | §2, §3.4 |
 | S16 | Séance pleine | file d'attente rejointe, statut `waitlist` | §1.4 |
 | S17 | Quota — mécanisme C | déblocage coach : bouton actif/désactivé, promotion, `AuditLog` | §1.4, §3.4 |
+| S21 | Alertes d'un garant | ses alertes et celles de son enfant se distinguent (préfixe, séance nommée) | §5, §6 |
 | D1 | RGPD | suppression refusée pour un garant de P1 | §8.4 |
 | D2 | Tutelle | rupture P2 + `AuditLog guardianship_severed` | §6 |
 | D3 | Bascule de saison | double validation, suspension de masse, réactivation, nouvelle année | §8.8 |

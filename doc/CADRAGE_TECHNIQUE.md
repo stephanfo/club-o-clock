@@ -503,6 +503,7 @@ la transaction), **paresseux** (calculé à l'affichage), ou **explicitement exc
 | Reset quota hebdo (§4.10.6) | ❌ **Non** | PRD : *« pas de cron de reset »* — recalcul naturel sur la semaine courante. |
 | Suppression comptes J+7 (§4.3) | ❌ **Non** | PRD : *« pas de job auto »* — clic admin ; signaux passifs à l'affichage. |
 | Alerte séance sans coach (§4.11.2) | ❌ **Non** | PRD : *« pas de cron / scheduler »* — détection in-context. |
+| **Élagage de l'`outbox`** (§7.14) | ❌ **Non — à ouvrir en V2** | La file ne se vide **jamais** : rien n'efface les lignes `sent`, ni les `failed` abandonnées. Sans effet fonctionnel (le drain ne relit pas une ligne envoyée), mais deux dettes s'accumulent — le volume, et le prénom du sujet conservé sur les `failed`, qu'on ne purge pas pour les garder rejouables. Même rôle que `club:prune-tokens` sur les jetons ; demande d'abord de trancher une durée de rétention. |
 | Rappels avant séance, bascule d'âge, purge journaux (§4.15.2, §4.2, §4.18.4) | ❌ **Non** | Explicitement exclus du V1. |
 
 ### 7.14 Stratégie de notification : `outbox` + drain (PRD §4.15)
@@ -539,6 +540,37 @@ ici on décide **si** on envoie. Deux points d'application, volontairement :
   moment de la coupure : passées en `cancelled` (statut existant, donc visible dans l'écran de
   gestion), sans consommer de tentative ni programmer de backoff. La cause n'est pas transitoire, un
   retry serait un faux échec.
+
+**Payload autoporteur : tout est figé à l'émission, rien n'est chargé à l'envoi.** Le rendu d'une
+ligne (`NotificationRenderer`, partagé par le push et l'email) ne lit **que** le couple type + payload
+— aucune requête au drain, et une entité disparue entre l'émission et l'envoi ne casse rien. Ce qui
+doit être *dit* voyage donc dans le payload, posé par l'émetteur :
+
+- **le sujet** (`subject_id`, `subject_first_name`), ajouté par `NotificationDispatcher::dispatch()`
+  **quand le destinataire n'est pas le sujet** — c'est-à-dire quand le routage parent/enfant (§4.15.5)
+  achemine vers le garant. Point d'application **unique** : tous les émetteurs en héritent sans le
+  savoir. `dispatchTo()` (adressage explicite, sans routage) n'en pose pas, sauf à le faire à la main.
+- **la séance** (`session_id`, `session_title`, `session_start_at`), via `Session::payloadNotification()`.
+  `session_start_at` part en **ISO8601 UTC** — jamais en wall-clock, cf. l'attribut `start_at` — et le
+  rendu applique le fuseau du club.
+
+Le payload transporte donc **deux natures de date, à ne pas confondre au rendu** : un *instant*
+(`session_start_at`) se repose au fuseau du club, une *date de calendrier* (les bornes `from`/`to`
+du récapitulatif de série, écrites en `toDateString()`) s'affiche telle quelle. Convertir la seconde
+comme la première la fait reculer d'un jour dès que le fuseau du club est négatif — minuit UTC
+devient la veille 20 h à Guadeloupe, proposée dans les réglages.
+
+**Corollaire non négociable : chaque enrichissement est conditionné à la présence de sa clé** et
+retombe sur le libellé/description du type. Ce n'est pas une précaution de migration mais un
+invariant permanent : une invitation n'a jamais de séance, une ligne `failed` se rejoue longtemps
+après, et une clé supposée présente jetterait **au drain**, là où la notification n'arriverait jamais.
+
+**Deux familles de clés meurent à l'envoi** (purge au passage à `sent`, jamais sur `failed` qui doit
+rester rejouable) : `SENSITIVE_PAYLOAD_KEYS` (le jeton d'activation — en plus **masqué** dans le
+tiroir admin, il vaut la prise du compte) et `VOLATILE_PAYLOAD_KEYS` (le prénom du sujet — pas un
+secret, donc pas masqué, mais un nom d'enfant n'a pas à dormir indéfiniment dans la file). La page
+Alertes n'en souffre pas : elle re-résout le prénom depuis `subject_id`, et le titre de séance depuis
+la base, où ils sont *frais* — le payload ne lui sert que de repli si l'entité a disparu.
 
 **Écran de gestion de l'`outbox` (bureau, §4.15.6)** — surface admin de supervision/rattrapage,
 réutilisant le chemin de drain unique : consultation/filtre (statut, canal, type, destinataire) + détail,
@@ -784,6 +816,11 @@ et compromis ops **assumés et documentés** plutôt qu'ignorés.
 - **Pas de temps réel** : rafraîchissement manuel (déjà autorisé PRD).
 - **Ops manuelles** : déploiement, vérification des dumps, surveillance du volume objets/logs reposent
   sur la discipline du mainteneur.
+- **Rétention de la file d'envoi** : l'`outbox` croît sans borne, aucune tâche ne l'élague (§7.13).
+  Assumé en V1 — le volume d'un club reste modeste et rien ne dysfonctionne. À rouvrir pour la
+  minimisation RGPD : le prénom du sujet est purgé au passage à `sent` (§7.14), mais survit sur une ligne
+  `failed`, volontairement gardée rejouable — ce qui n'a plus de sens passé quelques mois. Décision
+  préalable : la durée de rétention, par état (`sent` / `failed`).
 - **Conditions déclenchant une migration vers VPS / PaaS UE** (Scaleway, Clever Cloud, OVH VPS…) :
   besoin de **temps réel** (SSE/WebSocket), **PITR réel**, **preview-par-PR** automatisée, montée en
   **volume d'objets** justifiant un S3, ou charge cron dépassant les limites du mutualisé. Le monolithe

@@ -9,6 +9,15 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Corrigé
 
+- **La notification de réactivation d'un accès athlète menait le parent au mauvais écran.** Quand
+  c'est un enfant mineur qui est réactivé, c'est son garant qui reçoit le message — « Ton accès
+  athlète est réactivé » l'envoyait sur **son** tableau de bord à lui, où rien n'avait changé — et le
+  tutoyait, lui, pour un accès qui n'était pas le sien. Elle nomme désormais l'enfant, dit « L'accès
+  athlète de Jade est réactivé » et ouvre « Mes enfants ». La notification de rupture de tutelle nomme elle
+  aussi l'enfant concerné, ce qui manquait à un parent garant de plusieurs enfants ; elle continue de
+  mener au profil de chacun — surtout pas à « Mes enfants », d'où le lien vient justement de
+  disparaître.
+
 - **Chaque clic dans une modale levait une erreur JavaScript.** Invisible à l'écran — rien ne cassait,
   l'action se faisait —, mais la console de chaque utilisateur recevait une `SyntaxError` à chaque
   bouton de pied de modale. Le composant portait un `wire:click.stop` **sans valeur** : Livewire
@@ -87,6 +96,24 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   garde est **serveur** : un bouton grisé contourné ne déclenche rien.
 
 ### Ajouté
+
+- **Les notifications disent enfin qui elles concernent et de quelle séance il s'agit.** Un parent
+  garant est souvent adhérent lui-même : ses notifications et celles de ses enfants arrivaient sur le
+  même compte, dans la même boîte, avec des textes **rigoureusement identiques**. « Une séance à
+  laquelle tu es inscrit·e est annulée » — la sienne ou celle de son enfant ? Deux enfants inscrits à
+  deux séances différentes produisaient deux messages indiscernables. Et le lien menait à une fiche
+  qui parlait du parent, alors que la notification parlait de l'enfant.
+
+  Une notification adressée au garant **nomme désormais l'enfant** (« Hugo · Annulation de séance ») et
+  son lien ouvre la fiche **avec cet enfant pour sujet consulté** — le parent voit son inscription et
+  peut agir pour lui sans rien rebasculer à la main. Ses propres notifications, elles, restent nues :
+  le préfixe signale précisément qu'il s'agit de quelqu'un d'autre.
+
+  Dans la foulée, le corps du message dit **quelle** séance et **quand** (« Natation jeunes · sam. 5
+  sept. · 18:00 ») au lieu de répéter le titre sous une autre forme, et le récapitulatif d'affectation
+  d'un coach annonce son volume et sa plage. Une notification se comprend maintenant sans ouvrir
+  l'application — ce qui décide, en pratique, de la garder activée. Le prénom transporté pour composer
+  le titre est **effacé de la file dès l'envoi** : il a servi, il n'a pas à y dormir.
 
 - **Un garde-fou contre le déploiement d'un affichage périmé.** Les fichiers que le navigateur lit
   vraiment ne sont pas ceux qu'on écrit : une moulinette (`npm run build`) compresse les seconds en

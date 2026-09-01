@@ -124,7 +124,7 @@ class CoachRegistrationService
         });
 
         if ($removed) {
-            $this->notifyCoCoaches($remainingIds, $session->id);
+            $this->notifyCoCoaches($remainingIds, $session);
         }
     }
 
@@ -237,7 +237,7 @@ class CoachRegistrationService
         });
 
         // Le coach a quitté l'encadrement → les restants sont prévenus (coach_registration).
-        $this->notifyCoCoaches($remainingIds, $session->id);
+        $this->notifyCoCoaches($remainingIds, $session);
 
         return $status;
     }
@@ -258,10 +258,10 @@ class CoachRegistrationService
     private function notifyCoachJoined(Session $session, User $coach, User $actor, array $coCoachIds): void
     {
         if ($actor->id !== $coach->id) {
-            $this->notifier->dispatch(NotificationType::CoachAssigned, $coach, ['session_id' => $session->id]);
+            $this->notifier->dispatch(NotificationType::CoachAssigned, $coach, $session->payloadNotification());
         }
 
-        $this->notifyCoCoaches($coCoachIds, $session->id);
+        $this->notifyCoCoaches($coCoachIds, $session);
     }
 
     /**
@@ -270,14 +270,16 @@ class CoachRegistrationService
      *
      * @param  list<int>  $coachIds
      */
-    private function notifyCoCoaches(array $coachIds, int $sessionId): void
+    private function notifyCoCoaches(array $coachIds, Session $session): void
     {
         if ($coachIds === []) {
             return;
         }
 
+        $payload = $session->payloadNotification();
+
         foreach (User::whereIn('id', $coachIds)->get() as $coCoach) {
-            $this->notifier->dispatch(NotificationType::CoachRegistration, $coCoach, ['session_id' => $sessionId]);
+            $this->notifier->dispatch(NotificationType::CoachRegistration, $coCoach, $payload);
         }
     }
 
