@@ -287,6 +287,13 @@ docker run --rm --network container:cluboclock-app -v "$PWD":/app -w /app \
 Ils **reconstruisent la base** en fin d'exécution. Conventions détaillées dans
 [`tests/E2E/README.md`](https://github.com/stephanfo/club-o-clock/blob/main/tests/E2E/README.md).
 
+> Cette image n'embarque **aucun client de base de données** — ni `mysql`, ni `mariadb` — et n'en
+> aura pas : les deux paquets se déclarent mutuellement incompatibles chez Debian/Ubuntu, donc en
+> installer un choisirait le moteur du poste depuis le `Dockerfile`. C'est pourquoi la
+> reconstruction finale rejoue les migrations au lieu de charger le dump de schéma, dont le
+> chargement, lui, passe par ce client. Rien à faire de particulier — mais si un jour le harnais
+> s'arrête sur `sh: 1: mysql: not found`, c'est ce garde-fou qui a sauté.
+
 ---
 
 ## 5. Ce que le conteneur ne remplace pas

@@ -233,7 +233,23 @@ const tous = [];
   s.check('Kevin (suspendu) absent', !noms.some(n => /kevin/i.test(n)));
   s.check('prérequis : Kevin est bien suspendu en base',
           sql("SELECT athlete_access_suspended s FROM users WHERE email='kevin@demo.club'") === '1');
-  s.check('contrôle positif : un athlète éligible est proposé', noms.some(n => /camille/i.test(n)));
+  // Contrôle positif apparié à « Kevin absent » : sans lui, l'assertion négative passerait aussi
+  // sur un sélecteur vide ou cassé. Les candidats se DÉRIVENT de la base — nommer quelqu'un en dur
+  // (« Camille ») rendait le contrôle dépendant du tirage d'inscriptions du seeder, qui varie avec
+  // l'heure du re-seed : le jour où Camille se trouvait déjà inscrite à cette séance, donc exclue
+  // du sélecteur à bon droit, le contrôle échouait sans que rien ne soit cassé.
+  const eligibles = sql(`SELECT CONCAT(u.first_name,' ',u.last_name) n FROM users u
+      WHERE u.is_active=1 AND u.anonymized_at IS NULL AND u.athlete_access_suspended=0
+        AND JSON_CONTAINS(u.roles, '"athlete"')
+        AND EXISTS (SELECT 1 FROM user_category uc JOIN session_category sc ON sc.category_id=uc.category_id
+                    WHERE uc.user_id=u.id AND sc.session_id=${s15})
+        AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.session_id=${s15} AND r.user_id=u.id
+                        AND r.status IN ('participating','waitlist'))
+        AND NOT EXISTS (SELECT 1 FROM session_coach sc2 WHERE sc2.session_id=${s15} AND sc2.user_id=u.id)
+      ORDER BY u.id LIMIT 5`).split('\n').filter(Boolean);
+  const propose = eligibles.find(e => noms.some(n => n.includes(e)));
+  s.check('contrôle positif : un athlète éligible est proposé', propose !== undefined,
+          propose ?? `aucun des ${eligibles.length} éligibles en base`);
   // Les déjà-inscrits doivent aussi être exclus (§4.9.7).
   const inscrits = sql(`SELECT CONCAT(u.first_name,' ',u.last_name) n FROM registrations r JOIN users u ON u.id=r.user_id WHERE r.session_id=${s15} AND r.status='participating'`).split('\n').filter(Boolean);
   s.check('déjà-inscrits exclus du sélecteur',
