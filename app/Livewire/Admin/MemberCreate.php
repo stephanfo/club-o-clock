@@ -148,7 +148,7 @@ class MemberCreate extends Component
                 Rule::exists('users', 'id')->where(
                     fn ($q) => $q->whereNull('anonymized_at')
                         ->where(fn ($q) => $q->whereNull('dob')
-                            ->orWhereDate('dob', '<=', AgeCategory::minorityThreshold()))
+                            ->orWhere('dob', '<=', AgeCategory::minorityThreshold()->toDateString()))
                 ),
             ],
         ]);

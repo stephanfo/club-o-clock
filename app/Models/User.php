@@ -144,11 +144,15 @@ class User extends Authenticatable implements MustVerifyEmail
      * Comptes légalement mineurs, en SQL — la condition se pose sur la date de naissance, car
      * isLegallyMinor() ne peut pas s'évaluer ligne à ligne côté serveur.
      *
+     * Comparaison NUE sur la colonne, pas whereDate() : ce dernier enveloppe `dob` dans un appel de
+     * fonction, ce qui interdirait au moteur de se servir d'un index sur cette colonne. Le seuil est
+     * passé au format date, `dob` étant une colonne DATE.
+     *
      * @param  Builder<User>  $query
      */
     public function scopeMineur(Builder $query): void
     {
-        $query->whereNotNull('dob')->whereDate('dob', '>', AgeCategory::minorityThreshold());
+        $query->whereNotNull('dob')->where('dob', '>', AgeCategory::minorityThreshold()->toDateString());
     }
 
     /**
@@ -159,7 +163,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function scopeMajeur(Builder $query): void
     {
         $query->where(fn (Builder $q) => $q->whereNull('dob')
-            ->orWhereDate('dob', '<=', AgeCategory::minorityThreshold()));
+            ->orWhere('dob', '<=', AgeCategory::minorityThreshold()->toDateString()));
     }
 
     /**
