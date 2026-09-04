@@ -253,8 +253,16 @@ class GuardianshipService
             if ($ward->guardian_id === $newGuardian->id) {
                 throw new RuntimeException('Ce garant est déjà celui de ce pupille.');
             }
-            if (! $ward->isLegallyMinor() || $ward->anonymized_at !== null) {
-                throw new RuntimeException('Seul un mineur peut être rattaché à un garant.');
+            // Pas de condition d'âge ici, à la différence de link() — et ce n'est pas un oubli.
+            // link() CRÉE une tutelle : lui ouvrir les majeurs reviendrait à trancher une question
+            // produit (cf. carnet, points 4 et 5). relink() n'en crée aucune, il SUBSTITUE un garant
+            // à un autre sur un lien qui existe déjà : il ne peut donc pas placer sous tutelle
+            // quelqu'un qui n'y était pas. L'exiger rouvrait une impasse — un pupille arrivé à 18
+            // ans sans compte propre ne peut ni être rompu (il resterait sans accès) ni être
+            // autonomisé faute d'email connu, et son garant devenait alors indéplaçable ET
+            // insupprimable, MemberService::requestDeletion le refusant tant qu'un P1 lui pend.
+            if ($ward->anonymized_at !== null) {
+                throw new RuntimeException('Ce compte a été anonymisé.');
             }
             if ($newGuardian->isLegallyMinor() || ! $newGuardian->is_active || $newGuardian->anonymized_at !== null || $newGuardian->id === $ward->id) {
                 throw new RuntimeException('Le garant doit être un adulte actif du club.');

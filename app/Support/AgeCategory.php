@@ -68,10 +68,16 @@ class AgeCategory
      * Date de naissance à partir de laquelle on est encore légalement mineur au jour dit : née
      * APRÈS ce jour-là, la personne a moins de 18 ans révolus. Sert aux requêtes SQL, qui ne
      * peuvent pas appeler isLegallyMinor() ligne à ligne (cf. les scopes du modèle User).
+     *
+     * subYearsNoOverflow() et non subYears() : le 29 février, ce dernier reporte au 1er mars —
+     * 2028-02-29 moins 18 ans donnait 2010-03-01 —, et le seuil rangeait alors parmi les MAJEURS
+     * quelqu'un né le 1er mars 2010, que legalAge() compte à 17 ans ce jour-là. Un jour tous les
+     * quatre ans, le SQL et le calcul PHP se contredisaient, et le formulaire proposait ce mineur
+     * comme parent garant — précisément ce que link() interdit.
      */
     public static function minorityThreshold(?Carbon $on = null): Carbon
     {
-        return ($on ?? Carbon::now())->copy()->startOfDay()->subYears(18);
+        return ($on ?? Carbon::now())->copy()->startOfDay()->subYearsNoOverflow(18);
     }
 
     /**

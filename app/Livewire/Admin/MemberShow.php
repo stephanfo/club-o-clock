@@ -626,8 +626,11 @@ class MemberShow extends Component
             ? $adultesEligibles()
             : collect();
 
-        // Remplacement du garant en place : les mêmes, moins celui qui l'est déjà.
-        $relinkCandidates = ($estMineurGerable && $this->user->guardian_id !== null)
+        // Remplacement du garant en place : les mêmes, moins celui qui l'est déjà. La minorité
+        // n'entre PAS dans la condition — un pupille devenu majeur sans compte propre doit pouvoir
+        // changer de garant, sans quoi le sien devient indéplaçable et insupprimable (cf. le
+        // commentaire de GuardianshipService::relink).
+        $relinkCandidates = ($this->user->guardian_id !== null && $this->user->anonymized_at === null)
             ? $adultesEligibles()->reject(fn (User $u) => $u->id === $this->user->guardian_id)->values()
             : collect();
 

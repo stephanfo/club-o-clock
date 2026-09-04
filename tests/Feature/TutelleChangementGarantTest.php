@@ -6,6 +6,7 @@ use App\Livewire\Admin\MemberShow;
 use App\Models\NotificationOutbox;
 use App\Models\User;
 use App\Services\GuardianshipService;
+use App\Services\MemberService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
@@ -119,6 +120,56 @@ class TutelleChangementGarantTest extends TestCase
         }
 
         $this->assertSame($sortant->id, $pupille->fresh()->guardian_id, 'Le lien d\'origine doit être rendu.');
+    }
+
+    /**
+     * Un pupille arrivé à 18 ans sans compte propre doit pouvoir changer de garant.
+     *
+     * Sinon son garant devient à la fois indéplaçable et insupprimable : la rupture le laisserait
+     * sans accès, l'autonomisation exige un email que le club n'a pas forcément, et
+     * MemberService::requestDeletion refuse de supprimer un compte qui garde un P1. relink() ne
+     * CRÉE pas de tutelle — il en substitue une —, il ne peut donc pas placer sous tutelle
+     * quelqu'un qui n'y était pas : la condition d'âge n'a pas lieu d'être ici.
+     */
+    public function test_le_remplacement_accepte_un_pupille_devenu_majeur_sans_compte(): void
+    {
+        [$sortant, $pupille, $admin] = $this->famille();
+        $pupille->forceFill(['dob' => Carbon::now()->subYears(19)->toDateString()])->save();
+        $entrant = User::factory()->create();
+
+        app(GuardianshipService::class)->relink($pupille->fresh(), $entrant, $admin);
+
+        $this->assertSame($entrant->id, $pupille->fresh()->guardian_id);
+        $this->assertNotSame($sortant->id, $pupille->fresh()->guardian_id);
+    }
+
+    /** Contrôle positif apparié : créer une tutelle sur un majeur reste refusé (link, pas relink). */
+    public function test_creer_une_tutelle_sur_un_majeur_reste_refuse(): void
+    {
+        $majeur = User::factory()->create(['dob' => Carbon::now()->subYears(19)->toDateString(), 'email' => null]);
+        $admin = User::factory()->admin()->create();
+
+        $this->expectException(RuntimeException::class);
+        app(GuardianshipService::class)->link($majeur, User::factory()->create(), $admin);
+    }
+
+    /** Et le garant d'un tel pupille redevient supprimable, une fois la tutelle déplacée. */
+    public function test_le_garant_devient_supprimable_apres_deplacement(): void
+    {
+        [$sortant, $pupille, $admin] = $this->famille();
+        $pupille->forceFill(['dob' => Carbon::now()->subYears(19)->toDateString()])->save();
+
+        try {
+            app(MemberService::class)->requestDeletion($sortant, $admin);
+            $this->fail('Attendu : refus tant que le pupille sans compte lui est rattaché.');
+        } catch (RuntimeException) {
+            // attendu
+        }
+
+        app(GuardianshipService::class)->relink($pupille->fresh(), User::factory()->create(), $admin);
+        app(MemberService::class)->requestDeletion($sortant->fresh(), $admin);
+
+        $this->assertNotNull($sortant->fresh()->deletion_requested_at);
     }
 
     public function test_le_remplacement_refuse_un_garant_inactif(): void

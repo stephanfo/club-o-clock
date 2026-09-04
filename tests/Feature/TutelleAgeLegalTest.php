@@ -6,6 +6,7 @@ use App\Livewire\Admin\MemberCreate;
 use App\Models\ClubSettings;
 use App\Models\User;
 use App\Services\GuardianshipService;
+use App\Services\MemberService;
 use App\Support\AgeCategory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -55,6 +56,32 @@ class TutelleAgeLegalTest extends TestCase
         ClubSettings::flushCache();
 
         $this->assertSame($septembre, AgeCategory::isLegallyMinor($dob));
+    }
+
+    /**
+     * Le 29 février, le seuil SQL et le calcul PHP doivent dire la même chose.
+     *
+     * `subYears(18)` reportait 2028-02-29 au 1er mars 2010 : un adhérent né ce jour-là, âgé de 17
+     * ans, tombait du côté des MAJEURS pour les requêtes — donc proposé comme parent garant, ce
+     * que link() interdit — tout en restant mineur pour isLegallyMinor().
+     */
+    public function test_le_seuil_et_le_calcul_saccordent_un_29_fevrier(): void
+    {
+        Carbon::setTestNow(Carbon::create(2028, 2, 29, 12));
+
+        $dob = Carbon::create(2010, 3, 1);
+        $this->assertSame(17, AgeCategory::legalAge($dob));
+        $this->assertTrue(AgeCategory::isLegallyMinor($dob));
+
+        $ado = User::factory()->create(['dob' => $dob->toDateString()]);
+        $this->assertTrue($ado->isLegallyMinor());
+        $this->assertSame(1, User::query()->mineur()->whereKey($ado->id)->count(),
+            'Le scope SQL doit ranger ce mineur du même côté que le calcul.');
+        $this->assertSame(0, User::query()->majeur()->whereKey($ado->id)->count());
+
+        // Contrôle positif apparié : la veille de ses 18 ans révolus, il bascule bien.
+        $majeurCePremierMars = User::factory()->create(['dob' => '2010-02-28']);
+        $this->assertSame(1, User::query()->majeur()->whereKey($majeurCePremierMars->id)->count());
     }
 
     /** Rattachement d'un garant à un adhérent que seul l'âge de saison déclarait majeur. */
@@ -111,6 +138,31 @@ class TutelleAgeLegalTest extends TestCase
         $lila = User::where('first_name', 'Lila')->firstOrFail();
         $this->assertNull($lila->email, 'Un P1 n\'a pas de compte propre.');
         $this->assertSame($parent->id, $lila->guardian_id);
+    }
+
+    /**
+     * Un adulte dont la suppression RGPD est engagée ne peut pas devenir garant.
+     *
+     * requestDeletion() le désactive sans l'anonymiser : il restait proposé au formulaire, et
+     * l'enfant créé sous lui héritait d'un garant qui ne peut plus se connecter — donc d'aucun
+     * destinataire de notification (§4.15.5), et d'une suppression qui échouerait à J+7.
+     */
+    public function test_un_garant_dont_la_suppression_est_engagee_est_refuse(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $partant = User::factory()->create();
+        app(MemberService::class)->requestDeletion($partant, $admin);
+
+        Livewire::actingAs($admin)->test(MemberCreate::class)
+            ->set('first_name', 'Ana')
+            ->set('last_name', 'Roussel')
+            ->set('dob', '2014-05-02')
+            ->set('phase', 'P1')
+            ->set('guardian_id', $partant->fresh()->id)
+            ->call('create')
+            ->assertHasErrors('guardian_id');
+
+        $this->assertNull(User::where('first_name', 'Ana')->first());
     }
 
     /**

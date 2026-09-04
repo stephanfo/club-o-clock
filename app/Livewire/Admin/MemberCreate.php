@@ -147,6 +147,7 @@ class MemberCreate extends Component
                 'nullable',
                 Rule::exists('users', 'id')->where(
                     fn ($q) => $q->whereNull('anonymized_at')
+                        ->where('is_active', true)
                         ->where(fn ($q) => $q->whereNull('dob')
                             ->orWhere('dob', '<=', AgeCategory::minorityThreshold()->toDateString()))
                 ),
@@ -198,8 +199,12 @@ class MemberCreate extends Component
             : collect();
         $chosenQuals = Qualification::query()->whereIn('id', $this->qualifications)->get();
 
-        // Parents garants possibles : adultes existants (non mineurs, non anonymisés).
-        $guardians = User::query()->whereNull('anonymized_at')->majeur()
+        // Parents garants possibles : adultes ACTIFS et non anonymisés — mêmes conditions que
+        // GuardianshipService::link() et que la fiche adhérent. L'inactivité manquait ici, si bien
+        // qu'un adulte dont la suppression RGPD était engagée restait proposé : l'enfant créé sous
+        // lui héritait d'un garant qui ne peut plus se connecter, donc d'aucun destinataire de
+        // notification, et la suppression du parent explosait à J+7.
+        $guardians = User::query()->whereNull('anonymized_at')->where('is_active', true)->majeur()
             ->orderBy('last_name')->orderBy('first_name')->get();
 
         return view('livewire.admin.member-create', [
