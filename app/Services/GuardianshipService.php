@@ -32,8 +32,12 @@ class GuardianshipService
     public function invite(User $ward, User $actor, ?string $email = null): string
     {
         $token = DB::transaction(function () use ($ward, $actor, $email) {
-            if (! $ward->is_minor || $ward->guardian_id === null) {
-                throw new RuntimeException('L\'autonomisation ne concerne qu\'un mineur ayant un parent garant.');
+            // L'âge n'entre pas ici : la question est « a-t-il un accès à lui ? », pas « quel âge
+            // a-t-il ? ». Un pupille devenu majeur en gardant son garant (MemberService::updateDob)
+            // a d'autant plus droit à son compte — le lui refuser le laissait sans aucune sortie,
+            // puisque la rupture, elle, lui retire son garant sans rien lui donner en échange.
+            if ($ward->guardian_id === null) {
+                throw new RuntimeException('L\'autonomisation ne concerne qu\'un pupille ayant un parent garant.');
             }
 
             // Mêmes gardes de joignabilité que InvitationService::sendToMember() — l'exemption de
@@ -114,17 +118,19 @@ class GuardianshipService
      * P2 → P3 (§4.2.2) : rompt le lien de tutelle. Effet immédiat — lien supprimé, AuditLog +
      * notif guardianship_severed unique aux deux destinataires. Idempotent si déjà rompu.
      *
-     * Refus sur un pupille MINEUR en P1 : la transition part de P2 (§4.2 — le pupille a déjà un
-     * compte propre). Rompre un P1 laisserait un User sans garant ET sans moyen de connexion —
-     * plus personne ne pourrait agir dessus, ni l'enfant (aucun credential), ni le parent (détaché).
-     * Même raisonnement que canSever pour l'enfant lui-même, et que MemberService::requestDeletion
-     * (« ce compte est garant d'un mineur sans compte propre »). Le geste attendu est
-     * l'autonomisation (invite, P1 → P2), puis la rupture.
+     * Refus sur un pupille EN P1, quel que soit son âge : la transition part de P2 (§4.2 — le
+     * pupille a déjà un compte propre). Rompre un P1 laisserait un User sans garant ET sans moyen
+     * de connexion — plus personne ne pourrait agir dessus, ni lui (aucun credential), ni le parent
+     * (détaché) —, et le rattacher à nouveau est impossible passé la majorité. Même raisonnement
+     * que canSever pour l'enfant lui-même, et que MemberService::requestDeletion (« ce compte est
+     * garant d'un mineur sans compte propre »). Le geste attendu est l'autonomisation (invite,
+     * P1 → P2), désormais ouverte à tout âge, puis la rupture.
      *
-     * La garde est bornée aux MINEURS à dessein : un pupille devenu majeur en gardant son garant
-     * (MemberService::updateDob) n'a plus accès à invite(), qui exige un mineur. L'étendre à lui le
-     * rendrait définitivement captif — soit exactement le défaut qu'on corrige. Pour lui, la rupture
-     * EST la sortie prévue (cf. le bandeau « Ce pupille est majeur » sur la fiche adhérent).
+     * La garde valait autrefois pour les seuls mineurs, au motif qu'invite() exigeait un mineur et
+     * que la rupture était donc l'unique sortie d'un pupille majeur. C'était une sortie en trompe
+     * l'œil : elle produisait un compte sans garant ni accès, que plus rien ne pouvait reprendre.
+     * invite() ne regardant plus l'âge, la sortie existe vraiment, et la garde peut protéger tout
+     * le monde (carnet de retours terrain, 2026-09-04).
      */
     public function sever(User $ward, User $actor): void
     {
@@ -136,7 +142,7 @@ class GuardianshipService
                 return;
             }
 
-            if ($ward->email === null && $ward->is_minor) {
+            if ($ward->email === null) {
                 throw new RuntimeException(
                     'Ce pupille n\'a pas de compte propre (P1) : ouvre-lui d\'abord un compte autonome, '
                     .'sinon il resterait sans garant et sans accès.'
@@ -186,13 +192,17 @@ class GuardianshipService
     public function link(User $ward, User $guardian, User $actor): void
     {
         DB::transaction(function () use ($ward, $guardian, $actor) {
-            if (! $ward->is_minor || $ward->anonymized_at !== null) {
+            // Minorité LÉGALE, pas âge de saison : ce dernier déclarait majeur — jusqu'à douze mois
+            // à l'avance — un adhérent qui ne l'était pas, et lui interdisait donc tout garant.
+            // Sans date de naissance, la minorité n'est pas établie : on refuse plutôt que de
+            // supposer (fiche incomplète, compte anonymisé).
+            if (! $ward->isLegallyMinor() || $ward->anonymized_at !== null) {
                 throw new RuntimeException('Seul un mineur peut être rattaché à un garant.');
             }
             if ($ward->guardian_id !== null) {
                 throw new RuntimeException('Ce mineur a déjà un garant — romps d\'abord la tutelle existante.');
             }
-            if ($guardian->is_minor || ! $guardian->is_active || $guardian->anonymized_at !== null || $guardian->id === $ward->id) {
+            if ($guardian->isLegallyMinor() || ! $guardian->is_active || $guardian->anonymized_at !== null || $guardian->id === $ward->id) {
                 throw new RuntimeException('Le garant doit être un adulte actif du club.');
             }
 
@@ -208,6 +218,77 @@ class GuardianshipService
             ]);
             ActivityLogger::record('guardianship_linked', $actor, ['user_id' => $ward->id]);
         });
+    }
+
+    /**
+     * Remplace le parent garant d'un pupille — rupture et rattachement dans UNE transaction.
+     *
+     * Le lien ne se posait qu'à la création (formulaire, import CSV) : le reprendre imposait de
+     * rompre puis de rattacher, or la rupture est refusée à un P1 — à raison. Le garant d'un enfant
+     * sans compte propre était donc définitif, et un divorce, un décès ou une simple erreur de
+     * saisie n'avaient aucune issue dans l'outil (carnet de retours terrain, 2026-09-04).
+     *
+     * L'atomicité EST la garde : l'état « sans garant », que sever() protège, n'existe à aucun
+     * instant observable, pas même en cas d'échec — la transaction rend alors le lien d'origine.
+     * C'est pourquoi ce geste peut servir un P1 là où l'enchaînement de deux appels ne le pouvait
+     * pas. Admin uniquement (§4.1.3) : la fiche adhérent en est le seul appelant.
+     *
+     * Le journal reçoit les DEUX actions habituelles plutôt qu'un troisième verbe : un audit qui
+     * cherche `guardianship_severed` trouve toutes les ruptures, celui qui cherche
+     * `guardianship_linked` tous les rattachements, et leur horodatage commun dit le remplacement.
+     */
+    public function relink(User $ward, User $newGuardian, User $actor): void
+    {
+        $formerGuardian = null;
+
+        DB::transaction(function () use ($ward, $newGuardian, $actor, &$formerGuardian) {
+            if ($ward->guardian_id === null) {
+                throw new RuntimeException('Ce pupille n\'a pas de garant : rattache-lui-en un.');
+            }
+            if ($ward->guardian_id === $newGuardian->id) {
+                throw new RuntimeException('Ce garant est déjà celui de ce pupille.');
+            }
+            if (! $ward->isLegallyMinor() || $ward->anonymized_at !== null) {
+                throw new RuntimeException('Seul un mineur peut être rattaché à un garant.');
+            }
+            if ($newGuardian->isLegallyMinor() || ! $newGuardian->is_active || $newGuardian->anonymized_at !== null || $newGuardian->id === $ward->id) {
+                throw new RuntimeException('Le garant doit être un adulte actif du club.');
+            }
+
+            // Capture AVANT l'écriture : après, la relation pointe le nouveau garant et le fan-out
+            // n'atteindrait plus celui qu'on détache.
+            $formerGuardian = $ward->loadMissing('guardian')->guardian;
+
+            $ward->update([
+                'guardian_id' => $newGuardian->id,
+                'guardianship_linked_at' => Carbon::now(),
+            ]);
+
+            AuditLogger::record('guardianship_severed', $actor, [
+                'target_type' => User::class,
+                'target_id' => $ward->id,
+            ]);
+            AuditLogger::record('guardianship_linked', $actor, [
+                'target_type' => User::class,
+                'target_id' => $ward->id,
+                'guardian_id' => $newGuardian->id,
+            ]);
+            ActivityLogger::record('guardianship_severed', $actor, ['user_id' => $ward->id]);
+            ActivityLogger::record('guardianship_linked', $actor, ['user_id' => $ward->id]);
+        });
+
+        // Seul le garant SORTANT est notifié, et par la notification qui dit exactement ce qui lui
+        // arrive : son lien est rompu. Le pupille, lui, n'a rien perdu — lui envoyer « Lien de
+        // tutelle rompu » serait faux ; et le garant entrant vient d'être désigné par l'admin, qui
+        // le voit apparaître dans « Mes enfants ». Dire proprement « ton garant a changé » demande
+        // un type de notification qui n'existe pas encore ; le jour où il existera, c'est ici.
+        if ($formerGuardian !== null) {
+            $this->notifier->dispatchTo(NotificationType::GuardianshipSevered, $formerGuardian, [
+                'ward_id' => $ward->id,
+                'subject_id' => $ward->id,
+                'subject_first_name' => $ward->first_name,
+            ]);
+        }
     }
 
     /**

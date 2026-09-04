@@ -83,7 +83,7 @@ class MemberDeletionTest extends TestCase
     {
         $parent = User::factory()->create(['roles' => ['athlete']]);
         User::factory()->create([
-            'guardian_id' => $parent->id, 'is_minor' => true, 'email' => null, 'password' => null,
+            'guardian_id' => $parent->id, 'dob' => now()->subYears(12)->toDateString(), 'email' => null, 'password' => null,
         ]);
 
         Livewire::actingAs($parent)->test(Profil::class)

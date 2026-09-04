@@ -64,7 +64,7 @@
                         <div class="flex ac g14 wrap" style="margin-top:10px">
                             <span class="meta flex ac g4" style="white-space:nowrap"><x-icon name="calendar" :size="13" /> Créé le {{ $u->created_at?->translatedFormat('j M Y') }}</span>
                             @if ($u->guardian)
-                                <span class="meta flex ac g4" style="white-space:nowrap"><x-icon name="shield" :size="13" style="color:var(--info)" /> Parent garant · {{ $u->guardian->fullName() }} <span class="chip chip-sm chip-blue">{{ $u->is_minor ? 'P1/P2' : '—' }}</span></span>
+                                <span class="meta flex ac g4" style="white-space:nowrap"><x-icon name="shield" :size="13" style="color:var(--info)" /> Parent garant · {{ $u->guardian->fullName() }} <span class="chip chip-sm chip-blue">{{ $u->email ? 'P2' : 'P1' }}</span></span>
                             @endif
                         </div>
                     </div>
@@ -133,13 +133,14 @@
                                 <div class="flex ac jb"><span class="sect-title">Tutelle</span><x-icon name="shield" :size="16" class="muted" /></div>
                                 <div class="meta flex ac g4" style="margin-top:12px"><x-icon name="shield" :size="13" style="color:var(--info)" /> Parent garant · <b>{{ $u->guardian->fullName() }}</b></div>
 
-                                @if (! $u->email && ! $u->is_minor)
-                                    {{-- Devenu majeur en gardant son garant (MemberService::updateDob) :
-                                         GuardianshipService::invite refuse — l'autonomisation ne vaut que
-                                         pour un mineur. Le geste attendu est la rupture de tutelle. --}}
-                                    <x-banner kind="warn" style="margin-top:12px"><div>Ce pupille est <b>majeur</b> : l'ouverture d'un compte autonome ne s'applique plus. Romps le lien de tutelle pour le rendre indépendant.</div></x-banner>
-                                @elseif (! $u->email)
-                                    {{-- P1 → P2 : ouverture du compte autonome (§4.2.1) --}}
+                                @if (! $u->email)
+                                    {{-- P1 → P2 : ouverture du compte autonome (§4.2.1). Offerte à tout
+                                         âge : un pupille devenu majeur y a d'autant plus droit, et c'est
+                                         par là que passe sa sortie — la rupture, elle, le laisserait sans
+                                         garant ET sans accès (carnet, 2026-09-04). --}}
+                                    @if (! $u->isLegallyMinor())
+                                        <x-banner kind="warn" style="margin-top:12px"><div>Ce pupille est <b>majeur</b> : ouvre-lui son compte, puis romps le lien de tutelle pour le rendre indépendant.</div></x-banner>
+                                    @endif
                                     <div class="meta" style="margin-top:12px;line-height:1.5">Ouvre le compte autonome de l'enfant : saisis son email — l'email doit appartenir à l'enfant. Une invitation d'activation lui sera envoyée ; le lien de tutelle est conservé.</div>
                                     <div class="ifield" style="margin-top:10px"><x-icon name="mail" :size="15" class="muted" /><input class="ifield-input" type="email" wire:model.blur="wardEmail" placeholder="email de l'enfant"></div>
                                     @error('wardEmail')<div class="meta" style="margin-top:6px;color:var(--danger)">{{ $message }}</div>@enderror
@@ -151,12 +152,12 @@
                                 @endif
 
                                 {{-- P2 → P3 : rupture du lien de tutelle (§4.2.2).
-                                     Masqué pour un P1 MINEUR : sever() le refuse (il resterait sans
-                                     garant ET sans accès) — le geste attendu est l'autonomisation,
-                                     offerte juste au-dessus. Un pupille majeur sans email garde le
-                                     bouton : invite() ne s'applique plus à lui, la rupture est sa
-                                     seule sortie (cf. le bandeau « majeur » ci-dessus). --}}
-                                @if ($u->email || ! $u->is_minor)
+                                     Masquée tant que le pupille n'a pas de compte propre, quel que
+                                     soit son âge : sever() la refuse (il resterait sans garant ET
+                                     sans accès, et passé la majorité plus rien ne pourrait le
+                                     reprendre). Le geste attendu est l'autonomisation, offerte
+                                     juste au-dessus. --}}
+                                @if ($u->email)
                                 <hr class="divider" style="margin:14px 0">
                                 @if ($confirmingSever)
                                     <x-banner kind="warn"><div>Rompre le lien de tutelle : le parent ne recevra plus les notifs, ne verra plus l'historique et ne pourra plus agir. Action manuelle, tracée. Confirmer ?</div></x-banner>
@@ -170,8 +171,17 @@
                                     </button>
                                 @endif
                                 @endif
+
+                                {{-- Reprise du lien (§4.2, extension admin) : le garant se posait à la
+                                     création et ne se changeait plus, ce qui rendait définitif celui
+                                     d'un P1 — divorce, décès, erreur de saisie sans issue. --}}
+                                @if ($relinkCandidates->isNotEmpty())
+                                    <button type="button" class="btn btn-ghost btn-block" style="margin-top:10px" wire:click="openRelink">
+                                        <x-icon name="user-plus" :size="15" /> Changer de garant
+                                    </button>
+                                @endif
                             </div>
-                        @elseif ($u->is_minor && ! $u->anonymized_at)
+                        @elseif ($u->isLegallyMinor() && ! $u->anonymized_at)
                             {{-- Mineur SANS garant (autonome / orphelin de tutelle) : rattachement admin (§4.2). --}}
                             <div class="card card-pad">
                                 <div class="flex ac jb"><span class="sect-title">Tutelle</span><x-icon name="shield" :size="16" class="muted" /></div>
@@ -323,7 +333,9 @@
                             </div>
                         </div>
 
-                        {{-- Lien de tutelle (lecture seule — gestion fine → jalon ultérieur) --}}
+                        {{-- Rappel du garant en place. La GESTION du lien (accès autonome, rupture,
+                             changement de garant) vit dans la carte « Tutelle » de la colonne de
+                             gauche : ce bloc ne fait que rappeler qui est le garant. --}}
                         @if ($u->guardian)
                             <div class="card card-pad">
                                 <div class="flex ac jb"><span class="sect-title">Lien de tutelle</span><x-icon name="shield" :size="16" class="muted" /></div>
@@ -331,8 +343,6 @@
                                     <x-avatar :name="$u->guardian->fullName()" size="sm" tint="tint-bike" />
                                     <div class="f1" style="min-width:0"><div style="font-weight:700;font-size:14px">{{ $u->guardian->fullName() }}</div><div class="meta" style="font-size:12px">parent garant</div></div>
                                 </div>
-                                <div class="meta" style="font-size:12.5px;margin:12px 0;line-height:1.5">Gestion de la tutelle (accès autonome / rupture) — bientôt disponible.</div>
-                                <span class="btn btn-ghost btn-block is-disabled"><x-icon name="user-plus" :size="15" /> Gérer le lien de tutelle</span>
                             </div>
                         @endif
 
@@ -580,6 +590,41 @@
                 <button type="button" class="btn btn-danger{{ $suspendCheck ? '' : ' is-disabled' }}"
                     @if ($suspendCheck) wire:click="suspendAccess" @endif
                     wire:loading.attr="disabled" wire:target="suspendAccess">Suspendre l'accès</button>
+            </x-slot:footer>
+        </x-dialog>
+    @endif
+
+    {{-- ── Modale : changement de garant (§4.2) — confirmation forte ── --}}
+    @if ($relinkDialog)
+        <x-dialog title="Changer de garant" sub="{{ $u->first_name }} passe sous la tutelle d'un autre adulte." danger :width="480" close="cancelRelink">
+            <x-banner kind="danger">
+                <div>Le lien avec <b>{{ $u->guardian?->fullName() }}</b> est rompu et remplacé dans le même geste.
+                Effet immédiat : il ou elle ne recevra plus les notifications de {{ $u->first_name }}, ne verra
+                plus son historique et ne pourra plus l'inscrire.</div>
+            </x-banner>
+            <div style="margin-top:14px">
+                <label class="field-label" for="relink-guardian">Nouveau parent garant</label>
+                <select id="relink-guardian" class="input" style="width:100%" wire:model="relinkGuardianId">
+                    <option value="">— Choisir un garant —</option>
+                    @foreach ($relinkCandidates as $cand)
+                        <option value="{{ $cand->id }}">{{ $cand->fullName() }}{{ $cand->email ? ' · '.$cand->email : '' }}</option>
+                    @endforeach
+                </select>
+                @error('relinkGuardianId')<div class="meta" style="margin-top:6px;color:var(--danger)">{{ $message }}</div>@enderror
+            </div>
+            {{-- Accusé de réception : le geste prévient un tiers et ne se dédit pas. Le toggle est
+                 porté par la RANGÉE (souris) et par le x-check, qui est un vrai <button> — sans
+                 quoi la case, donc le bouton qu'elle arme, serait inatteignable au clavier.
+                 `.stop` empêche le clic de remonter à la rangée et de re-basculer. --}}
+            <div class="flex ac g10" style="margin-top:14px;font-size:14px;cursor:pointer" wire:click="$toggle('relinkCheck')">
+                <x-check :on="$relinkCheck" wire:click.stop="$toggle('relinkCheck')" aria-labelledby="txt-changer-garant" />
+                <span id="txt-changer-garant">Je comprends que {{ $u->guardian?->first_name }} sera prévenu·e de la rupture et perdra l'accès au compte de {{ $u->first_name }}.</span>
+            </div>
+            <x-slot:footer>
+                <button type="button" class="btn btn-ghost" wire:click="cancelRelink">Annuler</button>
+                <button type="button" class="btn btn-danger{{ $relinkCheck ? '' : ' is-disabled' }}"
+                        @if ($relinkCheck) wire:click="relinkGuardian" @endif
+                        wire:loading.attr="disabled" wire:target="relinkGuardian"><x-icon name="user-plus" :size="14" /> Changer de garant</button>
             </x-slot:footer>
         </x-dialog>
     @endif

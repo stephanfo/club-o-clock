@@ -8,11 +8,21 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Throwable;
 
-// Dérivation de la catégorie principale d'un athlète (PRD §4.5).
-// L'âge de référence est celui atteint sur l'« année sportive » du club : on évalue l'âge à la
-// veille du mois de bascule (31 août pour la saison sept→août par défaut). Les bornes
-// age_min/age_max des catégories actives sont inclusives et sans chevauchement (validé à la saisie
-// côté catalogue) → au plus une catégorie matche.
+// Arithmétique d'âge du projet. Deux questions, deux références — les confondre a produit la
+// friction consignée au carnet le 2026-09-04 (doc/RETOURS_TERRAIN.md) :
+//
+//   1. « Quel âge a-t-il POUR LA COMPÉTITION ? » → seasonAge() / derive() (PRD §4.5). L'âge de
+//      référence est celui atteint sur l'« année sportive » du club : on l'évalue à la veille du
+//      mois de bascule (31 août pour la saison sept→août par défaut), de sorte qu'un athlète court
+//      toute la saison dans la catégorie de l'âge qu'il y atteindra. Les bornes age_min/age_max des
+//      catégories actives sont inclusives et sans chevauchement (validé à la saisie côté catalogue)
+//      → au plus une catégorie matche.
+//   2. « Est-il LÉGALEMENT MINEUR ? » → legalAge() / isLegallyMinor() (PRD §4.2, tutelle). L'âge
+//      réel au jour dit, sans anticipation : la minorité est un fait juridique, pas une convention
+//      sportive. Un adhérent né en août est mineur jusqu'à son anniversaire, quand bien même l'âge
+//      de saison le compte déjà majeur onze mois plus tôt.
+//
+// Toute garde de tutelle interroge (2). Toute question de catégorie interroge (1).
 class AgeCategory
 {
     /**
@@ -34,10 +44,34 @@ class AgeCategory
         return (int) $dob->copy()->startOfDay()->diffInYears($reference->startOfDay());
     }
 
-    /** Mineur (< 18 ans) au sens de l'âge de saison (§4.2, §4.5). */
-    public static function isMinor(Carbon $dob, ?Carbon $on = null, ?int $startMonth = null): bool
+    /**
+     * Âge réel révolu au jour dit — celui de l'état civil, sans référence de saison.
+     *
+     * C'est la seule mesure qui répond à « cette personne est-elle mineure ? ». seasonAge() ne le
+     * peut pas : sa référence est postérieure de plusieurs mois, elle déclare donc majeur quelqu'un
+     * qui ne l'est pas encore.
+     */
+    public static function legalAge(Carbon $dob, ?Carbon $on = null): int
     {
-        return self::seasonAge($dob, $on, $startMonth) < 18;
+        $on ??= Carbon::now();
+
+        return (int) $dob->copy()->startOfDay()->diffInYears($on->copy()->startOfDay());
+    }
+
+    /** Minorité légale (< 18 ans révolus) au jour dit. Gouverne la tutelle (§4.2). */
+    public static function isLegallyMinor(Carbon $dob, ?Carbon $on = null): bool
+    {
+        return self::legalAge($dob, $on) < 18;
+    }
+
+    /**
+     * Date de naissance à partir de laquelle on est encore légalement mineur au jour dit : née
+     * APRÈS ce jour-là, la personne a moins de 18 ans révolus. Sert aux requêtes SQL, qui ne
+     * peuvent pas appeler isLegallyMinor() ligne à ligne (cf. les scopes du modèle User).
+     */
+    public static function minorityThreshold(?Carbon $on = null): Carbon
+    {
+        return ($on ?? Carbon::now())->copy()->startOfDay()->subYears(18);
     }
 
     /**

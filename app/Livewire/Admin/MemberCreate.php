@@ -10,6 +10,7 @@ use App\Services\InvitationService;
 use App\Services\MemberService;
 use App\Support\AgeCategory;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -69,9 +70,14 @@ class MemberCreate extends Component
         return $this->dob !== '' ? AgeCategory::seasonAge(Carbon::parse($this->dob)) : null;
     }
 
+    /**
+     * Minorité LÉGALE : elle seule décide de la tutelle (§4.2). L'âge affiché juste au-dessus reste
+     * celui de la SAISON, parce qu'il explique la catégorie sportive montrée à côté de lui — les
+     * deux peuvent diverger d'un an, et c'est normal.
+     */
     public function getIsMinorProperty(): bool
     {
-        return $this->age !== null && $this->age < 18;
+        return $this->dob !== '' && AgeCategory::isLegallyMinor(Carbon::parse($this->dob));
     }
 
     /** En P1 (mineur sans compte) : pas d'email, accès géré par le parent. */
@@ -133,7 +139,18 @@ class MemberCreate extends Component
             'last_name' => ['required', 'string', 'max:120'],
             'dob' => ['required', 'date', 'before:today', 'after:1900-01-01'],
             'email' => [$this->isP1 ? 'nullable' : 'required', 'email', 'max:255', 'unique:users,email'],
-            'guardian_id' => [$this->isMinor ? 'nullable' : 'prohibited', 'nullable', 'exists:users,id,is_minor,0,anonymized_at,NULL'],
+            // Le garant doit être un adulte non anonymisé. La majorité se vérifie sur la date de
+            // naissance : s'adosser à la colonne is_minor refusait un adulte dont la valeur stockée
+            // n'avait pas vieilli depuis sa création (carnet, 2026-09-04).
+            'guardian_id' => [
+                $this->isMinor ? 'nullable' : 'prohibited',
+                'nullable',
+                Rule::exists('users', 'id')->where(
+                    fn ($q) => $q->whereNull('anonymized_at')
+                        ->where(fn ($q) => $q->whereNull('dob')
+                            ->orWhereDate('dob', '<=', AgeCategory::minorityThreshold()))
+                ),
+            ],
         ]);
 
         $member = $service->create([
@@ -182,7 +199,7 @@ class MemberCreate extends Component
         $chosenQuals = Qualification::query()->whereIn('id', $this->qualifications)->get();
 
         // Parents garants possibles : adultes existants (non mineurs, non anonymisés).
-        $guardians = User::query()->whereNull('anonymized_at')->where('is_minor', false)
+        $guardians = User::query()->whereNull('anonymized_at')->majeur()
             ->orderBy('last_name')->orderBy('first_name')->get();
 
         return view('livewire.admin.member-create', [

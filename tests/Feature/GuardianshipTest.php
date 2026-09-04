@@ -20,9 +20,11 @@ class GuardianshipTest extends TestCase
 
     private function family(?string $childEmail = null): array
     {
-        $parent = User::factory()->create(['is_minor' => false]);
+        $parent = User::factory()->create(['dob' => Carbon::now()->subYears(40)->toDateString()]);
+        // La minorité se lit sur la date de naissance, pas sur un drapeau : un pupille de test doit
+        // donc être né il y a moins de 18 ans, sans quoi les gardes de tutelle le voient adulte.
         $child = User::factory()->create([
-            'is_minor' => true,
+            'dob' => Carbon::now()->subYears(12)->toDateString(),
             'guardian_id' => $parent->id,
             'guardianship_linked_at' => Carbon::now(),
             'email' => $childEmail,
@@ -65,39 +67,42 @@ class GuardianshipTest extends TestCase
         app(GuardianshipService::class)->invite($child, $admin, 'TAKEN@example.test');
     }
 
-    public function test_invite_rejects_non_minor(): void
+    // L'autonomisation s'adresse aux PUPILLES, à tout âge : la garde porte sur l'existence d'un
+    // garant, pas sur la minorité. Un adhérent sans garant n'a rien à autonomiser.
+    public function test_invite_rejects_someone_without_a_guardian(): void
     {
-        $adult = User::factory()->create(['is_minor' => false]);
+        $adult = User::factory()->create(['guardian_id' => null]);
         $admin = User::factory()->admin()->create();
 
         $this->expectException(RuntimeException::class);
         app(GuardianshipService::class)->invite($adult, $admin, 'x@example.test');
     }
 
-    // Un pupille devenu MAJEUR garde son garant (MemberService::updateDob) : invite() le refuse,
-    // le bouton « Accès autonome » ne doit donc plus être offert — ni au parent, ni à l'admin.
-    // Le rôle coach n'entre pas en jeu ici : c'est la tutelle, pas l'encadrement.
-    public function test_autonomy_cta_hidden_for_a_major_ward(): void
+    // Un pupille devenu MAJEUR garde son garant (MemberService::updateDob). L'autonomisation lui
+    // reste offerte — c'est même sa seule sortie, la rupture le laisserait sans garant ni accès —,
+    // accompagnée du bandeau qui dit quoi faire ensuite. Le rôle coach n'entre pas en jeu ici :
+    // c'est la tutelle, pas l'encadrement.
+    public function test_autonomy_cta_offered_to_a_major_ward(): void
     {
-        [$parent, $child] = $this->family();
-        $child->forceFill(['is_minor' => false, 'email' => null])->save();
+        [, $child] = $this->family();
+        $child->forceFill(['dob' => Carbon::now()->subYears(19)->toDateString(), 'email' => null])->save();
         $admin = User::factory()->admin()->create();
 
-        // Fiche admin : bandeau explicatif, plus de formulaire d'invitation.
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $child->fresh()])
-            ->assertDontSeeHtml('wire:click="inviteWard"')
+            ->assertSeeHtml('wire:click="inviteWard"')
             ->assertSee('est <b>majeur</b>', escape: false);
     }
 
-    // Contrôle positif appairé : tant que le pupille est mineur, l'autonomisation reste offerte.
+    // Contrôle positif appairé : pour un pupille mineur, le même formulaire, sans le bandeau.
     public function test_autonomy_cta_visible_for_a_minor_ward(): void
     {
-        [$parent, $child] = $this->family();
-        $child->forceFill(['email' => null])->save(); // is_minor reste true
+        [, $child] = $this->family();
+        $child->forceFill(['email' => null])->save();
         $admin = User::factory()->admin()->create();
 
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $child->fresh()])
-            ->assertSeeHtml('wire:click="inviteWard"');
+            ->assertSeeHtml('wire:click="inviteWard"')
+            ->assertDontSee('est <b>majeur</b>', escape: false);
     }
 
     public function test_invite_invalidates_previous_pending(): void
@@ -237,21 +242,45 @@ class GuardianshipTest extends TestCase
         ]);
     }
 
-    // Contre-garde : un pupille DEVENU MAJEUR en gardant son garant n'a plus accès à invite()
-    // (qui exige un mineur). Étendre le refus à lui le rendrait définitivement captif — soit le
-    // défaut même qu'on corrige. Pour lui, la rupture est la sortie prévue.
-    public function test_sever_allowed_on_adult_ward_without_email(): void
+    // Un pupille DEVENU MAJEUR en gardant son garant (MemberService::updateDob) est protégé par la
+    // même garde : sans compte propre, la rupture le laisserait sans garant ET sans accès, et
+    // passé la majorité plus rien ne pourrait le reprendre — link() exige un mineur.
+    //
+    // C'était l'inverse auparavant : la rupture lui était ouverte, au motif qu'invite() exigeait un
+    // mineur et qu'elle était donc sa seule sortie. Sortie en trompe l'œil — elle produisait un
+    // compte orphelin définitif. invite() ne regardant plus l'âge, la vraie sortie existe.
+    // Carnet de retours terrain, 2026-09-04.
+    public function test_sever_refused_on_adult_ward_without_own_account(): void
     {
-        [, $ward] = $this->family(); // sans email
-        $ward->forceFill(['is_minor' => false])->save();
+        [$parent, $ward] = $this->family(); // sans email
+        $ward->forceFill(['dob' => Carbon::now()->subYears(19)->toDateString()])->save();
         $admin = User::factory()->admin()->create();
 
-        app(GuardianshipService::class)->sever($ward->fresh(), $admin);
+        try {
+            app(GuardianshipService::class)->sever($ward->fresh(), $admin);
+            $this->fail('Attendu : refus de rompre la tutelle d\'un pupille sans compte propre.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('compte propre', $e->getMessage());
+        }
 
+        $this->assertSame($parent->id, $ward->fresh()->guardian_id);
+    }
+
+    // Contrôle positif apparié : sa sortie existe, et elle passe par l'ouverture de son compte.
+    public function test_invite_opens_an_account_for_an_adult_ward(): void
+    {
+        [$parent, $ward] = $this->family();
+        $ward->forceFill(['dob' => Carbon::now()->subYears(19)->toDateString()])->save();
+        $admin = User::factory()->admin()->create();
+
+        app(GuardianshipService::class)->invite($ward->fresh(), $admin, 'majeur@example.test');
+
+        $this->assertSame('majeur@example.test', $ward->fresh()->email);
+        $this->assertSame($parent->id, $ward->fresh()->guardian_id, 'Le lien est conservé (§4.2.1).');
+
+        // Et la rupture redevient alors possible : la sortie est complète.
+        app(GuardianshipService::class)->sever($ward->fresh(), $admin);
         $this->assertNull($ward->fresh()->guardian_id);
-        $this->assertDatabaseHas('audit_logs', [
-            'action' => 'guardianship_severed', 'target_id' => $ward->id,
-        ]);
     }
 
     // L'écran admin ne doit pas proposer un geste que le service refuse (motif récurrent de la
@@ -269,10 +298,12 @@ class GuardianshipTest extends TestCase
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $p2])
             ->assertSeeHtml('wire:click="$set(\'confirmingSever\', true)"');
 
-        // Majeur sans email : le bouton reste, c'est sa seule sortie.
-        $p1->forceFill(['is_minor' => false])->save();
+        // Majeur sans compte propre : le bouton reste masqué — sa sortie est l'autonomisation,
+        // désormais ouverte à tout âge, et c'est elle que l'écran propose.
+        $p1->forceFill(['dob' => Carbon::now()->subYears(19)->toDateString()])->save();
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $p1->fresh()])
-            ->assertSeeHtml('wire:click="$set(\'confirmingSever\', true)"');
+            ->assertDontSeeHtml('wire:click="$set(\'confirmingSever\', true)"')
+            ->assertSee('Inviter à activer son compte');
     }
 
     // Défense en profondeur : même en forçant l'appel Livewire (état périmé, second onglet),

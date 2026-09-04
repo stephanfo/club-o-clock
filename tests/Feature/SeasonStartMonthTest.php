@@ -48,22 +48,30 @@ class SeasonStartMonthTest extends TestCase
         ));
     }
 
-    /** Le statut mineur suit la même référence (§4.2) — il conditionne la tutelle parentale. */
-    public function test_minor_status_follows_the_configured_season(): void
+    /**
+     * La MINORITÉ, elle, ne suit plus la saison (carnet de retours terrain, 2026-09-04).
+     *
+     * Le mois de bascule déplace la référence de la catégorie sportive — c'est son rôle — mais il
+     * n'a aucune prise sur un fait juridique. Adosser la tutelle à l'âge de saison déclarait majeur
+     * un adhérent qui ne l'était pas, et jusqu'à douze mois d'avance selon le réglage du club.
+     */
+    public function test_legal_minority_ignores_the_configured_season(): void
     {
         $dob = Carbon::create(2008, 11, 15);
         $on = Carbon::create(2026, 3, 1);
 
+        // La référence sportive, elle, bouge bien : 31/08/2026 → 17 ans, 31/12/2026 → 18 ans.
         $this->setStartMonth(9);
-        $septemberSeason = AgeCategory::isMinor($dob, $on);
+        $this->assertSame(17, AgeCategory::seasonAge($dob, $on));
+        $septembre = AgeCategory::isLegallyMinor($dob, $on);
 
         $this->setStartMonth(1);
-        $januarySeason = AgeCategory::isMinor($dob, $on);
+        $this->assertSame(18, AgeCategory::seasonAge($dob, $on));
+        $janvier = AgeCategory::isLegallyMinor($dob, $on);
 
-        // Saison sept→août : référence 31/08/2026 → 17 ans, mineur.
-        // Saison janv→déc  : référence 31/12/2026 → 18 ans, majeur.
-        $this->assertTrue($septemberSeason, 'Saison sept→août : encore mineur à la référence.');
-        $this->assertFalse($januarySeason, 'Saison janv→déc : la référence plus tardive le rend majeur.');
+        // Au 01/03/2026, il a 17 ans révolus : mineur, quel que soit le mois de bascule.
+        $this->assertTrue($septembre);
+        $this->assertTrue($janvier, 'Le réglage club ne peut pas rendre quelqu\'un majeur avant l\'heure.');
     }
 
     /** Le paramètre explicite l'emporte sur le réglage club (calcul testable sans base). */

@@ -113,7 +113,7 @@ class ActivationScreenTest extends TestCase
         $garant = User::factory()->create();
         $pupille = User::factory()->create([
             'password' => null, 'email' => 'enfant@club.test',
-            'is_minor' => true, 'guardian_id' => $garant->id,
+            'dob' => now()->subYears(12)->toDateString(), 'guardian_id' => $garant->id,
         ]);
 
         $this->get('/invitation/'.$this->tokenFor($pupille))->assertRedirect(route('activation'));

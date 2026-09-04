@@ -26,7 +26,7 @@ class GuardianLifecycleTest extends TestCase
     {
         $guardian = User::factory()->create();
         $ward = User::factory()->create([
-            'is_minor' => true,
+            'dob' => now()->subYears(12)->toDateString(),
             'guardian_id' => $guardian->id,
             ...($phase === 'P1' ? ['email' => null, 'password' => null] : []),
         ]);
@@ -93,7 +93,7 @@ class GuardianLifecycleTest extends TestCase
 
     public function test_admin_links_guardian_to_autonomous_minor(): void
     {
-        $minor = User::factory()->create(['is_minor' => true]);
+        $minor = User::factory()->create(['dob' => now()->subYears(12)->toDateString()]);
         $adult = User::factory()->create();
         $admin = User::factory()->admin()->create();
 
@@ -117,8 +117,8 @@ class GuardianLifecycleTest extends TestCase
             $this->assertStringContainsString('déjà un garant', $e->getMessage());
         }
 
-        $orphan = User::factory()->create(['is_minor' => true]);
-        $minorGuardian = User::factory()->create(['is_minor' => true]);
+        $orphan = User::factory()->create(['dob' => now()->subYears(12)->toDateString()]);
+        $minorGuardian = User::factory()->create(['dob' => now()->subYears(12)->toDateString()]);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('adulte actif');
@@ -127,7 +127,7 @@ class GuardianLifecycleTest extends TestCase
 
     public function test_member_show_offers_link_for_orphan_minor(): void
     {
-        $minor = User::factory()->create(['is_minor' => true]);
+        $minor = User::factory()->create(['dob' => now()->subYears(12)->toDateString()]);
         $adult = User::factory()->create();
         $admin = User::factory()->admin()->create();
 
@@ -157,7 +157,7 @@ class GuardianLifecycleTest extends TestCase
     public function test_member_show_links_ward_from_guardian_page(): void
     {
         $adult = User::factory()->create(); // adulte actif → peut être garant
-        $minor = User::factory()->create(['is_minor' => true]); // mineur sans garant
+        $minor = User::factory()->create(['dob' => now()->subYears(12)->toDateString()]); // mineur sans garant
         $admin = User::factory()->admin()->create();
 
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $adult])

@@ -32,7 +32,7 @@ class MemberService
     {
         return DB::transaction(function () use ($data, $actor) {
             $dob = Carbon::parse($data['dob']);
-            $isMinor = AgeCategory::isMinor($dob);
+            $isMinor = AgeCategory::isLegallyMinor($dob);
 
             $user = User::create([
                 'first_name' => $data['first_name'],
@@ -105,7 +105,7 @@ class MemberService
                 'first_name' => $data['first_name'],
                 'last_name' => $data['last_name'],
                 'dob' => $dob->toDateString(),
-                'is_minor' => AgeCategory::isMinor($dob),
+                'is_minor' => AgeCategory::isLegallyMinor($dob),
             ]);
 
             // Recalcul de la principale ; les surclassements manuels (is_primary=false) sont conservés.
@@ -147,7 +147,7 @@ class MemberService
 
             $member->update([
                 'dob' => $parsed->toDateString(),
-                'is_minor' => AgeCategory::isMinor($parsed),
+                'is_minor' => AgeCategory::isLegallyMinor($parsed),
             ]);
 
             // Recalcul de la principale ; les surclassements manuels (is_primary=false) sont conservés.

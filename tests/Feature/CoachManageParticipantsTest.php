@@ -375,7 +375,7 @@ class CoachManageParticipantsTest extends TestCase
         $s->coaches()->attach([$parent->id, User::factory()->coach()->create()->id]);
         // Enfant SANS catégorie : non inscriptible sur cette séance.
         $child = User::factory()->create([
-            'guardian_id' => $parent->id, 'is_minor' => true, 'roles' => ['athlete'],
+            'guardian_id' => $parent->id, 'dob' => now()->subYears(12)->toDateString(), 'roles' => ['athlete'],
         ]);
 
         SubjectContext::set($parent, $child->id);

@@ -86,15 +86,19 @@ class AuthMethodService
      *
      * Un mot de passe suffit toujours à sauver un compte (le login MDP n'est jamais coupé).
      *
-     * Les mineurs en P1 sont HORS de ce décompte : le PRD §4.2 les définit comme existant « sans
+     * Les comptes en P1 sont HORS de ce décompte : le PRD §4.2 les définit comme existant « sans
      * credential d'auth, email nul » — le parent agit pour eux depuis « mes enfants ». Ils n'ont
      * aucun accès à perdre, donc aucune coupure ne peut les verrouiller dehors. Les compter
      * interdisait à tout club ayant des P1 de couper quoi que ce soit, avec un refus nommant des
-     * enfants qui ne se connectent pas. Même raison que l'exclusion des comptes inactifs et
+     * gens qui ne se connectent pas. Même raison que l'exclusion des comptes inactifs et
      * anonymisés : on ne protège que des accès qui existent.
      *
-     * Le critère est `is_minor` + `email IS NULL`, PAS la présence d'un garant : un mineur orphelin
-     * de tutelle (guardian_id nul, en attente de rattachement §4.2) n'a pas davantage de credential.
+     * Le critère est l'ABSENCE DE CREDENTIAL — `email IS NULL` et aucune identité OAuth —, pas
+     * l'âge et pas la présence d'un garant. L'âge n'a jamais décidé de l'existence d'un moyen de
+     * connexion : l'exemption y était adossée, si bien qu'un pupille que l'âge de saison comptait
+     * majeur bloquait en dur les réglages d'authentification du club, au nom d'un accès qu'il
+     * n'avait pas (carnet de retours terrain, 2026-09-04). Un pupille orphelin de tutelle
+     * (guardian_id nul, en attente de rattachement §4.2) n'a pas davantage de credential.
      * C'est l'absence d'email qui sépare P1 de P2 (§4.2.1 « la transition P1→P2 crée le credential
      * et renseigne l'email ») : un P2 a son propre email, se connecte seul, et reste protégé ici.
      *
@@ -115,9 +119,8 @@ class AuthMethodService
             ->where('is_active', true)
             ->whereNull('anonymized_at')
             ->whereNull('password')
-            // P1 (§4.2) : mineur sans email NI identité OAuth = aucun credential, rien à verrouiller.
-            ->whereNot(fn ($q) => $q->where('is_minor', true)
-                ->whereNull('email')
+            // P1 (§4.2) : sans email NI identité OAuth = aucun credential, rien à verrouiller.
+            ->whereNot(fn ($q) => $q->whereNull('email')
                 ->whereDoesntHave('authIdentities'));
 
         // Chaque moyen encore ouvert RETIRE de la liste les comptes qui peuvent l'emprunter.

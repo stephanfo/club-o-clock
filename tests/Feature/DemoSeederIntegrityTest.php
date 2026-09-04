@@ -166,7 +166,7 @@ class DemoSeederIntegrityTest extends TestCase
         // Contrôle apparié : le drapeau posé à la main par le seeder ne doit jamais diverger de
         // l'âge de saison dérivé par l'application (§4.5) — dans un sens comme dans l'autre.
         $divergents = User::whereNotNull('dob')->get()
-            ->filter(fn (User $u) => $u->is_minor !== AgeCategory::isMinor(Carbon::parse($u->dob)))
+            ->filter(fn (User $u) => $u->is_minor !== AgeCategory::isLegallyMinor(Carbon::parse($u->dob)))
             ->map(fn (User $u) => $u->email ?? $u->fullName())
             ->values()
             ->all();

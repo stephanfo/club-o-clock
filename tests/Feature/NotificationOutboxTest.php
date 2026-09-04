@@ -65,7 +65,7 @@ class NotificationOutboxTest extends TestCase
     {
         $guardian = User::factory()->create();
         $child = User::factory()->create([
-            'is_minor' => true,
+            'dob' => now()->subYears(12)->toDateString(),
             'guardian_id' => $guardian->id,
             'email' => 'child@club.test',
         ]);

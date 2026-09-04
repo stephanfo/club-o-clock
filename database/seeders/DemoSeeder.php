@@ -447,7 +447,7 @@ class DemoSeeder extends Seeder
                     'password' => Hash::make('password'),
                     'roles' => ['athlete'],
                     'is_active' => true,
-                    'is_minor' => AgeCategory::isMinor(Carbon::parse($dob)),
+                    'is_minor' => AgeCategory::isLegallyMinor(Carbon::parse($dob)),
                     'email_verified_at' => now(),
                 ],
             );

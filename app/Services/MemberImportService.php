@@ -295,7 +295,7 @@ class MemberImportService
             'line' => $lineNo,
             'raw_dob' => $fields['dob'],
             'dob' => $dob, // Carbon|null
-            'is_minor' => $dob !== null && AgeCategory::isMinor($dob),
+            'is_minor' => $dob !== null && AgeCategory::isLegallyMinor($dob),
             'email_lc' => $fields['email'] !== '' ? mb_strtolower($fields['email']) : null,
             'parent_email' => $fields['parent_email'] !== '' ? mb_strtolower($fields['parent_email']) : null,
             'data' => [
@@ -368,7 +368,7 @@ class MemberImportService
 
         $referenced = array_filter(array_map(fn ($r) => $r['parent_email'], $records));
         if ($referenced !== []) {
-            User::query()->whereNull('anonymized_at')->where('is_minor', false)->whereNotNull('email')
+            User::query()->whereNull('anonymized_at')->majeur()->whereNotNull('email')
                 ->get(['email'])
                 ->each(function (User $u) use (&$set, $referenced) {
                     $lc = mb_strtolower($u->email);
@@ -478,7 +478,7 @@ class MemberImportService
         }
 
         $map = [];
-        User::query()->whereNull('anonymized_at')->where('is_minor', false)->whereNotNull('email')
+        User::query()->whereNull('anonymized_at')->majeur()->whereNotNull('email')
             ->get(['id', 'email'])
             ->each(function (User $u) use (&$map, $refs) {
                 $lc = mb_strtolower($u->email);

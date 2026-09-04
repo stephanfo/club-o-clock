@@ -200,7 +200,6 @@ class MemberUiTest extends TestCase
             'first_name' => 'Camille',
             'last_name' => 'Vincent',
             'email' => 'camille.vincent@example.test',
-            'is_minor' => false,
         ]);
     }
 
@@ -217,6 +216,6 @@ class MemberUiTest extends TestCase
             ->call('create')
             ->assertHasNoErrors();
 
-        $this->assertDatabaseHas('users', ['first_name' => 'Léo', 'is_minor' => true, 'email' => null]);
+        $this->assertDatabaseHas('users', ['first_name' => 'Léo', 'email' => null]);
     }
 }

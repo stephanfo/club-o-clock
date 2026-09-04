@@ -104,7 +104,7 @@ class NotificationContexteSujetTest extends TestCase
     {
         $garant = User::factory()->create();
         $enfant = User::factory()->create([
-            'is_minor' => true,
+            'dob' => now()->subYears(12)->toDateString(),
             'guardian_id' => $garant->id,
             'email' => 'hugo@club.test',
             'first_name' => 'Hugo',
@@ -259,7 +259,7 @@ class NotificationContexteSujetTest extends TestCase
     {
         $garant = User::factory()->create();
         $enfant = User::factory()->create([
-            'is_minor' => true,
+            'dob' => now()->subYears(12)->toDateString(),
             'guardian_id' => $garant->id,
             'email' => 'hugo@club.test',
             'first_name' => 'Hugo',

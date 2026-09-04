@@ -68,6 +68,37 @@ class MemberImportTest extends TestCase
         $this->assertSame(1, $report['update']); // Alice (email déjà connu)
     }
 
+    /**
+     * Un adhérent que l'âge de SAISON compte majeur, mais qui est encore légalement mineur.
+     *
+     * Né le 15/07/2008, importé le 20/06/2026 : 17 ans révolus, mais 18 ans à la clôture de saison
+     * (31/08/2026). Sa ligne était refusée — « email requis pour un adulte » — et son parent_email
+     * ignoré sans un mot. Sa catégorie, elle, suit bien l'âge de saison : c'est son rôle.
+     * Carnet de retours terrain, 2026-09-04.
+     */
+    public function test_un_mineur_que_la_saison_compte_majeur_garde_son_garant(): void
+    {
+        $this->seedCategories();
+        $admin = User::factory()->admin()->create();
+
+        $csv = <<<'CSV'
+        nom,prénom,email,catégorie,date_nais,parent_email
+        Roy,Sylvie,sylvie@club.fr,Master,1979-02-11,
+        Roy,Nina,,,2008-07-15,sylvie@club.fr
+        CSV;
+
+        $report = $this->service()->analyze($csv);
+        $this->assertSame([], $report['errors'], 'Un mineur sans email est un P1, pas une ligne fautive.');
+
+        $this->service()->commit($report, $admin);
+
+        $nina = User::where('first_name', 'Nina')->firstOrFail();
+        $this->assertNull($nina->email);
+        $this->assertSame(User::where('first_name', 'Sylvie')->firstOrFail()->id, $nina->guardian_id);
+        // La catégorie, elle, reste calée sur l'âge de saison (§4.5) : 18 ans au 31/08/2026.
+        $this->assertSame('Sénior', $nina->primaryCategory()?->label);
+    }
+
     public function test_commit_creates_updates_and_links_guardians(): void
     {
         $this->seedCategories();

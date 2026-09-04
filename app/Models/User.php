@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Notifications\ResetPasswordNotification;
+use App\Support\AgeCategory;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
@@ -125,6 +126,43 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     // --- Parent garant (PRD §4.2) ---
+
+    /**
+     * Minorité LÉGALE au jour dit — la seule qui gouverne la tutelle (§4.2).
+     *
+     * À ne pas confondre avec l'âge de saison (AgeCategory::seasonAge), qui gouverne la catégorie
+     * sportive (§4.5) et anticipe de plusieurs mois : lui laisser décider de la minorité déclarait
+     * majeur un adhérent qui ne l'était pas. Sans date de naissance, la minorité n'est pas établie
+     * — fiche incomplète ou compte anonymisé —, et le compte n'est pas traité comme mineur.
+     */
+    public function isLegallyMinor(): bool
+    {
+        // Carbon::instance() : le cast 'date' produit un Carbon\Carbon, quand AgeCategory travaille
+        // avec celui d'Illuminate (son descendant). La conversion est explicite plutôt que subie.
+        return $this->dob !== null && AgeCategory::isLegallyMinor(Carbon::instance($this->dob));
+    }
+
+    /**
+     * Comptes légalement mineurs, en SQL — la condition se pose sur la date de naissance, car
+     * isLegallyMinor() ne peut pas s'évaluer ligne à ligne côté serveur.
+     *
+     * @param  Builder<User>  $query
+     */
+    public function scopeMineur(Builder $query): void
+    {
+        $query->whereNotNull('dob')->whereDate('dob', '>', AgeCategory::minorityThreshold());
+    }
+
+    /**
+     * Comptes majeurs. Une date de naissance absente n'est PAS une minorité : le compte tombe ici.
+     *
+     * @param  Builder<User>  $query
+     */
+    public function scopeMajeur(Builder $query): void
+    {
+        $query->where(fn (Builder $q) => $q->whereNull('dob')
+            ->orWhereDate('dob', '<=', AgeCategory::minorityThreshold()));
+    }
 
     /**
      * Le parent garant de cet utilisateur (0..1).
