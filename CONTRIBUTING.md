@@ -24,6 +24,11 @@ Ouvre une **issue** avec :
 > d'écran non floutée. Reproduis avec le jeu de démonstration
 > ([COMPTES_DEMO.md](doc/COMPTES_DEMO.md)) quand c'est possible.
 
+> **Un bug, pas une friction.** Cette section vise les **défauts** : le code ne fait pas ce que le
+> PRD ou le design annoncent déjà. Quand l'usage révèle plutôt un *manque* que le cadrage n'avait
+> pas vu — quelque chose qui reste à arbitrer —, la place est le carnet
+> [Retours terrain](doc/RETOURS_TERRAIN.md), pas une issue. Un même constat peut mériter les deux.
+
 Pour une **faille de sécurité**, n'ouvre pas d'issue : suis [SECURITY.md](SECURITY.md).
 
 ## Proposer une fonctionnalité
