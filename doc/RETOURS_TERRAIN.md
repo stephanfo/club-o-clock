@@ -358,9 +358,13 @@ colonne fait le travail depuis J7.7. Les deux s'affichent simultanément.
 > naissance, ni l'`UPDATE` en base ne sont encore nécessaires pour ces cas. Ils restent consignés
 > parce qu'ils décrivent l'état antérieur d'une instance qui n'aurait pas encore la mise à jour.
 >
-> **Restent ouverts : les points 4 et 5** — rattacher un majeur à un garant, et le compte unique par
-> foyer. Ce sont des décisions produit, pas des correctifs : elles demandent leur propre vocabulaire
-> (« gestion déléguée » plutôt que « tutelle ») et un endroit où la personne concernée consent.
+> **Restent ouverts : les points 4 et 5** — *créer* une tutelle sur un majeur, et le compte unique
+> par foyer. Ce sont des décisions produit, pas des correctifs : elles demandent leur propre
+> vocabulaire (« gestion déléguée » plutôt que « tutelle ») et un endroit où la personne concernée
+> consent. Nuance introduite au passage : le changement de garant, lui, accepte un pupille majeur —
+> substituer un garant sur un lien qui existe déjà ne place personne sous tutelle, et le refuser
+> rendait le garant d'un pupille arrivé à dix-huit ans sans compte propre à la fois indéplaçable et
+> insupprimable.
 
 **Traces.** PRD §4.2 (P1/P2/P3, transitions), §4.5 (âge de saison et catégories) ·
 [GuardianshipService.php](../app/Services/GuardianshipService.php) (`invite`, `sever`, `link` et

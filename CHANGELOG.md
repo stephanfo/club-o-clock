@@ -147,7 +147,10 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   garant » n'existe à aucun instant, pas même en cas d'échec, ce qui rend le geste sûr là où
   l'enchaînement de deux actions ne l'était pas. Elle demande une confirmation forte — la
   conséquence est nommée, la case à cocher arme le bouton, et le refus est gardé côté serveur. Seul
-  le garant sortant est prévenu : l'enfant, lui, n'a rien perdu.
+  le garant sortant est prévenu : l'enfant, lui, n'a rien perdu. Le geste sert aussi le pupille
+  arrivé à dix-huit ans sans compte propre — celui dont le garant était autrement indéplaçable **et**
+  insupprimable —, sans pour autant permettre de placer un adulte sous tutelle : substituer un
+  garant n'est pas en créer un.
 
 - **Les notifications disent enfin qui elles concernent et de quelle séance il s'agit.** Un parent
   garant est souvent adhérent lui-même : ses notifications et celles de ses enfants arrivaient sur le
