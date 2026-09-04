@@ -200,7 +200,7 @@ class GuardianshipService
                 throw new RuntimeException('Seul un mineur peut être rattaché à un garant.');
             }
             if ($ward->guardian_id !== null) {
-                throw new RuntimeException('Ce mineur a déjà un garant — romps d\'abord la tutelle existante.');
+                throw new RuntimeException('Ce mineur a déjà un garant — utilise le changement de garant.');
             }
             if ($guardian->isLegallyMinor() || ! $guardian->is_active || $guardian->anonymized_at !== null || $guardian->id === $ward->id) {
                 throw new RuntimeException('Le garant doit être un adulte actif du club.');
