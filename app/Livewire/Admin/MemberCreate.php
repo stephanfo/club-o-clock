@@ -140,7 +140,7 @@ class MemberCreate extends Component
             'dob' => ['required', 'date', 'before:today', 'after:1900-01-01'],
             'email' => [$this->isP1 ? 'nullable' : 'required', 'email', 'max:255', 'unique:users,email'],
             // Le garant doit être un adulte non anonymisé. La majorité se vérifie sur la date de
-            // naissance : s'adosser à la colonne is_minor refusait un adulte dont la valeur stockée
+            // naissance : s'adosser à une minorité stockée refusait un adulte dont la valeur
             // n'avait pas vieilli depuis sa création (carnet, 2026-09-04).
             'guardian_id' => [
                 $this->isMinor ? 'nullable' : 'prohibited',

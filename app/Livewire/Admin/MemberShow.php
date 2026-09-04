@@ -135,7 +135,7 @@ class MemberShow extends Component
         $this->editingDob = false;
     }
 
-    /** Persiste la nouvelle date de naissance (recalcule is_minor + catégorie principale via le service). */
+    /** Persiste la nouvelle date de naissance (recalcule la catégorie principale via le service). */
     public function saveDob(MemberService $service): void
     {
         $this->validate(

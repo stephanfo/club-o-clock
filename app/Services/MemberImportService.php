@@ -295,6 +295,8 @@ class MemberImportService
             'line' => $lineNo,
             'raw_dob' => $fields['dob'],
             'dob' => $dob, // Carbon|null
+            // Minorité LÉGALE du jour, calculée : il n'existe plus de colonne de ce nom, et c'est
+            // volontaire — la stocker sans la maintenir la faisait dériver (migration du 2026-09-04).
             'is_minor' => $dob !== null && AgeCategory::isLegallyMinor($dob),
             'email_lc' => $fields['email'] !== '' ? mb_strtolower($fields['email']) : null,
             'parent_email' => $fields['parent_email'] !== '' ? mb_strtolower($fields['parent_email']) : null,

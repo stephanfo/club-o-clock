@@ -333,18 +333,9 @@
                             </div>
                         </div>
 
-                        {{-- Rappel du garant en place. La GESTION du lien (accès autonome, rupture,
-                             changement de garant) vit dans la carte « Tutelle » de la colonne de
-                             gauche : ce bloc ne fait que rappeler qui est le garant. --}}
-                        @if ($u->guardian)
-                            <div class="card card-pad">
-                                <div class="flex ac jb"><span class="sect-title">Lien de tutelle</span><x-icon name="shield" :size="16" class="muted" /></div>
-                                <div class="card card-soft card-pad flex ac g10" style="margin-top:12px">
-                                    <x-avatar :name="$u->guardian->fullName()" size="sm" tint="tint-bike" />
-                                    <div class="f1" style="min-width:0"><div style="font-weight:700;font-size:14px">{{ $u->guardian->fullName() }}</div><div class="meta" style="font-size:12px">parent garant</div></div>
-                                </div>
-                            </div>
-                        @endif
+        {{-- Il n'y a plus de second bloc « Lien de tutelle » ici : il annonçait « gestion — bientôt
+             disponible » avec un bouton inerte, s'affichait dans la MÊME colonne que la carte
+             « Tutelle » qui fait le travail, et n'apportait qu'un doublon du garant déjà nommé. --}}
 
                         {{-- Rôles --}}
                         <div class="card card-pad">

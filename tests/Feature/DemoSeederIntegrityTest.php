@@ -6,11 +6,9 @@ use App\Models\Category;
 use App\Models\ClubSettings;
 use App\Models\Registration;
 use App\Models\User;
-use App\Support\AgeCategory;
 use Database\Seeders\CatalogSeeder;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -160,19 +158,21 @@ class DemoSeederIntegrityTest extends TestCase
             'Le surclassement doit rattacher la catégorie du dessus, en plus de la principale.');
         $this->assertCount(1, $categories->filter(fn (Category $c) => (bool) $c->pivot->is_primary),
             'Un athlète surclassé garde une et une seule catégorie principale.');
-        $this->assertTrue($noah->is_minor,
+        $this->assertTrue($noah->isLegallyMinor(),
             'Noah démontre la tutelle P2 (mineur avec compte propre) : il doit rester mineur.');
 
-        // Contrôle apparié : le drapeau posé à la main par le seeder ne doit jamais diverger de
-        // l'âge de saison dérivé par l'application (§4.5) — dans un sens comme dans l'autre.
-        $divergents = User::whereNotNull('dob')->get()
-            ->filter(fn (User $u) => $u->is_minor !== AgeCategory::isLegallyMinor(Carbon::parse($u->dob)))
+        // Contrôle apparié : tout pupille du jeu de démo doit être légalement mineur, sans quoi les
+        // parcours de tutelle qu'il illustre se joueraient sur des gardes qui le refusent. La
+        // divergence entre un drapeau stocké et la date de naissance, elle, n'existe plus : la
+        // minorité n'est plus stockée (migration du 2026-09-04).
+        $pupillesMajeurs = User::whereNotNull('guardian_id')->get()
+            ->reject(fn (User $u) => $u->isLegallyMinor())
             ->map(fn (User $u) => $u->email ?? $u->fullName())
             ->values()
             ->all();
 
-        $this->assertSame([], $divergents,
-            'Comptes de démo dont is_minor contredit la date de naissance : '.implode(', ', $divergents));
+        $this->assertSame([], $pupillesMajeurs,
+            'Pupilles du jeu de démo qui ne sont pas légalement mineurs : '.implode(', ', $pupillesMajeurs));
     }
 
     public function test_les_comptes_proposes_a_la_connexion_existent_tous(): void

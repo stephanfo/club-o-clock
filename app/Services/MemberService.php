@@ -23,7 +23,7 @@ use RuntimeException;
 class MemberService
 {
     /**
-     * Crée un adhérent (PRD §4.17.1). Dérive la catégorie principale + is_minor de la date de
+     * Crée un adhérent (PRD §4.17.1). Dérive la catégorie principale de la date de
      * naissance, attache surclassements / rôles / qualifs / garant, puis trace la création.
      *
      * @param  array{first_name:string,last_name:string,dob:string,email:?string,roles:array<int,string>,surclassements:array<int,int>,qualifications:array<int,int>,guardian_id:?int}  $data
@@ -41,7 +41,6 @@ class MemberService
                 'dob' => $dob->toDateString(),
                 'roles' => array_values($data['roles'] ?? ['athlete']),
                 'is_active' => true,
-                'is_minor' => $isMinor,
                 'guardian_id' => $isMinor ? ($data['guardian_id'] ?? null) : null,
                 'guardianship_linked_at' => ($isMinor && ! empty($data['guardian_id'])) ? Carbon::now() : null,
             ]);
@@ -90,7 +89,7 @@ class MemberService
 
     /**
      * Mise à jour d'identité lors d'un import CSV (J6.5) : nom, prénom, date de naissance. La date
-     * recalcule is_minor et la catégorie principale dérivée, en PRÉSERVANT les surclassements
+     * recalcule la catégorie principale dérivée, en PRÉSERVANT les surclassements
      * manuels existants. Ne touche ni email, ni rôles, ni qualifs, ni lien de tutelle (décision
      * produit : l'import ne fait que rafraîchir l'état civil des fiches déjà connues par email).
      *
@@ -105,7 +104,6 @@ class MemberService
                 'first_name' => $data['first_name'],
                 'last_name' => $data['last_name'],
                 'dob' => $dob->toDateString(),
-                'is_minor' => AgeCategory::isLegallyMinor($dob),
             ]);
 
             // Recalcul de la principale ; les surclassements manuels (is_primary=false) sont conservés.
@@ -135,7 +133,7 @@ class MemberService
 
     /**
      * Correction de la date de naissance depuis la fiche (§4.1.3, action immédiate). Recalcule
-     * is_minor + la catégorie principale dérivée, en PRÉSERVANT les surclassements manuels — même
+     * la catégorie principale dérivée, en PRÉSERVANT les surclassements manuels — même
      * logique que l'import (importUpdate). Ne touche pas au lien de tutelle : un mineur devenu majeur
      * garde son garant jusqu'à une rupture explicite (P2→P3, GuardianshipService), comme à l'import.
      * Acte d'identité sensible → AuditLog (survit à l'anonymisation) + ActivityLog métier.
@@ -147,7 +145,6 @@ class MemberService
 
             $member->update([
                 'dob' => $parsed->toDateString(),
-                'is_minor' => AgeCategory::isLegallyMinor($parsed),
             ]);
 
             // Recalcul de la principale ; les surclassements manuels (is_primary=false) sont conservés.
@@ -505,7 +502,6 @@ class MemberService
                 'password' => null,
                 'remember_token' => null,
                 'dob' => null,
-                'is_minor' => false,
                 'guardian_id' => null,
                 'guardianship_linked_at' => null,
                 'is_active' => false,

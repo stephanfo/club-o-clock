@@ -721,7 +721,6 @@ CREATE TABLE `users` (
   `roles` json DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
   `athlete_access_suspended` tinyint(1) NOT NULL DEFAULT '0',
-  `is_minor` tinyint(1) NOT NULL DEFAULT '0',
   `guardian_id` bigint unsigned DEFAULT NULL,
   `guardianship_linked_at` timestamp NULL DEFAULT NULL,
   `deletion_requested_at` timestamp NULL DEFAULT NULL,
@@ -802,3 +801,4 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (38,'2026_08_21_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (39,'2026_08_23_000000_add_code_to_magic_link_tokens',3);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (40,'2026_08_24_000000_add_last_login_at_to_users',4);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (41,'2026_08_24_000010_purge_sent_outbox_secrets',4);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (42,'2026_09_04_000000_drop_is_minor_from_users',5);

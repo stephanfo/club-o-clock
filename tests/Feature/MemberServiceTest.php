@@ -77,7 +77,7 @@ class MemberServiceTest extends TestCase
         ], $admin);
 
         $member->refresh();
-        $this->assertTrue($member->is_minor);
+        $this->assertTrue($member->isLegallyMinor());
         $this->assertSame($cats['minime']->id, $member->primaryCategory()->id);
         $this->assertTrue($member->categories()->where('category_id', $cats['senior']->id)->wherePivot('is_primary', false)->exists());
 

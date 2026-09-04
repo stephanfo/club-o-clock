@@ -128,7 +128,7 @@ class MemberImportTest extends TestCase
         // Mineur P1 sans email, garant = parent du CSV (résolu en 2e passe).
         $hugo = User::where('first_name', 'Hugo')->where('last_name', 'Fortin')->firstOrFail();
         $this->assertNull($hugo->email);
-        $this->assertTrue($hugo->is_minor);
+        $this->assertTrue($hugo->isLegallyMinor());
         $this->assertSame($pierre->id, $hugo->guardian_id);
         // Catégorie dérivée du DOB (Poussin 8-13), pas de la colonne CSV.
         $this->assertSame('Poussin', $hugo->categories()->wherePivot('is_primary', true)->first()->label);
@@ -138,7 +138,7 @@ class MemberImportTest extends TestCase
         // sur 750 et `where('first_name', …)->firstOrFail()` attrapait alors le compte de factory.
         // Test rouge au hasard des tirages, sur une PR sans rapport (vu en CI le 2026-08-27).
         $manon = User::where('email', 'manon@club.fr')->firstOrFail();
-        $this->assertTrue($manon->is_minor);
+        $this->assertTrue($manon->isLegallyMinor());
         $this->assertSame($pierre->id, $manon->guardian_id);
     }
 
@@ -221,7 +221,7 @@ class MemberImportTest extends TestCase
 
         $this->service()->commit($report, $admin);
         $tom = User::where('first_name', 'Tom')->where('last_name', 'Seul')->firstOrFail();
-        $this->assertTrue($tom->is_minor);
+        $this->assertTrue($tom->isLegallyMinor());
         $this->assertNull($tom->guardian_id);
     }
 

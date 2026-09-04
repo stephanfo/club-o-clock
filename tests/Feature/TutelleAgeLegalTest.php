@@ -113,13 +113,17 @@ class TutelleAgeLegalTest extends TestCase
         $this->assertSame($parent->id, $lila->guardian_id);
     }
 
-    /** Un adulte dont la valeur stockée serait périmée reste éligible comme garant. */
-    public function test_un_garant_reste_eligible_quand_sa_valeur_stockee_est_perimee(): void
+    /**
+     * Un adulte de 19 ans, créé alors qu'il était mineur, reste éligible comme garant.
+     *
+     * C'était le défaut exact de la minorité stockée : écrite à la création et jamais recalculée,
+     * elle refusait comme garant quelqu'un que la base croyait encore mineur. Rien à rafraîchir
+     * désormais — la minorité se lit sur la date de naissance à chaque question posée.
+     */
+    public function test_un_adulte_cree_mineur_reste_eligible_comme_garant(): void
     {
         $admin = User::factory()->admin()->create();
-        // Créé mineur il y a des années, jamais réédité depuis : la colonne n'a pas vieilli.
         $garant = User::factory()->create(['dob' => '2007-03-01']);
-        $garant->forceFill(['is_minor' => true])->save();
 
         Livewire::actingAs($admin)->test(MemberCreate::class)
             ->set('first_name', 'Noé')

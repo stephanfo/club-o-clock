@@ -49,7 +49,6 @@ class User extends Authenticatable implements MustVerifyEmail
         'roles',
         'is_active',
         'athlete_access_suspended',
-        'is_minor',
         'guardian_id',
         'guardianship_linked_at',
     ];
@@ -71,7 +70,6 @@ class User extends Authenticatable implements MustVerifyEmail
         'roles' => 'array',
         'is_active' => 'boolean',
         'athlete_access_suspended' => 'boolean',
-        'is_minor' => 'boolean',
         'guardianship_linked_at' => 'datetime',
         'deletion_requested_at' => 'datetime',
         'anonymized_at' => 'datetime',
