@@ -346,6 +346,22 @@ encore un bloc « Lien de tutelle » en lecture seule annonçant « Gestion de l
 disponible » avec un bouton désactivé (ligne 334), alors que la carte *Tutelle* de la première
 colonne fait le travail depuis J7.7. Les deux s'affichent simultanément.
 
+> ✅ **Sort de l'entrée — traitée le 2026-09-04, points 1 à 3 et le blocage des réglages d'auth.**
+> La minorité de la tutelle se calcule sur l'âge **légal** du jour ; la colonne `is_minor` est
+> supprimée, la minorité étant déduite de `dob` à chaque question posée. La rupture est refusée à
+> tout pupille sans compte propre, quel que soit son âge, et l'ouverture de compte autonome lui est
+> ouverte en échange — la sortie existe désormais vraiment. Une action **« Changer de garant »**
+> rompt et rattache dans une seule transaction. Le décompte des comptes verrouillés dehors exempte
+> sur l'absence de credential, non sur l'âge.
+>
+> **Les deux contournements ci-dessus sont donc caducs** : ni l'aller-retour sur la date de
+> naissance, ni l'`UPDATE` en base ne sont encore nécessaires pour ces cas. Ils restent consignés
+> parce qu'ils décrivent l'état antérieur d'une instance qui n'aurait pas encore la mise à jour.
+>
+> **Restent ouverts : les points 4 et 5** — rattacher un majeur à un garant, et le compte unique par
+> foyer. Ce sont des décisions produit, pas des correctifs : elles demandent leur propre vocabulaire
+> (« gestion déléguée » plutôt que « tutelle ») et un endroit où la personne concernée consent.
+
 **Traces.** PRD §4.2 (P1/P2/P3, transitions), §4.5 (âge de saison et catégories) ·
 [GuardianshipService.php](../app/Services/GuardianshipService.php) (`invite`, `sever`, `link` et
 leurs gardes) · [AgeCategory.php](../app/Support/AgeCategory.php) (`seasonAge`, `isMinor`) ·

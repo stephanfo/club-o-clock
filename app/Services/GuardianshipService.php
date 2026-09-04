@@ -242,6 +242,11 @@ class GuardianshipService
         $formerGuardian = null;
 
         DB::transaction(function () use ($ward, $newGuardian, $actor, &$formerGuardian) {
+            // Relecture DANS la transaction : le modèle vient d'une requête antérieure (composant
+            // Livewire, second onglet), et les gardes qui suivent doivent juger l'état réel, pas
+            // celui qu'on croyait au moment de l'affichage.
+            $ward->refresh();
+
             if ($ward->guardian_id === null) {
                 throw new RuntimeException('Ce pupille n\'a pas de garant : rattache-lui-en un.');
             }

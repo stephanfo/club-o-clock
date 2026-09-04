@@ -9,6 +9,34 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Corrigé
 
+- **Un adhérent de 17 ans pouvait être traité comme majeur, et perdre son parent garant.** La
+  minorité se calculait sur l'« âge de saison » — l'âge atteint au 31 août de fin de saison —, une
+  convention juste pour la **catégorie sportive**, où l'on court toute l'année dans la catégorie de
+  l'âge qu'on y atteindra, mais fausse pour la **tutelle**, qui est un fait juridique. Un adhérent né
+  fin août était compté majeur dès le 1er septembre, onze mois avant ses dix-huit ans : impossible de
+  lui déclarer un garant à la création, impossible de lui en rattacher un, sa ligne d'import refusée
+  faute d'email et le `parent_email` du fichier **ignoré sans un mot**. Les deux âges sont désormais
+  distincts : la catégorie garde l'âge de saison, la tutelle prend l'âge réel du jour.
+
+- **La minorité stockée en base ne vieillissait jamais.** Écrite à la création, à l'édition de la
+  date de naissance et à l'import, elle n'était recalculée nulle part — pas même à la bascule de
+  saison, qui recalcule pourtant les catégories. Un enfant inscrit à dix ans restait mineur en base
+  bien après ses dix-huit ans ; à l'inverse, un adulte créé mineur des années plus tôt se voyait
+  **refuser le rôle de parent garant** par une valeur périmée. La colonne est supprimée : la
+  minorité se déduit de la date de naissance à chaque fois qu'on la demande.
+
+- **Un enfant sans compte propre bloquait en dur les réglages d'authentification du club.** Le
+  décompte des comptes « qui n'auraient plus aucun moyen de se connecter » exemptait les mineurs
+  sans email — mais sur le critère de l'âge, si bien qu'un pupille que l'âge de saison comptait
+  majeur y rentrait et interdisait de couper le lien magique ou Google, au nom d'un accès qu'il
+  n'avait pas. L'exemption porte désormais sur ce qu'elle protège vraiment : l'absence de tout moyen
+  de connexion.
+
+- **Un pupille devenu majeur n'avait pas de sortie.** L'ouverture d'un compte autonome lui était
+  refusée — elle exigeait un mineur — et la rupture de tutelle lui était offerte : elle produisait un
+  compte sans garant ni accès, que plus rien ne pouvait reprendre. L'ouverture de compte ne regarde
+  plus l'âge, et la rupture est refusée tant qu'il n'y a pas de compte propre, quel que soit l'âge.
+
 - **Le jeu de démonstration vieillissait d'une catégorie par an.** Ses dates de naissance étaient
   écrites en dur : à chaque 1er septembre, la bascule d'année sportive faisait monter tout le monde
   d'un cran. Les « benjamins » du jeu sont devenus cadets, puis juniors, et les séances jeunes se
@@ -108,6 +136,18 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   garde est **serveur** : un bouton grisé contourné ne déclenche rien.
 
 ### Ajouté
+
+- **Le parent garant d'un enfant peut enfin être changé.** Le lien se posait à la création de la
+  fiche — formulaire ou import — et ne se reprenait plus jamais : pour en changer, il fallait rompre
+  puis rattacher, or la rupture est refusée à un enfant sans compte propre, et à raison — elle le
+  laisserait sans garant **et** sans accès. Le garant d'un enfant était donc **définitif**. Un
+  divorce, un décès, un changement de responsable légal, une simple erreur de saisie : aucune issue
+  dans l'outil, et un message de la fiche qui conseillait de « reparenter » un geste qui n'existait
+  pas. Une action **Changer de garant** rompt et rattache dans la même transaction : l'état « sans
+  garant » n'existe à aucun instant, pas même en cas d'échec, ce qui rend le geste sûr là où
+  l'enchaînement de deux actions ne l'était pas. Elle demande une confirmation forte — la
+  conséquence est nommée, la case à cocher arme le bouton, et le refus est gardé côté serveur. Seul
+  le garant sortant est prévenu : l'enfant, lui, n'a rien perdu.
 
 - **Les notifications disent enfin qui elles concernent et de quelle séance il s'agit.** Un parent
   garant est souvent adhérent lui-même : ses notifications et celles de ses enfants arrivaient sur le
