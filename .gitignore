@@ -49,3 +49,8 @@ Thumbs.db
 
 # Captures du harnais E2E (artefacts locaux)
 /tests/E2E/shots/
+
+# Bac à sable local : dumps de base, exports, fichiers de travail. Le dépôt est PUBLIC et un dump
+# de production contient des données personnelles — un `git add -A` distrait suffirait à les
+# publier, sans retour possible une fois poussé. Même raisonnement que la liste blanche des .env.
+/tmp/
