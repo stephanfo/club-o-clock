@@ -92,9 +92,14 @@ class MemberImportTest extends TestCase
 
         $this->service()->commit($report, $admin);
 
-        $nina = User::where('first_name', 'Nina')->firstOrFail();
+        // Jamais par prénom seul (cf. l.138) : « Sylvie » sort ~1 fois sur 285 du faker fr_FR de la
+        // CI, et le compte de factory volait alors l'identité de l'adhérente importée. Rouge au
+        // hasard des tirages, sur une PR sans rapport (vu en CI le 2026-09-06). La garante a un
+        // email, on l'y prend ; la pupille est un P1 sans email, on la prend sur nom + prénom.
+        $sylvie = User::where('email', 'sylvie@club.fr')->firstOrFail();
+        $nina = User::where('first_name', 'Nina')->where('last_name', 'Roy')->firstOrFail();
         $this->assertNull($nina->email);
-        $this->assertSame(User::where('first_name', 'Sylvie')->firstOrFail()->id, $nina->guardian_id);
+        $this->assertSame($sylvie->id, $nina->guardian_id);
         // La catégorie, elle, reste calée sur l'âge de saison (§4.5) : 18 ans au 31/08/2026.
         $this->assertSame('Sénior', $nina->primaryCategory()?->label);
     }
