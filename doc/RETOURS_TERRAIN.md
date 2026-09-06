@@ -61,9 +61,9 @@ public, l'amorçage passe par `club:create-admin`), donc y ouvrir une brèche de
 propre : lien d'invitation de campagne à durée limitée ? file de validation par le bureau ? Et le
 statut de garant doit rester une relation, sans dériver vers un rôle `parent` dans `roles[]`.
 
-**Traces.** PRD §4.1.3 (flow de création), §4.2 (P1/P2/P3) · [MemberCreate.php](../app/Livewire/Admin/MemberCreate.php)
-(règles de validation, `guardian_id`) · [MemberImportService.php](../app/Services/MemberImportService.php)
-(`parseDob`, rôle forcé au commit) · [DemoSeeder.php](../database/seeders/DemoSeeder.php)
+**Traces.** PRD §4.1.3 (flow de création), §4.2 (P1/P2/P3) · [MemberCreate.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Livewire/Admin/MemberCreate.php)
+(règles de validation, `guardian_id`) · [MemberImportService.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Services/MemberImportService.php)
+(`parseDob`, rôle forcé au commit) · [DemoSeeder.php](https://github.com/stephanfo/club-o-clock/blob/main/database/seeders/DemoSeeder.php)
 (Olivier Mercier : le parent pur `roles => []` existe déjà dans le jeu de démo).
 
 ---
@@ -71,7 +71,7 @@ statut de garant doit rester une relation, sans dériver vers un rôle `parent` 
 ## 2026-09-03 — Suivi de délivrabilité des emails (Brevo)
 
 **Ce qu'on observe.** L'outbox s'arrête à `sent`
-([migration](../database/migrations/2026_01_01_000220_create_notification_outbox_table.php)), qui
+([migration](https://github.com/stephanfo/club-o-clock/blob/main/database/migrations/2026_01_01_000220_create_notification_outbox_table.php)), qui
 signifie exactement « remis à l'API Brevo » — pas « arrivé dans la boîte ». Quand un adhérent dit
 « je n'ai jamais reçu mon invitation », le bureau ne peut pas trancher entre : jamais parti,
 adresse invalide, rejeté par le serveur destinataire, classé en indésirable, ou bien reçu et
@@ -81,7 +81,7 @@ l'aveugle, sans savoir si le problème est l'adresse ou l'attention du destinata
 
 > ⚠️ Ne pas se laisser abuser par `notification_outbox.read_at` : ce champ existe déjà mais porte
 > une **autre sémantique** — la lecture **in-app** de l'alerte, posée par
-> [Alerts.php](../app/Livewire/Alerts.php) à l'affichage. Le réutiliser pour une ouverture d'email
+> [Alerts.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Livewire/Alerts.php) à l'affichage. Le réutiliser pour une ouverture d'email
 > mélangerait deux faits sans rapport.
 
 **Ce qu'on fait aujourd'hui.** Rien dans l'application : on ouvre le tableau de bord Brevo à la
@@ -128,9 +128,9 @@ le moins le traiter comme une décision séparée, avec son propre motif. La que
 est-il arrivé ? » se répond entièrement sans savoir s'il a été lu.
 
 **Traces.** Cadrage §6.3 (email transactionnel UE), §7.13 (outbox/cron) ·
-[notification_outbox](../database/migrations/2026_01_01_000220_create_notification_outbox_table.php)
+[notification_outbox](https://github.com/stephanfo/club-o-clock/blob/main/database/migrations/2026_01_01_000220_create_notification_outbox_table.php)
 (statuts `pending|sent|failed|cancelled`, `read_at` = lecture in-app) ·
-[MailServiceProvider.php](../app/Providers/MailServiceProvider.php) (branchement du transport) ·
+[MailServiceProvider.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Providers/MailServiceProvider.php) (branchement du transport) ·
 `vendor/symfony/brevo-mailer/` (transport, `Webhook/`, `RemoteEvent/`).
 
 ---
@@ -174,9 +174,9 @@ banale en début de saison, la lister à chaque fois noierait le signal.
 Si le carnet donne lieu à un chantier « fiabiliser l'import », cette entrée se traite avec les
 points 2 et 3 de l'entrée sur les parents non-athlètes : même écran, même service.
 
-**Traces.** [MemberService::importUpdate()](../app/Services/MemberService.php) (contrat explicite :
-ne touche ni email, ni rôles, ni tutelle) · [MemberImportService::classify()](../app/Services/MemberImportService.php)
-(bascule `update` sur email connu) · [member-list.blade.php](../resources/views/livewire/admin/member-list.blade.php)
+**Traces.** [MemberService::importUpdate()](https://github.com/stephanfo/club-o-clock/blob/main/app/Services/MemberService.php) (contrat explicite :
+ne touche ni email, ni rôles, ni tutelle) · [MemberImportService::classify()](https://github.com/stephanfo/club-o-clock/blob/main/app/Services/MemberImportService.php)
+(bascule `update` sur email connu) · [member-list.blade.php](https://github.com/stephanfo/club-o-clock/blob/main/resources/views/livewire/admin/member-list.blade.php)
 (aperçu et compteurs de la modale) · [INSTALL.md](INSTALL.md) §4 (avertissement à l'exploitant).
 
 ---
@@ -188,11 +188,11 @@ tutelle se pose à la création et ne se reprend plus, sur la foi d'un `is_minor
 autre question que celle qu'on lui pose.
 
 1. **Aucun changement de garant.** `guardian_id` ne s'écrit qu'à la création
-   ([MemberCreate](../app/Livewire/Admin/MemberCreate.php)) ou à l'import. Ensuite, deux gestes
+   ([MemberCreate](https://github.com/stephanfo/club-o-clock/blob/main/app/Livewire/Admin/MemberCreate.php)) ou à l'import. Ensuite, deux gestes
    seulement : `sever()` et `link()` — ce dernier refusant tout mineur qui a déjà un garant.
    Changer de garant, c'est donc rompre puis rattacher. Or `sever()` refuse un **P1 mineur** — à
    raison : sans garant ni compte propre, l'enfant deviendrait ingérable — et le bouton est masqué
-   en conséquence ([member-show.blade.php:159](../resources/views/livewire/admin/member-show.blade.php)).
+   en conséquence ([member-show.blade.php:159](https://github.com/stephanfo/club-o-clock/blob/main/resources/views/livewire/admin/member-show.blade.php)).
    Pour un P1, c'est-à-dire le cas courant de l'enfant sans email, **le garant est définitif**.
    Divorce, décès, changement de responsable légal, erreur de saisie : aucune issue dans l'outil.
    La fiche adhérent conseille d'ailleurs, ligne 242, « autonomiser ou **reparenter** d'abord » —
@@ -222,7 +222,7 @@ autre question que celle qu'on lui pose.
 
 3. **`is_minor` ne vieillit pas.** Il n'est écrit qu'à la création, à l'édition de la date de
    naissance et à l'import. La bascule de saison recalcule la **catégorie**
-   ([SeasonService.php:117](../app/Services/SeasonService.php)) mais **pas** `is_minor` : la valeur
+   ([SeasonService.php:117](https://github.com/stephanfo/club-o-clock/blob/main/app/Services/SeasonService.php)) mais **pas** `is_minor` : la valeur
    reste celle du jour de la saisie. Un enfant inscrit à 10 ans reste `is_minor = 1` en base
    longtemps après ses 18 ans, jusqu'à ce que quelqu'un rouvre sa date de naissance. Le décalage du
    point 2 se fige donc aussi bien dans un sens que dans l'autre, et rien ne le rattrape.
@@ -231,7 +231,7 @@ autre question que celle qu'on lui pose.
    la validation `prohibited` de `MemberCreate`, `MemberService::create()` qui force `null`).
    Pourtant le modèle le supporte déjà sans rien changer : le routage des notifications déduit la
    phase du seul couple `(guardian_id, email)` et **ne lit jamais `is_minor`**
-   ([NotificationDispatcher.php:193-216](../app/Notifications/NotificationDispatcher.php)), tout
+   ([NotificationDispatcher.php:193-216](https://github.com/stephanfo/club-o-clock/blob/main/app/Notifications/NotificationDispatcher.php)), tout
    comme `SessionPolicy::122` et `RegistrationService::80`. Le besoin est réel — majeur protégé,
    adhérent en situation de handicap accompagné par un proche — et la mécanique existe déjà : elle
    est simplement interdite à l'entrée.
@@ -265,20 +265,20 @@ Aller-retour sur la date de naissance, en trois gestes **enchaînés** : créer 
 qui le place franchement sous les 18 ans de saison (16 ans, par exemple), poser le garant dans la
 foulée, puis rétablir la vraie date depuis la fiche. `updateDob()` recalcule `is_minor` et la
 catégorie principale mais **ne touche ni `guardian_id` ni `guardianship_linked_at`**
-([MemberService.php:143-175](../app/Services/MemberService.php)) : le lien survit à la correction.
+([MemberService.php:143-175](https://github.com/stephanfo/club-o-clock/blob/main/app/Services/MemberService.php)) : le lien survit à la correction.
 Enchaîner les trois gestes avant toute inscription — entre-temps, la catégorie dérivée est celle de
 la fausse date. Trois pièges en découlent, tous dus au `is_minor = 0` final et non à la manœuvre :
 
 - **Le bouton de rupture s'arme, et il est chez le parent.** La carte enfant teste
-  `phase === 'P1' && is_minor` ([child-card.blade.php:53](../resources/views/livewire/partials/child-card.blade.php)) :
+  `phase === 'P1' && is_minor` ([child-card.blade.php:53](https://github.com/stephanfo/club-o-clock/blob/main/resources/views/livewire/partials/child-card.blade.php)) :
   « Accès autonome » devient « **Rompre la tutelle** » sur l'écran « Mes enfants » du garant, qui
   n'a aucune raison de s'en méfier. Un clic, et le compte est orphelin définitif. Prévenir le
   parent.
 - **Les réglages d'authentification du club se bloquent.** `lockedOutBy()` exempte les P1 sur le
   critère `is_minor = true` **et** `email IS NULL`
-  ([AuthMethodService.php:118-121](../app/Services/AuthMethodService.php)) : sans mot de passe, sans
+  ([AuthMethodService.php:118-121](https://github.com/stephanfo/club-o-clock/blob/main/app/Services/AuthMethodService.php)) : sans mot de passe, sans
   email et sans identité OAuth, ce compte est compté comme verrouillé dehors, et
-  [ClubSettingsForm.php:189-195](../app/Livewire/Admin/ClubSettingsForm.php) **refuse** dès lors de
+  [ClubSettingsForm.php:189-195](https://github.com/stephanfo/club-o-clock/blob/main/app/Livewire/Admin/ClubSettingsForm.php) **refuse** dès lors de
   couper le magic link ou Google — « 1 compte(s) actif(s) n'auraient plus aucun moyen de se
   connecter » — pour un compte qui n'a aucun accès à perdre. Refus valable pour les deux
   interrupteurs, tant que l'état dure. Déblocage : lui poser un `password` en base, ce qui ne lui
@@ -367,23 +367,23 @@ colonne fait le travail depuis J7.7. Les deux s'affichent simultanément.
 > insupprimable.
 
 **Traces.** PRD §4.2 (P1/P2/P3, transitions), §4.5 (âge de saison et catégories) ·
-[GuardianshipService.php](../app/Services/GuardianshipService.php) (`invite`, `sever`, `link` et
-leurs gardes) · [AgeCategory.php](../app/Support/AgeCategory.php) (`seasonAge`, `isMinor`) ·
-[SeasonService.php](../app/Services/SeasonService.php) (recalcul des catégories à la bascule, sans
-`is_minor`) · [MemberService.php](../app/Services/MemberService.php) (`create`, `updateDob`,
+[GuardianshipService.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Services/GuardianshipService.php) (`invite`, `sever`, `link` et
+leurs gardes) · [AgeCategory.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Support/AgeCategory.php) (`seasonAge`, `isMinor`) ·
+[SeasonService.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Services/SeasonService.php) (recalcul des catégories à la bascule, sans
+`is_minor`) · [MemberService.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Services/MemberService.php) (`create`, `updateDob`,
 détachement des pupilles à l'anonymisation) ·
-[MemberImportService.php](../app/Services/MemberImportService.php) (« email requis pour un adulte »,
+[MemberImportService.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Services/MemberImportService.php) (« email requis pour un adulte »,
 lien de tutelle réservé aux mineurs) ·
-[NotificationDispatcher.php](../app/Notifications/NotificationDispatcher.php) (`recipients()` :
+[NotificationDispatcher.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Notifications/NotificationDispatcher.php) (`recipients()` :
 phase déduite de `(guardian_id, email)`) ·
-[SubjectContext.php](../app/Support/SubjectContext.php) (`wards()` : ni filtre d'âge ni filtre de
-phase) · [AuthMethodService.php](../app/Services/AuthMethodService.php) et
-[ClubSettingsForm.php](../app/Livewire/Admin/ClubSettingsForm.php) (exemption P1 du décompte des
+[SubjectContext.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Support/SubjectContext.php) (`wards()` : ni filtre d'âge ni filtre de
+phase) · [AuthMethodService.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Services/AuthMethodService.php) et
+[ClubSettingsForm.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Livewire/Admin/ClubSettingsForm.php) (exemption P1 du décompte des
 comptes verrouillés dehors, refus de couper un moyen d'auth) ·
-[child-card.blade.php](../resources/views/livewire/partials/child-card.blade.php) (bascule
-« Accès autonome » → « Rompre la tutelle » sur `is_minor`) · [ParentChildren.php](../app/Livewire/ParentChildren.php) et
-[parent-children.blade.php](../resources/views/livewire/parent-children.blade.php) (vocabulaire
+[child-card.blade.php](https://github.com/stephanfo/club-o-clock/blob/main/resources/views/livewire/partials/child-card.blade.php) (bascule
+« Accès autonome » → « Rompre la tutelle » sur `is_minor`) · [ParentChildren.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Livewire/ParentChildren.php) et
+[parent-children.blade.php](https://github.com/stephanfo/club-o-clock/blob/main/resources/views/livewire/parent-children.blade.php) (vocabulaire
 « Mes enfants ») · entrée du 2026-09-03 sur l'import CSV (l'email unique et le couple qui partage
 une boîte) ·
-[member-show.blade.php](../resources/views/livewire/admin/member-show.blade.php) (carte Tutelle,
+[member-show.blade.php](https://github.com/stephanfo/club-o-clock/blob/main/resources/views/livewire/admin/member-show.blade.php) (carte Tutelle,
 masquage de la rupture, bloc résiduel « bientôt disponible »).
