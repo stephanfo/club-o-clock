@@ -188,6 +188,111 @@ const tous = [];
   await ctx.close();
 }
 
+// ───────────────────────────────────────────────────────────────────
+// S23 — Suppression définitive d'une séance annulée (§4.7, admin).
+//       Le scénario CRÉE son propre sujet : la suppression est alors
+//       sa propre restauration — rien à remettre en place ensuite.
+//       Ce que PHPUnit ne voit pas : que l'entrée n'existe qu'à l'état
+//       annulé, que le bouton reste désarmé tant que la case n'est pas
+//       cochée, et qu'on atterrit sur le planning et non sur une fiche
+//       dont le modèle vient de disparaître.
+// ───────────────────────────────────────────────────────────────────
+{
+  const s = new Scenario('S23 · Suppression définitive d\'une séance annulée');
+  const journaux = repereJournaux();
+
+  // Sujet jetable, jamais le jeu de démo : on va l'effacer pour de bon.
+  const admin = sql("SELECT id FROM users WHERE email='admin@demo.club'");
+  const titre = 'Doublon E2E à effacer';
+  sql(`INSERT INTO sessions (kind, title, start_at, duration_min, visibility, created_by, created_at, updated_at)
+       VALUES ('training', '${titre}', DATE_ADD(NOW(), INTERVAL 21 DAY), 60, 'all', ${admin}, NOW(), NOW())`);
+  const cible = Number(sql(`SELECT id FROM sessions WHERE title='${titre}' ORDER BY id DESC LIMIT 1`));
+
+  // Alerte déjà « envoyée » ne portant QUE le session_id — le cas que la suppression doit rendre
+  // autonome (les event_created de production n'ont rien d'autre dans leur payload).
+  sql(`INSERT INTO notification_outbox (type, channel, payload, user_id, status, sent_at, created_at, updated_at)
+       VALUES ('event_created', 'push', '{"session_id": ${cible}}', ${admin}, 'sent', NOW(), NOW(), NOW())`);
+  const alerte = Number(sql('SELECT MAX(id) FROM notification_outbox'));
+
+  // Desktop : l'entrée de suppression est un geste d'administration, absent du format mobile.
+  const { ctx, page } = await session(browser, 'admin@demo.club', DESKTOP);
+
+  await fiche(page, cible);
+  s.check('séance vivante : pas d\'entrée de suppression',
+          await page.locator('button[wire\\:click="openDeleteConfirm"]').count() === 0);
+
+  // On annule par l'écran, pas en base : c'est le premier temps du geste, et il conditionne le second.
+  await page.locator('button[wire\\:click="openCancelConfirm"]:visible').first().click();
+  await page.waitForTimeout(700);
+  await page.locator('[wire\\:click="$toggle(\'cancelCheck\')"]:visible').first().click();
+  await page.waitForTimeout(400);
+  await page.locator('button[wire\\:click="cancel"]:visible').first().click();
+  await page.waitForTimeout(1500);
+
+  s.check('la séance est annulée en base',
+          sql(`SELECT cancelled_at IS NOT NULL FROM sessions WHERE id=${cible}`) === '1');
+  s.check('l\'entrée de suppression apparaît une fois annulée',
+          await page.locator('button[wire\\:click="openDeleteConfirm"]:visible').count() === 1);
+  await s.shot(page, 's23-annulee-avant-suppression');
+
+  // Le geste est en deux temps et l'annulation existe au téléphone : réserver le second temps au
+  // desktop obligerait à changer d'appareil au milieu. On le vérifie au format, pas sur parole.
+  {
+    const m = await session(browser, 'admin@demo.club', MOBILE);
+    await fiche(m.page, cible);
+    await m.page.waitForTimeout(600);
+    s.check('mobile : l\'entrée est offerte elle aussi',
+            await m.page.locator('button[wire\\:click="openDeleteConfirm"]:visible').count() === 1);
+    s.check('mobile : la barre collante garde le geste RÉVERSIBLE',
+            /Restaurer/i.test(await barreMobile(m.page) ?? ''));
+    await s.shot(m.page, 's23-mobile-gestion');
+    await m.ctx.close();
+  }
+
+  await page.locator('button[wire\\:click="openDeleteConfirm"]:visible').first().click();
+  await page.waitForTimeout(700);
+  const dlg = page.locator('.dialog, [role="dialog"]').first();
+  s.check('le dialog annonce l\'irréversibilité',
+          /irréversible/i.test((await dlg.innerText()).replace(/\s+/g, ' ')));
+  s.check('bouton non armé sans accusé de réception',
+          await dlg.locator('button[wire\\:click="delete"]').count() === 0);
+  await s.shot(page, 's23-dialog-suppression');
+
+  await dlg.locator('[wire\\:click="$toggle(\'deleteCheck\')"]').first().click();
+  await page.waitForTimeout(500);
+  s.check('la case cochée arme le bouton',
+          await dlg.locator('button[wire\\:click="delete"]').count() === 1);
+
+  await dlg.locator('button[wire\\:click="delete"]').first().click();
+  await page.waitForTimeout(1800);
+
+  s.check('on atterrit sur le planning, pas sur une fiche morte',
+          /\/planning\/?$/.test(new URL(page.url()).pathname + '/') || page.url().includes('/planning'),
+          page.url());
+  s.check('la séance a disparu de la base',
+          sql(`SELECT COUNT(*) FROM sessions WHERE id=${cible}`) === '0');
+  s.check('la trace d\'audit survit avec sa cible et le titre',
+          sql(`SELECT COUNT(*) FROM audit_logs WHERE action='delete_session' AND target_type='session' AND target_id=${cible}`) === '1' &&
+          sql(`SELECT motif FROM audit_logs WHERE action='delete_session' AND target_id=${cible}`).includes(titre));
+  // JSON_UNQUOTE : Laravel échappe l'unicode à l'écriture (« \\u00e0 »), JSON_EXTRACT rend la
+  // forme échappée. Sans le décodage, l'assertion échouerait sur un titre accentué alors que le
+  // payload est juste — et tous les vrais titres de séance en portent.
+  s.check('l\'alerte garde son titre et perd son lien',
+          sql(`SELECT JSON_UNQUOTE(JSON_EXTRACT(payload,'$.session_title')) FROM notification_outbox WHERE id=${alerte}`).includes(titre) &&
+          sql(`SELECT JSON_CONTAINS_PATH(payload,'one','$.session_id') FROM notification_outbox WHERE id=${alerte}`) === '0');
+  await s.shot(page, 's23-apres-suppression');
+  s.checkJs(page);
+
+  // Restauration : la séance s'est effacée elle-même, restent les journaux et l'alerte de test.
+  purgeJournaux(journaux);
+  s.check('état restauré (séance jetable et journaux)',
+          sql(`SELECT COUNT(*) FROM sessions WHERE title='${titre}'`) === '0' &&
+          sql(`SELECT COUNT(*) FROM notification_outbox WHERE id=${alerte}`) === '0');
+
+  tous.push(s.report());
+  await ctx.close();
+}
+
 await browser.close();
 const ok = tous.every(Boolean);
 console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES SCÉNARIOS PASSENT' : '❌ AU MOINS UN SCÉNARIO ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);

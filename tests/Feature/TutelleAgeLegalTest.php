@@ -135,7 +135,9 @@ class TutelleAgeLegalTest extends TestCase
             ->call('create')
             ->assertHasNoErrors();
 
-        $lila = User::where('first_name', 'Lila')->firstOrFail();
+        // Nom ET prénom : le faker fr_FR de la CI peut tirer le même prénom pour un compte de
+        // factory, et `firstOrFail()` attraperait celui-là (cf. MemberImportTest l.138).
+        $lila = User::where('first_name', 'Lila')->where('last_name', 'Berger')->firstOrFail();
         $this->assertNull($lila->email, 'Un P1 n\'a pas de compte propre.');
         $this->assertSame($parent->id, $lila->guardian_id);
     }
@@ -162,7 +164,7 @@ class TutelleAgeLegalTest extends TestCase
             ->call('create')
             ->assertHasErrors('guardian_id');
 
-        $this->assertNull(User::where('first_name', 'Ana')->first());
+        $this->assertNull(User::where('first_name', 'Ana')->where('last_name', 'Roussel')->first());
     }
 
     /**
@@ -186,6 +188,7 @@ class TutelleAgeLegalTest extends TestCase
             ->call('create')
             ->assertHasNoErrors();
 
-        $this->assertSame($garant->id, User::where('first_name', 'Noé')->firstOrFail()->guardian_id);
+        $this->assertSame($garant->id,
+            User::where('first_name', 'Noé')->where('last_name', 'Bertin')->firstOrFail()->guardian_id);
     }
 }

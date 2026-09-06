@@ -5,9 +5,11 @@ namespace App\Livewire\Concerns\SessionShow;
 use App\Notifications\NotificationType;
 use App\Services\AperoService;
 use App\Services\RegistrationService;
+use App\Services\SessionDeletionService;
 use App\Services\SessionNotificationService;
 use App\Support\Logging\AuditLogger;
 use Illuminate\Support\Carbon;
+use RuntimeException;
 
 // Cycle de vie de la séance : annulation / restauration (PRD §4.7) — actions coach/admin.
 trait ManagesLifecycle
@@ -93,5 +95,64 @@ trait ManagesLifecycle
         // premier niveau et perd les imbrications (registrations.user, coaches.qualifications).
         $this->refreshSession();
         session()->flash('status', 'Séance réactivée.');
+    }
+
+    // ── Suppression définitive (§4.7) — admin seul, sur une séance déjà annulée ────────────────
+
+    public bool $confirmingDelete = false;
+
+    /** Case « j'ai compris » du dialog de suppression — arme le bouton. Jamais pré-cochée. */
+    public bool $deleteCheck = false;
+
+    public function openDeleteConfirm(): void
+    {
+        $this->authorize('delete', $this->session);
+        $this->deleteCheck = false;
+        $this->confirmingDelete = true;
+    }
+
+    public function dismissDeleteConfirm(): void
+    {
+        $this->confirmingDelete = false;
+        $this->deleteCheck = false;
+    }
+
+    /**
+     * Supprime la séance, puis quitte la fiche : elle n'a plus de modèle à afficher.
+     *
+     * Niveau 3 de confirmation, comme l'annulation, mais pour l'autre raison : ici rien n'est
+     * notifié — c'est l'irréversibilité seule qui exige l'accusé de réception.
+     */
+    public function delete(SessionDeletionService $service): void
+    {
+        $this->authorize('delete', $this->session);
+
+        if (! $this->deleteCheck) {
+            return;
+        }
+
+        try {
+            $service->delete($this->session, auth()->user());
+        } catch (RuntimeException $e) {
+            // QueryException descend de PDOException, donc de RuntimeException : sans ce tri, un
+            // interblocage ou un délai de verrou serait présenté comme un refus métier ordinaire et
+            // son SQLSTATE — requête comprise — s'afficherait dans une bannière orange, sans rien
+            // journaliser. Le geste étant destructif, l'admin doit voir une vraie erreur, pas un
+            // refus rassurant. (Le `catch` large est le motif du dépôt ; l'enjeu est ici, on trie.)
+            if ($e instanceof \PDOException) {
+                throw $e;
+            }
+
+            $this->dismissDeleteConfirm();
+            session()->flash('warn', $e->getMessage());
+
+            return;
+        }
+
+        // redirect() et non redirectRoute() + refreshSession() : le modèle vient de disparaître,
+        // tout re-rendu de cette fiche lèverait. Le flash est lu par le planning à l'arrivée.
+        session()->flash('status', 'Séance supprimée.');
+
+        $this->redirect(route('planning'), navigate: true);
     }
 }

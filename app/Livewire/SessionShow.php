@@ -12,6 +12,7 @@ use App\Models\ClubSettings;
 use App\Models\Debrief;
 use App\Models\Session;
 use App\Services\RegistrationService;
+use App\Services\SessionDeletionService;
 use App\Services\WeatherService;
 use App\Support\QualificationDisplay;
 use App\Support\RegistrantDisplay;
@@ -177,6 +178,10 @@ class SessionShow extends Component
 
         $weather = $this->weatherData();
 
+        // Deux requêtes de décompte que seul l'admin d'une séance annulée déclenche : inutile de
+        // les payer sur chaque affichage de fiche.
+        $canDelete = $me !== null && $me->can('delete', $this->session);
+
         return view('livewire.session-show', [
             'tz' => $this->tz(),
             'hasConflict' => $this->hasScheduleConflict(),
@@ -198,6 +203,13 @@ class SessionShow extends Component
             'isStaff' => $isCoachMember,
             'canEnrollOther' => $isCoachMember && ! $this->session->hasStarted() && ! $this->session->isCancelled(),
             'selectableAthletes' => $this->pickingAthlete ? $this->selectableAthletes() : collect(),
+            // Suppression définitive (§4.7) : la policy dit QUI (admin, séance annulée), le service
+            // dit CE QUI reste rattaché. On sépare les deux pour pouvoir EXPLIQUER un refus au lieu
+            // de laisser l'admin le découvrir au clic — même partage que GpxRouteShow::canDelete.
+            'deleteBlockers' => $canDelete ? SessionDeletionService::blocages($this->session) : ['debriefs' => 0],
+            'deleteEnvois' => $canDelete
+                ? SessionDeletionService::decompteEnvois($this->session)
+                : ['cloches' => 0, 'enAttente' => 0],
             // Débriefs (§4.12.5).
             'debriefLabels' => $debriefLabels,
             'canWriteDebrief' => $this->canWriteDebrief(),
