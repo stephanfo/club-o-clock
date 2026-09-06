@@ -19,7 +19,10 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   blocage au lieu de le laisser découvrir au clic. Les journaux survivent, avec le titre et le
   créneau en clair ; les notifications déjà reçues restent lisibles dans les cloches — titre et
   créneau compris — mais cessent de renvoyer vers une séance disparue, et celles encore en file
-  partent quand même, vers le planning.
+  partent quand même, vers le planning. Le geste est offert **aux deux formats** : l'annulation,
+  qui le précède obligatoirement, est disponible au téléphone — réserver le second temps au bureau
+  aurait obligé à changer d'appareil au milieu. Il vit dans le bloc « Gestion » de la fiche et non
+  dans la barre collante, qui garde le geste réversible sous le pouce.
 
 ### Corrigé
 

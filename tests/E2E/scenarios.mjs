@@ -232,8 +232,22 @@ const tous = [];
   s.check('la séance est annulée en base',
           sql(`SELECT cancelled_at IS NOT NULL FROM sessions WHERE id=${cible}`) === '1');
   s.check('l\'entrée de suppression apparaît une fois annulée',
-          await page.locator('button[wire\\:click="openDeleteConfirm"]').count() === 1);
+          await page.locator('button[wire\\:click="openDeleteConfirm"]:visible').count() === 1);
   await s.shot(page, 's23-annulee-avant-suppression');
+
+  // Le geste est en deux temps et l'annulation existe au téléphone : réserver le second temps au
+  // desktop obligerait à changer d'appareil au milieu. On le vérifie au format, pas sur parole.
+  {
+    const m = await session(browser, 'admin@demo.club', MOBILE);
+    await fiche(m.page, cible);
+    await m.page.waitForTimeout(600);
+    s.check('mobile : l\'entrée est offerte elle aussi',
+            await m.page.locator('button[wire\\:click="openDeleteConfirm"]:visible').count() === 1);
+    s.check('mobile : la barre collante garde le geste RÉVERSIBLE',
+            /Restaurer/i.test(await barreMobile(m.page) ?? ''));
+    await s.shot(m.page, 's23-mobile-gestion');
+    await m.ctx.close();
+  }
 
   await page.locator('button[wire\\:click="openDeleteConfirm"]:visible').first().click();
   await page.waitForTimeout(700);

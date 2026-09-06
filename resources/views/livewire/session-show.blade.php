@@ -168,7 +168,7 @@
                      différence des écrans admin assumés desktop.
                      Hors de la barre collante : elle porte le CTA d'inscription, et un bouton rouge
                      qui notifie tous les inscrits n'a rien à faire à côté, au pouce. --}}
-                @unless ($session->isCancelled())
+                @if (! $session->isCancelled())
                     @can('cancel', $session)
                         <div>
                             <div class="eyebrow" style="margin-bottom:6px">Gestion</div>
@@ -177,7 +177,18 @@
                             </button>
                         </div>
                     @endcan
-                @endunless
+                @else
+                    {{-- Séance annulée : la barre collante offre « Restaurer », ce bloc offre son
+                         pendant définitif. Le geste se fait en deux temps — annuler puis supprimer —
+                         et l'annulation est disponible ici : réserver le second temps au desktop
+                         obligerait à changer d'appareil au milieu du geste. --}}
+                    @can('delete', $session)
+                        <div>
+                            <div class="eyebrow" style="margin-bottom:6px">Gestion</div>
+                            @include('livewire.partials.fiche-suppression')
+                        </div>
+                    @endcan
+                @endif
                 </div>
             </div>
             {{-- Encadrement — onglet masqué si vide hors staff (cf. $tabs) : ne rendre le panneau
@@ -331,23 +342,12 @@
                             @else
                                 <x-banner kind="danger">Tu as été notifié·e de l'annulation.</x-banner>
                             @endcan
-                            {{-- Suppression définitive (§4.7) : admin seul, sous la restauration.
-                                 L'ordre compte — on propose d'abord de revenir en arrière, l'effacement
-                                 n'est que le dernier recours. Desktop uniquement, comme les autres
-                                 gestes d'administration. --}}
+                            {{-- Suppression définitive (§4.7), sous la restauration : l'ordre compte —
+                                 on propose d'abord de revenir en arrière, l'effacement n'est que le
+                                 dernier recours. Même partiel qu'en mobile. --}}
                             @can('delete', $session)
                                 <div style="margin-top:var(--space-3);padding-top:var(--space-3);border-top:var(--border-thin) solid var(--border)">
-                                    @if ($deleteBlockers['debriefs'] > 0)
-                                        <div class="meta" style="font-size:var(--text-xs)">
-                                            Suppression impossible : {{ $deleteBlockers['debriefs'] }} débrief{{ $deleteBlockers['debriefs'] > 1 ? 's' : '' }}
-                                            {{ $deleteBlockers['debriefs'] > 1 ? 'sont rattachés' : 'est rattaché' }} à cette séance.
-                                        </div>
-                                    @else
-                                        <button wire:click="openDeleteConfirm" class="btn btn-ghost btn-block" style="color:var(--danger)">
-                                            <x-icon name="trash" :size="15" /> Supprimer définitivement
-                                        </button>
-                                        <div class="meta" style="font-size:var(--text-xs);margin-top:var(--space-2)">Efface la séance de la base. Sans retour possible.</div>
-                                    @endif
+                                    @include('livewire.partials.fiche-suppression')
                                 </div>
                             @endcan
                         @else
