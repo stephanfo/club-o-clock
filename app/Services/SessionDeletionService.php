@@ -8,6 +8,7 @@ use App\Models\Session;
 use App\Models\User;
 use App\Support\Logging\AuditLogger;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -23,6 +24,12 @@ use RuntimeException;
  * débriefs partent avec la séance ; audit_logs.session_id et activity_logs.session_id passent à
  * NULL. Restent deux choses que la base ne sait pas faire seule, et qui sont tout l'objet de cette
  * classe : préserver la lisibilité des alertes déjà envoyées, et laisser une trace qui survive.
+ *
+ * Rien à effacer sur le disque : le seul fichier qu'une séance porte est son parcours GPX, et il ne
+ * lui appartient pas — il vit dans la bibliothèque partagée (§4.20), `route_id` n'est qu'un renvoi.
+ * `content_attachment_path` existe au schéma mais n'est aujourd'hui ni écrit ni lu : le jour où la
+ * pièce jointe (§4.7) sera implémentée, c'est ICI qu'il faudra supprimer le fichier, sans quoi
+ * chaque suppression laissera un orphelin hors webroot.
  */
 class SessionDeletionService
 {
@@ -80,10 +87,28 @@ class SessionDeletionService
         return ['debriefs' => $session->debriefs()->count()];
     }
 
-    /** Décompte de ce qui partira, pour chiffrer les conséquences dans le dialog. */
-    public static function alertesLiees(Session $session): int
+    /**
+     * Décompte des envois liés, pour chiffrer honnêtement les conséquences dans le dialog.
+     *
+     * Deux nombres et non un, parce qu'ils ne disent pas la même chose et qu'ils diffèrent presque
+     * toujours. La cloche ne montre QUE les lignes `sent` du canal `push` de moins de 60 jours
+     * (NotificationOutbox::alertsFor) ; or une annulation crée deux lignes par destinataire — push
+     * ET email —, et l'admin supprime souvent dans la foulée de l'annulation, quand rien n'est
+     * encore parti. Un compteur unique annoncerait donc « 20 alertes déjà envoyées restent lisibles
+     * dans les cloches » là où zéro l'est et où dix seulement le seront : la case d'accusé doit
+     * chiffrer la conséquence, pas un total commode.
+     *
+     * @return array{cloches:int, enAttente:int}
+     */
+    public static function decompteEnvois(Session $session): array
     {
-        return self::requeteAlertes($session)->count();
+        return [
+            'cloches' => (clone self::requeteAlertes($session))
+                ->where('status', 'sent')->where('channel', 'push')
+                ->where('created_at', '>=', Carbon::now()->subDays(60))->count(),
+            'enAttente' => (clone self::requeteAlertes($session))
+                ->whereIn('status', ['pending', 'failed'])->count(),
+        ];
     }
 
     /**
@@ -93,9 +118,13 @@ class SessionDeletionService
      * qu'Alerts les rendrait sans titre, avec un lien vers un 404.
      *
      * On les rend donc autonomes avant de couper : le titre et le créneau sont figés dans le
-     * payload (le repli que Alerts::sousTitre prévoit déjà pour ce cas exact), puis `session_id`
-     * est retiré — ce qui fait disparaître le lien plutôt que de le laisser mener nulle part.
-     * L'alerte reste vraie : elle a bien été envoyée, elle dit toujours de quoi elle parlait.
+     * payload (le repli d'Alerts::sousTitre), puis `session_id` est retiré — ce qui fait disparaître
+     * le lien plutôt que de le laisser mener nulle part. L'alerte reste vraie : elle dit toujours de
+     * quoi elle parlait.
+     *
+     * Toutes les lignes sont traitées, pas seulement les envoyées : celles encore en file partiront
+     * après la suppression, et sans ce tampon leur corps et leur lien pointeraient une séance
+     * disparue (NotificationRenderer lit ces deux clés, et retombe sur le planning sans session_id).
      */
     private function delierAlertes(Session $session): void
     {

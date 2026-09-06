@@ -244,6 +244,29 @@ class SessionSuppressionTest extends TestCase
         $this->assertSame('Titre au moment de l\'envoi', $alerte->fresh()->payload['session_title']);
     }
 
+    /**
+     * Le délien relit le payload puis le réécrit : il ne doit JAMAIS réécrire une version masquée.
+     *
+     * `redactedPayload()` est aujourd'hui une méthode explicite, donc `$ligne->payload` rend le
+     * brut. Le jour où quelqu'un en ferait un accesseur, la suppression persisterait des « •••••• »
+     * à la place des vraies valeurs — une perte silencieuse et définitive. Ce test tombe ce jour-là.
+     */
+    public function test_le_delien_ne_persiste_pas_un_payload_masque(): void
+    {
+        $seance = $this->annulee();
+        $admin = User::factory()->admin()->create();
+
+        $alerte = $this->alerte(User::factory()->create(), [
+            'session_id' => $seance->id, 'token' => 'jeton-en-clair', 'autre' => 'valeur',
+        ]);
+
+        app(SessionDeletionService::class)->delete($seance, $admin);
+
+        $payload = $alerte->fresh()->payload;
+        $this->assertSame('jeton-en-clair', $payload['token'], 'Le délien a réécrit une valeur masquée.');
+        $this->assertSame('valeur', $payload['autre']);
+    }
+
     /** Contrôle positif : l'alerte reste lisible dans la cloche, séance disparue. */
     public function test_lecran_alertes_rend_encore_lalerte_orpheline(): void
     {
@@ -257,6 +280,75 @@ class SessionSuppressionTest extends TestCase
 
         Livewire::actingAs($destinataire)->test(Alerts::class)
             ->assertSee('Compétition annulée puis effacée');
+    }
+
+    /**
+     * Le créneau doit survivre dans la cloche, pas seulement le titre.
+     *
+     * Alerts::sousTitre ne repliait que le titre sur le payload : la séance disparue, sa ligne se
+     * réduisait à « SwimRun St Nazaire » sans date, alors que le payload porte la réponse. Le repli
+     * ne servait à rien tant que rien ne supprimait de séance — c'est cette PR qui le rend utile.
+     */
+    public function test_lalerte_orpheline_garde_son_creneau_et_pas_seulement_son_titre(): void
+    {
+        $seance = $this->annulee([
+            'title' => 'Sortie longue',
+            'start_at' => Carbon::parse('2026-09-26 13:00', 'UTC'),
+        ]);
+        $destinataire = User::factory()->create();
+        $admin = User::factory()->admin()->create();
+
+        $this->alerte($destinataire, ['session_id' => $seance->id]);
+
+        app(SessionDeletionService::class)->delete($seance, $admin);
+
+        Livewire::actingAs($destinataire)->test(Alerts::class)
+            ->assertSee('Sortie longue')
+            ->assertSee('26 sept.');
+    }
+
+    /**
+     * Les deux compteurs du dialog disent deux choses différentes, et ne doivent pas se confondre.
+     *
+     * La cloche ne montre que les push ENVOYÉS de moins de 60 jours, or une annulation met en file
+     * un push ET un email par destinataire. Un compteur unique annoncerait « déjà envoyées » des
+     * lignes qui n'ont pas bougé.
+     */
+    public function test_le_decompte_separe_les_cloches_des_envois_en_attente(): void
+    {
+        $seance = $this->annulee();
+        $u = User::factory()->create();
+
+        $this->alerte($u, ['session_id' => $seance->id]);                                    // push envoyé → cloche
+        $this->alerte($u, ['session_id' => $seance->id], ['channel' => 'email']);            // email envoyé → ni l'un ni l'autre
+        $this->alerte($u, ['session_id' => $seance->id], ['status' => 'pending', 'sent_at' => null]);
+        $this->alerte($u, ['session_id' => $seance->id], ['channel' => 'email', 'status' => 'pending', 'sent_at' => null]);
+        // created_at n'est pas fillable : on le force après coup, comme le fait le vieillissement réel.
+        $this->alerte($u, ['session_id' => $seance->id])
+            ->forceFill(['created_at' => Carbon::now()->subDays(90)])->save();  // hors fenêtre de 60 j
+        $this->alerte($u, ['session_id' => $this->annulee()->id]);                           // autre séance
+
+        $this->assertSame(
+            ['cloches' => 1, 'enAttente' => 2],
+            SessionDeletionService::decompteEnvois($seance)
+        );
+    }
+
+    /** Le tampon vaut aussi pour ce qui n'est pas encore parti : ces envois survivront à la séance. */
+    public function test_les_envois_encore_en_file_sont_tamponnes_eux_aussi(): void
+    {
+        $seance = $this->annulee(['title' => 'Annulée puis effacée']);
+        $admin = User::factory()->admin()->create();
+
+        $enAttente = $this->alerte(User::factory()->create(), ['session_id' => $seance->id],
+            ['type' => 'session_cancelled', 'channel' => 'email', 'status' => 'pending', 'sent_at' => null]);
+
+        app(SessionDeletionService::class)->delete($seance, $admin);
+
+        $payload = $enAttente->fresh()->payload;
+        $this->assertSame('Annulée puis effacée', $payload['session_title']);
+        $this->assertArrayNotHasKey('session_id', $payload);
+        $this->assertSame('pending', $enAttente->fresh()->status, 'L\'envoi n\'est pas annulé : il doit partir.');
     }
 
     // ── L'écran ─────────────────────────────────────────────────────────────────────────────────
@@ -319,6 +411,31 @@ class SessionSuppressionTest extends TestCase
         Livewire::actingAs(User::factory()->coach()->create())
             ->test(SessionShow::class, ['session' => $this->annulee()])
             ->assertDontSee('Supprimer définitivement');
+    }
+
+    /**
+     * Course entre deux admins : A ouvre le dialog, B restaure la séance, A confirme.
+     *
+     * Le geste ne doit pas effacer une séance redevenue vivante. Livewire ne transporte pas le
+     * modèle dans le snapshot — il n'en garde que la clé et le relit à chaque requête —, donc la
+     * policy voit l'état frais ; le service le revérifie de son côté. Ce test vérifie que cette
+     * chaîne tient vraiment, plutôt que de le supposer.
+     */
+    public function test_une_restauration_concurrente_annule_la_suppression(): void
+    {
+        $seance = $this->annulee();
+        $admin = User::factory()->admin()->create();
+
+        $composant = Livewire::actingAs($admin)->test(SessionShow::class, ['session' => $seance])
+            ->call('openDeleteConfirm')
+            ->set('deleteCheck', true);
+
+        // Un autre admin réactive la séance, sans passer par ce composant.
+        Session::whereKey($seance->id)->update(['cancelled_at' => null, 'cancelled_by' => null]);
+
+        $composant->call('delete')->assertForbidden();
+
+        $this->assertDatabaseHas('sessions', ['id' => $seance->id]);
     }
 
     /** Le blocage s'explique à l'écran plutôt que de se découvrir au clic. */

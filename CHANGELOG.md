@@ -17,8 +17,9 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   inscrits, la suppression n'a donc personne à notifier. Elle est **refusée tant qu'un débrief est
   rattaché** — du texte écrit par un membre ne s'efface pas au passage —, et l'écran explique le
   blocage au lieu de le laisser découvrir au clic. Les journaux survivent, avec le titre et le
-  créneau en clair ; les alertes déjà envoyées restent lisibles dans les cloches mais cessent de
-  renvoyer vers une séance disparue.
+  créneau en clair ; les notifications déjà reçues restent lisibles dans les cloches — titre et
+  créneau compris — mais cessent de renvoyer vers une séance disparue, et celles encore en file
+  partent quand même, vers le planning.
 
 ### Corrigé
 

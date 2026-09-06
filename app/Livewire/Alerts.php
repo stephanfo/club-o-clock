@@ -7,6 +7,7 @@ use App\Models\NotificationOutbox;
 use App\Models\Session;
 use App\Models\User;
 use App\Notifications\NotificationType;
+use Illuminate\Support\Carbon;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -91,11 +92,17 @@ class Alerts extends Component
             return null;
         }
 
-        if ($session?->start_at === null) {
+        // Le créneau suit le même repli que le titre. Sans lui, une séance supprimée (§4.7) laissait
+        // une ligne réduite au seul titre — « SwimRun St Nazaire » sans date —, alors que le payload
+        // porte la réponse. Le repli ne servait à rien tant que rien ne supprimait de séance.
+        // Carbon::parse accepte aussi bien l'instance de la base que la chaîne ISO du payload.
+        $quand = $session->start_at ?? ($payload['session_start_at'] ?? null);
+
+        if ($quand === null) {
             return $titre;
         }
 
-        $start = $session->start_at->copy()->setTimezone($tz)->locale('fr');
+        $start = Carbon::parse($quand)->setTimezone($tz)->locale('fr');
 
         return $titre.' · '.$start->isoFormat('ddd D MMM').' · '.$start->format('H:i');
     }

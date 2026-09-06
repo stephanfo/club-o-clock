@@ -134,6 +134,15 @@ trait ManagesLifecycle
         try {
             $service->delete($this->session, auth()->user());
         } catch (RuntimeException $e) {
+            // QueryException descend de PDOException, donc de RuntimeException : sans ce tri, un
+            // interblocage ou un délai de verrou serait présenté comme un refus métier ordinaire et
+            // son SQLSTATE — requête comprise — s'afficherait dans une bannière orange, sans rien
+            // journaliser. Le geste étant destructif, l'admin doit voir une vraie erreur, pas un
+            // refus rassurant. (Le `catch` large est le motif du dépôt ; l'enjeu est ici, on trie.)
+            if ($e instanceof \PDOException) {
+                throw $e;
+            }
+
             $this->dismissDeleteConfirm();
             session()->flash('warn', $e->getMessage());
 

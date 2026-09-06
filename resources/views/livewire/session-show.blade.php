@@ -510,11 +510,21 @@
                         {{ $nbReg === 1 ? '1 inscription disparaît' : $nbReg.' inscriptions disparaissent' }} avec elle. Personne n'est prévenu : l'annulation l'a déjà fait.
                     </x-conseq-row>
                 @endif
-                @if ($deleteAlertes > 0)
-                    @php($phraseAlertes = $deleteAlertes === 1
-                        ? '1 alerte déjà envoyée reste lisible dans les cloches, mais ne renvoie'
-                        : $deleteAlertes.' alertes déjà envoyées restent lisibles dans les cloches, mais ne renvoient')
-                    <x-conseq-row icon="bell" label="Alertes">{{ $phraseAlertes }} plus vers la séance.</x-conseq-row>
+                {{-- Deux compteurs distincts et non un total : la cloche ne montre que les push
+                     ENVOYÉS de moins de 60 jours, tandis qu'une annulation met en file un push ET un
+                     email par destinataire. Annoncer le total dirait « déjà envoyées » de lignes qui
+                     n'ont pas bougé — la case doit chiffrer la conséquence, pas un total commode. --}}
+                @if ($deleteEnvois['cloches'] > 0)
+                    @php($phraseCloches = $deleteEnvois['cloches'] === 1
+                        ? '1 alerte déjà reçue reste lisible dans la cloche de son destinataire, mais ne renvoie'
+                        : $deleteEnvois['cloches'].' alertes déjà reçues restent lisibles dans les cloches de leurs destinataires, mais ne renvoient')
+                    <x-conseq-row icon="bell" label="Alertes">{{ $phraseCloches }} plus vers la séance.</x-conseq-row>
+                @endif
+                @if ($deleteEnvois['enAttente'] > 0)
+                    @php($phraseAttente = $deleteEnvois['enAttente'] === 1
+                        ? "1 envoi n'a pas encore quitté la file : il partira"
+                        : $deleteEnvois['enAttente']." envois n'ont pas encore quitté la file : ils partiront")
+                    <x-conseq-row icon="send" label="En attente" tone="warn">{{ $phraseAttente }} quand même, en renvoyant vers le planning et non vers la séance.</x-conseq-row>
                 @endif
                 <x-conseq-row icon="file-text" label="Journaux">Les traces d'audit et d'activité sont conservées, avec le titre et le créneau.</x-conseq-row>
             </div>

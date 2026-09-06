@@ -207,7 +207,9 @@ class SessionShow extends Component
             // dit CE QUI reste rattaché. On sépare les deux pour pouvoir EXPLIQUER un refus au lieu
             // de laisser l'admin le découvrir au clic — même partage que GpxRouteShow::canDelete.
             'deleteBlockers' => $canDelete ? SessionDeletionService::blocages($this->session) : ['debriefs' => 0],
-            'deleteAlertes' => $canDelete ? SessionDeletionService::alertesLiees($this->session) : 0,
+            'deleteEnvois' => $canDelete
+                ? SessionDeletionService::decompteEnvois($this->session)
+                : ['cloches' => 0, 'enAttente' => 0],
             // Débriefs (§4.12.5).
             'debriefLabels' => $debriefLabels,
             'canWriteDebrief' => $this->canWriteDebrief(),
