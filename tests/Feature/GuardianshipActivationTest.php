@@ -21,10 +21,10 @@ class GuardianshipActivationTest extends TestCase
 
     private function ward(): User
     {
-        $guardian = User::factory()->create(['is_minor' => false]);
+        $guardian = User::factory()->create();
 
         return User::factory()->create([
-            'is_minor' => true,
+            'dob' => now()->subYears(12)->toDateString(),
             'guardian_id' => $guardian->id,
             'guardianship_linked_at' => Carbon::now(),
             'email' => 'ward@club.test',
@@ -94,7 +94,7 @@ class GuardianshipActivationTest extends TestCase
         $admin = User::factory()->create(['roles' => ['admin']]);
         $garant = User::factory()->create(['email' => 'parent@club.test']);
         $enfant = User::factory()->create([
-            'email' => null, 'is_minor' => true, 'guardian_id' => $garant->id,
+            'email' => null, 'dob' => now()->subYears(12)->toDateString(), 'guardian_id' => $garant->id,
             'guardianship_linked_at' => now(),
         ]);
 
@@ -124,7 +124,7 @@ class GuardianshipActivationTest extends TestCase
         $admin = User::factory()->create(['roles' => ['admin']]);
         $garant = User::factory()->create(['email' => 'parent3@club.test']);
         $enfant = User::factory()->create([
-            'email' => null, 'is_minor' => true, 'guardian_id' => $garant->id,
+            'email' => null, 'dob' => now()->subYears(12)->toDateString(), 'guardian_id' => $garant->id,
             'guardianship_linked_at' => now(), 'is_active' => false,
         ]);
 
@@ -145,7 +145,7 @@ class GuardianshipActivationTest extends TestCase
         $admin = User::factory()->create(['roles' => ['admin']]);
         $garant = User::factory()->create(['email' => 'parent4@club.test']);
         $enfant = User::factory()->create([
-            'email' => null, 'is_minor' => true, 'guardian_id' => $garant->id,
+            'email' => null, 'dob' => now()->subYears(12)->toDateString(), 'guardian_id' => $garant->id,
             'guardianship_linked_at' => now(), 'anonymized_at' => now(),
         ]);
 
@@ -168,7 +168,7 @@ class GuardianshipActivationTest extends TestCase
         $admin = User::factory()->create(['roles' => ['admin']]);
         $garant = User::factory()->create(['email' => 'parent2@club.test']);
         $enfant = User::factory()->create([
-            'email' => null, 'is_minor' => true, 'guardian_id' => $garant->id,
+            'email' => null, 'dob' => now()->subYears(12)->toDateString(), 'guardian_id' => $garant->id,
             'guardianship_linked_at' => now(),
         ]);
 

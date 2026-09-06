@@ -214,7 +214,7 @@ class AuthMethodSwitchesTest extends TestCase
         $parent = User::factory()->create(['email' => 'parent@demo.club', 'password' => 'password']);
         User::factory()->create([
             'email' => null, 'password' => null, 'is_active' => true,
-            'is_minor' => true, 'guardian_id' => $parent->id,
+            'dob' => now()->subYears(12)->toDateString(), 'guardian_id' => $parent->id,
         ]);
 
         Livewire::actingAs($this->admin())
@@ -232,7 +232,7 @@ class AuthMethodSwitchesTest extends TestCase
         // davantage de credential. Le critère est l'absence d'email, pas la présence d'un garant.
         User::factory()->create([
             'email' => null, 'password' => null, 'is_active' => true,
-            'is_minor' => true, 'guardian_id' => null,
+            'dob' => now()->subYears(12)->toDateString(), 'guardian_id' => null,
         ]);
 
         Livewire::actingAs($this->admin())
@@ -249,7 +249,7 @@ class AuthMethodSwitchesTest extends TestCase
         // `users.email`. Couper Google lui retirerait son unique porte.
         $user = User::factory()->create([
             'email' => null, 'password' => null, 'is_active' => true,
-            'is_minor' => true, 'guardian_id' => null,
+            'dob' => now()->subYears(12)->toDateString(), 'guardian_id' => null,
         ]);
         AuthIdentity::create([
             'user_id' => $user->id, 'provider' => 'google', 'provider_uid' => 'g-mineur',
@@ -273,7 +273,7 @@ class AuthMethodSwitchesTest extends TestCase
         $parent = User::factory()->create(['email' => 'parent2@demo.club', 'password' => 'password']);
         User::factory()->create([
             'email' => 'ado@demo.club', 'password' => null, 'is_active' => true,
-            'is_minor' => true, 'guardian_id' => $parent->id,
+            'dob' => now()->subYears(12)->toDateString(), 'guardian_id' => $parent->id,
         ]);
 
         Livewire::actingAs($this->admin())
@@ -288,10 +288,11 @@ class AuthMethodSwitchesTest extends TestCase
 
     public function test_an_adult_without_email_still_blocks_the_switch(): void
     {
-        // Second contrôle positif : c'est bien la MINORITÉ qui exempte, pas l'absence d'email.
-        // Un adulte sans email ni mot de passe dépend réellement de son identité Google.
+        // Second contrôle positif : c'est bien l'ABSENCE DE CREDENTIAL qui exempte, pas l'absence
+        // d'email à elle seule. Cet adulte sans email ni mot de passe a bien un accès à protéger —
+        // son identité Google — et doit donc continuer de bloquer la coupure.
         $user = User::factory()->create([
-            'email' => null, 'password' => null, 'is_active' => true, 'is_minor' => false,
+            'email' => null, 'password' => null, 'is_active' => true,
         ]);
         AuthIdentity::create([
             'user_id' => $user->id, 'provider' => 'google', 'provider_uid' => 'g-adulte',

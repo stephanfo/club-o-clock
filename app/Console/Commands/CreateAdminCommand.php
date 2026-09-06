@@ -104,7 +104,6 @@ class CreateAdminCommand extends Command
             'password' => Hash::make($password),
             'roles' => ['admin'],
             'is_active' => true,
-            'is_minor' => false,
         ]);
 
         // Compte créé en CLI par l'exploitant de l'instance : l'email n'a pas à être re-vérifié

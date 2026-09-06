@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Notifications\ResetPasswordNotification;
+use App\Support\AgeCategory;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
@@ -48,7 +49,6 @@ class User extends Authenticatable implements MustVerifyEmail
         'roles',
         'is_active',
         'athlete_access_suspended',
-        'is_minor',
         'guardian_id',
         'guardianship_linked_at',
     ];
@@ -70,7 +70,6 @@ class User extends Authenticatable implements MustVerifyEmail
         'roles' => 'array',
         'is_active' => 'boolean',
         'athlete_access_suspended' => 'boolean',
-        'is_minor' => 'boolean',
         'guardianship_linked_at' => 'datetime',
         'deletion_requested_at' => 'datetime',
         'anonymized_at' => 'datetime',
@@ -125,6 +124,47 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     // --- Parent garant (PRD §4.2) ---
+
+    /**
+     * Minorité LÉGALE au jour dit — la seule qui gouverne la tutelle (§4.2).
+     *
+     * À ne pas confondre avec l'âge de saison (AgeCategory::seasonAge), qui gouverne la catégorie
+     * sportive (§4.5) et anticipe de plusieurs mois : lui laisser décider de la minorité déclarait
+     * majeur un adhérent qui ne l'était pas. Sans date de naissance, la minorité n'est pas établie
+     * — fiche incomplète ou compte anonymisé —, et le compte n'est pas traité comme mineur.
+     */
+    public function isLegallyMinor(): bool
+    {
+        // Carbon::instance() : le cast 'date' produit un Carbon\Carbon, quand AgeCategory travaille
+        // avec celui d'Illuminate (son descendant). La conversion est explicite plutôt que subie.
+        return $this->dob !== null && AgeCategory::isLegallyMinor(Carbon::instance($this->dob));
+    }
+
+    /**
+     * Comptes légalement mineurs, en SQL — la condition se pose sur la date de naissance, car
+     * isLegallyMinor() ne peut pas s'évaluer ligne à ligne côté serveur.
+     *
+     * Comparaison NUE sur la colonne, pas whereDate() : ce dernier enveloppe `dob` dans un appel de
+     * fonction, ce qui interdirait au moteur de se servir d'un index sur cette colonne. Le seuil est
+     * passé au format date, `dob` étant une colonne DATE.
+     *
+     * @param  Builder<User>  $query
+     */
+    public function scopeMineur(Builder $query): void
+    {
+        $query->whereNotNull('dob')->where('dob', '>', AgeCategory::minorityThreshold()->toDateString());
+    }
+
+    /**
+     * Comptes majeurs. Une date de naissance absente n'est PAS une minorité : le compte tombe ici.
+     *
+     * @param  Builder<User>  $query
+     */
+    public function scopeMajeur(Builder $query): void
+    {
+        $query->where(fn (Builder $q) => $q->whereNull('dob')
+            ->orWhere('dob', '<=', AgeCategory::minorityThreshold()->toDateString()));
+    }
 
     /**
      * Le parent garant de cet utilisateur (0..1).

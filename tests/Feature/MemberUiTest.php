@@ -148,7 +148,7 @@ class MemberUiTest extends TestCase
             ->assertSee('Date de naissance mise à jour');
 
         $member->refresh()->load('categories');
-        $this->assertTrue($member->is_minor);
+        $this->assertTrue($member->isLegallyMinor());
         // Principale dérivée bascule Adulte → Minimes (l'ancienne dérivée n'est pas un surclassement, elle part).
         $this->assertSame($minimes->id, $member->primaryCategory()?->id);
         $this->assertFalse($member->categories->contains('id', $adulte->id));
@@ -200,7 +200,6 @@ class MemberUiTest extends TestCase
             'first_name' => 'Camille',
             'last_name' => 'Vincent',
             'email' => 'camille.vincent@example.test',
-            'is_minor' => false,
         ]);
     }
 
@@ -217,6 +216,6 @@ class MemberUiTest extends TestCase
             ->call('create')
             ->assertHasNoErrors();
 
-        $this->assertDatabaseHas('users', ['first_name' => 'Léo', 'is_minor' => true, 'email' => null]);
+        $this->assertDatabaseHas('users', ['first_name' => 'Léo', 'email' => null]);
     }
 }

@@ -42,10 +42,10 @@ class ParentSubjectTest extends TestCase
         // P1 : pas d'email/credential — le parent agit en son nom (§4.2). Catégorisé pour être
         // inscriptible (§4.5).
         $p1 = $this->categorize(User::factory()->create([
-            'email' => null, 'password' => null, 'is_minor' => true, 'guardian_id' => $parent->id,
+            'email' => null, 'password' => null, 'dob' => now()->subYears(12)->toDateString(), 'guardian_id' => $parent->id,
         ]));
         // P2 : compte propre, tutelle active.
-        $p2 = $this->categorize(User::factory()->create(['is_minor' => true, 'guardian_id' => $parent->id]));
+        $p2 = $this->categorize(User::factory()->create(['dob' => now()->subYears(12)->toDateString(), 'guardian_id' => $parent->id]));
 
         return [$parent, $p1, $p2];
     }
@@ -139,7 +139,7 @@ class ParentSubjectTest extends TestCase
     public function test_actions_rejected_on_non_ward(): void
     {
         [$parent] = $this->makeFamily();
-        $stranger = User::factory()->create(['is_minor' => true, 'guardian_id' => User::factory()->create()->id]);
+        $stranger = User::factory()->create(['dob' => now()->subYears(12)->toDateString(), 'guardian_id' => User::factory()->create()->id]);
 
         Livewire::actingAs($parent)->test(ParentChildren::class)
             ->call('openSever', $stranger->id)
@@ -183,7 +183,7 @@ class ParentSubjectTest extends TestCase
     public function test_opening_session_with_forged_as_param_is_ignored(): void
     {
         [$parent] = $this->makeFamily();
-        $stranger = User::factory()->create(['is_minor' => true, 'guardian_id' => User::factory()->create()->id]);
+        $stranger = User::factory()->create(['dob' => now()->subYears(12)->toDateString(), 'guardian_id' => User::factory()->create()->id]);
         $s = $this->makeSession();
 
         // ?as= forgé sur un non-ward → SubjectContext::set() l'ignore, on reste soi
@@ -237,7 +237,7 @@ class ParentSubjectTest extends TestCase
         // Un coach-parent inscrivant SON enfant reste un parent (§4.9.7) : pas de notif
         // enrolled_by_coach, ActivityLog inscription_for_other.
         $parent = User::factory()->athleteCoach()->create();
-        $child = $this->categorize(User::factory()->create(['is_minor' => true, 'guardian_id' => $parent->id]));
+        $child = $this->categorize(User::factory()->create(['dob' => now()->subYears(12)->toDateString(), 'guardian_id' => $parent->id]));
         $s = $this->makeSession();
 
         app(RegistrationService::class)->register($s, $child, $parent);

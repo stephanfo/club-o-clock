@@ -45,7 +45,7 @@ const tous = [];
   const s = new Scenario('S19 · Correction de l\'email depuis la fiche adhérent');
   const journaux = repereJournaux();   // le changement d'email est tracé DEUX fois : aller et retour
 
-  const cible = sql("SELECT id FROM users WHERE email IS NOT NULL AND is_minor=0 AND anonymized_at IS NULL AND NOT JSON_CONTAINS(roles,'\"admin\"') ORDER BY id LIMIT 1");
+  const cible = sql("SELECT id FROM users WHERE email IS NOT NULL AND (dob IS NULL OR dob <= DATE_SUB(CURDATE(), INTERVAL 18 YEAR)) AND anonymized_at IS NULL AND NOT JSON_CONTAINS(roles,'\"admin\"') ORDER BY id LIMIT 1");
   const emailOrigine = sql(`SELECT email FROM users WHERE id=${cible}`);
   const corrige = 'correction.e2e@demo.club';
 
@@ -185,6 +185,89 @@ const tous = [];
   sql(`DELETE FROM audit_logs WHERE target_id=${cible} AND action IN ('account_deactivated','account_activated')`);
   s.check('état restauré (journal et file d\'envoi nettoyés)',
     sql(`SELECT COUNT(*) FROM audit_logs WHERE target_id=${cible} AND action='account_deactivated'`) === '0');
+  s.checkJs(page);
+
+  await ctx.close();
+  tous.push(s.report());
+}
+
+// ── S22 · Changement de garant depuis la fiche adhérent (§4.2) ───────
+// Cible un pupille P1 — sans compte propre — parce que c'est le cas que rien ne savait reprendre :
+// la rupture lui est refusée, à raison, et le rattachement exige un mineur sans garant. Le geste
+// atomique est donc le seul chemin, et c'est lui qu'on regarde depuis le navigateur.
+{
+  const s = new Scenario('S22 · Changement de garant depuis la fiche adhérent');
+  const journaux = repereJournaux();
+
+  const pupille = sql(`SELECT id FROM users
+      WHERE guardian_id IS NOT NULL AND email IS NULL AND anonymized_at IS NULL
+        AND dob > DATE_SUB(CURDATE(), INTERVAL 18 YEAR)
+      ORDER BY id LIMIT 1`);
+  const garantOrigine = sql(`SELECT guardian_id FROM users WHERE id=${pupille}`);
+  // L'horodatage du lien est réécrit par le remplacement : le restaurer aussi, sans quoi le jeu de
+  // démo dérive d'un run à l'autre sans que rien ne le signale (règle de restauration, README E2E).
+  const lieOrigine = sql(`SELECT guardianship_linked_at FROM users WHERE id=${pupille}`);
+  const entrant = sql(`SELECT id FROM users
+      WHERE id <> ${pupille} AND id <> ${garantOrigine} AND is_active=1 AND anonymized_at IS NULL
+        AND (dob IS NULL OR dob <= DATE_SUB(CURDATE(), INTERVAL 18 YEAR))
+      ORDER BY id LIMIT 1`);
+  s.check('prérequis : un pupille P1 et un adulte disponible',
+    pupille !== '' && entrant !== '' && garantOrigine !== '', `pupille=${pupille} entrant=${entrant}`);
+
+  const { ctx, page } = await session(browser, 'admin@demo.club', DESKTOP);
+  await page.goto(`${BASE}/admin/adherents/${pupille}`, { waitUntil: 'networkidle' });
+
+  const bouton = page.getByRole('button', { name: /Changer de garant/i }).first();
+  s.check('le changement de garant est proposé', await bouton.isVisible().catch(() => false));
+  await bouton.click();
+  await page.waitForTimeout(700);
+
+  const dlg = page.locator('.dialog, [role="dialog"]').first();
+  const dlgVisible = await dlg.isVisible().catch(() => false);
+  s.check('modale ouverte (pas un confirm natif)', dlgVisible);
+  if (dlgVisible) {
+    const t = (await dlg.innerText()).replace(/\s+/g, ' ');
+    s.check('la conséquence pour le garant sortant est annoncée',
+      /ne recevra plus les notifications/i.test(t), t.slice(0, 110));
+    await s.shot(page, 's22-changement-garant-dialog');
+
+    await dlg.locator('select#relink-guardian').selectOption(entrant);
+    await page.waitForTimeout(500);
+
+    // Contrôle NÉGATIF d'abord, puis son positif : sans la paire, « le bouton n'agit pas » ne
+    // vaudrait rien — il ne prouverait pas que la case sert à quelque chose.
+    s.check('bouton non armé tant que la case n\'est pas cochée',
+      await dlg.locator('button[wire\\:click="relinkGuardian"]').count() === 0);
+    await dlg.locator('[wire\\:click="$toggle(\'relinkCheck\')"]').first().click();
+    await page.waitForTimeout(600);
+    s.check('la case cochée arme le bouton',
+      await dlg.locator('button[wire\\:click="relinkGuardian"]').count() === 1);
+
+    await dlg.locator('button[wire\\:click="relinkGuardian"]').first().click();
+    await page.waitForTimeout(1200);
+  }
+
+  s.check('le lien pointe le nouveau garant',
+    sql(`SELECT guardian_id FROM users WHERE id=${pupille}`) === entrant, `attendu ${entrant}`);
+  s.check('les deux moitiés du geste sont tracées',
+    sql(`SELECT COUNT(*) FROM audit_logs WHERE target_id=${pupille} AND action='guardianship_severed'`) === '1' &&
+    sql(`SELECT COUNT(*) FROM audit_logs WHERE target_id=${pupille} AND action='guardianship_linked'`) === '1');
+  s.check('le garant sortant est prévenu',
+    Number(sql(`SELECT COUNT(*) FROM notification_outbox WHERE user_id=${garantOrigine} AND type='guardianship_severed'`)) > 0);
+  s.check('le pupille, lui, n\'est pas prévenu d\'une rupture qu\'il ne subit pas',
+    sql(`SELECT COUNT(*) FROM notification_outbox WHERE user_id=${pupille} AND type='guardianship_severed'`) === '0');
+  await s.shot(page, 's22-changement-garant-apres');
+
+  // Restauration : le lien d'origine ET son horodatage, puis les journaux et la file d'envoi.
+  const lieSql = lieOrigine === '' ? 'NULL' : `'${lieOrigine}'`;
+  sql(`UPDATE users SET guardian_id=${garantOrigine}, guardianship_linked_at=${lieSql} WHERE id=${pupille}`);
+  purgeJournaux(journaux);
+  s.check('état restauré (lien d\'origine)',
+    sql(`SELECT guardian_id FROM users WHERE id=${pupille}`) === garantOrigine);
+  s.check('état restauré (horodatage du lien)',
+    sql(`SELECT guardianship_linked_at FROM users WHERE id=${pupille}`) === lieOrigine, lieOrigine);
+  s.check('état restauré (journaux et file d\'envoi)',
+    sql(`SELECT COUNT(*) FROM audit_logs WHERE target_id=${pupille} AND action='guardianship_linked'`) === '0');
   s.checkJs(page);
 
   await ctx.close();

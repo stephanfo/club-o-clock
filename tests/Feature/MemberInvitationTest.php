@@ -243,7 +243,7 @@ class MemberInvitationTest extends TestCase
             $lignes[] = [
                 'first_name' => 'Lot', 'last_name' => 'Numero'.str_pad((string) $i, 4, '0', STR_PAD_LEFT),
                 'email' => "lot{$i}@club.test", 'email_verified_at' => now(),
-                'roles' => json_encode(['athlete']), 'is_active' => true, 'is_minor' => false,
+                'roles' => json_encode(['athlete']), 'is_active' => true,
                 'created_at' => now(), 'updated_at' => now(),
             ];
         }

@@ -19,6 +19,7 @@ s'adresse à toi si tu vas héberger, exploiter et faire vivre l'application pou
 | **Comprendre les choix techniques** et ce qu'ils coûtent | [Cadrage technique](CADRAGE_TECHNIQUE.md) |
 | **Recetter ton instance** avant l'ouverture aux adhérents | [Plan de tests — membres](PLAN_TESTS_MEMBRES.md) |
 | **Contribuer** au projet | [Guide de contribution](../CONTRIBUTING.md) |
+| **Consigner une friction** rencontrée en exploitation | [Retours terrain](RETOURS_TERRAIN.md) |
 | **Monter un poste de développement** sans rien installer | [Poste de développement en conteneurs](DOCKER_LOCAL.md) |
 
 ## Les documents
@@ -52,6 +53,9 @@ s'adresse à toi si tu vas héberger, exploiter et faire vivre l'application pou
 ### Contribuer
 
 - **[Guide de contribution](../CONTRIBUTING.md)** — porte de qualité, conventions, périmètre.
+- **[Retours terrain](RETOURS_TERRAIN.md)** — le carnet des frictions révélées par l'exploitation
+  réelle, déposées au fil de l'eau. **Rien n'y est arbitré** : c'est la matière première de la
+  prochaine réflexion de périmètre, pas une source de vérité.
 - **[Poste de développement en conteneurs](DOCKER_LOCAL.md)** — faire tourner l'application, la
   porte de qualité et les tests navigateur sans installer PHP, MySQL ni les navigateurs sur sa
   machine. **Outil de poste uniquement** : la cible de déploiement reste le mutualisé sans Docker.

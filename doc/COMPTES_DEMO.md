@@ -43,7 +43,7 @@ Générée sur **6 semaines glissantes** à partir du lundi de la semaine du see
 | État | Signification |
 |---|---|
 | **Admin / Coach / Athlete** | Rôles cumulables (`roles` JSON). Le statut « parent garant » est une **relation** (`guardian_id`), pas un rôle. |
-| **Mineur** | `is_minor` dérivé de la date de naissance (< 18 ans au 31/08 de fin de saison). |
+| **Mineur** | Déduit de la date de naissance : moins de 18 ans **révolus au jour dit**. Rien n'est stocké — à ne pas confondre avec l'« âge de saison », qui gouverne la catégorie sportive et anticipe de plusieurs mois. |
 | **P1** | Compte mineur **sans credential** (pas d'email ni de mot de passe), géré par son garant. Notifications routées vers le **garant seul** (§4.15.5). |
 | **P2** | Compte mineur **avec son propre compte** (email + mot de passe) **et** lien garant actif. Notifications routées vers **l'enfant ET le garant**. |
 | **Suspendu** | `athlete_access_suspended` — ne peut plus s'inscrire aux séances, mais le compte reste **actif** (distinct de `is_active`). |
@@ -112,7 +112,7 @@ Générée sur **6 semaines glissantes** à partir du lundi de la semaine du see
 
 ### Mineurs autonomes (cas limite)
 
-Ces comptes sont **mineurs** (`is_minor`) mais possèdent leur propre credential **sans garant rattaché**.
+Ces comptes sont **mineurs** mais possèdent leur propre credential **sans garant rattaché**.
 Utiles pour tester l'affichage des catégories jeunes (Benjamins → Cadets) côté athlète.
 
 | Email | Prénom Nom | Catégorie d'âge |

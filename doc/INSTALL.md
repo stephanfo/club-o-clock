@@ -318,6 +318,21 @@ facultatif**, le lien magique est une méthode complète à part entière.
   consulter ni choisir le mot de passe de quelqu'un : le secret ne transite que par la boîte mail de
   l'adhérent.
 
+> ⚠️ **À l'import, une adresse email déjà connue n'est jamais un doublon : c'est une mise à jour.**
+> L'email est l'identifiant d'un compte, et il est unique. Une ligne dont l'adresse existe déjà en
+> base ne crée donc rien — elle **écrase le nom, le prénom et la date de naissance** de la fiche qui
+> porte cette adresse, sans le moindre avertissement. Saisir par mégarde l'email de Jean sur la
+> ligne de Marie renomme la fiche de Jean en Marie, avec l'historique d'inscriptions de Jean.
+>
+> Le seul signal avant validation est le compteur de l'aperçu (« … · **1 mise à jour** · 0 erreur ») :
+> **si le nombre de mises à jour annoncé ne correspond pas à ce que vous attendez, n'importez pas** —
+> relisez les adresses du fichier. Un doublon *à l'intérieur* du fichier, lui, est bien détecté et
+> bloque l'import.
+>
+> L'écrasement reste circonscrit à l'état civil : ni l'email, ni les rôles, ni les qualifications,
+> ni le lien de tutelle ne sont touchés, et l'opération est tracée (Admin → Journaux). Mais les
+> journaux ne conservent pas les valeurs d'avant : le rétablissement se fait à la main.
+
 Pour un **mineur**, créer d'abord le compte du **représentant légal**, puis rattacher l'enfant en le
 désignant comme garant. Trois configurations sont possibles selon l'âge et l'autonomie (enfant sans
 compte propre, avec compte propre sous tutelle, ou autonome).

@@ -447,7 +447,6 @@ class DemoSeeder extends Seeder
                     'password' => Hash::make('password'),
                     'roles' => ['athlete'],
                     'is_active' => true,
-                    'is_minor' => AgeCategory::isMinor(Carbon::parse($dob)),
                     'email_verified_at' => now(),
                 ],
             );
@@ -482,7 +481,6 @@ class DemoSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'roles' => ['athlete'],
                 'is_active' => true,
-                'is_minor' => false,
                 'email_verified_at' => now(),
             ],
         );
@@ -499,7 +497,6 @@ class DemoSeeder extends Seeder
                 'dob' => $this->naissancePour(13, '05-09'), // Benjamins
                 'roles' => ['athlete'],
                 'is_active' => true,
-                'is_minor' => true,
                 'guardianship_linked_at' => now(),
             ],
         );
@@ -517,7 +514,6 @@ class DemoSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'roles' => [],
                 'is_active' => true,
-                'is_minor' => false,
                 'email_verified_at' => now(),
             ],
         );
@@ -533,7 +529,6 @@ class DemoSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'roles' => ['athlete'],
                 'is_active' => true,
-                'is_minor' => true,
                 'email_verified_at' => now(),
                 'guardian_id' => $olivier->id,
                 'guardianship_linked_at' => now(),
@@ -552,7 +547,6 @@ class DemoSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'roles' => ['athlete'],
                 'is_active' => true,
-                'is_minor' => false,
                 'email_verified_at' => now(),
             ],
         );
@@ -567,7 +561,6 @@ class DemoSeeder extends Seeder
                 'dob' => $this->naissancePour(12, '04-02'), // Benjamins
                 'roles' => ['athlete'],
                 'is_active' => true,
-                'is_minor' => true,
                 'guardianship_linked_at' => now(),
             ],
         );
@@ -582,7 +575,6 @@ class DemoSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'roles' => ['athlete'],
                 'is_active' => true,
-                'is_minor' => true,
                 'email_verified_at' => now(),
                 'guardian_id' => $sandrine->id,
                 'guardianship_linked_at' => now(),
@@ -606,7 +598,6 @@ class DemoSeeder extends Seeder
                 'dob' => $this->naissancePour(14, '09-14'), // Minimes
                 'roles' => ['athlete'],
                 'is_active' => true,
-                'is_minor' => true,
                 'guardian_id' => null,
             ],
         );
@@ -825,7 +816,7 @@ class DemoSeeder extends Seeder
 
             // Écriture directe (firstOrCreate ≠ RegistrationService) : la garde catégorielle §4.5
             // n'est pas appliquée, on filtre donc sur le ciblage réel de la compétition
-            // (Adulte+Master). ! is_minor ne suffit pas : un Junior/Cadet majeur y échapperait.
+            // (Adulte+Master). La seule majorité ne suffit pas : un Junior/Cadet majeur y échapperait.
             $eligible = $athletes->filter(fn (User $u) => $u->isTargetedBy($comp));
             foreach ($eligible->take(5)->values() as $u) {
                 Registration::firstOrCreate(
@@ -1092,7 +1083,7 @@ class DemoSeeder extends Seeder
         // NB : « apéro parké » est déjà couvert par l'annulation ci-dessus (cascade §4.14.4).
 
         // Club_event avec inscrits : l'AG reçoit des déclarations de présence (statut uniforme §4.9.1).
-        foreach ($athletes->filter(fn (User $u) => ! $u->is_minor)->take(4) as $u) {
+        foreach ($athletes->filter(fn (User $u) => ! $u->isLegallyMinor())->take(4) as $u) {
             try {
                 $regService->register($ag, $u, $u);
             } catch (\RuntimeException) {

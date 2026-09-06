@@ -68,6 +68,37 @@ class MemberImportTest extends TestCase
         $this->assertSame(1, $report['update']); // Alice (email déjà connu)
     }
 
+    /**
+     * Un adhérent que l'âge de SAISON compte majeur, mais qui est encore légalement mineur.
+     *
+     * Né le 15/07/2008, importé le 20/06/2026 : 17 ans révolus, mais 18 ans à la clôture de saison
+     * (31/08/2026). Sa ligne était refusée — « email requis pour un adulte » — et son parent_email
+     * ignoré sans un mot. Sa catégorie, elle, suit bien l'âge de saison : c'est son rôle.
+     * Carnet de retours terrain, 2026-09-04.
+     */
+    public function test_un_mineur_que_la_saison_compte_majeur_garde_son_garant(): void
+    {
+        $this->seedCategories();
+        $admin = User::factory()->admin()->create();
+
+        $csv = <<<'CSV'
+        nom,prénom,email,catégorie,date_nais,parent_email
+        Roy,Sylvie,sylvie@club.fr,Master,1979-02-11,
+        Roy,Nina,,,2008-07-15,sylvie@club.fr
+        CSV;
+
+        $report = $this->service()->analyze($csv);
+        $this->assertSame([], $report['errors'], 'Un mineur sans email est un P1, pas une ligne fautive.');
+
+        $this->service()->commit($report, $admin);
+
+        $nina = User::where('first_name', 'Nina')->firstOrFail();
+        $this->assertNull($nina->email);
+        $this->assertSame(User::where('first_name', 'Sylvie')->firstOrFail()->id, $nina->guardian_id);
+        // La catégorie, elle, reste calée sur l'âge de saison (§4.5) : 18 ans au 31/08/2026.
+        $this->assertSame('Sénior', $nina->primaryCategory()?->label);
+    }
+
     public function test_commit_creates_updates_and_links_guardians(): void
     {
         $this->seedCategories();
@@ -97,7 +128,7 @@ class MemberImportTest extends TestCase
         // Mineur P1 sans email, garant = parent du CSV (résolu en 2e passe).
         $hugo = User::where('first_name', 'Hugo')->where('last_name', 'Fortin')->firstOrFail();
         $this->assertNull($hugo->email);
-        $this->assertTrue($hugo->is_minor);
+        $this->assertTrue($hugo->isLegallyMinor());
         $this->assertSame($pierre->id, $hugo->guardian_id);
         // Catégorie dérivée du DOB (Poussin 8-13), pas de la colonne CSV.
         $this->assertSame('Poussin', $hugo->categories()->wherePivot('is_primary', true)->first()->label);
@@ -107,7 +138,7 @@ class MemberImportTest extends TestCase
         // sur 750 et `where('first_name', …)->firstOrFail()` attrapait alors le compte de factory.
         // Test rouge au hasard des tirages, sur une PR sans rapport (vu en CI le 2026-08-27).
         $manon = User::where('email', 'manon@club.fr')->firstOrFail();
-        $this->assertTrue($manon->is_minor);
+        $this->assertTrue($manon->isLegallyMinor());
         $this->assertSame($pierre->id, $manon->guardian_id);
     }
 
@@ -190,7 +221,7 @@ class MemberImportTest extends TestCase
 
         $this->service()->commit($report, $admin);
         $tom = User::where('first_name', 'Tom')->where('last_name', 'Seul')->firstOrFail();
-        $this->assertTrue($tom->is_minor);
+        $this->assertTrue($tom->isLegallyMinor());
         $this->assertNull($tom->guardian_id);
     }
 

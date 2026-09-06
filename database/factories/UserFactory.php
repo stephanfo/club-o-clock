@@ -60,7 +60,6 @@ class UserFactory extends Factory
             'email' => null,
             'email_verified_at' => null,
             'password' => null,
-            'is_minor' => true,
             'dob' => fake()->dateTimeBetween('-12 years', '-8 years')->format('Y-m-d'),
             'roles' => ['athlete'],
         ]);

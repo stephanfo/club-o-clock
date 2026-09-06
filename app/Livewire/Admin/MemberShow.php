@@ -135,7 +135,7 @@ class MemberShow extends Component
         $this->editingDob = false;
     }
 
-    /** Persiste la nouvelle date de naissance (recalcule is_minor + catégorie principale via le service). */
+    /** Persiste la nouvelle date de naissance (recalcule la catégorie principale via le service). */
     public function saveDob(MemberService $service): void
     {
         $this->validate(
@@ -311,6 +311,63 @@ class MemberShow extends Component
             session()->flash('status', 'Garant rattaché — '.$guardian->fullName().' gère désormais la tutelle.');
         } catch (RuntimeException $e) {
             $this->addError('linkGuardianId', $e->getMessage());
+        }
+    }
+
+    // --- Changement de garant (§4.2, extension admin) ---
+
+    /** Garant pressenti pour remplacer celui en place. Null quand le dialog est fermé. */
+    public ?int $relinkGuardianId = null;
+
+    public bool $relinkDialog = false;
+
+    /** Accusé de réception : le garant sortant est prévenu, et l'envoi ne se dédit pas. */
+    public bool $relinkCheck = false;
+
+    /** Ouvre le dialog. La case repart à zéro à CHAQUE ouverture — jamais pré-cochée (§4.17). */
+    public function openRelink(): void
+    {
+        $this->relinkCheck = false;
+        $this->relinkGuardianId = null;
+        $this->resetErrorBag();
+        $this->relinkDialog = true;
+    }
+
+    public function cancelRelink(): void
+    {
+        $this->relinkDialog = false;
+        $this->relinkCheck = false;
+        $this->relinkGuardianId = null;
+    }
+
+    /**
+     * Remplace le garant en une transaction (GuardianshipService::relink).
+     *
+     * L'accusé de réception est gardé ICI, pas seulement par le bouton grisé : l'état vient du
+     * client, et l'action notifie le garant sortant sans pouvoir se dédire.
+     */
+    public function relinkGuardian(GuardianshipService $service): void
+    {
+        if (! $this->relinkDialog || ! $this->relinkCheck) {
+            return;
+        }
+
+        $guardian = User::find($this->relinkGuardianId);
+        if (! $guardian) {
+            $this->addError('relinkGuardianId', 'Choisis un nouveau garant.');
+
+            return;
+        }
+
+        try {
+            $sortant = $this->user->loadMissing('guardian')->guardian?->fullName();
+            $service->relink($this->user, $guardian, auth()->user());
+            $this->cancelRelink();
+            $this->user->refresh();
+            session()->flash('status', 'Garant remplacé — '.$guardian->fullName().' gère désormais la tutelle'
+                .($sortant ? ' à la place de '.$sortant : '').'.');
+        } catch (RuntimeException $e) {
+            $this->addError('relinkGuardianId', $e->getMessage());
         }
     }
 
@@ -553,23 +610,36 @@ class MemberShow extends Component
         $future = $registrations->filter(fn ($r) => $r->session && $r->session->start_at && $r->session->start_at->isAfter($now))->values();
         $past = $registrations->filter(fn ($r) => $r->session && $r->session->start_at && ! $r->session->start_at->isAfter($now))->values();
 
-        // Rattachement d'un garant (mineur sans tutelle) : adultes actifs candidats.
-        $guardianCandidates = ($this->user->is_minor && $this->user->guardian_id === null && $this->user->anonymized_at === null)
-            ? User::query()
-                ->where('is_minor', false)
-                ->where('is_active', true)
-                ->whereNull('anonymized_at')
-                ->whereKeyNot($this->user->id)
-                ->orderBy('first_name')->orderBy('last_name')
-                ->get()
+        // Adultes actifs éligibles comme garant. Sert au rattachement d'un mineur orphelin de
+        // tutelle comme au remplacement d'un garant en place — mêmes conditions, deux usages.
+        $adultesEligibles = fn () => User::query()
+            ->majeur()
+            ->where('is_active', true)
+            ->whereNull('anonymized_at')
+            ->whereKeyNot($this->user->id)
+            ->orderBy('first_name')->orderBy('last_name')
+            ->get();
+
+        $estMineurGerable = $this->user->isLegallyMinor() && $this->user->anonymized_at === null;
+
+        $guardianCandidates = ($estMineurGerable && $this->user->guardian_id === null)
+            ? $adultesEligibles()
+            : collect();
+
+        // Remplacement du garant en place : les mêmes, moins celui qui l'est déjà. La minorité
+        // n'entre PAS dans la condition — un pupille devenu majeur sans compte propre doit pouvoir
+        // changer de garant, sans quoi le sien devient indéplaçable et insupprimable (cf. le
+        // commentaire de GuardianshipService::relink).
+        $relinkCandidates = ($this->user->guardian_id !== null && $this->user->anonymized_at === null)
+            ? $adultesEligibles()->reject(fn (User $u) => $u->id === $this->user->guardian_id)->values()
             : collect();
 
         // Rattachement d'un pupille (vu du parent) : cet adhérent peut-il être garant, et quels
         // mineurs sans tutelle lui rattacher. Miroir de $guardianCandidates, du point de vue parent.
-        $canBeGuardian = ! $this->user->is_minor && $this->user->is_active && $this->user->anonymized_at === null;
+        $canBeGuardian = ! $this->user->isLegallyMinor() && $this->user->is_active && $this->user->anonymized_at === null;
         $wardCandidates = $canBeGuardian
             ? User::query()
-                ->where('is_minor', true)
+                ->mineur()
                 ->whereNull('guardian_id')
                 ->whereNull('anonymized_at')
                 ->whereKeyNot($this->user->id)
@@ -586,6 +656,7 @@ class MemberShow extends Component
             'future' => $future,
             'past' => $past,
             'guardianCandidates' => $guardianCandidates,
+            'relinkCandidates' => $relinkCandidates,
             // Pupilles (§4.2) : enfants dont cet adhérent est garant — carte visible côté parent.
             'wards' => $this->user->wards->whereNull('anonymized_at')->values(),
             'canBeGuardian' => $canBeGuardian,
