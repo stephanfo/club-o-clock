@@ -51,9 +51,23 @@ class SessionPolicy
         return $this->update($user, $session) && $session->start_at->isFuture();
     }
 
+    /**
+     * Suppression définitive (§4.7) : admin SEUL, et seulement sur une séance DÉJÀ annulée.
+     *
+     * L'annulation d'abord n'est pas une formalité : c'est elle qui prévient les inscrits, libère
+     * les quotas et gare les apéros. La suppression n'a donc plus personne à notifier — elle ne
+     * fait que retirer de la base une ligne qui a déjà disparu des plannings. Supprimer directement
+     * une séance vivante ferait taire cet avertissement, et c'est le seul geste de l'application
+     * qui détruise pour de bon : les cascades emportent inscriptions, encadrement, catégories et
+     * flags apéro sans retour possible.
+     *
+     * Le garde-fou « pas de débrief » n'est pas ici mais dans SessionDeletionService : il ne dit
+     * pas QUI a le droit mais CE QUI est encore rattaché, et il doit pouvoir s'expliquer à l'écran
+     * (cf. le précédent GpxRouteShow, où le décompte de séances complète le `can`).
+     */
     public function delete(User $user, Session $session): bool
     {
-        return $user->hasRole('admin');
+        return $user->hasRole('admin') && $session->isCancelled();
     }
 
     /**

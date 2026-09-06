@@ -331,6 +331,25 @@
                             @else
                                 <x-banner kind="danger">Tu as été notifié·e de l'annulation.</x-banner>
                             @endcan
+                            {{-- Suppression définitive (§4.7) : admin seul, sous la restauration.
+                                 L'ordre compte — on propose d'abord de revenir en arrière, l'effacement
+                                 n'est que le dernier recours. Desktop uniquement, comme les autres
+                                 gestes d'administration. --}}
+                            @can('delete', $session)
+                                <div style="margin-top:var(--space-3);padding-top:var(--space-3);border-top:var(--border-thin) solid var(--border)">
+                                    @if ($deleteBlockers['debriefs'] > 0)
+                                        <div class="meta" style="font-size:var(--text-xs)">
+                                            Suppression impossible : {{ $deleteBlockers['debriefs'] }} débrief{{ $deleteBlockers['debriefs'] > 1 ? 's' : '' }}
+                                            {{ $deleteBlockers['debriefs'] > 1 ? 'sont rattachés' : 'est rattaché' }} à cette séance.
+                                        </div>
+                                    @else
+                                        <button wire:click="openDeleteConfirm" class="btn btn-ghost btn-block" style="color:var(--danger)">
+                                            <x-icon name="trash" :size="15" /> Supprimer définitivement
+                                        </button>
+                                        <div class="meta" style="font-size:var(--text-xs);margin-top:var(--space-2)">Efface la séance de la base. Sans retour possible.</div>
+                                    @endif
+                                </div>
+                            @endcan
                         @else
                             <div class="flex g6 wrap" style="margin-bottom:var(--space-3)">
                                 @if ($session->capacity)
@@ -470,6 +489,48 @@
                 <button type="button" class="btn btn-danger{{ $cancelCheck ? '' : ' is-disabled' }}"
                         @if ($cancelCheck) wire:click="cancel" @endif wire:loading.attr="disabled" wire:target="cancel">
                     <x-icon name="x" :size="14" /> Annuler la séance
+                </button>
+            </x-slot:footer>
+        </x-dialog>
+    @endif
+
+    {{-- Dialog « Supprimer définitivement » (§4.7) — niveau 3 comme l'annulation, mais pour l'autre
+         raison : ici personne n'est notifié (l'annulation l'a déjà fait), c'est l'irréversibilité
+         seule qui exige l'accusé de réception. --}}
+    @if ($confirmingDelete)
+        <x-dialog title="Supprimer définitivement" sub="{{ $session->title }}" danger :width="520" close="dismissDeleteConfirm">
+            <div style="display:flex;flex-direction:column;gap:12px">
+                <x-conseq-row icon="alert-triangle" label="Irréversible" tone="danger">La séance est effacée de la base. Ni restauration, ni corbeille.</x-conseq-row>
+                @if ($session->registrations->isNotEmpty())
+                    {{-- Phrase entière calculée, verbe compris : « 1 inscription disparaissent »
+                         accordait le nom sans accorder le verbe. Même parti que l'accusé du dialog
+                         d'annulation, pour la même raison — une seule forme mentait dans un cas. --}}
+                    @php($nbReg = $session->registrations->count())
+                    <x-conseq-row icon="users" label="Inscriptions" tone="warn">
+                        {{ $nbReg === 1 ? '1 inscription disparaît' : $nbReg.' inscriptions disparaissent' }} avec elle. Personne n'est prévenu : l'annulation l'a déjà fait.
+                    </x-conseq-row>
+                @endif
+                @if ($deleteAlertes > 0)
+                    @php($phraseAlertes = $deleteAlertes === 1
+                        ? '1 alerte déjà envoyée reste lisible dans les cloches, mais ne renvoie'
+                        : $deleteAlertes.' alertes déjà envoyées restent lisibles dans les cloches, mais ne renvoient')
+                    <x-conseq-row icon="bell" label="Alertes">{{ $phraseAlertes }} plus vers la séance.</x-conseq-row>
+                @endif
+                <x-conseq-row icon="file-text" label="Journaux">Les traces d'audit et d'activité sont conservées, avec le titre et le créneau.</x-conseq-row>
+            </div>
+            {{-- Même construction que l'accusé d'annulation : le toggle est porté par la rangée ET
+                 par le x-check (un vrai <button>), sans quoi la case est inatteignable au clavier ;
+                 `.stop` empêche le clic de remonter à la rangée et de re-basculer. --}}
+            <div class="flex ac g10" style="margin-top:14px;font-size:14px;cursor:pointer" wire:click="$toggle('deleteCheck')">
+                <x-check :on="$deleteCheck" wire:click.stop="$toggle('deleteCheck')" aria-labelledby="txt-supprimer-seance" />
+                <span id="txt-supprimer-seance">Je comprends que cette séance et son historique d'inscriptions seront effacés sans retour possible.</span>
+            </div>
+
+            <x-slot:footer>
+                <button type="button" class="btn btn-ghost" wire:click="dismissDeleteConfirm">Garder la séance</button>
+                <button type="button" class="btn btn-danger{{ $deleteCheck ? '' : ' is-disabled' }}"
+                        @if ($deleteCheck) wire:click="delete" @endif wire:loading.attr="disabled" wire:target="delete">
+                    <x-icon name="trash" :size="14" /> Supprimer définitivement
                 </button>
             </x-slot:footer>
         </x-dialog>

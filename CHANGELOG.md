@@ -7,6 +7,19 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ## [Non publié]
 
+### Ajouté
+
+- **Suppression définitive d'une séance annulée, réservée à l'admin.** L'annulation couvrait la
+  séance qui n'a pas lieu ; rien ne couvrait la séance qui **n'aurait jamais dû exister** — un
+  doublon, une saisie erronée. Elle restait affichée « annulée » indéfiniment, ce qui était faux :
+  rien n'avait été annulé, la ligne était de trop, et seul un accès SQL permettait de la retirer.
+  Le geste n'est offert que sur une séance **déjà annulée** : c'est l'annulation qui prévient les
+  inscrits, la suppression n'a donc personne à notifier. Elle est **refusée tant qu'un débrief est
+  rattaché** — du texte écrit par un membre ne s'efface pas au passage —, et l'écran explique le
+  blocage au lieu de le laisser découvrir au clic. Les journaux survivent, avec le titre et le
+  créneau en clair ; les alertes déjà envoyées restent lisibles dans les cloches mais cessent de
+  renvoyer vers une séance disparue.
+
 ### Corrigé
 
 - **Un adhérent de 17 ans pouvait être traité comme majeur, et perdre son parent garant.** La

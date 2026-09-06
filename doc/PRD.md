@@ -59,6 +59,7 @@ Remplacer le tableur Google Sheets actuel par une **PWA** qui offre aux adhéren
 - Catégories d'âge multi-rattachement (M:N).
 - Planning hebdomadaire avec 3 `kind` de `Session` : `training`, `competition`, `club_event`.
 - Générateur de séances récurrentes (`SessionTemplate`, admin uniquement).
+- Suppression définitive d'une séance annulée, admin uniquement (nettoyage d'un doublon ou d'une saisie erronée).
 - Inscription/désinscription libre jusqu'au début, bloquée après.
 - Capacité + waitlist (`capacity`, `quota_exceeded`) avec visibilité publique.
 - Quota fair-share par tag avec 3 mécanismes de promotion (A auto place libérée, B auto silencieuse sur libération propre quota, C déblocage manuel coach).
@@ -412,6 +413,18 @@ Tant que `startAt` n'est pas dépassé, un coach ou admin peut **réactiver** la
 - **Conflit quota** : si entre-temps un athlète restauré a profité du quota libéré ou s'est ré-arbitré ailleurs et que la restauration le ferait dépasser son quota, **override silencieux** : `AuditLog override_quota` automatique (`actorId = system` ou coach, motif « restauration après annulation »). Le quota est secondaire face à la priorité de remettre les inscrits initiaux.
 - **Notif aux athlètes restaurés** : push + email « la séance [X] a été réactivée, ton inscription est rétablie ».
 - **Garde-fou** : restauration impossible une fois `startAt` dépassé. Au-delà, l'annulation est définitive.
+
+#### Suppression définitive
+Pendant de l'annulation, pour le cas qu'elle ne couvre pas : la séance qui **n'aurait jamais dû exister** — doublon, erreur de saisie. L'annulation la laisserait affichée « annulée » indéfiniment, ce qui est faux : rien n'a été annulé, la ligne est de trop.
+
+- **Qui** : **admin uniquement**. Seul geste de l'application qui détruise pour de bon.
+- **Quand** : uniquement sur une séance **déjà annulée**. L'ordre n'est pas une formalité — c'est l'annulation qui prévient les inscrits, libère les quotas et gare les apéros. La suppression n'a donc **personne à notifier** : la séance a déjà disparu des plannings.
+- **Garde-fou** : refusée tant qu'un **débrief** est rattaché. Un débrief est du texte écrit par un membre ; l'effacer sans que personne l'ait lu serait une perte, là où une inscription sur un doublon n'en est pas une. Même doctrine que les parcours (§4.20), dont l'usage interdit la suppression dure. L'écran **explique** le blocage au lieu de le laisser découvrir au clic.
+- **Confirmation forte** : dialog avec conséquences chiffrées et **case à cocher d'accusé de réception**, comme l'annulation — mais pour l'autre raison. Ici rien n'est envoyé : c'est l'irréversibilité seule qui exige l'accusé. Refus gardé **côté serveur**.
+- **Effet immédiat** : la séance est effacée ; inscriptions, encadrement, catégories ciblées et flags apéro partent avec elle. `AuditLog delete_session`.
+- **Ce qui survit** : les **journaux** (audit et activité) sont conservés, détachés de la séance disparue. La trace de la suppression porte le **titre et le créneau** en clair — sans quoi elle ne désignerait plus rien.
+- **Alertes déjà envoyées** : celles qui pointaient la séance restent **lisibles** dans les cloches (leur titre y est figé) mais **ne renvoient plus** vers elle. Une notification a réellement été envoyée : l'effacer réécrirait l'histoire, la laisser pointer le vide mènerait à une page morte.
+- **Pas de restauration.** Ni corbeille, ni délai de grâce — contrairement à la suppression de compte (§4.3), dont le tampon de 7 jours protège une personne et ses données. Une séance n'a pas cet enjeu, et le tampon rendrait le nettoyage inutilisable.
 
 #### Édition en lot
 **Pas en V1.** Pour propager un changement sur plusieurs séances futures, édition séance par séance, ou annulation en lot + regénération depuis un `SessionTemplate` mis à jour.
