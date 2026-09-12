@@ -158,16 +158,65 @@ class GuardianshipTest extends TestCase
         $this->assertDatabaseHas('invitation_tokens', ['user_id' => $child->id]);
     }
 
-    public function test_admin_severs_via_member_show(): void
+    // La rupture notifie les DEUX comptes et l'envoi ne se dédit pas : elle relève du niveau 3
+    // (dialog + accusé de réception armant le bouton), comme côté parent. L'écran admin s'en tenait
+    // au niveau 2 — une bannière inline et un bouton rouge.
+    public function test_admin_severs_via_member_show_once_acknowledged(): void
     {
         [, $child] = $this->family('ado@example.test');
         $admin = User::factory()->admin()->create();
 
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $child])
-            ->call('severGuardianship')
-            ->assertSet('confirmingSever', false);
+            ->call('openSever')
+            ->set('severCheck', true)
+            ->call('confirmSever')
+            ->assertSet('severDialog', false)
+            ->assertSet('severCheck', false);
 
         $this->assertNull($child->fresh()->guardian_id);
+    }
+
+    // Le bouton grisé ne suffit pas : l'état vient du client, le refus se garde côté serveur.
+    public function test_admin_sever_without_the_acknowledgement_changes_nothing(): void
+    {
+        [$parent, $child] = $this->family('ado@example.test');
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $child])
+            ->call('openSever')
+            ->call('confirmSever');
+
+        $this->assertSame($parent->id, $child->fresh()->guardian_id);
+    }
+
+    // La case n'est jamais pré-cochée : la méthode d'ouverture la remet à zéro, sans quoi un dialog
+    // rouvert après une première hésitation armerait le bouton tout seul.
+    public function test_opening_the_sever_dialog_resets_the_acknowledgement(): void
+    {
+        [, $child] = $this->family('ado@example.test');
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $child])
+            ->set('severCheck', true)
+            ->call('openSever')
+            ->assertSet('severCheck', false);
+    }
+
+    // L'accusé de réception CHIFFRE la conséquence : il nomme les deux personnes prévenues.
+    public function test_sever_dialog_names_both_people_who_will_be_notified(): void
+    {
+        [$parent, $child] = $this->family('ado@example.test');
+        $admin = User::factory()->admin()->create();
+
+        $component = Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $child]);
+
+        // Contrôle positif : les prénoms ne sont pas déjà là avant l'ouverture du dialog.
+        $component->assertDontSee('seront prévenu');
+
+        $component->call('openSever')
+            ->assertSee('seront prévenu', escape: false)
+            ->assertSee($child->first_name)
+            ->assertSee($parent->first_name);
     }
 
     // ── J8.5 : notifs transactionnelles de tutelle (hors matrice) ──
@@ -292,17 +341,17 @@ class GuardianshipTest extends TestCase
         $admin = User::factory()->admin()->create();
 
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $p1])
-            ->assertDontSeeHtml('wire:click="$set(\'confirmingSever\', true)"')
+            ->assertDontSeeHtml('wire:click="openSever"')
             ->assertSee('Inviter à activer son compte'); // le geste attendu en P1 est bien offert
 
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $p2])
-            ->assertSeeHtml('wire:click="$set(\'confirmingSever\', true)"');
+            ->assertSeeHtml('wire:click="openSever"');
 
         // Majeur sans compte propre : le bouton reste masqué — sa sortie est l'autonomisation,
         // désormais ouverte à tout âge, et c'est elle que l'écran propose.
         $p1->forceFill(['dob' => Carbon::now()->subYears(19)->toDateString()])->save();
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $p1->fresh()])
-            ->assertDontSeeHtml('wire:click="$set(\'confirmingSever\', true)"')
+            ->assertDontSeeHtml('wire:click="openSever"')
             ->assertSee('Inviter à activer son compte');
     }
 
@@ -314,7 +363,9 @@ class GuardianshipTest extends TestCase
         $admin = User::factory()->admin()->create();
 
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $p1])
-            ->call('severGuardianship')
+            ->call('openSever')
+            ->set('severCheck', true)
+            ->call('confirmSever')
             ->assertSee('compte propre', escape: false);
 
         $this->assertSame($parent->id, $p1->fresh()->guardian_id);

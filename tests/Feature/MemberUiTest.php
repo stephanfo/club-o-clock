@@ -158,6 +158,92 @@ class MemberUiTest extends TestCase
         ));
     }
 
+    // §4.1.5 confie l'identité à l'adhérent — mais un mineur P1 n'a pas de compte : personne ne
+    // pouvait corriger une coquille dans son nom. L'admin est le seul recours.
+    public function test_show_edit_identity_corrects_the_name_of_a_member_without_account(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $child = User::factory()->create([
+            'first_name' => 'Jade', 'last_name' => 'Dubios', 'email' => null,
+            'dob' => Carbon::now()->subYears(12)->toDateString(),
+        ]);
+
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $child])
+            ->call('editIdentity')
+            ->set('first_name', 'Jade')
+            ->set('last_name', 'Dubois')
+            ->call('saveIdentity')
+            ->assertHasNoErrors()
+            ->assertSet('editingIdentity', false)
+            ->assertSee('Identité mise à jour');
+
+        $child->refresh();
+        $this->assertSame('Dubois', $child->last_name);
+        $this->assertSame('Jade', $child->first_name);
+        // Le compte reste sans credential : corriger un nom n'ouvre pas d'accès.
+        $this->assertNull($child->email);
+    }
+
+    // Acte d'identité sensible : tracé comme l'est déjà la correction d'email et de date de naissance.
+    public function test_identity_correction_is_audited(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $member = User::factory()->create(['first_name' => 'Luc', 'last_name' => 'Martn']);
+
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $member])
+            ->call('editIdentity')
+            ->set('last_name', 'Martin')
+            ->call('saveIdentity')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'member_updated',
+            'target_id' => $member->id,
+            'motif' => 'identity_changed',
+        ]);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'member_identity_changed']);
+    }
+
+    public function test_show_edit_identity_rejects_an_empty_name(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $member = User::factory()->create(['first_name' => 'Luc', 'last_name' => 'Martin']);
+
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $member])
+            ->call('editIdentity')
+            ->set('last_name', '   ')
+            ->call('saveIdentity')
+            ->assertHasErrors('last_name');
+
+        $this->assertSame('Martin', $member->fresh()->last_name);
+    }
+
+    // Le libellé de confirmation de suppression RGPD se compare au nom COURANT : une correction
+    // d'identité doit le suivre, sans quoi la suppression deviendrait impossible à confirmer.
+    public function test_deletion_confirmation_follows_the_corrected_name(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $member = User::factory()->create(['first_name' => 'Luc', 'last_name' => 'Martn']);
+
+        $component = Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $member])
+            ->call('editIdentity')
+            ->set('last_name', 'Martin')
+            ->call('saveIdentity')
+            ->assertHasNoErrors();
+
+        // Contrôle positif : l'ancien nom ne passe plus — rien n'est enregistré.
+        $component->set('deleteConfirmName', 'Luc Martn')
+            ->call('requestDeletion')
+            ->assertHasErrors('deleteConfirmName');
+        $this->assertNull($member->fresh()->deletion_requested_at);
+
+        // …et le nouveau est accepté. On assied l'assertion sur l'EFFET, pas sur le sac d'erreurs :
+        // addError() s'accumule d'un appel à l'autre sur une même instance de composant.
+        $component->set('deleteConfirmName', 'Luc Martin')
+            ->call('requestDeletion');
+        $this->assertNotNull($member->fresh()->deletion_requested_at);
+    }
+
     public function test_show_edit_dob_rejects_future_date(): void
     {
         $admin = User::factory()->admin()->create();

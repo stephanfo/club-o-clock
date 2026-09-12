@@ -78,6 +78,53 @@ class MemberShow extends Component
         $this->user = $user;
         $this->dob = $user->dob?->toDateString() ?? '';
         $this->email = $user->email ?? '';
+        $this->first_name = $user->first_name;
+        $this->last_name = $user->last_name;
+    }
+
+    // ── Identité (§4.17.1) ──
+    // §4.1.5 confie le nom à l'adhérent lui-même. Un pupille P1 n'ayant pas de compte, sa coquille
+    // n'avait aucun correcteur possible : l'admin est le seul recours. Même coexistence que pour
+    // l'email (§4.1.3), pas une reprise de l'auto-édition.
+
+    public bool $editingIdentity = false;
+
+    public string $first_name = '';
+
+    public string $last_name = '';
+
+    /** Ouvre les champs d'identité (réinitialise aux valeurs courantes). */
+    public function editIdentity(): void
+    {
+        $this->first_name = $this->user->first_name;
+        $this->last_name = $this->user->last_name;
+        $this->resetErrorBag(['first_name', 'last_name']);
+        $this->editingIdentity = true;
+    }
+
+    public function cancelEditIdentity(): void
+    {
+        $this->first_name = $this->user->first_name;
+        $this->last_name = $this->user->last_name;
+        $this->resetErrorBag(['first_name', 'last_name']);
+        $this->editingIdentity = false;
+    }
+
+    public function saveIdentity(MemberService $service): void
+    {
+        $this->validate(
+            [
+                'first_name' => ['required', 'string', 'max:100'],
+                'last_name' => ['required', 'string', 'max:100'],
+            ],
+            [],
+            ['first_name' => 'prénom', 'last_name' => 'nom'],
+        );
+
+        $service->updateIdentity($this->user, $this->first_name, $this->last_name, auth()->user());
+        $this->user->refresh();
+        $this->editingIdentity = false;
+        session()->flash('status', 'Identité mise à jour.');
     }
 
     /** Ouvre le champ d'édition de l'email (réinitialise à la valeur courante). */
@@ -257,8 +304,11 @@ class MemberShow extends Component
     /** Email saisi pour ouvrir le compte autonome d'un mineur P1. */
     public string $wardEmail = '';
 
-    /** Dialog de confirmation de rupture du lien de tutelle. */
-    public bool $confirmingSever = false;
+    /** Dialog de rupture du lien de tutelle ouvert. */
+    public bool $severDialog = false;
+
+    /** Case « j'ai compris » du dialog de rupture — arme le bouton (motif §4.17). */
+    public bool $severCheck = false;
 
     /** P1 → P2 : crée l'invitation d'activation (email envoyé en J8). */
     public function inviteWard(GuardianshipService $service): void
@@ -273,13 +323,34 @@ class MemberShow extends Component
         }
     }
 
-    /**
-     * P2 → P3 : rompt le lien de tutelle après confirmation. Le refus P1 remonte en flash : le
-     * bouton est masqué dans ce cas, mais l'appel reste atteignable sur état périmé (second onglet,
-     * page rejouée) — sans capture, l'admin verrait une 500.
-     */
-    public function severGuardianship(GuardianshipService $service): void
+    /** Ouvre le dialog de rupture. La case n'est JAMAIS reprise d'une ouverture précédente. */
+    public function openSever(): void
     {
+        $this->severCheck = false;
+        $this->severDialog = true;
+    }
+
+    public function cancelSever(): void
+    {
+        $this->severDialog = false;
+        $this->severCheck = false;
+    }
+
+    /**
+     * P2 → P3 : rompt le lien de tutelle après accusé de réception. La rupture notifie le pupille ET
+     * le garant, et l'envoi ne se dédit pas : niveau 3 de confirmation, garde SERVEUR — le bouton
+     * grisé ne suffit pas, son état vient du client.
+     *
+     * Le refus P1 remonte en flash : le bouton est masqué dans ce cas, mais l'appel reste
+     * atteignable sur état périmé (second onglet, page rejouée) — sans capture, l'admin verrait
+     * une 500.
+     */
+    public function confirmSever(GuardianshipService $service): void
+    {
+        if (! $this->severDialog || ! $this->severCheck) {
+            return;
+        }
+
         try {
             $service->sever($this->user, auth()->user());
             session()->flash('status', 'Lien de tutelle rompu — l\'athlète est désormais autonome (P3).');
@@ -287,7 +358,8 @@ class MemberShow extends Component
             session()->flash('warn', $e->getMessage());
         }
 
-        $this->confirmingSever = false;
+        $this->severDialog = false;
+        $this->severCheck = false;
         $this->user->refresh();
     }
 

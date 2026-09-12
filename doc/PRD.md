@@ -150,7 +150,7 @@ Au déploiement, un email de bootstrap admin est configuré (mécanisme arrêté
 
 #### 4.1.5 Édition du profil utilisateur
 **L'utilisateur édite seul** :
-- Identité : nom, prénom.
+- Identité : nom, prénom. L'admin peut également les corriger depuis la fiche adhérent (§4.17.1) — même coexistence que pour l'email (§4.1.3), et **seul recours pour un pupille P1**, qui n'a pas de compte pour le faire lui-même.
 - Préférences de notifications : matrice §4.15 + toggle pause global.
 - Mot de passe : changement avec MDP actuel, ou définition initiale si arrivé via magic link / Google sans MDP. **Retrait** possible également (le compte redevient passwordless), dès lors qu'il reste au moins une méthode active (§4.1.2).
 - Méthodes d'auth liées : voir et révoquer.
@@ -983,7 +983,7 @@ Distincte de la page Paramètres :
   - Accès athlète (actif / suspendu / tous).
   - Rôles (multi parmi `athlete`, `coach`, `admin`, `parent_garant` — pseudo-rôle dérivé du lien de tutelle).
   - Statut suppression (aucun / en cours de tampon / éligible / tous).
-- **Actions sur la fiche d'un user** : éditer email + date de naissance + rôles + catégories + qualifications, **suspendre** / réactiver l'accès athlète (cf. §4.4), supprimer le compte (avec bouton **« Confirmer la suppression définitive »** distinct qui apparaît / devient cliquable uniquement à partir de J+7 ; bouton **« Annuler la demande de suppression »** disponible pendant le tampon).
+- **Actions sur la fiche d'un user** : éditer nom + prénom + email + date de naissance + rôles + catégories + qualifications, **suspendre** / réactiver l'accès athlète (cf. §4.4), supprimer le compte (avec bouton **« Confirmer la suppression définitive »** distinct qui apparaît / devient cliquable uniquement à partir de J+7 ; bouton **« Annuler la demande de suppression »** disponible pendant le tampon).
 - **Bouton « Ajouter un adhérent »** : formulaire one-shot (cf. §4.1.3).
 
 ### 4.18 Traçabilité : `AuditLog` et `ActivityLog`

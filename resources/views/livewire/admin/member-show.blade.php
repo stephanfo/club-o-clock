@@ -159,17 +159,9 @@
                                      juste au-dessus. --}}
                                 @if ($u->email)
                                 <hr class="divider" style="margin:14px 0">
-                                @if ($confirmingSever)
-                                    <x-banner kind="warn"><div>Rompre le lien de tutelle : le parent ne recevra plus les notifs, ne verra plus l'historique et ne pourra plus agir. Action manuelle, tracée. Confirmer ?</div></x-banner>
-                                    <div class="flex g8" style="margin-top:10px">
-                                        <button type="button" class="btn btn-ghost f1" wire:click="$set('confirmingSever', false)">Annuler</button>
-                                        <button type="button" class="btn btn-danger f1" wire:click="severGuardianship"><x-icon name="x" :size="15" /> Rompre la tutelle</button>
-                                    </div>
-                                @else
-                                    <button type="button" class="btn btn-ghost btn-block" wire:click="$set('confirmingSever', true)">
-                                        <x-icon name="x" :size="15" /> Rompre le lien de tutelle (P3)
-                                    </button>
-                                @endif
+                                <button type="button" class="btn btn-ghost btn-block" wire:click="openSever">
+                                    <x-icon name="x" :size="15" /> Rompre le lien de tutelle (P3)
+                                </button>
                                 @endif
 
                                 {{-- Reprise du lien (§4.2, extension admin) : le garant se posait à la
@@ -253,6 +245,37 @@
                                 @endif
                             </div>
                         @endif
+
+                        {{-- Identité — édition action-immédiate (§4.17.1).
+                             §4.1.5 confie le nom à l'adhérent, mais un pupille P1 n'a pas de compte :
+                             sans ce geste, une coquille dans son nom n'avait aucun correcteur.
+                             L'auto-édition du profil reste ouverte en parallèle, comme pour l'email. --}}
+                        <div class="card card-pad">
+                            <div class="flex ac jb">
+                                <span class="sect-title">Identité</span>
+                                @unless ($editingIdentity)
+                                    <button wire:click="editIdentity" class="iconbtn" aria-label="Modifier le nom"><x-icon name="edit" :size="15" /></button>
+                                @else
+                                    <x-icon name="user" :size="16" class="muted" />
+                                @endunless
+                            </div>
+                            @if ($editingIdentity)
+                                <div class="flex ac g10 wrap" style="margin-top:12px">
+                                    <input class="input f1" style="min-width:140px" wire:model.blur="first_name" placeholder="Prénom" autocomplete="off" aria-label="Prénom">
+                                    <input class="input f1" style="min-width:140px" wire:model.blur="last_name" placeholder="Nom" autocomplete="off" aria-label="Nom">
+                                </div>
+                                @error('first_name') <div class="meta" style="color:var(--danger);margin-top:8px">{{ $message }}</div> @enderror
+                                @error('last_name') <div class="meta" style="color:var(--danger);margin-top:8px">{{ $message }}</div> @enderror
+                                <div class="flex ac g8" style="margin-top:12px">
+                                    <button wire:click="saveIdentity" class="btn btn-primary btn-sm"
+                                            wire:loading.attr="disabled" wire:target="saveIdentity">Enregistrer</button>
+                                    <button wire:click="cancelEditIdentity" class="btn btn-ghost btn-sm">Annuler</button>
+                                </div>
+                            @else
+                                <div class="input" style="margin-top:12px">{{ $u->fullName() }}</div>
+                            @endif
+                            <div class="meta" style="margin-top:8px">Correction de saisie. N'ouvre aucun accès et ne change aucune catégorie.</div>
+                        </div>
 
                         {{-- Date de naissance — édition action-immédiate (recalcule la catégorie d'âge) --}}
                         <div class="card card-pad">
@@ -586,6 +609,41 @@
     @endif
 
     {{-- ── Modale : changement de garant (§4.2) — confirmation forte ── --}}
+    {{-- ── Dialog « Rompre la tutelle » (P2→P3, §4.2.2) ──
+         Niveau 3 de confirmation : le geste notifie le pupille ET le garant, et l'envoi ne se dédit
+         pas. L'écran s'en tenait au niveau 2 (bannière inline + bouton rouge), alors que le même
+         geste côté parent exigeait déjà un accusé de réception. --}}
+    @if ($severDialog)
+        <x-dialog title="Rompre la tutelle" sub="{{ $u->first_name }} devient autonome (P3)." danger :width="460" close="cancelSever">
+            <div style="display:flex;flex-direction:column;gap:12px">
+                <x-conseq-row icon="user-minus" label="{{ $u->guardian?->fullName() }} perd l'accès" tone="warn">
+                    Plus de notifications, plus d'historique, plus d'inscription possible pour {{ $u->first_name }}.
+                </x-conseq-row>
+                <x-conseq-row icon="user" label="Le compte de {{ $u->first_name }} reste ouvert">
+                    Il ou elle se connecte et s'inscrit seul·e, comme tout adhérent autonome.
+                </x-conseq-row>
+                <x-conseq-row icon="send" label="Les deux comptes sont prévenus" tone="warn">
+                    L'envoi part immédiatement et ne se rattrape pas. Le geste est tracé.
+                </x-conseq-row>
+            </div>
+            {{-- Accusé de réception CHIFFRANT la conséquence : il nomme les deux personnes
+                 prévenues. Le toggle est porté par la RANGÉE (souris) et par le x-check, qui est un
+                 vrai <button> — sans quoi la case, donc le bouton qu'elle arme, serait
+                 inatteignable au clavier. `.stop` empêche le clic de remonter à la rangée et de
+                 re-basculer. --}}
+            <div class="flex ac g10" style="margin-top:14px;font-size:14px;cursor:pointer" wire:click="$toggle('severCheck')">
+                <x-check :on="$severCheck" wire:click.stop="$toggle('severCheck')" aria-labelledby="txt-rompre-tutelle" />
+                <span id="txt-rompre-tutelle">Je comprends que {{ $u->first_name }} et {{ $u->guardian?->first_name }} seront prévenu·e·s de la rupture.</span>
+            </div>
+            <x-slot:footer>
+                <button type="button" class="btn btn-ghost" wire:click="cancelSever">Annuler</button>
+                <button type="button" class="btn btn-danger{{ $severCheck ? '' : ' is-disabled' }}"
+                        @if ($severCheck) wire:click="confirmSever" @endif
+                        wire:loading.attr="disabled" wire:target="confirmSever"><x-icon name="log-out" :size="14" /> Rompre la tutelle</button>
+            </x-slot:footer>
+        </x-dialog>
+    @endif
+
     @if ($relinkDialog)
         <x-dialog title="Changer de garant" sub="{{ $u->first_name }} passe sous la tutelle d'un autre adulte." danger :width="480" close="cancelRelink">
             <x-banner kind="danger">

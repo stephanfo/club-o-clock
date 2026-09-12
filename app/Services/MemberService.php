@@ -171,6 +171,33 @@ class MemberService
         });
     }
 
+    /**
+     * Correction du nom depuis la fiche admin (§4.17.1). §4.1.5 confie l'identité à l'adhérent, mais
+     * un pupille P1 n'a pas de compte : sans ce geste, une coquille dans son nom n'avait AUCUN
+     * chemin de correction. L'auto-édition du profil reste ouverte en parallèle, comme pour l'email
+     * (§4.1.3).
+     *
+     * Ne touche à rien d'autre : pas de credential ouvert, pas de catégorie recalculée — le nom
+     * n'entre dans aucune dérivation. Acte d'identité sensible → AuditLog (survit à
+     * l'anonymisation) + ActivityLog métier.
+     */
+    public function updateIdentity(User $member, string $firstName, string $lastName, User $actor): void
+    {
+        DB::transaction(function () use ($member, $firstName, $lastName, $actor) {
+            $member->update([
+                'first_name' => trim($firstName),
+                'last_name' => trim($lastName),
+            ]);
+
+            AuditLogger::record('member_updated', $actor, [
+                'target_type' => User::class,
+                'target_id' => $member->id,
+                'motif' => 'identity_changed',
+            ]);
+            ActivityLogger::record('member_identity_changed', $actor, ['user_id' => $member->id]);
+        });
+    }
+
     /** Active/désactive un rôle cumulable (§5.1). Trace role_changed (Audit) + métier (Activity). */
     public function toggleRole(User $member, string $role, User $actor): bool
     {
