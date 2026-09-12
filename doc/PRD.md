@@ -1084,7 +1084,7 @@ Vue logique des entités. **Volontairement agnostique** à la techno de stockage
 
 ### 5.1 Entités principales
 
-- **`User`** : `firstName`, `lastName`, `email?` (nullable en P1), `dob`, `isActive`, `athleteAccessSuspended` (booléen — suspend la capacité d'inscription comme athlète, séparé de `isActive`), `deletionRequestedAt?` (timestamp — posé au déclenchement du flow §4.3, remis à `null` à l'annulation), `isMinor`, `roles[]` (`athlete` / `coach` / `admin` cumulables). Lien optionnel `0..1` vers le parent garant. **Pas de stockage du n° de licence FFTri** (RGPD).
+- **`User`** : `firstName`, `lastName`, `email?` (nullable en P1), `dob`, `isActive`, `athleteAccessSuspended` (booléen — suspend la capacité d'inscription comme athlète, séparé de `isActive`), `deletionRequestedAt?` (timestamp — posé au déclenchement du flow §4.3, remis à `null` à l'annulation), `isMinor` (**dérivé de `dob`**, jamais saisi ni figé : la minorité change d'elle-même au 18ᵉ anniversaire), `roles[]` (`athlete` / `coach` / `admin` cumulables). Lien optionnel `0..1` vers le parent garant. **Pas de stockage du n° de licence FFTri** (RGPD).
 - **`Category`** : `label`, `ageMin`, `ageMax` (inclusives), `sortOrder`, `archivedAt?`. Pas de chevauchement entre catégories actives.
 - **`UserCategory`** (M:N) : un `User` ↔ une ou plusieurs `Category`. Une catégorie est dite « principale » (dérivée auto, surclassable).
 - **`Session`** :
