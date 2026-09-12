@@ -497,6 +497,10 @@ a.scard { text-decoration: none; color: inherit; }
 /* variante row : ligne horizontale (home, agenda, semaine mobile) */
 .scard-row { display: flex; gap: 12px; padding: 12px; align-items: center; }
 .scard-row-date { width: 40px; text-align: center; flex: 0 0 auto; }
+/* Variante plage horaire (showDate="time", #33) : « 18:30 » en 16 px gras dépasse les 40 px prévus
+   pour un quantième, et débordait dans le gap de 12 px jusqu'à toucher le titre. La colonne y est
+   élargie, elle seule — la variante datée garde sa largeur. */
+.scard-row-date.scard-row-time { width: 52px; }
 .scard-row-title {
     font-weight: 700; font-size: 15px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
@@ -1039,4 +1043,11 @@ body:has(.scrim) { overflow: hidden; }
 @media (max-width: 768px) {
     .dialog-foot { flex-direction: column-reverse; align-items: stretch; }
     .dialog-foot .btn { width: 100%; justify-content: center; }
+    /* Dérogation pour les dialogs DESTRUCTIFS (<x-dialog danger>) : on ne remonte pas l'action
+       principale. Un dialog danger ne demande pas « laquelle de ces deux actions veux-tu ? » mais
+       « confirmes-tu quelque chose que tu ne pourras pas défaire ? » — la sortie sûre y est le geste
+       attendu, et l'action irréversible ne doit pas s'empiler au-dessus d'elle. Même raisonnement
+       que la dérogation de .dialog-foot-stack ci-dessus (trois choix ou plus). Le markup ne change
+       pas, l'ordre desktop non plus : seule la direction d'empilement mobile s'inverse. (#36) */
+    .dialog-foot.danger { flex-direction: column; }
 }

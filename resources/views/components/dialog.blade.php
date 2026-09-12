@@ -22,6 +22,8 @@
             @if ($sub)<div class="dialog-sub">{{ $sub }}</div>@endif
         </div>
         <div class="dialog-body">{{ $slot }}</div>
-        @if (isset($footer))<div class="dialog-foot{{ $footStack ? ' dialog-foot-stack' : '' }}">{{ $footer }}</div>@endif
+        {{-- `danger` est reporté sur le pied : c'est le crochet CSS qui empêche, sur mobile, que
+             l'action irréversible se retrouve au-dessus de la sortie sûre (#36). --}}
+        @if (isset($footer))<div class="dialog-foot{{ $footStack ? ' dialog-foot-stack' : '' }}{{ $danger ? ' danger' : '' }}">{{ $footer }}</div>@endif
     </div>
 </div>
