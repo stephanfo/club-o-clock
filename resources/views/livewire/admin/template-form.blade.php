@@ -6,7 +6,9 @@
     // Jours ISO 1..7 → libellés (DAYS du proto, ré-indexés sur l'ISO).
     $days = [1 => 'Lun', 2 => 'Mar', 3 => 'Mer', 4 => 'Jeu', 5 => 'Ven', 6 => 'Sam', 7 => 'Dim'];
     $daysFull = [1 => 'Lundi', 2 => 'Mardi', 3 => 'Mercredi', 4 => 'Jeudi', 5 => 'Vendredi', 6 => 'Samedi', 7 => 'Dimanche'];
-    $n = $this->occurrenceCount;
+    // Aperçu de génération : la CRÉATION seule génère. L'édition met à jour le modèle et rien
+    // d'autre (§4.8) — annoncer « N séances seront créées » y serait faux (#40).
+    $n = $edit ? 0 : $this->occurrenceCount;
     $selectedCoaches = $coaches->whereIn('id', $coach_ids);
 @endphp
 <div class="form-screen">
@@ -82,11 +84,11 @@
                             <div class="ifield"><input class="ifield-input" type="number" min="1" wire:model.blur="duration_min"></div>
                         </div>
                         <div>
-                            <label class="field-label">Date de début</label>
+                            <label class="field-label">{{ $edit ? 'Début de la plage de référence' : 'Date de début' }}</label>
                             <div class="ifield"><input class="ifield-input" type="date" wire:model.live="generation_start_date"></div>
                         </div>
                         <div>
-                            <label class="field-label">Date de fin</label>
+                            <label class="field-label">{{ $edit ? 'Fin de la plage de référence' : 'Date de fin' }}</label>
                             <div class="ifield"><input class="ifield-input" type="date" wire:model.live="generation_end_date"></div>
                         </div>
                     </div>
@@ -136,22 +138,35 @@
 
             {{-- ═══ Colonne droite ═══ --}}
             <div class="tpl-side">
-                {{-- Aperçu génération --}}
-                <div class="card card-pad" style="border-color:var(--brand-200);background:var(--brand-50)">
-                    <div class="eyebrow" style="color:var(--brand-700);margin-bottom:10px">À l'enregistrement</div>
-                    <div style="margin-bottom:6px">
+                @if ($edit)
+                    {{-- Édition : aucun effet de génération. Encadré neutre, qui dit ce que fait
+                         réellement l'enregistrement et où générer (#40). --}}
+                    <div class="card card-pad">
+                        <div class="eyebrow" style="margin-bottom:10px">Déjà généré</div>
                         <div class="flex" style="align-items:baseline;gap:8px;flex-wrap:nowrap">
-                            <span class="num" style="font-size:46px;line-height:1;color:var(--brand-700);flex:0 0 auto">{{ $n }}</span>
+                            <span class="num" style="font-size:46px;line-height:1;flex:0 0 auto">{{ $generatedCount }}</span>
                             <span style="font-weight:700;font-size:var(--text-base);white-space:nowrap">séances</span>
                         </div>
-                        <div class="meta" style="font-size:13px;margin-top:5px">{{ $n ? mb_strtolower($daysFull[$day_of_week]).' · '.$start_time_of_day : 'aucune dans la plage' }}</div>
+                        <div class="meta" style="font-size:12.5px;margin-top:10px;line-height:1.5">Enregistrer met à jour le <b>modèle seul</b> : aucune séance n'est créée ni modifiée. Pour générer sur une nouvelle plage, utilise <b>« Relancer / prolonger »</b> depuis la liste des modèles.</div>
                     </div>
-                </div>
+                @else
+                    {{-- Aperçu génération --}}
+                    <div class="card card-pad" style="border-color:var(--brand-200);background:var(--brand-50)">
+                        <div class="eyebrow" style="color:var(--brand-700);margin-bottom:10px">À l'enregistrement</div>
+                        <div style="margin-bottom:6px">
+                            <div class="flex" style="align-items:baseline;gap:8px;flex-wrap:nowrap">
+                                <span class="num" style="font-size:46px;line-height:1;color:var(--brand-700);flex:0 0 auto">{{ $n }}</span>
+                                <span style="font-weight:700;font-size:var(--text-base);white-space:nowrap">séances</span>
+                            </div>
+                            <div class="meta" style="font-size:13px;margin-top:5px">{{ $n ? mb_strtolower($daysFull[$day_of_week]).' · '.$start_time_of_day : 'aucune dans la plage' }}</div>
+                        </div>
+                    </div>
 
-                <x-banner kind="warn"><div><b>{{ $n }} séances indépendantes</b> seront créées. Modifier le modèle <b>plus tard ne propage pas</b> aux séances déjà générées — chacune s'édite séparément.</div></x-banner>
+                    <x-banner kind="warn"><div><b>{{ $n }} séances indépendantes</b> seront créées. Modifier le modèle <b>plus tard ne propage pas</b> aux séances déjà générées — chacune s'édite séparément.</div></x-banner>
 
-                @if ($this->pastCount > 0)
-                    <x-banner kind="danger"><div><b>{{ $this->pastCount }} dans le passé.</b> La plage commence avant aujourd'hui : ces séances seront créées mais avec inscriptions déjà fermées. Ajuste la date de début si ce n'est pas voulu.</div></x-banner>
+                    @if ($this->pastCount > 0)
+                        <x-banner kind="danger"><div><b>{{ $this->pastCount }} dans le passé.</b> La plage commence avant aujourd'hui : ces séances seront créées mais avec inscriptions déjà fermées. Ajuste la date de début si ce n'est pas voulu.</div></x-banner>
+                    @endif
                 @endif
 
                 {{-- Coachs par défaut — chips toggle (préaffectation §4.8) --}}

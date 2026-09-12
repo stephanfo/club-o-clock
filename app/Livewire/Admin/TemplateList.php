@@ -2,9 +2,12 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\ClubSettings;
+use App\Models\Session;
 use App\Models\SessionTemplate;
 use App\Services\TemplateGenerationService;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -21,9 +24,6 @@ class TemplateList extends Component
 
     /** Modale de relance ouverte sur ce modèle ? + plage saisie. */
     public ?int $relaunchId = null;
-
-    /** Jour ISO du modèle relancé (mémorisé à l'ouverture → aperçu sans re-query). */
-    public ?int $relaunchDay = null;
 
     public string $relaunchStart = '';
 
@@ -62,16 +62,6 @@ class TemplateList extends Component
         session()->flash('status', 'Modèle réactivé.');
     }
 
-    /** (Re)génère la plage stockée du modèle — bouton « Générer & enregistrer » (§4.8). */
-    public function generate(int $id, TemplateGenerationService $service): void
-    {
-        $tpl = SessionTemplate::findOrFail($id);
-        $this->authorize('generate', $tpl);
-
-        $created = $service->generate($tpl, auth()->user());
-        session()->flash('status', $created->count().' séances générées.');
-    }
-
     // ── Relance / prolongation (§4.8 Réutilisation), porté de RelanceModal ──
 
     public function openRelaunch(int $id): void
@@ -80,7 +70,6 @@ class TemplateList extends Component
         $this->authorize('generate', $tpl);
 
         $this->relaunchId = $id;
-        $this->relaunchDay = $tpl->day_of_week;
         // Préremplit sur la saison suivante (preset « Nouvelle saison »).
         $this->relaunchStart = $tpl->generation_start_date->copy()->addYear()->toDateString();
         $this->relaunchEnd = $tpl->generation_end_date->copy()->addYear()->toDateString();
@@ -89,13 +78,20 @@ class TemplateList extends Component
     public function closeRelaunch(): void
     {
         $this->relaunchId = null;
-        $this->relaunchDay = null;
     }
 
     public function relaunch(TemplateGenerationService $service): void
     {
         $tpl = SessionTemplate::findOrFail($this->relaunchId);
         $this->authorize('generate', $tpl);
+
+        // Refus gardé CÔTÉ SERVEUR : le bouton grisé à 0 ne suffit pas, son état vient du client.
+        // Un non-effet remonte en orange (flash('warn')), pas en vert.
+        if ($this->missingOccurrences()->isEmpty()) {
+            session()->flash('warn', 'Aucune séance à créer : la plage est déjà entièrement générée.');
+
+            return;
+        }
 
         $created = $service->relaunch(
             $tpl,
@@ -108,23 +104,61 @@ class TemplateList extends Component
         session()->flash('status', $created->count().' nouvelles séances générées.');
     }
 
-    /** Aperçu live du nombre d'occurrences de la plage de relance saisie (sans re-query : day mémorisé). */
+    /**
+     * Aperçu live de la relance : occurrences de la plage saisie qui ne sont PAS déjà générées.
+     * Compter les occurrences tout court mentait — le générateur est idempotent (une occurrence
+     * déjà produite pour ce modèle n'est pas recréée), donc rejouer la plage courante annonçait
+     * « N nouvelles séances » pour n'en créer aucune. Depuis le retrait de « Générer &
+     * enregistrer », cette modale est le seul moyen de reboucher un trou : elle doit dire vrai.
+     */
     public function getRelaunchCountProperty(): int
     {
-        if ($this->relaunchDay === null || ! $this->relaunchStart || ! $this->relaunchEnd) {
-            return 0;
+        return $this->missingOccurrences()->count();
+    }
+
+    /**
+     * Occurrences de [relaunchStart, relaunchEnd] sans séance déjà générée pour ce modèle.
+     * La règle de comparaison est celle de l'idempotence du générateur : le JOUR local du club,
+     * pas l'instant exact — une séance décalée par le bureau reste l'occurrence de son jour.
+     *
+     * @return Collection<int, Carbon>
+     */
+    private function missingOccurrences(): Collection
+    {
+        if ($this->relaunchId === null || ! $this->relaunchStart || ! $this->relaunchEnd) {
+            return collect();
         }
 
-        $probe = new SessionTemplate(['day_of_week' => $this->relaunchDay]);
+        $tpl = SessionTemplate::find($this->relaunchId);
+        if (! $tpl) {
+            return collect();
+        }
 
-        return app(TemplateGenerationService::class)
-            ->occurrences($probe, Carbon::parse($this->relaunchStart), Carbon::parse($this->relaunchEnd))
-            ->count();
+        $occurrences = app(TemplateGenerationService::class)
+            ->occurrences($tpl, Carbon::parse($this->relaunchStart), Carbon::parse($this->relaunchEnd));
+
+        if ($occurrences->isEmpty()) {
+            return $occurrences;
+        }
+
+        $tz = ClubSettings::current()->timezone;
+        $first = $occurrences->first();
+        $last = $occurrences->last();
+        $already = Session::where('source_template_id', $tpl->id)
+            ->whereBetween('start_at', [
+                Carbon::create($first->year, $first->month, $first->day, 0, 0, 0, $tz)->utc(),
+                Carbon::create($last->year, $last->month, $last->day, 0, 0, 0, $tz)->endOfDay()->utc(),
+            ])
+            ->get(['start_at'])
+            ->map(fn (Session $s) => $s->start_at->copy()->setTimezone($tz)->toDateString())
+            ->all();
+
+        return $occurrences->reject(fn (Carbon $d) => in_array($d->toDateString(), $already, true))->values();
     }
 
     public function render()
     {
-        $templates = SessionTemplate::with(['discipline', 'quotaTag', 'defaultCoaches'])
+        $templates = SessionTemplate::with(['discipline', 'quotaTag', 'defaultCoaches', 'categories', 'location'])
             ->withCount('sessions')
             ->orderBy('label')
             ->get();

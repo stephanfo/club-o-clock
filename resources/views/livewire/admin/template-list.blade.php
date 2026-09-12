@@ -3,6 +3,7 @@
      (relance / archive / regénération / édition). Admin uniquement. --}}
 @php
     $days = [1 => 'Lundi', 2 => 'Mardi', 3 => 'Mercredi', 4 => 'Jeudi', 5 => 'Vendredi', 6 => 'Samedi', 7 => 'Dimanche'];
+    $kindLabels = ['training' => 'Entraînement', 'competition' => 'Compétition', 'club_event' => 'Événement club'];
 @endphp
 <div class="form-screen">
     {{-- Feedback d'action global (revue UX 2026-07-11) : bannière flottante auto-masquée,
@@ -83,10 +84,19 @@
                     <div class="flex ac jb"><div class="dsp-7" style="font-size:19px">{{ $selected->label }}</div><span class="meta" style="font-size:12px">{{ $selected->sessions_count }} générées</span></div>
                     <hr class="divider" style="margin:12px 0">
                     <div class="tpl-row2">
+                        <div><label class="field-label">Type</label><div class="input">{{ $kindLabels[$selected->kind] }}</div></div>
+                        <div><label class="field-label">Discipline</label><div class="input flex ac g6">@if ($selected->discipline)<span class="dot dot-{{ $selected->discipline->colorClass() }}"></span> {{ $selected->discipline->label }}@else<span class="meta" style="font-size:12px">—</span>@endif</div></div>
                         <div><label class="field-label">Jour</label><div class="input">{{ $days[$selected->day_of_week] }}</div></div>
                         <div><label class="field-label">Créneau</label><div class="input">{{ \Illuminate\Support\Str::substr($selected->start_time_of_day, 0, 5) }} · {{ $selected->duration_min }} min</div></div>
                         <div><label class="field-label">Date début</label><div class="input">{{ $selected->generation_start_date->locale('fr')->isoFormat('D MMM YYYY') }}</div></div>
                         <div><label class="field-label">Date fin</label><div class="input">{{ $selected->generation_end_date->locale('fr')->isoFormat('D MMM YYYY') }}</div></div>
+                        <div><label class="field-label">Lieu</label><div class="input">{{ $selected->location?->name ?? $selected->location_text ?: '—' }}</div></div>
+                        <div><label class="field-label">Capacité</label><div class="input">{{ $selected->capacity ? $selected->capacity.' places' : 'Sans limite' }}</div></div>
+                    </div>
+
+                    <label class="field-label" style="margin-top:12px">Catégories ciblées</label>
+                    <div class="input flex g4 wrap">
+                        @forelse ($selected->categories as $cat)<span class="chip chip-sm chip-line">{{ $cat->label }}</span>@empty<span class="meta" style="font-size:12px">Toutes</span>@endforelse
                     </div>
 
                     @if ($selected->kind === 'training' && $selected->quotaTag)
@@ -99,7 +109,7 @@
                         @forelse ($selected->defaultCoaches as $c)<span class="chip chip-sm chip-ink">{{ $c->fullName() }}</span>@empty<span class="meta" style="font-size:12px">Aucun</span>@endforelse
                     </div>
 
-                    <x-banner kind="warn"><div>« Générer & enregistrer » crée <b>des séances indépendantes</b> sur la plage du modèle. Les modifications futures ne propagent <b>pas</b> aux séances déjà générées.</div></x-banner>
+                    <x-banner kind="warn"><div>Les séances générées sont <b>indépendantes du modèle</b>. Modifier le modèle ensuite ne propage <b>pas</b> aux séances déjà créées — chacune s'édite séparément.</div></x-banner>
 
                     <button type="button" wire:click="openRelaunch({{ $selected->id }})" class="btn btn-ghost btn-block" style="margin-top:12px;border-color:var(--brand-200);color:var(--brand-700)">
                         <x-icon name="repeat" :size="15" /> Relancer / prolonger la saison
@@ -110,10 +120,9 @@
                         <button type="button" wire:click="archive({{ $selected->id }})" wire:confirm="Archiver ce modèle ? Il ne générera plus de séances." class="btn btn-ghost btn-sm">
                             <x-icon name="layers" :size="14" /> Archiver
                         </button>
-                        <a href="{{ route('admin.templates.edit', $selected) }}" class="btn btn-ghost btn-sm" wire:navigate>
+                        <a href="{{ route('admin.templates.edit', $selected) }}" class="btn btn-primary btn-sm" wire:navigate>
                             <x-icon name="edit" :size="14" /> Éditer
                         </a>
-                        <button type="button" wire:click="generate({{ $selected->id }})" wire:loading.attr="disabled" wire:target="generate" class="btn btn-primary btn-sm">Générer &amp; enregistrer</button>
                     </div>
                 </div>
             @endif
@@ -133,11 +142,11 @@
             <div class="card card-pad" style="border-color:var(--brand-200);background:var(--brand-50);margin-top:14px">
                 <div class="flex ac" style="gap:10px">
                     <span class="num" style="font-size:42px;line-height:1;color:var(--brand-700);flex:0 0 auto">{{ $this->relaunchCount }}</span>
-                    <div><div style="font-weight:700;font-size:15px">nouvelles séances</div><div class="meta" style="font-size:12.5px;margin-top:2px">s'ajoutent aux existantes</div></div>
+                    <div><div style="font-weight:700;font-size:15px">nouvelles séances</div><div class="meta" style="font-size:12.5px;margin-top:2px">{{ $this->relaunchCount === 0 ? 'cette plage est déjà entièrement générée' : "s'ajoutent aux existantes" }}</div></div>
                 </div>
             </div>
 
-            <x-banner kind="warn"><div>Ces séances seront créées et s'ajouteront aux existantes. Les séances déjà générées (saisons précédentes) <b>restent intactes</b>.</div></x-banner>
+            <x-banner kind="warn"><div>Seules les occurrences <b>non encore générées</b> sont créées. Les séances déjà générées (saisons précédentes, ou cette plage) <b>restent intactes</b>.</div></x-banner>
 
             <x-slot:footer>
                 <button type="button" class="btn btn-ghost" wire:click="closeRelaunch">Annuler</button>

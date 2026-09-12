@@ -11,6 +11,7 @@ use App\Models\SessionTemplate;
 use App\Models\User;
 use App\Services\TemplateGenerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -111,7 +112,7 @@ class TemplateUiTest extends TestCase
 
     /**
      * Revue de code — TemplateForm::save() nullifie discipline_id hors training à l'enregistrement,
-     * mais TemplateList::generate()/relaunch() rejouent un template EXISTANT sans repasser par cette
+     * mais TemplateList::relaunch() rejoue un template EXISTANT sans repasser par cette
      * validation. Un modèle competition créé avant ce garde-fou (discipline_id encore renseigné en
      * base) ne doit pas propager sa discipline aux séances générées (§4.7 : discipline = training
      * uniquement).
@@ -125,17 +126,23 @@ class TemplateUiTest extends TestCase
             'day_of_week' => 1, 'generation_start_date' => '2026-09-01', 'generation_end_date' => '2026-09-07',
         ]);
 
-        Livewire::actingAs($admin)->test(TemplateList::class)->call('generate', $tpl->id);
+        // Depuis le retrait de « Générer & enregistrer » (#40), la modale de relance est le seul
+        // chemin d'écran qui rejoue un modèle existant.
+        Livewire::actingAs($admin)->test(TemplateList::class)
+            ->call('openRelaunch', $tpl->id)
+            ->set('relaunchStart', '2026-09-01')
+            ->set('relaunchEnd', '2026-09-07')
+            ->call('relaunch');
 
         $session = Session::where('source_template_id', $tpl->id)->firstOrFail();
         $this->assertSame('competition', $session->kind);
         $this->assertNull($session->discipline_id);
     }
 
-    // Double-tap sur « Générer & enregistrer » : sans wire:loading le second clic partait avant
-    // le retour du premier, et generate() créant les Session sans déduplication, la plage était
+    // Double-tap sur le bouton de relance : sans wire:loading le second clic partait avant le
+    // retour du premier, et generate() créant les Session sans déduplication, la plage était
     // générée deux fois. Les séances en double sont persistantes (§4.8).
-    public function test_double_tap_on_generate_does_not_duplicate_sessions(): void
+    public function test_double_tap_on_relaunch_does_not_duplicate_sessions(): void
     {
         $admin = User::factory()->admin()->create();
         $disc = $this->discipline();
@@ -144,12 +151,25 @@ class TemplateUiTest extends TestCase
             'generation_start_date' => '2026-09-01', 'generation_end_date' => '2026-09-30',
         ]);
 
-        // Deux appels consécutifs, comme un double-tap sur le mutualisé.
+        // Deux appels consécutifs, comme un double-tap sur le mutualisé. Le second clic part avec
+        // le snapshot du client, où la modale est encore ouverte : on ré-arme relaunchId pour le
+        // rejouer tel qu'il arriverait au serveur.
         Livewire::actingAs($admin)->test(TemplateList::class)
-            ->call('generate', $tpl->id)
-            ->call('generate', $tpl->id);
+            ->call('openRelaunch', $tpl->id)
+            ->set('relaunchStart', '2026-09-01')
+            ->set('relaunchEnd', '2026-09-30')
+            ->call('relaunch')
+            ->set('relaunchId', $tpl->id)
+            ->call('relaunch');
 
         // 4 lundis en septembre 2026 : la seconde passe ne doit rien ajouter.
+        $this->assertSame(4, Session::where('source_template_id', $tpl->id)->count());
+
+        // Et si les deux requêtes se croisaient malgré la garde de comptage, l'idempotence du
+        // générateur tient toujours — c'est elle qui rend les doublons impossibles en base.
+        app(TemplateGenerationService::class)->relaunch(
+            $tpl, $admin, Carbon::parse('2026-09-01'), Carbon::parse('2026-09-30')
+        );
         $this->assertSame(4, Session::where('source_template_id', $tpl->id)->count());
     }
 
@@ -257,6 +277,90 @@ class TemplateUiTest extends TestCase
             ->call('save');
 
         $this->assertNull(SessionTemplate::first()->capacity);
+    }
+
+    /**
+     * #40 — le compteur de la modale de relance comptait les OCCURRENCES de la plage, pas les
+     * séances manquantes : rejouer la plage courante annonçait « 4 nouvelles séances » là où
+     * l'idempotence du générateur n'en crée aucune. Seul moyen de reboucher un trou depuis la
+     * suppression de « Générer & enregistrer », la modale doit dire vrai.
+     */
+    public function test_relaunch_count_only_counts_missing_occurrences(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $tpl = SessionTemplate::factory()->create([
+            'created_by' => $admin->id, 'day_of_week' => 1,
+            'generation_start_date' => '2026-09-01', 'generation_end_date' => '2026-09-30',
+        ]);
+        app(TemplateGenerationService::class)->generate($tpl, $admin); // 4 lundis de septembre
+
+        Livewire::actingAs($admin)->test(TemplateList::class)
+            ->call('openRelaunch', $tpl->id)
+            ->set('relaunchStart', '2026-09-01')
+            ->set('relaunchEnd', '2026-09-30')
+            ->assertSet('relaunchCount', 0); // plage déjà entièrement générée
+
+        // Contrôle positif : un trou dans la plage se compte pour exactement 1.
+        Session::where('source_template_id', $tpl->id)->orderBy('start_at')->first()->delete();
+
+        Livewire::actingAs($admin)->test(TemplateList::class)
+            ->call('openRelaunch', $tpl->id)
+            ->set('relaunchStart', '2026-09-01')
+            ->set('relaunchEnd', '2026-09-30')
+            ->assertSet('relaunchCount', 1);
+    }
+
+    /**
+     * #40 — le bouton grisé à 0 ne suffit pas : l'état vient du client. Une relance sans rien à
+     * créer est refusée côté serveur, en orange (convention flash('warn') pour un non-effet).
+     */
+    public function test_relaunch_is_refused_when_nothing_is_missing(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $tpl = SessionTemplate::factory()->create([
+            'created_by' => $admin->id, 'day_of_week' => 1,
+            'generation_start_date' => '2026-09-01', 'generation_end_date' => '2026-09-30',
+        ]);
+        app(TemplateGenerationService::class)->generate($tpl, $admin);
+
+        Livewire::actingAs($admin)->test(TemplateList::class)
+            ->call('openRelaunch', $tpl->id)
+            ->set('relaunchStart', '2026-09-01')
+            ->set('relaunchEnd', '2026-09-30')
+            ->call('relaunch')
+            // Le refus se voit à l'écran, en orange (x-flash-float lit session('warn')).
+            ->assertSee('Aucune séance à créer', false)
+            ->assertSet('relaunchId', $tpl->id); // la modale reste ouverte pour corriger la plage
+
+        $this->assertSame(4, Session::where('source_template_id', $tpl->id)->count());
+    }
+
+    /**
+     * #40 — la colonne droite du formulaire annonçait « À l'enregistrement — N séances » et
+     * « N séances indépendantes seront créées » même en édition, où save() ne génère rien.
+     */
+    public function test_edit_screen_does_not_announce_a_generation(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $tpl = SessionTemplate::factory()->create([
+            'created_by' => $admin->id, 'day_of_week' => 1,
+            'generation_start_date' => '2026-09-01', 'generation_end_date' => '2026-09-30',
+        ]);
+        app(TemplateGenerationService::class)->generate($tpl, $admin);
+
+        // Contrôle positif : en création, l'aperçu de génération est bien là. Le modèle vide est
+        // passé explicitement — sans lui, Livewire résout le paramètre typé du mount() et retombe
+        // sur le modèle existant, donc sur l'écran d'édition.
+        Livewire::actingAs($admin)->test(TemplateForm::class, ['template' => new SessionTemplate])
+            ->set('generation_start_date', '2026-09-01')
+            ->set('generation_end_date', '2026-09-30')
+            ->assertSee("À l'enregistrement", false)
+            ->assertSee('séances indépendantes', false);
+
+        Livewire::actingAs($admin)->test(TemplateForm::class, ['template' => $tpl])
+            ->assertDontSee("À l'enregistrement", false)
+            ->assertDontSee('séances indépendantes', false)
+            ->assertSee("aucune séance n'est créée ni modifiée", false);
     }
 
     public function test_non_admin_cannot_access_templates(): void
