@@ -266,6 +266,40 @@ class GpxUiTest extends TestCase
             ->assertOk()->assertSee($attribute, false);
     }
 
+    /**
+     * `download` ne suffit pas : en PWA iOS installée, WebKit l'ignore et présente quand même le
+     * fichier en aperçu plein écran sans issue (#44, constaté sur iPhone). Le relais est la feuille
+     * de partage du système, câblée par le composant Alpine `gpxDownload` — dont la précharge exige
+     * l'URL ET le nom du fichier. Ce test garde le câblage : sans lui, le bouton retombe
+     * silencieusement sur le lien natif, donc sur le piège, et aucun test PHP ne s'en aperçoit.
+     */
+    public function test_the_download_button_wires_the_native_share_sheet(): void
+    {
+        Storage::fake('local');
+        $route = GpxRoute::factory()->create([
+            'gpx_path' => 'gpx/x.gpx',
+            'gpx_original_name' => 'Boucle de la Loire.gpx',
+        ]);
+        Storage::disk('local')->put('gpx/x.gpx', '<gpx>data</gpx>');
+
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Sortie avec parcours',
+            'discipline_id' => $this->discipline()->id,
+            'start_at' => Carbon::now()->addDay(), 'duration_min' => 90,
+            'route_id' => $route->id,
+        ]);
+
+        $member = User::factory()->create(['email_verified_at' => now()]);
+        $cablage = "gpxDownload({ url: '".route('gpx-routes.gpx', $route)."', name: '".$route->downloadFilename()."' })";
+
+        foreach ([route('gpx-routes.show', $route), route('sessions.show', $session)] as $url) {
+            $this->actingAs($member)->get($url)
+                ->assertOk()
+                ->assertSee($cablage, false)
+                ->assertSee('x-on:click="partager($event)"', false);
+        }
+    }
+
     /** Le nom est slugifié et suffixé : ni espace ni accent, que iOS reprend tel quel. */
     public function test_the_download_filename_is_slugged(): void
     {

@@ -92,11 +92,7 @@
                     <x-icon name="chevron-right" style="color:var(--fg-muted);flex:0 0 auto" />
                 </a>
 
-                {{-- `download` obligatoire : cf. la fiche parcours et #44 (PWA iOS piégée sans lui). --}}
-                <a class="btn btn-ghost btn-block" href="{{ route('gpx-routes.gpx', $gpxRoute) }}" download="{{ $gpxRoute->downloadFilename() }}">
-                    <x-icon name="download" :size="15" /> Télécharger le GPX
-                    @if ($gpxRoute->gpx_size_ko)<span class="meta" style="font-size:12px;margin-left:4px">· {{ $gpxRoute->gpx_size_ko }} Ko</span>@endif
-                </a>
+                <x-gpx-download :route="$gpxRoute" />
             </div>
         @endif
 

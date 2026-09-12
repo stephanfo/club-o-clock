@@ -794,9 +794,91 @@ function locationMap({ lat, lng, lockable = false }) {
     };
 }
 
+/**
+ * Téléchargement d'un GPX depuis une PWA iOS installée.
+ *
+ * LE PROBLÈME. En `display: standalone`, WebKit n'a ni gestionnaire de téléchargement ni chrome.
+ * Toute réponse qu'il décide de présenter comme document — et c'est le cas d'un GPX, quel que soit
+ * le `Content-Disposition` — prend la fenêtre entière, sans bouton pour en sortir : l'utilisateur
+ * est piégé jusqu'au kill de l'application (#44). L'attribut `download` n'y change rien : vérifié
+ * sur iPhone, WebKit l'ignore dans ce contexte. Aucun réglage du lien ni de l'en-tête ne s'en sort.
+ *
+ * LA SORTIE. `navigator.share({ files })` délègue à la feuille de partage du système : « Enregistrer
+ * dans Fichiers », « Ouvrir dans… », et surtout un bouton Annuler. La PWA reste affichée dessous.
+ *
+ * POURQUOI PRÉCHARGER. Safari perd l'activation transitoire dès le premier `await` : un `fetch` au
+ * clic, puis `share()`, échoue en NotAllowedError. Le fichier doit donc être DÉJÀ en mémoire pour
+ * que `share()` parte de façon synchrone dans le geste. D'où la précharge au montage — restreinte
+ * au seul contexte qui en a besoin, pour ne pas infliger un second téléchargement du fichier à tous
+ * les autres (la carte de la même page le tire déjà une fois).
+ *
+ * Partout ailleurs (desktop, Android, Safari onglet) ce composant ne fait rien : le `<a download>`
+ * sous-jacent fonctionne, et c'est lui qui s'applique.
+ */
+function gpxDownload({ url, name }) {
+    let fichier = null;
+
+    // Le contexte à traiter, et lui seul : PWA installée + partage de fichiers réellement offert.
+    // `canShare({files})` est le seul test fiable — la présence de `navigator.share` ne dit rien du
+    // niveau 2 de l'API, et l'appel exige un contexte sécurisé (HTTPS), donc il est absent en http.
+    const enPwa = () => window.matchMedia?.('(display-mode: standalone)').matches
+        || window.navigator.standalone === true;
+
+    const partageOffert = () => {
+        if (!enPwa() || typeof navigator.canShare !== 'function') {
+            return false;
+        }
+        try {
+            return navigator.canShare({ files: [new File([''], name, { type: 'application/gpx+xml' })] });
+        } catch {
+            return false;
+        }
+    };
+
+    return {
+        // Pilote `x-bind` sur le lien : tant que le fichier n'est pas là, le lien natif reste la
+        // voie active. Aucun état d'attente affiché — le bouton ne ment jamais sur ce qu'il fera.
+        pret: false,
+
+        async init() {
+            if (!partageOffert()) {
+                return;
+            }
+            try {
+                const res = await fetch(url, { headers: { Accept: 'application/gpx+xml' } });
+                if (!res.ok) throw new Error('GPX indisponible');
+                fichier = new File([await res.blob()], name, { type: 'application/gpx+xml' });
+                this.pret = true;
+            } catch {
+                // Précharge en échec : on ne touche à rien, le lien natif reprend la main. Le piège
+                // de l'aperçu est alors possible, mais c'est le comportement d'avant — pas une
+                // régression, et mieux qu'un bouton sans effet.
+                fichier = null;
+            }
+        },
+
+        /** @returns {boolean} true si le clic a été traité ici (le lien ne doit pas naviguer). */
+        partager(event) {
+            if (!this.pret || !fichier) {
+                return false;
+            }
+            // Pas d'await avant share() : cf. l'activation transitoire, plus haut.
+            event.preventDefault();
+            navigator.share({ files: [fichier], title: name }).catch(() => {
+                // Une annulation de la feuille lève AbortError : c'est un refus de l'utilisateur,
+                // pas une erreur — et surtout, ne PAS retomber sur la navigation, qui le piégerait
+                // précisément dans l'aperçu qu'il vient de refuser.
+            });
+
+            return true;
+        },
+    };
+}
+
 // Enregistrement des composants Alpine via `alpine:init` (cohérent avec wysiwyg.js) → disponibles
 // quand Alpine évalue x-data, quel que soit l'ordre de chargement des modules Vite.
 document.addEventListener('alpine:init', () => {
+    window.Alpine.data('gpxDownload', gpxDownload);
     window.Alpine.data('gpxField', gpxField);
     window.Alpine.data('gpxMap', gpxMap);
     window.Alpine.data('gpxRoutesMap', gpxRoutesMap);
