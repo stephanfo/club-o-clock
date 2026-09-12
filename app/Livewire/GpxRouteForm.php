@@ -126,6 +126,21 @@ class GpxRouteForm extends Component
         $this->duplicateAcknowledged = true;
     }
 
+    /**
+     * ANNULE le dépôt en cours. Le composant Alpine gpxField est partagé avec SessionForm, dont le
+     * removeGpx() détache un parcours de la bibliothèque ; ici il n'y a rien à détacher, seulement
+     * un fichier en attente à oublier — avec la bannière de doublon qu'il avait déclenchée. Un
+     * parcours déjà enregistré n'est pas touché : le retrait ramène simplement au fichier d'origine.
+     */
+    public function removeGpx(): void
+    {
+        $this->gpxFile = null;
+        $this->gpxStats = $this->gpxRoute !== null ? $this->statsFromRoute($this->gpxRoute) : null;
+        $this->duplicateId = null;
+        $this->duplicateName = null;
+        $this->duplicateAcknowledged = false;
+    }
+
     public function save(GpxRouteService $service)
     {
         // Défense en profondeur : les actions Livewire ne repassent pas par mount().
