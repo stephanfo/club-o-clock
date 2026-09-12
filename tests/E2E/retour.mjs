@@ -67,6 +67,10 @@ const tous = [];
   const carteApres = page.locator(`a[href*="/seances/${cible}"]:visible`).first();
   s.check('au retour, la carte porte « Tu participes »',
           /participes/i.test(await carteApres.innerHTML().catch(() => '')));
+  // La capture doit MONTRER la carte à jour : sans ce cadrage, elle tombait sur le haut de la
+  // semaine et ne prouvait rien à l'œil.
+  await carteApres.evaluate((el) => el.scrollIntoView({ block: 'center' })).catch(() => {});
+  await page.waitForTimeout(500);
   await s.shot(page, 'r1-retour-planning-a-jour');
   s.checkJs(page);
   await ctx.close();
