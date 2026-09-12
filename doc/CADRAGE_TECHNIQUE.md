@@ -154,6 +154,11 @@ Lecture : *énoncé PRD → implication → où c'est tranché*. Les exigences s
   affichée dessous (cf. `gpxDownload` dans `resources/js/gpx.js`). Deux conséquences à connaître :
   - Le fichier doit être **préchargé** avant le clic. Safari perd l'activation transitoire au premier
     `await` : un `fetch` au moment du geste fait échouer `share()` en `NotAllowedError`.
+  - `navigator.canShare` n'existe qu'en **contexte sécurisé**. Sur une instance servie en `http://`
+    (un poste de développement joint par son IP locale, typiquement), le composant se met en retrait
+    et le lien natif reprend la main — donc **l'aperçu piégeant réapparaît**. Ce n'est pas une
+    régression mais le repli prévu : le correctif ne se teste qu'en HTTPS (tunnel ou production),
+    jamais depuis le réseau local en clair.
   - **L'envoi direct vers une app tierce de cartographie (Komoot, OpenRunner…) n'est pas accessible**
     depuis une PWA iOS. La feuille de partage n'expose pas l'UTI `com.topografix.gpx` aux apps
     tierces, quel que soit le type déclaré (`application/gpx+xml`, `application/octet-stream`, type
