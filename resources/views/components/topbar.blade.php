@@ -7,10 +7,15 @@
        retour. Le chevron tente d'abord un vrai retour arrière (window.clubBack, cf. resources/js/back.js)
        pour ramener d'où l'on vient avec ses filtres ; il ne suit le href que si l'on est entré
        directement sur la page (lien partagé, nouvel onglet) ou si le JS est indisponible.
+     - backTarget : URL que le bouton ANNONCE, quand l'écran peut être atteint par une redirection
+       après enregistrement (#26). Fournie, clubBack remonte directement à sa dernière occurrence
+       dans la pile plutôt qu'à l'entrée précédente — qui serait le formulaire qu'on vient de
+       quitter. À ne PAS fournir sur un écran atteignable depuis plusieurs endroits légitimes (une
+       fiche parcours ouverte depuis une séance) : le retour arrière ordinaire y est le bon geste.
      - slot `leading` : contenu à gauche à la place du chevron (ex. avatar du profil).
      - slot `trailing` : contenu à droite (ex. <x-alert-bell dark />).
      Priorité à gauche : slot leading > bouton back. --}}
-@props(['title' => '', 'sub' => null, 'back' => null, 'backLabel' => 'Retour'])
+@props(['title' => '', 'sub' => null, 'back' => null, 'backLabel' => 'Retour', 'backTarget' => null])
 <div class="topbar">
     @if (isset($leading))
         {{ $leading }}
@@ -21,7 +26,7 @@
              Le repli reste un lien ordinaire : rechargement pleine page, sans conséquence puisqu'il
              ne sert qu'en entrée directe (lien partagé, nouvel onglet), déjà hors SPA. --}}
         <a href="{{ $back }}" class="iconbtn" aria-label="{{ $backLabel }}"
-           onclick="return !window.clubBack?.()"><x-icon name="chevron-left" /></a>
+           onclick="return !window.clubBack?.({{ $backTarget ? "'".e($backTarget)."'" : '' }})"><x-icon name="chevron-left" /></a>
     @endif
     <div class="f1">
         <div class="topbar-title">{{ $title }}</div>

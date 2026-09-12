@@ -12,11 +12,14 @@
     <x-topbar :title="$edit ? 'Modifier le parcours' : 'Nouveau parcours'"
               :sub="$edit ? $gpxRoute->name : 'Bibliothèque de parcours'"
               :back="route('gpx-routes.index')"
+              :back-target="route('gpx-routes.index')"
               back-label="Retour parcours" />
 
     <div class="dk-topbar">
+        {{-- Cible passée à clubBack : l'enregistrement redirige vers cet écran, qui restait donc
+             sous lui dans la pile — trois sauvegardes demandaient trois retours (#26). --}}
         <a href="{{ route('gpx-routes.index') }}" class="btn btn-ghost btn-sm"
-           onclick="return !window.clubBack?.()">
+           onclick="return !window.clubBack?.('{{ route('gpx-routes.index') }}')">
             <x-icon name="chevron-left" :size="15" /> Parcours
         </a>
         <div class="f1">

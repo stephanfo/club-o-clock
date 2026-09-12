@@ -85,6 +85,7 @@ Le design system existe : tout écran doit lui être fidèle.
 - **Admin sur mobile : assumé desktop.** Pas d'entrée de navigation admin sur mobile — ces écrans ne sont pas conçus pour ce format ; ne pas en ajouter sans les repenser.
 - **CTA d'action serveur** : toujours `wire:loading.attr="disabled"` + `wire:target` (latence du mutualisé, anti double-tap).
 - **Retour** (chevron de topbar, bouton « ← » desktop) : `onclick="return !window.clubBack?.()"` + `href` de repli, et **jamais `wire:navigate` sur ce lien** — il navigue dès `mousedown`, donc avant l'`onclick`, et le repli partirait toujours. Cf. [resources/js/back.js](resources/js/back.js).
+  - Sur un écran **atteignable par une redirection après enregistrement**, passer la destination annoncée en argument — `clubBack('{{ $url }}')`, ou `:back-target` sur `<x-topbar>`. Le retour saute alors les formulaires laissés dans la pile par le `pushState` de `navigate`, au lieu d'y retomber. **Ne pas** en mettre sur un écran ouvert depuis plusieurs endroits légitimes (une fiche parcours atteinte depuis une séance) : le retour arrière ordinaire y est le bon geste.
 - **Ne jamais empiler `wire:click` et `wire:navigate` sur le même clic** : la course est non déterministe (bugs vus en production). Porter l'état dans l'URL, lu au `mount()`.
 
 ## Ce qu'il NE faut PAS faire

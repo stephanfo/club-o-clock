@@ -98,9 +98,12 @@
              fondu (même dégradé vert), le libellé n'est donc pas nécessaire ici. --}}
         <div class="topbar topbar-fiche">
             {{-- Retour historique d'abord (restaure la vue et les filtres du planning tels quels),
-                 $planningUrl en repli. Pas de wire:navigate : cf. components/topbar.blade.php. --}}
+                 $planningUrl en repli. Pas de wire:navigate : cf. components/topbar.blade.php.
+                 $planningUrl est aussi passée en CIBLE : après « éditer → enregistrer », l'entrée
+                 précédente est le formulaire, laissé dans la pile par la redirection (#26). Cible
+                 absente de la pile (on vient de l'accueil, d'une fiche enfant…) → retour ordinaire. --}}
             <a href="{{ $planningUrl }}" class="iconbtn" aria-label="Retour planning"
-               onclick="return !window.clubBack?.()"><x-icon name="chevron-left" /></a>
+               onclick="return !window.clubBack?.('{{ $planningUrl }}')"><x-icon name="chevron-left" /></a>
             <span class="topbar-spacer"></span>
             {{-- Barre composée à la main (pas <x-topbar>) : cf. la même insertion sur l'accueil. --}}
             <x-demo-badge mode="bar" />
@@ -277,7 +280,7 @@
     <div class="fiche-desktop">
         <div class="dk-topbar">
             <a href="{{ $planningUrl }}" class="btn btn-ghost btn-sm"
-               onclick="return !window.clubBack?.()"><x-icon name="chevron-left" :size="15" /> Planning</a>
+               onclick="return !window.clubBack?.('{{ $planningUrl }}')"><x-icon name="chevron-left" :size="15" /> Planning</a>
             <span class="meta">{{ $dateLine }}</span>
             @if ($session->isCancelled())
                 <span class="chip chip-sm chip-cancel"><x-icon name="x" :size="12" /> Annulée</span>

@@ -38,6 +38,7 @@ node tests/E2E/run.mjs          # les 3 suites non destructives (verdict agrég�
 
 node tests/E2E/scenarios.mjs    # S1–S5   gardes d'inscription et bascule de rôle
 node tests/E2E/parcours.mjs     # S7–S17, S21  parcours métier, cloisonnement, alertes parent
+node tests/E2E/retour.mjs       # R1–R3   navigation « retour » : pile d'historique et fraîcheur
 node tests/E2E/comptes.mjs      # S18–S20 messages d'auth, correction d'email, suspension d'accès
 node tests/E2E/responsive.mjs   # S6      bascule mobile/desktop
 ```

@@ -32,13 +32,14 @@
     <x-topbar :title="$edit ? 'Modifier '.$titleWord : 'Créer '.$titleWord"
               :sub="$edit ? $session->title.' · édition isolée' : 'Création autonome · pas un modèle'"
               :back="$edit ? route('sessions.show', $session) : null"
+              :back-target="$edit ? route('sessions.show', $session) : null"
               back-label="Retour fiche" />
     {{-- ─── Topbar desktop (porté de screen-creation.jsx CreationDesktop) — masquée sur mobile. --}}
     <div class="dk-topbar">
         {{-- Cf. topbar mobile : pas de retour en création, c'est un écran de navigation. --}}
         @if ($edit)
             <a href="{{ route('sessions.show', $session) }}" class="btn btn-ghost btn-sm"
-               onclick="return !window.clubBack?.()">
+               onclick="return !window.clubBack?.('{{ route('sessions.show', $session) }}')">
                 <x-icon name="chevron-left" :size="15" /> Fiche
             </a>
         @endif

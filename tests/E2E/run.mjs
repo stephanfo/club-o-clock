@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { sql } from './lib.mjs';
 
 const HERE = new URL('.', import.meta.url).pathname;
-const suites = ['scenarios.mjs', 'parcours.mjs', 'comptes.mjs', 'responsive.mjs'];
+const suites = ['scenarios.mjs', 'parcours.mjs', 'retour.mjs', 'comptes.mjs', 'responsive.mjs'];
 const echecs = [];
 
 /**

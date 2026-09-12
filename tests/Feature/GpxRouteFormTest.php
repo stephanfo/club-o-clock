@@ -111,6 +111,48 @@ class GpxRouteFormTest extends TestCase
         $this->assertSame('Renommé', $route->fresh()->name);
     }
 
+    /**
+     * #26 — save() redirigeait TOUJOURS vers `gpx-routes.edit`, y compris quand on y était déjà :
+     * chaque enregistrement empilait une entrée d'historique identique (la redirection `navigate`
+     * fait un pushState). Après trois sauvegardes il fallait trois retours pour sortir de l'écran,
+     * et les deux premiers rendaient une version périmée du même formulaire.
+     */
+    public function test_saving_an_existing_route_does_not_redirect_to_itself(): void
+    {
+        Storage::fake('local');
+        $coach = User::factory()->coach()->create();
+        $route = app(GpxRouteService::class)->createFromUpload(
+            UploadedFile::fake()->createWithContent('v1.gpx', '<gpx>v1</gpx>'),
+            ['name' => 'Trace'],
+            null,
+            $coach,
+        );
+
+        Livewire::actingAs($coach)->test(GpxRouteForm::class, ['gpxRoute' => $route])
+            ->set('name', 'Renommé')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertNoRedirect();
+
+        // Contrôle positif : l'enregistrement a bien eu lieu, on ne teste pas un formulaire inerte.
+        $this->assertSame('Renommé', $route->fresh()->name);
+    }
+
+    /** Contrepartie : la CRÉATION doit bien rediriger, l'URL devant porter l'id du parcours créé. */
+    public function test_creating_a_route_redirects_to_its_edit_screen(): void
+    {
+        Storage::fake('local');
+        $coach = User::factory()->coach()->create();
+
+        Livewire::actingAs($coach)->test(GpxRouteForm::class)
+            ->set('name', 'Nouvelle trace')
+            ->set('gpxFile', UploadedFile::fake()->create('boucle.gpx', 42))
+            ->set('gpxStats', $this->clientStats())
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('gpx-routes.edit', GpxRoute::where('name', 'Nouvelle trace')->firstOrFail()));
+    }
+
     public function test_out_of_range_geo_nulls_columns_but_still_creates_route(): void
     {
         Storage::fake('local');
