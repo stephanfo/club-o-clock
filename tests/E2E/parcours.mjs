@@ -1,6 +1,9 @@
 // Scénarios complémentaires — parcours critiques et cas limites (PLAN_TESTS.md §1 à §8).
 // NON destructifs : chaque scénario restaure ce qu'il modifie. Voir destructif.mjs pour le reste.
 import { launch, session, fiche, sql, seance, seanceFuture, ligne, barreMobile, Scenario, MOBILE, DESKTOP, BASE, repereJournaux, purgeJournaux } from './lib.mjs';
+import { writeFileSync, unlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const browser = await launch();
 const tous = [];
@@ -635,6 +638,78 @@ async function ongletMobile(page, nom) {
 
   purgeJournaux(repere);
   if (nonLues) sql(`UPDATE notification_outbox SET read_at=NULL WHERE id IN (${nonLues})`);
+  tous.push(s.report());
+}
+
+// ── S22 · Retirer un GPX déposé (issue #43) ───────────────────────────
+//
+// Le composant Alpine `gpxField` est partagé entre le formulaire de séance et celui de la
+// bibliothèque : son bouton « retirer » appelle `$wire.removeGpx()` sur les deux hôtes. Tant que la
+// méthode n'existait que côté séance, le clic levait `MethodNotFoundException` — une modale
+// « erreur 500 » que PHPUnit ne peut pas voir, puisque le chemin part d'un clic Alpine.
+//
+// NON destructif : on dépose un fichier et on le retire, sans jamais enregistrer. Rien n'atteint la
+// base ni le disque (le temporaire Livewire est balayé par sa propre purge).
+{
+  const s = new Scenario('S22 · Parcours — retirer le GPX déposé');
+
+  const gpx = join(tmpdir(), `coc-e2e-${process.pid}.gpx`);
+  writeFileSync(gpx, `<?xml version="1.0"?><gpx version="1.1" creator="e2e"><trk><name>E2E</name><trkseg>
+<trkpt lat="47.5500" lon="1.3000"><ele>62</ele></trkpt>
+<trkpt lat="47.5600" lon="1.3200"><ele>110</ele></trkpt>
+<trkpt lat="47.5700" lon="1.3400"><ele>95</ele></trkpt>
+</trkseg></trk></gpx>`);
+
+  const { ctx, page } = await session(browser, 'vincent@demo.club', DESKTOP);
+
+  const erreurs5xx = [];
+  page.on('response', r => { if (r.status() >= 500) erreurs5xx.push(`${r.status()} ${r.url()}`); });
+
+  const retirer = page.locator('button[aria-label="Retirer le GPX"]');
+
+  // ── Création : le retrait ramène le champ à vide ──
+  await page.goto(`${BASE}/parcours/creer`, { waitUntil: 'networkidle' });
+  await page.setInputFiles('input[type=file][accept=".gpx"]', gpx);
+  await page.waitForTimeout(2500);
+
+  // Contrôle positif : sans dépôt effectif, l'assertion de retrait ne vaudrait rien.
+  const depose = s.check('création — le GPX est déposé (bouton « retirer » présent)',
+    await retirer.isVisible().catch(() => false));
+
+  if (depose) {
+    await retirer.click();
+    await page.waitForTimeout(1500);
+    s.check('création — aucune réponse HTTP 5xx au retrait', erreurs5xx.length === 0, erreurs5xx.join(' | '));
+    s.check('création — le champ est revenu à l\'état « aucun fichier »',
+      !(await retirer.isVisible().catch(() => false)));
+    await s.shot(page, 's22-retrait-creation');
+  }
+
+  // ── Édition : le retrait d'un remplaçant ne vide pas la fiche ──
+  // Le parcours enregistré garde sa trace ; seul le fichier en attente est oublié.
+  const [routeId, routeNom] = ligne('SELECT id, name FROM gpx_routes WHERE archived_at IS NULL ORDER BY id LIMIT 1',
+    'un parcours de la bibliothèque');
+  erreurs5xx.length = 0;
+
+  await page.goto(`${BASE}/parcours/${routeId}/modifier`, { waitUntil: 'networkidle' });
+  await page.setInputFiles('input[type=file][accept=".gpx"]', gpx);
+  await page.waitForTimeout(2500);
+
+  if (s.check('édition — le remplaçant est déposé', await retirer.isVisible().catch(() => false))) {
+    await retirer.click();
+    await page.waitForTimeout(1500);
+    s.check('édition — aucune réponse HTTP 5xx au retrait', erreurs5xx.length === 0, erreurs5xx.join(' | '));
+
+    const txt = await page.locator('body').innerText();
+    s.check('édition — la fiche garde le parcours enregistré', txt.includes(routeNom), routeNom);
+    await s.shot(page, 's22-retrait-edition');
+  }
+
+  s.checkJs(page);
+  await ctx.close();
+
+  // Le formulaire n'a jamais été enregistré : rien à restaurer en base, seul le fichier local part.
+  unlinkSync(gpx);
   tous.push(s.report());
 }
 
