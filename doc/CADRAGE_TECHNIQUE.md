@@ -145,6 +145,24 @@ Lecture : *énoncé PRD → implication → où c'est tranché*. Les exigences s
   rôle du **code à usage unique** joint au magic link (PRD §4.1.1). Le service worker est enregistré
   par les layouts `app` **et** `guest` : sans quoi un visiteur qui installe l'app depuis l'écran de
   connexion n'a aucun SW avant sa première page authentifiée.
+- **Téléchargement d'un fichier depuis la PWA iOS** (constaté sur iPhone, septembre 2026). En
+  `display: standalone`, WebKit n'a ni gestionnaire de téléchargement ni chrome : il présente le
+  fichier en **aperçu plein écran, sans aucune sortie** — l'utilisateur est piégé jusqu'au kill de
+  l'application. Ni l'attribut `download`, ni le `Content-Disposition`, ni le type MIME n'y changent
+  quoi que ce soit : les trois ont été essayés. La voie retenue est **`navigator.share({ files })`**,
+  qui délègue à la feuille de partage du système — celle-ci a un bouton Annuler et laisse la PWA
+  affichée dessous (cf. `gpxDownload` dans `resources/js/gpx.js`). Deux conséquences à connaître :
+  - Le fichier doit être **préchargé** avant le clic. Safari perd l'activation transitoire au premier
+    `await` : un `fetch` au moment du geste fait échouer `share()` en `NotAllowedError`.
+  - **L'envoi direct vers une app tierce de cartographie (Komoot, OpenRunner…) n'est pas accessible**
+    depuis une PWA iOS. La feuille de partage n'expose pas l'UTI `com.topografix.gpx` aux apps
+    tierces, quel que soit le type déclaré (`application/gpx+xml`, `application/octet-stream`, type
+    vide, `application/xml` — tous essayés, aucun ne les propose). Et la contourner en ouvrant le
+    fichier **hors** de la PWA (`window.open('_blank')`) échoue pour la raison ci-dessus : le pot de
+    cookies distinct fait que la fenêtre ouverte n'a pas la session et n'affiche rien, le GPX étant
+    servi derrière `auth+verified`. Le chemin documenté est donc : **partager → Enregistrer dans
+    Fichiers → partager depuis Fichiers vers l'app**, qui, lui, fonctionne. Limite assumée, du même
+    ordre que celle du push iOS.
 
 ### 4.2 Souveraineté UE / RGPD / AGPL / self-hosting (PRD §1.4, §6)
 - **Hébergement UE strict** (Paris/Francfort), données + backups en UE → mutualisé OVH FR + services
@@ -813,6 +831,9 @@ et compromis ops **assumés et documentés** plutôt qu'ignorés.
 ## 13. Risques, dette assumée, réexamen V2 / VPS
 
 - **Push iOS** : limité à Safari 16.4+ avec PWA installée (déjà acté PRD) ; email = fallback documenté.
+- **Envoi d'un GPX vers une app tierce depuis la PWA iOS** : inaccessible (§4.1). Le téléchargement
+  passe par la feuille de partage du système ; l'import dans Komoot & co. demande un détour par
+  l'app Fichiers. Limite WebKit, aucun contournement côté application.
 - **Pas de temps réel** : rafraîchissement manuel (déjà autorisé PRD).
 - **Ops manuelles** : déploiement, vérification des dumps, surveillance du volume objets/logs reposent
   sur la discipline du mainteneur.
