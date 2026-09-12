@@ -24,7 +24,7 @@
                 </div>
             </x-banner>
             @foreach ($cards as $c)
-                @include('livewire.partials.child-card', ['c' => $c, 'tz' => $tz, 'pad' => 14])
+                @include('livewire.partials.child-card', ['c' => $c, 'tz' => $tz, 'pad' => 14, 'scope' => 'm'])
             @endforeach
         </div>
     </div>
@@ -48,7 +48,7 @@
                 </x-banner>
                 <div class="children-grid">
                     @foreach ($cards as $c)
-                        @include('livewire.partials.child-card', ['c' => $c, 'tz' => $tz, 'pad' => 16])
+                        @include('livewire.partials.child-card', ['c' => $c, 'tz' => $tz, 'pad' => 16, 'scope' => 'dk'])
                     @endforeach
                 </div>
             </div>
