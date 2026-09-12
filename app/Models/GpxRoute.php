@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 // Parcours GPX réutilisable (PRD §4.20, §5.1). Objet de première classe : créable sans séance,
 // référencé par N sessions. Nommé GpxRoute (pas Route) pour éviter la collision avec la facade
@@ -78,6 +79,21 @@ class GpxRoute extends Model
         'elevation_profile' => 'array',
         'archived_at' => 'datetime',
     ];
+
+    /**
+     * Nom du fichier servi au téléchargement — slugifié et suffixé `.gpx`.
+     *
+     * Porté par le modèle et non par le contrôleur parce que les vues en ont besoin : le lien de
+     * téléchargement doit annoncer dans son attribut `download` exactement le nom que le contrôleur
+     * met en `Content-Disposition`, sinon iOS renomme le fichier enregistré (#44).
+     */
+    public function downloadFilename(): string
+    {
+        $base = $this->gpx_original_name ?: $this->name;
+        $name = Str::of($base)->basename('.gpx')->slug()->value();
+
+        return ($name !== '' ? $name : 'parcours-'.$this->id).'.gpx';
+    }
 
     public function isArchived(): bool
     {

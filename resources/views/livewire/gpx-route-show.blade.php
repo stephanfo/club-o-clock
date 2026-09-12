@@ -170,10 +170,7 @@
             @endif
 
             {{-- ═══ Téléchargement + OpenRunner ═══ --}}
-            <a class="btn btn-ghost btn-block" href="{{ route('gpx-routes.gpx', $r) }}">
-                <x-icon name="download" :size="15" /> Télécharger le GPX
-                @if ($r->gpx_size_ko)<span class="meta" style="font-size:12px;margin-left:4px">· {{ $r->gpx_size_ko }} Ko</span>@endif
-            </a>
+            <x-gpx-download :route="$r" />
 
             @if ($r->openrunner_public_url)
                 <a class="btn btn-ghost btn-block" href="{{ $r->openrunner_public_url }}" target="_blank" rel="noopener noreferrer">

@@ -227,4 +227,91 @@ class GpxUiTest extends TestCase
             ->assertOk()
             ->assertSee(route('gpx-routes.show', $route), false);
     }
+
+    /**
+     * En PWA iOS (`display: standalone`), un lien nu vers une réponse `attachment` déclenche une
+     * navigation de premier niveau : WebKit affiche sa vue d'aperçu, sans chrome pour en sortir —
+     * l'utilisateur est piégé jusqu'au kill de l'app (#44). `download` fait passer WebKit en mode
+     * téléchargement, sans quitter la page. La valeur doit être celle que le contrôleur sert,
+     * sinon iOS renomme le fichier.
+     */
+    public function test_the_download_link_carries_the_served_filename(): void
+    {
+        Storage::fake('local');
+        $route = GpxRoute::factory()->create([
+            'gpx_path' => 'gpx/x.gpx',
+            'gpx_original_name' => 'Boucle de la Loire.gpx',
+        ]);
+        Storage::disk('local')->put('gpx/x.gpx', '<gpx>data</gpx>');
+
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Sortie avec parcours',
+            'discipline_id' => $this->discipline()->id,
+            'start_at' => Carbon::now()->addDay(), 'duration_min' => 90,
+            'route_id' => $route->id,
+        ]);
+
+        $member = User::factory()->create(['email_verified_at' => now()]);
+        $attribute = 'download="'.$route->downloadFilename().'"';
+
+        // Le nom annoncé dans la vue est bien celui que le contrôleur sert.
+        $this->actingAs($member)->get(route('gpx-routes.gpx', $route))
+            ->assertHeader('content-disposition', 'attachment; filename='.$route->downloadFilename());
+
+        // Les deux écrans qui offrent le téléchargement le portent.
+        $this->actingAs($member)->get(route('gpx-routes.show', $route))
+            ->assertOk()->assertSee($attribute, false);
+
+        $this->actingAs($member)->get(route('sessions.show', $session))
+            ->assertOk()->assertSee($attribute, false);
+    }
+
+    /**
+     * `download` ne suffit pas : en PWA iOS installée, WebKit l'ignore et présente quand même le
+     * fichier en aperçu plein écran sans issue (#44, constaté sur iPhone). Le relais est la feuille
+     * de partage du système, câblée par le composant Alpine `gpxDownload` — dont la précharge exige
+     * l'URL ET le nom du fichier. Ce test garde le câblage : sans lui, le bouton retombe
+     * silencieusement sur le lien natif, donc sur le piège, et aucun test PHP ne s'en aperçoit.
+     */
+    public function test_the_download_button_wires_the_native_share_sheet(): void
+    {
+        Storage::fake('local');
+        $route = GpxRoute::factory()->create([
+            'gpx_path' => 'gpx/x.gpx',
+            'gpx_original_name' => 'Boucle de la Loire.gpx',
+        ]);
+        Storage::disk('local')->put('gpx/x.gpx', '<gpx>data</gpx>');
+
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Sortie avec parcours',
+            'discipline_id' => $this->discipline()->id,
+            'start_at' => Carbon::now()->addDay(), 'duration_min' => 90,
+            'route_id' => $route->id,
+        ]);
+
+        $member = User::factory()->create(['email_verified_at' => now()]);
+        $cablage = "gpxDownload({ url: '".route('gpx-routes.gpx', $route)."', name: '".$route->downloadFilename()."' })";
+
+        foreach ([route('gpx-routes.show', $route), route('sessions.show', $session)] as $url) {
+            $this->actingAs($member)->get($url)
+                ->assertOk()
+                ->assertSee($cablage, false)
+                ->assertSee('x-on:click="partager($event)"', false);
+        }
+    }
+
+    /** Le nom est slugifié et suffixé : ni espace ni accent, que iOS reprend tel quel. */
+    public function test_the_download_filename_is_slugged(): void
+    {
+        $route = GpxRoute::factory()->create(['gpx_original_name' => 'Boucle de la Loire.gpx']);
+        $this->assertSame('boucle-de-la-loire.gpx', $route->downloadFilename());
+
+        // Repli sur le nom du parcours quand le fichier d'origine n'a pas de nom.
+        $sansNom = GpxRoute::factory()->create(['gpx_original_name' => null, 'name' => 'Côte du Mont']);
+        $this->assertSame('cote-du-mont.gpx', $sansNom->downloadFilename());
+
+        // Dernier repli : un nom qui ne slugifie en rien ne doit pas produire un fichier « .gpx ».
+        $vide = GpxRoute::factory()->create(['gpx_original_name' => null, 'name' => '???']);
+        $this->assertSame('parcours-'.$vide->id.'.gpx', $vide->downloadFilename());
+    }
 }
