@@ -1,6 +1,6 @@
 // Scénarios complémentaires — parcours critiques et cas limites (PLAN_TESTS.md §1 à §8).
 // NON destructifs : chaque scénario restaure ce qu'il modifie. Voir destructif.mjs pour le reste.
-import { launch, session, fiche, sql, seance, seanceFuture, barreMobile, Scenario, MOBILE, DESKTOP, BASE, repereJournaux, purgeJournaux } from './lib.mjs';
+import { launch, session, fiche, sql, seance, seanceFuture, ligne, barreMobile, Scenario, MOBILE, DESKTOP, BASE, repereJournaux, purgeJournaux } from './lib.mjs';
 
 const browser = await launch();
 const tous = [];
@@ -29,27 +29,48 @@ const tous = [];
   const s = new Scenario('S8 · Quota NAT (1/sem) — dialog de dépassement');
   const { ctx, page } = await session(browser, 'marie@demo.club', MOBILE);
 
-  // Cible dérivée, pas codée en dur : il faut une séance FUTURE portant le même tag de quota
-  // qu'une séance à laquelle Marie participe déjà DANS LA MÊME SEMAINE — c'est cette collision qui
-  // déclenche le dialog. L'ancienne version pointait les ids 8 et 36, dont la position dans la
-  // semaine dépend du jour du seed.
+  // Le scénario CONSTRUIT sa collision de quota au lieu de l'espérer dans le jeu de démo (#46).
+  //
+  // L'ancienne version cherchait une séance future dont le quota était DÉJÀ consommé par une
+  // inscription du seed. Or le seed place l'inscription de Marie en début de semaine : la collision
+  // n'existe que tant qu'il reste, la même semaine, une séance future au même tag — soit du lundi au
+  // mercredi. Le scénario était vert en début de semaine et rouge ensuite, sans qu'une ligne change.
+  //
+  // On prend donc une PAIRE de séances futures (même tag, même semaine ISO, toutes deux ouvertes à
+  // Marie et non pleines) : A sert à consommer le quota, B est la cible. Les deux sont restaurées en
+  // fin de scénario. Paire et non deux `seance()` séparés : leur cohérence mutuelle est justement
+  // ce qui déclenche le dialog.
   const marie = sql("SELECT id FROM users WHERE email='marie@demo.club'");
-  const cible = seance(`kind='training' AND cancelled_at IS NULL AND start_at > NOW()
-      AND quota_tag_id IS NOT NULL
-      -- Marie doit pouvoir s'y inscrire : la séance cible une de ses catégories actives (§4.5),
-      -- sinon le bouton n'apparaît pas du tout et ce n'est plus le quota qu'on teste.
-      AND EXISTS (SELECT 1 FROM session_category sc JOIN user_category uc ON uc.category_id=sc.category_id
-                  WHERE sc.session_id=sessions.id AND uc.user_id=${marie})
-      -- ... et son quota est déjà consommé cette semaine-là sur le même tag par une AUTRE séance.
-      -- Le « s2.id <> sessions.id » est essentiel : sans lui, une séance à laquelle Marie participe
-      -- déjà se sélectionne elle-même, le scénario supprime son inscription juste après, et le
-      -- quota redevient libre — plus de dialog, l'inscription passe directement.
-      AND EXISTS (
-        SELECT 1 FROM registrations r2 JOIN sessions s2 ON s2.id = r2.session_id
-        WHERE r2.user_id = ${marie} AND r2.status = 'participating'
-          AND s2.id <> sessions.id
-          AND s2.quota_tag_id = sessions.quota_tag_id
-          AND YEARWEEK(s2.start_at, 3) = YEARWEEK(sessions.start_at, 3))`);
+  const place = (t) => `(${t}.capacity IS NULL OR (SELECT COUNT(*) FROM registrations r
+      WHERE r.session_id=${t}.id AND r.status='participating') < ${t}.capacity)`;
+  const ouverte = (t) => `EXISTS (SELECT 1 FROM session_category c JOIN user_category u
+      ON u.category_id=c.category_id WHERE c.session_id=${t}.id AND u.user_id=${marie})`;
+
+  const [consomme, cible] = ligne(`
+    SELECT a.id aid, b.id bid
+    FROM sessions a
+    JOIN sessions b ON b.quota_tag_id = a.quota_tag_id
+                   AND YEARWEEK(b.start_at, 3) = YEARWEEK(a.start_at, 3)
+                   AND b.id <> a.id
+    WHERE a.kind='training' AND a.cancelled_at IS NULL AND a.start_at > NOW() AND a.quota_tag_id IS NOT NULL
+      AND b.kind='training' AND b.cancelled_at IS NULL AND b.start_at > NOW()
+      AND ${ouverte('a')} AND ${ouverte('b')} AND ${place('a')} AND ${place('b')}
+    ORDER BY a.start_at, b.start_at LIMIT 1`,
+    'une paire de séances en collision de quota').map(Number);
+
+  // État de Marie sur A, pour le rendre tel quel ensuite. '' = elle n'y était pas inscrite.
+  const etatA = sql(`SELECT status, IFNULL(waitlist_reason,'') m FROM registrations
+      WHERE session_id=${consomme} AND user_id=${marie}`);
+  const [statutA, motifA] = etatA ? etatA.split(' | ') : ['', ''];
+
+  // On consomme le quota sur A — c'est ce que le scénario suppose, et il l'établit lui-même.
+  if (!etatA) {
+    sql(`INSERT INTO registrations (session_id, user_id, status, registered_at, created_at, updated_at)
+         VALUES (${consomme}, ${marie}, 'participating', NOW(), NOW(), NOW())`);
+  } else if (statutA !== 'participating') {
+    sql(`UPDATE registrations SET status='participating', waitlist_reason=NULL
+         WHERE session_id=${consomme} AND user_id=${marie}`);
+  }
 
   const dejaNat = sql(`SELECT COUNT(*) n FROM registrations r JOIN sessions s ON s.id=r.session_id
       WHERE r.user_id=${marie} AND r.status='participating'
@@ -100,6 +121,18 @@ const tous = [];
   s.check('état restauré (statut)', restaure === avant, `${restaure || 'aucun'} (attendu ${avant || 'aucun'})`);
   s.check('état restauré (motif de file)', restaureMotif === avantMotif, `${restaureMotif || 'aucun'} (attendu ${avantMotif || 'aucun'})`);
 
+  // ... et la séance A, dont le scénario s'est servi pour consommer le quota.
+  if (!etatA) {
+    sql(`DELETE FROM registrations WHERE session_id=${consomme} AND user_id=${marie}`);
+  } else {
+    sql(`UPDATE registrations SET status='${statutA}', waitlist_reason=${motifA ? `'${motifA}'` : 'NULL'}
+         WHERE session_id=${consomme} AND user_id=${marie}`);
+  }
+  const restaureA = sql(`SELECT status, IFNULL(waitlist_reason,'') m FROM registrations
+      WHERE session_id=${consomme} AND user_id=${marie}`);
+  s.check('état restauré (séance ayant consommé le quota)', restaureA === etatA,
+          `${restaureA || 'aucune'} (attendu ${etatA || 'aucune'})`);
+
   tous.push(s.report());
   await ctx.close();
 }
@@ -125,18 +158,43 @@ const tous = [];
 
 // ── S10 · Séance annulée : bandeau, aucune action (PRD §4.7) ──────────
 {
-  // Cible dérivée : la séance annulée du jeu de démo n'a pas d'id stable (l'ancienne version
-  // pointait la 15, qui n'est plus annulée sur une base fraîche — le scénario passait alors sur un
-  // faux positif, « annul » matchant un autre mot de la page).
-  const annulee = seance('cancelled_at IS NOT NULL AND start_at > NOW()');
+  // Le scénario ANNULE lui-même sa séance au lieu d'en chercher une annulée (#35, #46).
+  //
+  // Le jeu de démo n'annule qu'une séance, et `start_at > NOW()` la disqualifie dès qu'elle est
+  // passée — le scénario levait alors, comme S8 et S16 avant lui. Contrôler l'état apporte en prime
+  // ce qui manquait : l'assertion « pas d'action d'inscription » ne vaut rien sans la preuve qu'une
+  // action était proposée AVANT l'annulation (convention du harnais : toute assertion négative
+  // s'apparie à un contrôle positif). Sur une séance annulée trouvée telle quelle, cette preuve
+  // était hors d'atteinte.
+  const marie10 = Number(sql("SELECT id FROM users WHERE email='marie@demo.club'"));
+  const annulee = seance(`kind='training' AND cancelled_at IS NULL AND start_at > NOW()
+      AND (capacity IS NULL OR (SELECT COUNT(*) FROM registrations r
+           WHERE r.session_id=sessions.id AND r.status='participating') < capacity)
+      AND EXISTS (SELECT 1 FROM session_category c JOIN user_category u ON u.category_id=c.category_id
+                  WHERE c.session_id=sessions.id AND u.user_id=${marie10})
+      AND NOT EXISTS (SELECT 1 FROM registrations r2 WHERE r2.session_id=sessions.id AND r2.user_id=${marie10})`);
   const s = new Scenario(`S10 · Séance annulée (${annulee}) — bandeau et gel des actions`);
   const { ctx, page } = await session(browser, 'marie@demo.club', MOBILE);
+
+  // Contrôle positif, AVANT l'annulation : la séance propose bien une inscription.
+  await fiche(page, annulee);
+  const barreAvant = await barreMobile(page);
+  s.check('contrôle positif : inscription proposée avant annulation',
+          /s'inscrire|liste d'attente/i.test(barreAvant || ''), barreAvant?.slice(0, 60));
+
+  const admin = Number(sql("SELECT id FROM users WHERE email='admin@demo.club'"));
+  sql(`UPDATE sessions SET cancelled_at=NOW(), cancelled_by=${admin} WHERE id=${annulee}`);
+
   await fiche(page, annulee);
   const txt = (await page.locator('body').innerText()).toLowerCase();
   s.check('bandeau d\'annulation présent', /annul/i.test(txt));
   const barre = await barreMobile(page);
   s.check('pas d\'action d\'inscription', !/s'inscrire|se désinscrire/i.test(barre || ''), barre?.slice(0, 60));
   await s.shot(page, 's10-annulee');
+
+  sql(`UPDATE sessions SET cancelled_at=NULL, cancelled_by=NULL WHERE id=${annulee}`);
+  s.check('état restauré (séance à nouveau active)',
+          sql(`SELECT COUNT(*) n FROM sessions WHERE id=${annulee} AND cancelled_at IS NULL`) === '1');
   tous.push(s.report());
   await ctx.close();
 }
@@ -261,19 +319,43 @@ const tous = [];
 
 // ── S16 · Liste d'attente sur séance pleine (PRD §4.9) ────────────────
 {
-  // Séance dérivée : future, SATURÉE, ciblant une catégorie de Noah, et où il n'est pas inscrit.
+  // Le scénario SATURE lui-même sa séance au lieu d'en chercher une déjà pleine (#35).
+  //
+  // Le jeu de démo ne sature qu'une séance — « Natation samedi matin — jeunes » — et `seance()`
+  // exige `start_at > NOW()` : dès ce samedi passé, plus rien ne satisfaisait le prédicat et le
+  // scénario levait, emportant la fin du fichier. On prend donc une séance future à capacité
+  // ouverte à Noah, et on la remplit : capacité abaissée au nombre de participants, complété d'un
+  // inscrit si elle était vide (une capacité à 0 saturerait aussi, mais testerait un cas dégénéré
+  // que l'application ne produit jamais). Tout est restauré en fin de scénario.
   const noah = Number(sql("SELECT id FROM users WHERE email='noah.faure@demo.club'"));
   const pleine = seance(`kind='training' AND cancelled_at IS NULL AND start_at > NOW() AND capacity IS NOT NULL
-      AND (SELECT COUNT(*) FROM registrations r WHERE r.session_id=sessions.id AND r.status='participating') >= capacity
       AND EXISTS (SELECT 1 FROM session_category k JOIN user_category uc ON uc.category_id=k.category_id
                   WHERE k.session_id=sessions.id AND uc.user_id=${noah})
       AND NOT EXISTS (SELECT 1 FROM registrations r2 WHERE r2.session_id=sessions.id AND r2.user_id=${noah})`);
 
   const s = new Scenario(`S16 · Séance pleine (${pleine}) — rejoindre puis quitter la file`);
   const journaux = repereJournaux();
+  const capOrigine = sql(`SELECT capacity c FROM sessions WHERE id=${pleine}`);
+
+  // Le bouche-trou est un membre RÉELLEMENT éligible à la séance : saturer avec n'importe qui
+  // laisserait un état que l'application ne peut pas produire, et fausserait les écrans.
+  let bouchon = null;
+  if (sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${pleine} AND status='participating'`) === '0') {
+    bouchon = ligne(`SELECT u.id uid FROM users u
+        JOIN user_category uc ON uc.user_id = u.id
+        JOIN session_category k ON k.category_id = uc.category_id AND k.session_id = ${pleine}
+        WHERE u.id <> ${noah} AND u.is_active = 1 AND u.athlete_access_suspended = 0
+          AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.session_id = ${pleine} AND r.user_id = u.id)
+        LIMIT 1`, `un membre éligible à la séance ${pleine}`)[0];
+    sql(`INSERT INTO registrations (session_id, user_id, status, registered_at, created_at, updated_at)
+         VALUES (${pleine}, ${bouchon}, 'participating', NOW(), NOW(), NOW())`);
+  }
+  sql(`UPDATE sessions SET capacity = (SELECT COUNT(*) FROM registrations r
+       WHERE r.session_id = ${pleine} AND r.status = 'participating') WHERE id = ${pleine}`);
+
   const cap = sql(`SELECT capacity c FROM sessions WHERE id=${pleine}`);
   const pris = sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${pleine} AND status='participating'`);
-  s.check('prérequis : séance saturée', Number(pris) >= Number(cap), `${pris}/${cap}`);
+  s.check('prérequis : séance saturée', Number(pris) >= Number(cap) && Number(cap) > 0, `${pris}/${cap}`);
   const avant = sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${pleine} AND user_id=${noah}`);
   s.check('prérequis : Noah non inscrit', avant === '0');
 
@@ -291,12 +373,19 @@ const tous = [];
   const statut = sql(`SELECT status FROM registrations WHERE session_id=${pleine} AND user_id=${noah}`);
   s.check('inscrit en liste d\'attente (pas participant)', statut === 'waitlist', `statut=${statut || 'aucun'}`);
 
-  // Remise en état.
+  // Remise en état : l'inscription de Noah, le bouche-trou, puis la capacité d'origine.
   sql(`DELETE FROM registrations WHERE session_id=${pleine} AND user_id=${noah}`);
+  if (bouchon) sql(`DELETE FROM registrations WHERE session_id=${pleine} AND user_id=${bouchon}`);
+  sql(`UPDATE sessions SET capacity=${capOrigine} WHERE id=${pleine}`);
   s.checkJs(page);
   purgeJournaux(journaux);
-  s.check('état restauré',
+  s.check('état restauré (inscription de Noah)',
          sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${pleine} AND user_id=${noah}`) === '0');
+  s.check('état restauré (capacité de la séance)',
+         sql(`SELECT capacity c FROM sessions WHERE id=${pleine}`) === capOrigine, `capacité=${capOrigine}`);
+  s.check('état restauré (aucun inscrit ajouté)',
+         sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${pleine} AND status='participating'`)
+           === (bouchon ? '0' : pris), bouchon ? 'bouche-trou retiré' : 'aucun ajout');
   s.check('journaux restaurés (audit, activité, envois)',
           sql(`SELECT (SELECT COUNT(*) FROM audit_logs WHERE id>${journaux.audit})
                     + (SELECT COUNT(*) FROM activity_logs WHERE id>${journaux.activite})
@@ -325,16 +414,27 @@ async function ongletMobile(page, nom) {
 {
   const s = new Scenario('S17 · Mécanisme C — remplir avec la file quota');
 
-  // Préconditions de $canFillQuota (session-show.blade.php:54) : file capacity vide + places libres.
-  // Cible dérivée : séance future avec file quota NON vide, file capacity VIDE et des places libres
-  // — les préconditions exactes de $canFillQuota (session-show.blade.php:54).
+  // La file quota est POSÉE par le scénario, pas cherchée dans le jeu de démo (#35, #46) — comme
+  // S21 le fait déjà pour ses alertes. Le seed ne contient qu'une entrée de file quota, sur une
+  // séance qui devient passée : le scénario levait dès ce jour-là. On ne garde du seed que les
+  // préconditions structurelles de $canFillQuota (session-show.blade.php:54) — file capacity vide
+  // et places libres — et on fabrique l'entrée de file, retirée en fin de scénario.
   const sq = seance(`kind='training' AND cancelled_at IS NULL AND start_at > NOW()
-      AND EXISTS (SELECT 1 FROM registrations r WHERE r.session_id=sessions.id
-                  AND r.status='waitlist' AND r.waitlist_reason='quota_exceeded')
       AND NOT EXISTS (SELECT 1 FROM registrations r2 WHERE r2.session_id=sessions.id
                       AND r2.status='waitlist' AND r2.waitlist_reason='capacity')
       AND (capacity IS NULL OR capacity > (SELECT COUNT(*) FROM registrations r3
                       WHERE r3.session_id=sessions.id AND r3.status='participating'))`);
+
+  // L'athlète mis en file est réellement éligible à la séance : le bloc « Quota dépassé » le nomme,
+  // et un inscrit hors catégorie serait un état que l'application ne produit jamais.
+  const enFile = ligne(`SELECT u.id uid FROM users u
+      JOIN user_category uc ON uc.user_id = u.id
+      JOIN session_category k ON k.category_id = uc.category_id AND k.session_id = ${sq}
+      WHERE u.is_active = 1 AND u.athlete_access_suspended = 0 AND JSON_CONTAINS(u.roles, '"athlete"')
+        AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.session_id = ${sq} AND r.user_id = u.id)
+      LIMIT 1`, `un athlète éligible à la séance ${sq}`)[0];
+  sql(`INSERT INTO registrations (session_id, user_id, status, waitlist_reason, registered_at, created_at, updated_at)
+       VALUES (${sq}, ${enFile}, 'waitlist', 'quota_exceeded', NOW(), NOW(), NOW())`);
 
   const wq = sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${sq} AND status='waitlist' AND waitlist_reason='quota_exceeded'`);
   const wcap = sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${sq} AND status='waitlist' AND waitlist_reason='capacity'`);
@@ -349,9 +449,16 @@ async function ongletMobile(page, nom) {
   // Une séance saturée n'a pas forcément de file quota : sans en fabriquer une, le bloc ne serait
   // pas rendu du tout et l'assertion ne prouverait rien. On l'ajoute puis on la retire.
   {
+    // Même traitement que la cible principale : le seed n'a plus de file « séance pleine » sur une
+    // séance future, on la pose ici (et on la retire plus bas).
     const bloquee = seance(`kind='training' AND cancelled_at IS NULL AND start_at > NOW()
-        AND EXISTS (SELECT 1 FROM registrations r WHERE r.session_id=sessions.id
-                    AND r.status='waitlist' AND r.waitlist_reason='capacity')`);
+        AND id <> ${sq}`);
+    const enFileCap = ligne(`SELECT id uid FROM users
+        WHERE JSON_CONTAINS(roles, '"athlete"') AND is_active = 1
+          AND id NOT IN (SELECT user_id FROM registrations WHERE session_id = ${bloquee})
+        LIMIT 1`, `un athlète pour la file « séance pleine » de ${bloquee}`)[0];
+    sql(`INSERT INTO registrations (session_id, user_id, status, waitlist_reason, registered_at, created_at, updated_at)
+         VALUES (${bloquee}, ${enFileCap}, 'waitlist', 'capacity', NOW(), NOW(), NOW())`);
     const coachBl = sql(`SELECT u.email FROM session_coach sc JOIN users u ON u.id=sc.user_id WHERE sc.session_id=${bloquee} LIMIT 1`) || 'admin@demo.club';
     const cobaye = sql(`SELECT id FROM users WHERE id NOT IN (SELECT user_id FROM registrations WHERE session_id=${bloquee}) AND JSON_CONTAINS(roles, '"athlete"') LIMIT 1`);
     sql(`INSERT INTO registrations (session_id, user_id, status, waitlist_reason, registered_at, created_at, updated_at) VALUES (${bloquee}, ${cobaye}, 'waitlist', 'quota_exceeded', NOW(), NOW(), NOW())`);
@@ -368,9 +475,10 @@ async function ongletMobile(page, nom) {
     await s.shot(page, 's17-quota-desactive');
     await ctx.close();
 
-    sql(`DELETE FROM registrations WHERE session_id=${bloquee} AND user_id=${cobaye}`);
+    sql(`DELETE FROM registrations WHERE session_id=${bloquee} AND user_id IN (${cobaye}, ${enFileCap})`);
     s.check('contrôle négatif : état restauré',
-            sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${bloquee} AND user_id=${cobaye}`) === '0');
+            sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${bloquee}
+                 AND user_id IN (${cobaye}, ${enFileCap})`) === '0');
   }
 
   // Instantané AVANT l'action, pour une remise en état complète.
@@ -471,6 +579,12 @@ async function ongletMobile(page, nom) {
     s.check('athlète simple : aucun bouton de déblocage', n === 0, `n=${n}`);
     await ctx.close();
   }
+
+  // L'entrée de file posée en tête de scénario est retirée en dernier : les vérifications de
+  // restauration ci-dessus la comptent encore, puisqu'elles contrôlent l'état d'AVANT `fillQuota`.
+  sql(`DELETE FROM registrations WHERE session_id=${sq} AND user_id=${enFile}`);
+  s.check('état restauré (entrée de file posée par le scénario)',
+          sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${sq} AND user_id=${enFile}`) === '0');
 
   tous.push(s.report());
 }
