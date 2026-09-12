@@ -1,6 +1,11 @@
 {{-- Carte de séance unifiée — porté de ui.jsx <SessionRow> + variantes planning.
      variant : row (liste home/agenda/semaine mobile) | week (colonne planning desktop) | pill (cellule mois).
-     showDate : variante row → empile jour/date/heure à gauche au lieu du disc-badge. --}}
+     showDate : variante row → ce que porte la colonne de gauche, en TROIS états (#33).
+       true (défaut) = jour · numéro · heure de début — situe la séance dans une liste non groupée ;
+       'time'        = heure de début · heure de fin — réservé aux listes DÉJÀ groupées par jour
+                       (vue Semaine mobile), où l'en-tête collant porte la date : la répéter dans
+                       la carte accordait son plus gros caractère à son information la moins utile ;
+       false         = pastille de discipline. --}}
 @props([
     'session',
     'tz',
@@ -15,6 +20,8 @@
     $cls = $s->colorClass();
     $icon = $s->discipline?->icon() ?? 'calendar';
     $start = $s->start_at->copy()->setTimezone($tz);
+    // duration_min est NOT NULL et validé min:1 : la fin est toujours calculable (§4.7).
+    $end = $s->endsAt()->copy()->setTimezone($tz);
     $participating = $s->registrations->where('status', 'participating')->count();
     $full = $s->capacity && $participating >= $s->capacity;
     $loc = $s->location_text ?: $s->location?->name;
@@ -91,7 +98,15 @@
     {{-- Ligne horizontale (home, agenda, semaine mobile). Carte entièrement cliquable → fiche.
          L'inscription se fait toujours depuis la fiche (cohérent avec les autres écrans). --}}
     <a {{ $attributes }} href="{{ $href }}" wire:navigate class="scard {{ $cls }} scard-row {{ $cancelled ? 'scard-cancelled' : '' }}">
-        @if ($showDate)
+        @if ($showDate === 'time')
+            {{-- Plage horaire : début en .num, fin en .meta. L'écart de taille suffit à les séparer
+                 — deux heures de même corps se liraient comme une plage unique. Reprend la
+                 convention de la fiche séance (« 18:30 — 19:45 »), seul endroit où la fin existait. --}}
+            <div class="scard-row-date">
+                <div class="num" style="font-size:16px">{{ $start->format('H:i') }}</div>
+                <div class="meta" style="font-size:11px;margin-top:1px">{{ $end->format('H:i') }}</div>
+            </div>
+        @elseif ($showDate)
             <div class="scard-row-date">
                 <div class="eyebrow" style="font-size:10px">{{ $start->locale('fr')->isoFormat('ddd') }}</div>
                 <div class="num" style="font-size:22px">{{ $start->format('j') }}</div>

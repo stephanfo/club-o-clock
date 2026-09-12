@@ -1,6 +1,7 @@
-import { launch, session, fiche, sql, seance, Scenario, MOBILE, DESKTOP } from './lib.mjs';
+import { launch, session, fiche, sql, seance, ligne, Scenario, MOBILE, DESKTOP, BASE } from './lib.mjs';
 
 const browser = await launch();
+const tous = [];
 const s = new Scenario('S6 · Point de rupture 768px — mobile vs desktop');
 
 // Cible dérivée : le segment de rôle (enroll-actions.blade.php) n'apparaît que si Mathieu ENCADRE
@@ -40,6 +41,106 @@ for (const [nom, vp] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   await ctx.close();
 }
 
-const ok = s.report();
+tous.push(s.report());
+
+// ── S24 · #33 · Vue Semaine mobile : la carte porte la plage horaire, pas la date ──
+{
+  const s24 = new Scenario('S24 · Semaine mobile — la carte dit la plage horaire, plus le jour');
+  // Un jour à PLUSIEURS séances : deux lignes d'heures alignées sont justement le cas où le
+  // rendu peut se lire comme une plage unique.
+  const [jour] = ligne(`SELECT DATE(start_at) j FROM sessions WHERE cancelled_at IS NULL
+      GROUP BY j HAVING COUNT(*) > 1 ORDER BY ABS(DATEDIFF(j, CURDATE())) LIMIT 1`,
+    'un jour à plusieurs séances');
+
+  const { ctx, page } = await session(browser, 'marie@demo.club', MOBILE);
+  await page.goto(`${BASE}/planning?view=week&anchor=${jour}`, { waitUntil: 'networkidle' });
+
+  const colonnes = page.locator('.plan-daylist-m .scard-row-date');
+  const n = await colonnes.count();
+  s24.check('des cartes sont rendues en semaine mobile', n > 0, `${n} carte(s)`);
+
+  const texte = (await colonnes.first().innerText()).trim();
+  // Deux heures, rien d'autre : plus de jour abrégé ni de numéro de quantième.
+  s24.check('la colonne porte deux heures', /^\d{1,2}:\d{2}\s*\n\s*\d{1,2}:\d{2}$/.test(texte),
+            JSON.stringify(texte));
+  // La fin est postérieure au début — on rend bien une plage, pas deux fois la même heure.
+  const [debut, fin] = texte.split('\n').map((l) => l.trim());
+  s24.check('la fin suit le début', fin > debut, `${debut} → ${fin}`);
+
+  // L'en-tête de jour, lui, ne bouge pas : c'est lui qui porte la date (l'issue le dit).
+  const entete = (await page.locator('.plan-dayhead-m').first().innerText()).toLowerCase();
+  s24.check("l'en-tête de jour garde la date", /\d/.test(entete) && /lun|mar|mer|jeu|ven|sam|dim/.test(entete),
+            entete.replace(/\s+/g, ' ').slice(0, 40));
+  await page.screenshot({ path: new URL('./shots/s24-semaine-mobile-plage.png', import.meta.url).pathname });
+
+  // Contrôle positif apparié : ailleurs, la colonne garde la date — c'est elle qui situe la
+  // séance dans une liste non groupée par jour.
+  await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+  const accueil = page.locator('.scard-row-date');
+  if (s24.check("l'accueil rend au moins une carte datée", await accueil.count() > 0)) {
+    const t = (await accueil.first().innerText()).trim().toLowerCase();
+    s24.check("l'accueil garde le jour dans la colonne", /lun|mar|mer|jeu|ven|sam|dim/.test(t),
+              JSON.stringify(t));
+  }
+  s24.checkJs(page);
+  await ctx.close();
+  tous.push(s24.report());
+}
+
+// ── S25 · #36 · Dialog destructif : la sortie sûre n'est pas sous l'action irréversible ──
+{
+  const s25 = new Scenario('S25 · Dialog destructif — la sortie sûre au-dessus sur mobile');
+  // Compte dérivé : le bouton est masqué pour le dernier admin et pour un garant de mineur sans
+  // compte propre (deux gardes du formulaire), et il disparaît si une demande est déjà en cours.
+  const [email] = ligne(`SELECT email FROM users WHERE is_active=1 AND deletion_requested_at IS NULL
+      AND JSON_SEARCH(roles, 'one', 'admin') IS NULL
+      AND id NOT IN (SELECT guardian_id FROM users WHERE guardian_id IS NOT NULL)
+      ORDER BY id LIMIT 1`, 'un compte pouvant demander sa suppression');
+
+  for (const [nom, vp] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
+    const { ctx, page } = await session(browser, email, vp);
+    await page.goto(`${BASE}/profil?tab=connexion`, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: /supprimer mon compte/i }).first().click();
+    await page.waitForTimeout(1200);
+
+    // Plusieurs dialogs coexistent dans le DOM de cet onglet (déconnexion des autres appareils) :
+    // on cible celui-ci par son titre, pas par sa position.
+    // Les deux coquilles (mobile et desktop) rendent chacune leur dialog ; une seule est visible,
+    // et l'onglet en contient d'autres (déconnexion des appareils). On cible par visibilité ET titre.
+    const modale = page.locator('.dialog:visible').filter({ hasText: 'Supprimer mon compte ?' }).first();
+    const pied = modale.locator('.dialog-foot').first();
+    const sortie = pied.getByRole('button', { name: /annuler/i }).first();
+    const destructif = pied.getByRole('button', { name: /envoyer la demande/i }).first();
+    const bSortie = await sortie.boundingBox();
+    const bDestructif = await destructif.boundingBox();
+
+    if (s25.check(`${nom} : le pied du dialog est mesurable`, !!bSortie && !!bDestructif)) {
+      if (nom === 'mobile') {
+        // Le cœur de #36 : empilés, l'irréversible ne doit pas surplomber la sortie sûre.
+        s25.check('mobile : la sortie sûre est AU-DESSUS de l\'action irréversible',
+                  bSortie.y < bDestructif.y, `annuler y=${bSortie.y} · envoyer y=${bDestructif.y}`);
+      } else {
+        // Contrôle apparié : l'ordre desktop n'a pas bougé — même rangée, sûre à gauche.
+        s25.check('desktop : les deux actions restent sur la même rangée',
+                  Math.abs(bSortie.y - bDestructif.y) < 4, `${bSortie.y} vs ${bDestructif.y}`);
+        s25.check('desktop : la sortie sûre reste à gauche', bSortie.x < bDestructif.x);
+      }
+    }
+    await page.screenshot({ path: new URL(`./shots/s25-dialog-danger-${nom}.png`, import.meta.url).pathname });
+
+    // On referme sans rien envoyer : scénario non destructif.
+    await sortie.click();
+    await page.waitForTimeout(800);
+    s25.checkJs(page);
+    await ctx.close();
+  }
+
+  s25.check('aucune demande de suppression n\'a été créée',
+            sql(`SELECT COUNT(*) n FROM users WHERE deletion_requested_at IS NOT NULL AND email='${email}'`) === '0');
+  tous.push(s25.report());
+}
+
 await browser.close();
+const ok = tous.every(Boolean);
+console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES SCÉNARIOS RESPONSIVE PASSENT' : '❌ AU MOINS UN SCÉNARIO RESPONSIVE ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);
 process.exit(ok ? 0 : 1);

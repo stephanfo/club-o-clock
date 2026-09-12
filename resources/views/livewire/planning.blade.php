@@ -144,7 +144,11 @@
                             </div>
                             <div class="plan-daylist-m">
                                 @foreach ($daySessions as $s)
+                                    {{-- show-date="time" : la liste est groupée par jour et
+                                         l'en-tête ci-dessus est collant — la carte n'a pas à
+                                         répéter la date, elle porte la plage horaire (#33). --}}
                                     <x-session-card :key="'m-'.$s->id" :session="$s" :tz="$tz" variant="row"
+                                        show-date="time"
                                         :viewAs="$subjectUser->id" :subjectName="$subjectFirstName" />
                                 @endforeach
                             </div>
