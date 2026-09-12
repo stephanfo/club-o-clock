@@ -170,7 +170,10 @@
             @endif
 
             {{-- ═══ Téléchargement + OpenRunner ═══ --}}
-            <a class="btn btn-ghost btn-block" href="{{ route('gpx-routes.gpx', $r) }}">
+            {{-- `download` est indispensable, pas décoratif : sans lui, le clic est une navigation de
+                 premier niveau vers une réponse `attachment`, et la PWA iOS (`display: standalone`)
+                 se retrouve remplacée par la vue d'aperçu de WebKit, sans chrome pour en sortir (#44). --}}
+            <a class="btn btn-ghost btn-block" href="{{ route('gpx-routes.gpx', $r) }}" download="{{ $r->downloadFilename() }}">
                 <x-icon name="download" :size="15" /> Télécharger le GPX
                 @if ($r->gpx_size_ko)<span class="meta" style="font-size:12px;margin-left:4px">· {{ $r->gpx_size_ko }} Ko</span>@endif
             </a>

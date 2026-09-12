@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\GpxRoute;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 // Téléchargement du fichier d'un parcours (PRD §4.20). Visible à tous les membres connectés
@@ -21,11 +20,9 @@ class GpxRouteGpxController extends Controller
             404
         );
 
-        $base = $gpxRoute->gpx_original_name ?: $gpxRoute->name;
-        $name = Str::of($base)->basename('.gpx')->slug()->value();
-        $name = ($name !== '' ? $name : 'parcours-'.$gpxRoute->id).'.gpx';
-
-        return Storage::disk('local')->download($gpxRoute->gpx_path, $name, [
+        // Le nom vit sur le modèle : les vues le répètent dans l'attribut `download` du lien, et les
+        // deux doivent concorder (cf. GpxRoute::downloadFilename).
+        return Storage::disk('local')->download($gpxRoute->gpx_path, $gpxRoute->downloadFilename(), [
             'Content-Type' => 'application/gpx+xml',
         ]);
     }
