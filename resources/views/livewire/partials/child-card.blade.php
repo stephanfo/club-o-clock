@@ -1,5 +1,7 @@
 {{-- Carte enfant (screen-parent.jsx) — header, prochaine séance + Inscrire, semaine, tutelle.
-     Reçoit : $c (ward/phase/age/cat/nextRegistered/nextOpen/quotaFull), $tz, $pad. --}}
+     Reçoit : $c (ward/phase/age/cat/nextRegistered/nextOpen/quotaFull), $tz, $pad, $scope.
+     $scope ('m' | 'dk') préfixe les wire:key : la partial est incluse dans les DEUX coquilles,
+     une clé non préfixée apparaîtrait deux fois dans le même arbre (#50). --}}
 @php
     $w = $c['ward'];
     $registered = $c['nextRegistered'];
@@ -9,7 +11,7 @@
     $tintCls = $tintSession?->discipline?->colorClass() ?? 'prep';
     $tint = in_array($tintCls, ['swim', 'bike', 'run'], true) ? 'tint-'.$tintCls : null;
 @endphp
-<div class="card" style="overflow:hidden" wire:key="child-{{ $w->id }}">
+<div class="card" style="overflow:hidden" wire:key="child-{{ $scope }}-{{ $w->id }}">
     <div class="flex ac g10" style="padding:{{ $pad }}px;border-bottom:1px solid var(--divider);background:var(--bg-alt)">
         <x-avatar :name="$w->fullName()" :tint="$tint" />
         <div class="f1">
@@ -28,14 +30,15 @@
                 @foreach ($registered as $ns)
                     <x-session-card :session="$ns" :tz="$tz" variant="row"
                         :viewAs="$w->id" :linkAs="$w->id" :subjectName="$w->first_name"
-                        wire:key="reg-{{ $w->id }}-{{ $ns->id }}" />
+                        wire:key="reg-{{ $scope }}-{{ $w->id }}-{{ $ns->id }}" />
                 @endforeach
             </div>
         @elseif ($open)
             {{-- Enfant non inscrit : même bascule via l'URL, la fiche permet ensuite l'inscription. --}}
             <div class="home-cards">
                 <x-session-card :session="$open" :tz="$tz" variant="row"
-                    :viewAs="$w->id" :linkAs="$w->id" :subjectName="$w->first_name" />
+                    :viewAs="$w->id" :linkAs="$w->id" :subjectName="$w->first_name"
+                    wire:key="open-{{ $scope }}-{{ $w->id }}-{{ $open->id }}" />
             </div>
         @else
             <div class="meta">Aucune séance à venir.</div>
