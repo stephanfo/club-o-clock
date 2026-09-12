@@ -178,6 +178,77 @@ class GpxRouteFormTest extends TestCase
         $this->assertNotNull(GpxRoute::where('name', 'Le même en double')->first());
     }
 
+    // Le composant Alpine gpxField est partagé entre SessionForm et GpxRouteForm : son bouton
+    // « retirer » appelle $wire.removeGpx() sur les deux hôtes. Sans la méthode côté bibliothèque,
+    // Livewire lève MethodNotFoundException et l'utilisateur voit une modale « erreur 500 ».
+    public function test_removing_a_deposited_file_resets_the_upload(): void
+    {
+        Storage::fake('local');
+        $coach = User::factory()->coach()->create();
+
+        $component = Livewire::actingAs($coach)->test(GpxRouteForm::class)
+            ->set('name', 'Boucle Loire')
+            ->set('gpxFile', UploadedFile::fake()->create('boucle.gpx', 42, 'application/gpx+xml'))
+            ->set('gpxStats', $this->clientStats());
+
+        $component->call('removeGpx')
+            ->assertHasNoErrors()
+            ->assertSet('gpxFile', null)
+            ->assertSet('gpxStats', null);
+
+        // Contrôle positif : le reste du formulaire n'est pas balayé au passage.
+        $component->assertSet('name', 'Boucle Loire');
+    }
+
+    public function test_removing_a_replacement_file_falls_back_to_the_stored_route(): void
+    {
+        Storage::fake('local');
+        $coach = User::factory()->coach()->create();
+        $service = app(GpxRouteService::class);
+
+        $route = $service->createFromUpload(
+            UploadedFile::fake()->createWithContent('origine.gpx', '<gpx>origine</gpx>'),
+            ['name' => 'Boucle Loire'],
+            $this->clientStats(),
+            $coach,
+        );
+
+        $component = Livewire::actingAs($coach)->test(GpxRouteForm::class, ['gpxRoute' => $route])
+            ->set('gpxFile', UploadedFile::fake()->create('remplacant.gpx', 42, 'application/gpx+xml'));
+
+        // Le retrait annule le remplacement, il ne vide pas la fiche : la trace enregistrée reste.
+        $component->call('removeGpx')
+            ->assertSet('gpxFile', null)
+            ->assertNotSet('gpxStats', null);
+
+        $component->call('save')->assertHasNoErrors();
+        $this->assertSame('Boucle Loire', $route->fresh()->name);
+    }
+
+    public function test_removing_a_deposited_file_clears_the_duplicate_banner(): void
+    {
+        Storage::fake('local');
+        $coach = User::factory()->coach()->create();
+        $service = app(GpxRouteService::class);
+
+        $file = UploadedFile::fake()->createWithContent('boucle.gpx', '<gpx>identique</gpx>');
+        $existing = $service->createFromUpload($file, ['name' => 'Boucle Loire 42 km'], null, $coach);
+
+        $component = Livewire::actingAs($coach)->test(GpxRouteForm::class)
+            ->set('name', 'Le même en double')
+            ->set('gpxFile', UploadedFile::fake()->createWithContent('autre-nom.gpx', '<gpx>identique</gpx>'))
+            ->call('acknowledgeDuplicate');
+
+        // Contrôle positif : la bannière est bien levée avant le retrait.
+        $component->assertSet('duplicateId', $existing->id)
+            ->assertSet('duplicateAcknowledged', true);
+
+        $component->call('removeGpx')
+            ->assertSet('duplicateId', null)
+            ->assertSet('duplicateName', null)
+            ->assertSet('duplicateAcknowledged', false);
+    }
+
     public function test_replacing_file_deletes_the_previous_one(): void
     {
         Storage::fake('local');
