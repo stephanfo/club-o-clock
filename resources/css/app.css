@@ -497,6 +497,10 @@ a.scard { text-decoration: none; color: inherit; }
 /* variante row : ligne horizontale (home, agenda, semaine mobile) */
 .scard-row { display: flex; gap: 12px; padding: 12px; align-items: center; }
 .scard-row-date { width: 40px; text-align: center; flex: 0 0 auto; }
+/* Variante plage horaire (showDate="time", #33) : « 18:30 » en 16 px gras dépasse les 40 px prévus
+   pour un quantième, et débordait dans le gap de 12 px jusqu'à toucher le titre. La colonne y est
+   élargie, elle seule — la variante datée garde sa largeur. */
+.scard-row-date.scard-row-time { width: 52px; }
 .scard-row-title {
     font-weight: 700; font-size: 15px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;

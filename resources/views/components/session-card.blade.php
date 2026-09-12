@@ -102,7 +102,7 @@
             {{-- Plage horaire : début en .num, fin en .meta. L'écart de taille suffit à les séparer
                  — deux heures de même corps se liraient comme une plage unique. Reprend la
                  convention de la fiche séance (« 18:30 — 19:45 »), seul endroit où la fin existait. --}}
-            <div class="scard-row-date">
+            <div class="scard-row-date scard-row-time">
                 <div class="num" style="font-size:16px">{{ $start->format('H:i') }}</div>
                 <div class="meta" style="font-size:11px;margin-top:1px">{{ $end->format('H:i') }}</div>
             </div>
