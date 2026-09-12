@@ -221,6 +221,8 @@ class TemplateForm extends Component
             'categories' => Category::whereNull('archived_at')->orderBy('sort_order')->get(),
             'locations' => Location::where('is_archived', false)->orderBy('name')->get(),
             'coaches' => User::whereJsonContains('roles', 'coach')->orderBy('last_name')->get(),
+            // Édition : ce que ce modèle a déjà produit — l'écran ne promet plus de génération (#40).
+            'generatedCount' => $this->template?->exists ? $this->template->sessions()->count() : 0,
         ]);
     }
 }

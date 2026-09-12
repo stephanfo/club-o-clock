@@ -713,6 +713,67 @@ async function ongletMobile(page, nom) {
   tous.push(s.report());
 }
 
+// ── S23 · Admin modèles : l'écran ne promet plus de génération qui n'a pas lieu (#40) ─
+{
+  // Non destructif : on ouvre la modale de relance et on la referme sans jamais générer.
+  const [tplId, tplLabel] = ligne(
+    "SELECT id, label FROM session_templates WHERE status='active' ORDER BY label LIMIT 1",
+    'un modèle actif');
+  const [debut, fin] = ligne(
+    `SELECT generation_start_date, generation_end_date FROM session_templates WHERE id=${tplId}`,
+    'la plage du modèle');
+  const s = new Scenario(`S23 · Admin modèles — plus de « Générer & enregistrer » (modèle ${tplId})`);
+  // Écran admin : desktop assumé (doctrine projet « Admin sur mobile : assumé desktop »).
+  const { ctx, page } = await session(browser, 'admin@demo.club', DESKTOP);
+
+  await page.goto(`${BASE}/admin/modeles`, { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: new RegExp(tplLabel.slice(0, 20).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }).first().click();
+  await page.waitForTimeout(900);
+
+  const panneau = await page.locator('body').innerText();
+  s.check('le bouton « Générer & enregistrer » a disparu', !/générer\s*&\s*enregistrer/i.test(panneau));
+  // Contrôle positif apparié : le panneau de détail est bien rendu, pas vide.
+  s.check('le panneau garde « Relancer / prolonger »', /relancer\s*\/\s*prolonger/i.test(panneau));
+  // innerText applique text-transform : les field-label remontent en MAJUSCULES.
+  const panneauMin = panneau.toLowerCase();
+  for (const champ of ['Type', 'Discipline', 'Lieu', 'Capacité', 'Catégories ciblées']) {
+    s.check(`le panneau affiche « ${champ} »`, panneauMin.includes(champ.toLowerCase()));
+  }
+  await s.shot(page, 's23-panneau-detail');
+
+  // La modale de relance dit la vérité : rejouer la plage COURANTE ne crée rien.
+  await page.getByRole('button', { name: /relancer \/ prolonger/i }).first().click();
+  await page.waitForTimeout(900);
+  const modale = page.locator('.dialog, [role="dialog"]').first();
+  const dates = modale.locator('input[type=date]');
+  await dates.nth(0).fill(String(debut).slice(0, 10));
+  await page.waitForTimeout(700);
+  await dates.nth(1).fill(String(fin).slice(0, 10));
+  await page.waitForTimeout(1200);
+
+  const txtModale = await modale.innerText();
+  s.check('plage déjà générée → 0 nouvelle séance annoncée',
+          /\b0\b/.test(txtModale) && /déjà entièrement générée/i.test(txtModale), txtModale.slice(0, 120));
+  const boutonRelancer = modale.getByRole('button', { name: /relancer ·/i }).first();
+  s.check('le bouton de relance est refusé à 0', await boutonRelancer.isDisabled().catch(() => true));
+  await s.shot(page, 's23-modale-relance-zero');
+  await modale.getByRole('button', { name: /annuler/i }).first().click();
+  await page.waitForTimeout(600);
+
+  // L'écran d'édition n'annonce plus de génération.
+  await page.goto(`${BASE}/admin/modeles/${tplId}/modifier`, { waitUntil: 'networkidle' });
+  const edition = await page.locator('body').innerText();
+  s.check("l'édition n'annonce plus « À l'enregistrement »", !/à l'enregistrement/i.test(edition));
+  s.check("l'édition dit ce qu'elle fait vraiment",
+          /aucune séance n'est créée ni modifiée/i.test(edition));
+  s.check('les dates sont relabellisées en plage de référence', /plage de référence/i.test(edition));
+  await s.shot(page, 's23-edition-sans-generation');
+
+  s.checkJs(page);
+  await ctx.close();
+  tous.push(s.report());
+}
+
 await browser.close();
 const ok = tous.every(Boolean);
 console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES PARCOURS PASSENT' : '❌ AU MOINS UN PARCOURS ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);

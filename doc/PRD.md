@@ -451,6 +451,9 @@ Pendant de l'annulation, pour le cas qu'elle ne couvre pas : la séance qui **n'
 #### Réutilisation
 Le template est conservé en base, relançable (nouvelle saison, prolongation) — la regénération crée de nouvelles `Session` sans écraser les précédentes.
 
+- **L'édition d'un template ne génère rien** : elle met à jour le template seul, aucune `Session` n'est créée ni modifiée (corollaire de l'absence de lien retour comportemental ci-dessus). `generationStartDate` / `generationEndDate` y valent **plage de référence des prochaines générations**.
+- **La relance ne crée que les occurrences absentes** de la plage demandée : rejouer une plage déjà générée ne produit aucune `Session`, et le nombre annoncé avant l'action est celui des séances réellement manquantes.
+
 ### 4.9 Inscriptions, capacité, liste d'attente
 
 #### 4.9.1 Règles uniformes sur les 3 `kind`
