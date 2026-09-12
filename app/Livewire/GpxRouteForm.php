@@ -150,6 +150,7 @@ class GpxRouteForm extends Component
             $this->authorize('create', GpxRoute::class);
         }
 
+        $edition = $this->gpxRoute !== null;
         $data = $this->validate();
 
         // Doublon signalé et non levé : on refuse plutôt que de créer une trace en double en silence.
@@ -179,6 +180,21 @@ class GpxRouteForm extends Component
 
         session()->flash('status', 'Parcours enregistré.');
 
+        // En ÉDITION on reste où l'on est. Rediriger vers l'écran courant n'apportait rien et
+        // empilait une entrée d'historique identique à chaque enregistrement (la redirection
+        // `navigate` fait un pushState) : trois sauvegardes demandaient trois retours pour sortir,
+        // et les deux premiers rendaient une version périmée du même formulaire (#26).
+        if ($edition) {
+            // Le dépôt en attente est consommé : sans ça, un second clic sur « Enregistrer »
+            // rejouerait replaceGpx() avec le même fichier temporaire. removeGpx() remet les stats
+            // affichées sur le fichier désormais enregistré.
+            $this->gpxRoute->refresh();
+            $this->removeGpx();
+
+            return null;
+        }
+
+        // En création, la redirection est nécessaire : l'URL doit porter l'id du parcours créé.
         return $this->redirect(route('gpx-routes.edit', $this->gpxRoute), navigate: true);
     }
 
