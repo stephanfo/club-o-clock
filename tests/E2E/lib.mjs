@@ -88,6 +88,23 @@ export function seance(where, ordre = 'start_at') {
   return Number(id);
 }
 
+/**
+ * Une ligne de résultat, découpée en colonnes — lève si la requête ne ramène rien.
+ *
+ * Complète `seance()` pour les scénarios qui ont besoin de PLUSIEURS valeurs liées entre elles (une
+ * paire de séances en collision de quota, par exemple) : les obtenir par des appels séparés ne
+ * garantirait pas leur cohérence mutuelle.
+ *
+ * ATTENTION aux colonnes homonymes : `SELECT a.id, b.id` s'écrase en une seule clé dans l'objet
+ * retourné par le driver. Toujours aliaser (`a.id aid, b.id bid`).
+ */
+export function ligne(query, quoi = 'la requête') {
+  const brut = sql(query);
+  if (!brut) throw new Error(`Aucun résultat pour ${quoi}`);
+
+  return brut.split('\n')[0].split(' | ');
+}
+
 /** Séance d'entraînement future, non annulée, satisfaisant `where`. */
 export function seanceFuture(where = '1=1') {
   return seance(`kind='training' AND cancelled_at IS NULL AND start_at > NOW() AND (${where})`);
