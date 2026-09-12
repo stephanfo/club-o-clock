@@ -130,7 +130,12 @@
                     @endphp
                     @if ($daySessions->isNotEmpty())
                         @php $hasAny = true; $isToday = $dayStr === $todayStr; @endphp
-                        <div class="plan-daygroup-m">
+                        {{-- Clé obligatoire : sans elle le morphing Livewire substitue les nœuds
+                             texte de l'en-tête collant d'une semaine à l'autre, et WebKit ne
+                             recompose pas un élément `position:sticky` sur simple changement de
+                             texte — le numéro du jour et le compteur restaient ceux de la semaine
+                             précédente jusqu'au prochain scroll (issue #32). --}}
+                        <div class="plan-daygroup-m" wire:key="daygroup-{{ $dayStr }}">
                             <div class="plan-dayhead-m">
                                 <span class="num" style="font-size:18px;{{ $isToday ? 'color:var(--accent)' : '' }}">{{ $day->format('j') }}</span>
                                 <span class="dsp-7" style="font-size:16px;text-transform:capitalize">{{ $day->locale('fr')->isoFormat('dddd') }}</span>
