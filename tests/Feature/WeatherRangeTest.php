@@ -205,7 +205,10 @@ class WeatherRangeTest extends TestCase
 
         $this->fiche($debut, 105)
             ->assertViewHas('weatherState', 'full')
-            ->assertSee('12° → 19°')
+            // La flèche est soudée à la valeur d'arrivée dans un span (elle serait orpheline en
+            // bout de première ligne sur mobile) : la plage se lit en deux morceaux.
+            ->assertSee('12°')
+            ->assertSee('→ 19°')
             ->assertSee('12–24')
             ->assertSee('Prévision 09h–11h');
     }

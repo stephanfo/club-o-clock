@@ -68,7 +68,10 @@
             </div>
             <div class="wx-cell">
                 <div class="eyebrow"><x-icon name="gauge" :size="12" style="color:var(--fg-soft)" /> Temp.</div>
-                <div class="v">{{ $tDeb === null ? '—' : ($plageTemp ? round($tDeb).'° → '.round($tFin).'°' : round($tDeb).'°') }}</div>
+                {{-- La flèche reste soudée à la valeur d'arrivée : dans une colonne de grille 1fr,
+                     la plage passe à la ligne dès 390 px, et une flèche orpheline en fin de
+                     première ligne se lit mal. --}}
+                <div class="v">@if ($tDeb === null)—@elseif ($plageTemp){{ round($tDeb) }}° <span style="white-space:nowrap">→ {{ round($tFin) }}°</span>@else{{ round($tDeb) }}°@endif</div>
             </div>
         </div>
         <div class="wx-source"><x-icon name="cloud" :size="12" /> Source : Open-Meteo · CC BY 4.0</div>
