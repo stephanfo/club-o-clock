@@ -34,13 +34,13 @@ seed, et la subtilité du partage de pile réseau qui rend `BASE` joignable —,
 ## Exécution
 
 ```bash
-node tests/E2E/run.mjs          # les 3 suites non destructives (verdict agrégé)
+node tests/E2E/run.mjs          # les 5 suites non destructives (verdict agrégé)
 
 node tests/E2E/scenarios.mjs    # S1–S5   gardes d'inscription et bascule de rôle
 node tests/E2E/parcours.mjs     # S7–S17, S21  parcours métier, cloisonnement, alertes parent
 node tests/E2E/retour.mjs       # R1–R3   navigation « retour » : pile d'historique et fraîcheur
 node tests/E2E/comptes.mjs      # S18–S20 messages d'auth, correction d'email, suspension d'accès
-node tests/E2E/responsive.mjs   # S6      bascule mobile/desktop
+node tests/E2E/responsive.mjs   # S6, S24-S26  bascule mobile/desktop, rendu des cartes, morphing
 ```
 
 Sortie : une ligne par assertion (✅/❌), code de sortie non nul si un scénario échoue.
@@ -103,6 +103,10 @@ des requêtes brutes. Les deux **refusent de s'exécuter si `APP_ENV != local`**
 | S16 | Séance pleine | file d'attente rejointe, statut `waitlist` | §1.4 |
 | S17 | Quota — mécanisme C | déblocage coach : bouton actif/désactivé, promotion, `AuditLog` | §1.4, §3.4 |
 | S21 | Alertes d'un garant | ses alertes et celles de son enfant se distinguent (préfixe, séance nommée) | §5, §6 |
+| S23 | Retour après enregistrement | la fiche revient à sa destination annoncée, pas au formulaire | consignes |
+| S24 | Semaine mobile | la carte porte la plage horaire, l'en-tête de jour garde la date | consignes |
+| S25 | Dialog destructif | sur mobile, la sortie sûre n'est pas sous l'action irréversible | consignes |
+| S26 | Morphing des cartes | clés distinctes, aucun contenu croisé après semaine ou filtre | consignes |
 | D1 | RGPD | suppression refusée pour un garant de P1 | §8.4 |
 | D2 | Tutelle | rupture P2 + `AuditLog guardianship_severed` | §6 |
 | D3 | Bascule de saison | double validation, suspension de masse, réactivation, nouvelle année | §8.8 |

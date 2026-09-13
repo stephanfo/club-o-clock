@@ -68,7 +68,7 @@
                             </div>
                             <div class="wk-colbody-dk">
                                 @foreach ($daySessions as $s)
-                                    <x-session-card :session="$s" :tz="$tz" variant="week"
+                                    <x-session-card wire:key="wk-dk-{{ $s->id }}" :session="$s" :tz="$tz" variant="week"
                                         :viewAs="$subjectUser->id" :subjectName="$subjectFirstName" />
                                 @endforeach
                             </div>
@@ -147,7 +147,7 @@
                                     {{-- show-date="time" : la liste est groupée par jour et
                                          l'en-tête ci-dessus est collant — la carte n'a pas à
                                          répéter la date, elle porte la plage horaire (#33). --}}
-                                    <x-session-card :key="'m-'.$s->id" :session="$s" :tz="$tz" variant="row"
+                                    <x-session-card wire:key="wk-m-{{ $s->id }}" :session="$s" :tz="$tz" variant="row"
                                         show-date="time"
                                         :viewAs="$subjectUser->id" :subjectName="$subjectFirstName" />
                                 @endforeach

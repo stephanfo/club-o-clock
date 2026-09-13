@@ -87,7 +87,7 @@
                 @else
                     <div style="display:flex;flex-direction:column;gap:10px">
                         @foreach ($myUpcoming as $s)
-                            <x-session-card :session="$s" :tz="$tz" variant="row"
+                            <x-session-card wire:key="up-m-{{ $s->id }}" :session="$s" :tz="$tz" variant="row"
                                 :viewAs="$subjectUser->id" :subjectName="$subjectFirstName" />
                         @endforeach
                     </div>
@@ -172,7 +172,7 @@
                     @else
                         <div class="home-cards">
                             @foreach ($myUpcoming as $s)
-                                <x-session-card :session="$s" :tz="$tz" variant="row"
+                                <x-session-card wire:key="up-dk-{{ $s->id }}" :session="$s" :tz="$tz" variant="row"
                                     :viewAs="$subjectUser->id" :subjectName="$subjectFirstName" />
                             @endforeach
                         </div>

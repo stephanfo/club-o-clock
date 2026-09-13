@@ -78,7 +78,7 @@
                                 {{-- Desktop : mini-cartes (liseré discipline + heure + titre + statut perso). --}}
                                 <div class="plan-month-pills">
                                     @foreach ($daySessions->take($pillsMax) as $s)
-                                        <x-session-card :session="$s" :tz="$tz" variant="pill"
+                                        <x-session-card wire:key="pill-{{ $scope }}-{{ $s->id }}" :session="$s" :tz="$tz" variant="pill"
                                                         :view-as="$uid" :subject-name="$subjectFirstName ?? null" />
                                     @endforeach
                                     @if ($daySessions->count() > $pillsMax)

@@ -191,7 +191,7 @@
                 @else
                     <div style="display:flex;flex-direction:column;gap:8px;padding:12px">
                         @foreach ($sessions as $s)
-                            <x-session-card :session="$s" :tz="$tz" variant="row" />
+                            <x-session-card wire:key="route-sess-{{ $s->id }}" :session="$s" :tz="$tz" variant="row" />
                         @endforeach
                     </div>
                     @if ($sessionCount > $sessions->count())

@@ -140,6 +140,93 @@ tous.push(s.report());
   tous.push(s25.report());
 }
 
+// ── S26 · #50 · Identité des cartes : après navigation, chaque carte rend SA séance ──
+{
+  const s26 = new Scenario('S26 · Morphing — la carte rend bien la séance de son lien');
+
+  // Vérité en base : id → titre. C'est à ELLE qu'on confronte le rendu, pas à un instantané
+  // précédent — un contenu croisé par morphing produit justement une carte cohérente avec
+  // elle-même, mais menteuse sur le lien qu'elle porte.
+  const titres = new Map(sql('SELECT id, title FROM sessions').split('\n')
+    .filter(Boolean).map((l) => l.split(' | ').map((c) => c.trim())));
+
+  // Cartes VISIBLES uniquement : les deux coquilles sont dans le DOM, une seule est rendue.
+  // Les variantes `row` et `week` portent le titre ; la variante `pill` (vue Mois) ne le porte
+  // pas — le contrôle de contenu ne vaut donc que sur la vue Semaine.
+  const releve = (page) => page.$$eval('a.scard:visible', (els) => els.map((e) => ({
+    id: (e.getAttribute('href').match(/\/seances\/(\d+)/) || [])[1],
+    texte: e.innerText,
+    cle: e.getAttribute('wire:key'),
+  })));
+
+  // Retourne le libellé de la première incohérence, ou null.
+  const croisee = (cartes) => {
+    for (const c of cartes) {
+      const attendu = titres.get(c.id);
+      if (!attendu) return `/seances/${c.id} inconnue en base`;
+      if (!c.texte.includes(attendu)) {
+        return `/seances/${c.id} devrait dire « ${attendu} », rend ${JSON.stringify(c.texte.replace(/\s+/g, ' ').slice(0, 60))}`;
+      }
+    }
+    return null;
+  };
+
+  const clesUniques = (cartes) => {
+    const vues = cartes.map((c) => c.cle);
+    return vues.every(Boolean) && new Set(vues).size === vues.length;
+  };
+
+  for (const [nom, vp] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
+    const { ctx, page } = await session(browser, 'marie@demo.club', vp);
+    await page.goto(`${BASE}/planning?view=week`, { waitUntil: 'networkidle' });
+
+    const avant = await releve(page);
+    // Contrôle positif : sans cartes, tout ce qui suit serait vrai à vide.
+    if (!s26.check(`${nom} : la semaine rend des cartes`, avant.length > 0, `${avant.length} carte(s)`)) {
+      await ctx.close();
+      continue;
+    }
+    s26.check(`${nom} : chaque carte porte une wire:key distincte`, clesUniques(avant),
+              avant.map((c) => c.cle).join(', ').slice(0, 90));
+    s26.check(`${nom} : chaque carte rend sa propre séance`, croisee(avant) === null, croisee(avant) ?? '');
+
+    // Changement de semaine : c'est CE re-rendu que le morphing traite, et sans clé il apparie
+    // les cartes par position.
+    await page.locator('button[aria-label="Suivant"]:visible').first().click();
+    await page.waitForTimeout(1200);
+    const apres = await releve(page);
+    // Contrôle positif apparié : la liste a bien changé — sinon le morphing n'a rien eu à faire
+    // et l'assertion qui suit ne prouverait rien.
+    const memes = avant.map((c) => c.id).join() === apres.map((c) => c.id).join();
+    s26.check(`${nom} : la semaine suivante rend une autre liste`, !memes,
+              `${avant.length} → ${apres.length} carte(s)`);
+    s26.check(`${nom} : après changement de semaine, aucun contenu croisé`,
+              croisee(apres) === null, croisee(apres) ?? '');
+    s26.check(`${nom} : les clés restent distinctes`, clesUniques(apres));
+    await page.screenshot({ path: new URL(`./shots/s26-semaine-suivante-${nom}.png`, import.meta.url).pathname });
+
+    // Filtre discipline — masqué sur mobile (is-hidden-temp), donc desktop seulement.
+    if (nom === 'desktop') {
+      const chips = page.locator('.dk-plan-filters .chip:visible');
+      const n = await chips.count();
+      if (s26.check('desktop : les chips de filtre sont rendus', n > 1, `${n} chip(s)`)) {
+        await chips.nth(1).click();
+        await page.waitForTimeout(1200);
+        const filtre = await releve(page);
+        s26.check('desktop : après filtrage, aucun contenu croisé',
+                  croisee(filtre) === null, croisee(filtre) ?? `${filtre.length} carte(s)`);
+        s26.check('desktop : les clés restent distinctes après filtrage', clesUniques(filtre));
+        await page.screenshot({ path: new URL('./shots/s26-filtre-discipline.png', import.meta.url).pathname });
+      }
+    }
+
+    s26.checkJs(page);
+    await ctx.close();
+  }
+
+  tous.push(s26.report());
+}
+
 await browser.close();
 const ok = tous.every(Boolean);
 console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES SCÉNARIOS RESPONSIVE PASSENT' : '❌ AU MOINS UN SCÉNARIO RESPONSIVE ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);
