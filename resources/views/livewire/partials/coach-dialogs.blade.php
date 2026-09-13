@@ -50,8 +50,15 @@
     @php($lcCoach = $session->coaches->firstWhere('id', $lastCoachConfirm['coach_id']))
     <x-dialog title="Dernier coach inscrit" :danger="true" :width="440" close="cancelLastCoachConfirm">
         <x-banner kind="danger">
-            <div><b>{{ $lcCoach?->fullName() }}</b> est le seul coach inscrit. La séance se retrouvera
-            sans encadrement après son retrait.</div>
+            {{-- Un intervenant extérieur signalé (#38) vaut encadrement : ne pas annoncer une séance
+                 « sans encadrement » qui ne l'est pas, mais dire ce qui disparaît vraiment. --}}
+            @if ($session->external_staff_label)
+                <div><b>{{ $lcCoach?->fullName() }}</b> est le seul coach inscrit. Après son retrait, la séance
+                n'aura plus aucun coach du club — seul l'intervenant extérieur (« {{ $session->external_staff_label }} ») restera signalé.</div>
+            @else
+                <div><b>{{ $lcCoach?->fullName() }}</b> est le seul coach inscrit. La séance se retrouvera
+                sans encadrement après son retrait.</div>
+            @endif
         </x-banner>
         <x-slot:footer>
             <button type="button" class="btn btn-ghost" wire:click="cancelLastCoachConfirm">Annuler</button>
@@ -109,7 +116,11 @@
             </div>
 
             @if (! empty($flipConfirm['last_coach']))
-                <x-banner kind="danger"><div><b>Dernier coach.</b> En basculant, la séance se retrouvera sans encadrement (0 coach).</div></x-banner>
+                @if ($session->external_staff_label)
+                    <x-banner kind="danger"><div><b>Dernier coach.</b> En basculant, la séance n'aura plus aucun coach du club — seul l'intervenant extérieur (« {{ $session->external_staff_label }} ») restera signalé.</div></x-banner>
+                @else
+                    <x-banner kind="danger"><div><b>Dernier coach.</b> En basculant, la séance se retrouvera sans encadrement (0 coach).</div></x-banner>
+                @endif
             @endif
 
             <div style="margin-top:{{ empty($flipConfirm['last_coach']) ? 0 : 14 }}px">
