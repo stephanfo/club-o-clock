@@ -200,18 +200,30 @@ class SessionAdHocLocationTest extends TestCase
             ->assertSet('ad_hoc_longitude', 3.4234567);
     }
 
-    /** Repli manuel : géocodeur muet → message de refus, coordonnées laissées à la saisie. */
-    public function test_form_geocode_failure_warns_instead_of_silently_passing(): void
+    /**
+     * Repli du PRD §4.13.4 quand le géocodeur ne trouve rien : aucune suggestion, pas de plantage,
+     * et les coordonnées saisies à la main suffisent à porter météo et carte. C'est ce repli qui
+     * dispense d'un second bouton « Géocoder » — il taperait le même Nominatim que l'autocomplétion.
+     */
+    public function test_manual_coordinates_are_the_fallback_when_geocoder_finds_nothing(): void
     {
         Http::fake(['nominatim.openstreetmap.org/*' => Http::response([])]);
 
-        Livewire::actingAs($this->coach())->test(SessionForm::class)
+        $composant = Livewire::actingAs($this->coach())->test(SessionForm::class)
             ->set('locationMode', 'adhoc')
             ->set('ad_hoc_address', 'lieu introuvable xyz')
-            ->call('geocodeAdHoc')
-            ->assertSet('ad_hoc_latitude', null)
-            // Le refus se voit à l'écran, en orange (x-flash-float lit session('warn')).
-            ->assertSee('Géocodage en échec', false);
+            ->assertSet('addressSuggestions', [])
+            ->set('ad_hoc_latitude', 46.1234567)
+            ->set('ad_hoc_longitude', 3.4234567)
+            ->set('kind', 'club_event')
+            ->set('title', 'Sortie hors catalogue')
+            ->set('start_at', Carbon::now()->addDays(2)->setTime(9, 0)->format('Y-m-d\TH:i'))
+            ->set('duration_min', 120)
+            ->call('save');
+
+        $composant->assertHasNoErrors();
+        $s = Session::where('title', 'Sortie hors catalogue')->firstOrFail();
+        $this->assertSame(['lat' => 46.1234567, 'lng' => 3.4234567], $s->coordinates());
     }
 
     // ---------------------------------------------------------------- pré-calcul météo

@@ -222,15 +222,15 @@
                                 @endif
                             </div>
 
-                            {{-- Coordonnées : auto-remplies par la sélection, modifiables. Sans elles
-                                 l'adresse reste affichée mais ne porte ni météo ni carte. --}}
+                            {{-- Coordonnées : auto-remplies par la sélection, modifiables. Elles SONT le
+                                 repli quand le géocodeur ne trouve rien (PRD §4.13.4 : « saisie manuelle
+                                 de lat/lng, pas de fallback en cascade ») — d'où l'absence d'un second
+                                 bouton « Géocoder », que le catalogue a lui aussi abandonné une fois
+                                 l'autocomplétion en place. Sans coordonnées, l'adresse reste affichée
+                                 mais ne porte ni météo ni carte. --}}
                             <div class="flex g8 wrap" style="align-items:flex-end">
                                 <div style="width:150px"><label class="field-label">Latitude</label><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="ad_hoc_latitude" placeholder="47.37"></div></div>
                                 <div style="width:150px"><label class="field-label">Longitude</label><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="ad_hoc_longitude" placeholder="-1.17"></div></div>
-                                <button type="button" class="btn btn-ghost btn-sm" wire:click="geocodeAdHoc"
-                                        wire:loading.attr="disabled" wire:target="geocodeAdHoc">
-                                    <x-icon name="map-pin" :size="14" /> Géocoder
-                                </button>
                             </div>
 
                             @if (filled($ad_hoc_latitude) && filled($ad_hoc_longitude))

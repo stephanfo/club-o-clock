@@ -407,29 +407,6 @@ class SessionForm extends Component
         $this->dispatch('location-located', lat: $this->ad_hoc_latitude, lng: $this->ad_hoc_longitude);
     }
 
-    /** Géocode l'adresse ponctuelle saisie (§4.13.4). Échec → repli sur la saisie manuelle lat/lng. */
-    public function geocodeAdHoc(GeocodingService $geo): void
-    {
-        $address = trim($this->ad_hoc_address);
-        if ($address === '') {
-            session()->flash('warn', 'Renseigne d\'abord une adresse à géocoder.');
-
-            return;
-        }
-
-        $coords = $geo->geocode($address);
-        if ($coords === null) {
-            session()->flash('warn', 'Géocodage en échec — saisis la latitude et la longitude manuellement.');
-
-            return;
-        }
-
-        $this->ad_hoc_latitude = $coords['lat'];
-        $this->ad_hoc_longitude = $coords['lng'];
-        $this->dispatch('location-located', lat: $coords['lat'], lng: $coords['lng']);
-        session()->flash('status', 'Coordonnées renseignées par géocodage.');
-    }
-
     public function save(SessionNotificationService $notifier)
     {
         $data = $this->validate();
