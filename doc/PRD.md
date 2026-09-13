@@ -630,6 +630,8 @@ Le coach peut **forcer une inscription `participating`**, en outrepassant quota 
 - **Bandeau d'alerte douce** sur la fiche séance (§4.11.4).
 - **Compteur « séances futures sans coach »** dans le dashboard admin (§4.16).
 
+**Intervenant extérieur** (`training` uniquement) : certaines séances sont encadrées par un prestataire non adhérent et sans compte — surveillant de baignade, MNS. `Session.externalStaffLabel` signale **qu'il y en a un**, sans nommer la personne : ni compte fictif (qui ferait pousser des notifications vers une adresse morte et polluerait pickers et statistiques), ni fiche sur un tiers non adhérent. Une séance qui le porte est considérée **encadrée** par les deux signaux ci-dessus. Champ **non structurant** : le renseigner ne notifie pas les inscrits (§4.7).
+
 **Droits opérationnels inchangés** : l'inscription comme coach **ne confère aucun droit supplémentaire** par rapport au rôle `coach` global. Tout coach du club (inscrit ou non sur la séance) peut éditer la séance, déclencher un override, déclencher le mécanisme C. La présence dans `coaches[]` sert uniquement à : afficher qui anime, agréger les qualifications, alimenter les stats d'activité.
 
 **Traçabilité** : chaque action génère une entrée `ActivityLog` (`coach_registered` ou `coach_unregistered`, sans motif). `actorId` = utilisateur qui déclenche, `userId` = coach concerné — **peuvent différer** en cas d'inscription/désinscription par un tiers.
@@ -660,7 +662,8 @@ Le coach peut **forcer une inscription `participating`**, en outrepassant quota 
 Bloc **« Encadrement »** :
 - **Liste nominative** des coachs inscrits (`coaches[]`) — prénom + nom complet (**visibilité publique** à tout membre connecté, contrairement aux athlètes affichés en prénom + initiale, cf. §4.9.4).
 - Bloc **« Qualifications disponibles »** : **chips agrégés uniques** des qualifs des coachs inscrits (déduplication par `qualificationId`). Au tap / hover d'un chip : détail des coachs qui portent cette qualif + badge d'expiration éventuel.
-- **Si `coaches[] = ∅`** : **bandeau d'alerte douce** « Pas de coach inscrit pour le moment ». S'efface dès qu'un coach s'inscrit. Pas de blocage d'inscription athlète.
+- **Carte « Intervenant extérieur »** si `externalStaffLabel` est renseigné : le libellé seul, sans avatar nominatif ni chips de qualifications — **aucune donnée nominative n'est stockée** sur ce prestataire (minimisation RGPD, cohérent avec les exclusions de §3.2). Affichée **indépendamment** des coachs inscrits : une séance peut légitimement avoir un coach du club **et** un surveillant externe.
+- **Si `coaches[] = ∅` et `externalStaffLabel` vide** : **bandeau d'alerte douce** « Pas de coach inscrit pour le moment ». S'efface dès qu'un coach s'inscrit **ou** qu'un intervenant extérieur est signalé — dans les deux cas la séance est encadrée. Pas de blocage d'inscription athlète.
 
 Sur `competition` / `club_event` : liste nominative des `coaches[]` (« accompagnateurs » / « organisateurs ») — pas de bloc qualifs, pas de bandeau « pas de coach ».
 
@@ -1096,12 +1099,12 @@ Vue logique des entités. **Volontairement agnostique** à la techno de stockage
 - **`UserCategory`** (M:N) : un `User` ↔ une ou plusieurs `Category`. Une catégorie est dite « principale » (dérivée auto, surclassable).
 - **`Session`** :
   - Communs : `kind` (`training` | `competition` | `club_event`), `title`, `disciplineId?`, `startAt`, `durationMin`, `locationId?` + `locationText?`, `capacity?`, `categoryIds[]`, `createdBy` (immuable), `coaches[]` (M:N), `sourceTemplateId?` (informatif uniquement), `cancelledAt?` / `cancelledBy?`, `visibility`.
-  - `training` : `quotaTagId?`, `contentMarkdown`, `contentAttachment`.
+  - `training` : `quotaTagId?`, `contentMarkdown`, `contentAttachment`, `externalStaffLabel?` (libellé libre ≤ 120 car. d'un intervenant extérieur — **non nominatif**, cf. §4.11.2 ; forcé à `null` sur les autres `kind`).
   - `competition` : `eventTypeId` (FK Types d'épreuve), `distance`, `externalUrl`, `photosAlbumUrl?`.
   - `club_event` : `agenda` (markdown), `externalUrl?`, `photosAlbumUrl?`.
   - Parcours : `routeOpenrunnerEmbedUrl?`, `routeOpenrunnerPublicUrl?`, `routeOpenrunnerId?` (dérivé du `code` opaque, non exposé), `route?` (référence `0..1` vers un **`GpxRoute`** — cf. §4.20 ; remplace les anciens `routeGpxFile?` / `routeStats?` portés par la séance).
 - **`Registration`** (rattachée à une `Session`) : `userId`, `status` (`participating` | `waitlist` | `cancelled`), `waitlistReason?` (`capacity` | `quota_exceeded`), `waitlistPosition?`, `registeredAt`, `promotedAt?`, `promotedBy?`, `overrideBy?`, `overrideReason?`.
-- **`SessionTemplate`** : `id`, `label`, `kind`, `disciplineId?`, `dayOfWeek` (1..7), `startTimeOfDay`, `durationMin`, `locationId?` / `locationText?`, `capacity?`, `quotaTagId?`, `categoryIds[]`, `defaultCoachIds[]`, `generationStartDate`, `generationEndDate` (**obligatoires**), `createdBy` (= admin), `status` (`active` / `archived`). Aucun lien retour comportemental vers les `Session` générées.
+- **`SessionTemplate`** : `id`, `label`, `kind`, `disciplineId?`, `dayOfWeek` (1..7), `startTimeOfDay`, `durationMin`, `locationId?` / `locationText?`, `externalStaffLabel?` (recopié sur chaque séance générée, `training` uniquement), `capacity?`, `quotaTagId?`, `categoryIds[]`, `defaultCoachIds[]`, `generationStartDate`, `generationEndDate` (**obligatoires**), `createdBy` (= admin), `status` (`active` / `archived`). Aucun lien retour comportemental vers les `Session` générées.
 - **`QuotaTag`** : `code`, `label`, `maxPerWeek`, `archivedAt?`. Universel — aucune restriction de discipline.
 - **`Discipline`** : `id`, `label`, `archivedAt?`. Référencée par `Session.disciplineId` et `SessionTemplate.disciplineId`, sur les `training` uniquement (§4.7). Garde-fou : la dernière discipline active ne peut être ni archivée ni supprimée.
 - **`EventType`** : `id`, `label`, `archivedAt?`. Référencé par `Session.eventTypeId` (uniquement pour `kind = competition`). Garde-fou : le dernier type actif ne peut être ni archivé ni supprimé (cf. §4.6.2 — note ouverte sur ce point).
