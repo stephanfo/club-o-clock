@@ -10,7 +10,7 @@
                     <span class="apero-dot"><x-chope :size="14" /></span>
                     <div class="f1" style="min-width:0">
                         <div style="font-weight:700;font-size:14px">{{ $s->title }}</div>
-                        <div class="meta">{{ $s->start_at->copy()->setTimezone($tz)->locale('fr')->isoFormat('ddd HH:mm') }}{{ $loc ? ' · '.$loc : '' }}</div>
+                        <div class="meta">{{ $s->start_at->copy()->setTimezone($tz)->locale('fr')->isoFormat('ddd D MMM · HH:mm') }}{{ $loc ? ' · '.$loc : '' }}</div>
                     </div>
                     <x-icon name="chevron-right" style="color:var(--fg-muted);flex:0 0 auto" />
                 </a>
