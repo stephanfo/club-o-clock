@@ -5,6 +5,7 @@ namespace App\Livewire\Concerns\SessionShow;
 use App\Models\User;
 use App\Services\CoachRegistrationService;
 use App\Services\RegistrationService;
+use App\Support\Logging\AuditLogger;
 use Illuminate\Support\Collection;
 use RuntimeException;
 
@@ -30,6 +31,83 @@ trait ManagesCoaching
     public function closeCoachPicker(): void
     {
         $this->pickingCoach = false;
+    }
+
+    /** Fenêtre « Intervenant extérieur » (#38) ouverte ? */
+    public bool $editingExternalStaff = false;
+
+    /** Libellé en cours de saisie dans la fenêtre — n'écrit rien tant qu'on n'enregistre pas. */
+    public string $externalStaffDraft = '';
+
+    /**
+     * Intervenant extérieur réglé depuis la fiche, sans passer par le formulaire d'édition (#38).
+     * Fenêtre DISTINCTE du sélecteur de coach : celui-ci agit au clic et notifie (§4.11.2), celle-ci
+     * attend une saisie et ne prévient personne — champ non structurant, comme au formulaire.
+     */
+    public function openExternalStaff(): void
+    {
+        $this->authorize('update', $this->session);
+        if (! $this->externalStaffManageable()) {
+            return;
+        }
+
+        $this->resetValidation('externalStaffDraft');
+        $this->externalStaffDraft = $this->session->external_staff_label ?? '';
+        $this->editingExternalStaff = true;
+    }
+
+    public function closeExternalStaff(): void
+    {
+        $this->editingExternalStaff = false;
+    }
+
+    public function saveExternalStaff(): void
+    {
+        $this->authorize('update', $this->session);
+        if (! $this->externalStaffManageable()) {
+            $this->editingExternalStaff = false;
+
+            return;
+        }
+
+        $this->validate(['externalStaffDraft' => ['nullable', 'string', 'max:120']]);
+
+        $this->writeExternalStaff(trim($this->externalStaffDraft) ?: null);
+        $this->editingExternalStaff = false;
+    }
+
+    /** Retrait (wire:confirm côté vue : anodin et réversible, personne n'est prévenu). */
+    public function removeExternalStaff(): void
+    {
+        $this->authorize('update', $this->session);
+        if (! $this->externalStaffManageable()) {
+            return;
+        }
+
+        $this->writeExternalStaff(null);
+    }
+
+    /**
+     * Même fenêtre de gestion que les coachs sur la fiche (`$manage` de fiche-encadrement) :
+     * entraînement ni annulé ni commencé. Gardée ICI, le bouton masqué ne gardant rien.
+     */
+    private function externalStaffManageable(): bool
+    {
+        if ($this->session->kind !== 'training' || $this->session->isCancelled() || $this->session->hasStarted()) {
+            session()->flash('warn', 'L’intervenant extérieur ne se règle que sur un entraînement à venir.');
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function writeExternalStaff(?string $label): void
+    {
+        $this->session->update(['external_staff_label' => $label]);
+        AuditLogger::record('update_session', auth()->user(), ['session_id' => $this->session->id]);
+        session()->flash('status', $label === null ? 'Intervenant extérieur retiré.' : 'Intervenant extérieur enregistré.');
+        $this->refreshSession();
     }
 
     /** Voie 2 — self-inscription comme encadrant (§4.11.2). */

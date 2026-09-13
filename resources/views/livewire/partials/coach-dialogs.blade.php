@@ -1,5 +1,5 @@
 {{-- Dialogs d'encadrement (§4.11.2 / §4.11.5), portés de modals.jsx (BasculeModal + inscrireCoach).
-     Pilotés par les propriétés Livewire : $pickingCoach, $lastCoachConfirm, $flipConfirm.
+     Pilotés par les propriétés Livewire : $pickingCoach, $editingExternalStaff, $lastCoachConfirm, $flipConfirm.
      Reçoit : $session, $selectableCoaches. --}}
 
 {{-- ── Sélecteur « Inscrire un coach » (voie 3, §4.11.2) ── --}}
@@ -24,6 +24,23 @@
         @endif
         <x-slot:footer>
             <button type="button" class="btn btn-ghost" wire:click="closeCoachPicker">Fermer</button>
+        </x-slot:footer>
+    </x-dialog>
+@endif
+
+{{-- ── Intervenant extérieur (#38) ── Fenêtre distincte du sélecteur de coach : ici on saisit un
+     libellé puis on enregistre, et personne n'est notifié. Non nominatif par construction. --}}
+@if ($editingExternalStaff)
+    <x-dialog title="Intervenant extérieur" sub="Prestataire sans compte · sans nommer la personne" :width="440" close="closeExternalStaff">
+        <form wire:submit="saveExternalStaff" id="form-intervenant">
+            <label class="field-label">Libellé</label>
+            <div class="ifield"><input class="ifield-input" type="text" maxlength="120" wire:model="externalStaffDraft" placeholder="ex. Surveillant de baignade" autofocus></div>
+            @error('externalStaffDraft')<div class="field-error">{{ $message }}</div>@enderror
+            <div class="meta" style="font-size:var(--text-xs);margin-top:6px">Suffit à lever l’alerte « pas de coach inscrit ». Aucun inscrit n’est prévenu.</div>
+        </form>
+        <x-slot:footer>
+            <button type="button" class="btn btn-ghost" wire:click="closeExternalStaff">Annuler</button>
+            <button type="submit" form="form-intervenant" class="btn btn-primary" wire:loading.attr="disabled" wire:target="saveExternalStaff">Enregistrer</button>
         </x-slot:footer>
     </x-dialog>
 @endif

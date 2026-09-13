@@ -5,9 +5,11 @@ namespace Tests\Feature;
 use App\Livewire\Admin\TemplateForm;
 use App\Livewire\SessionForm;
 use App\Livewire\SessionShow;
+use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\Discipline;
 use App\Models\EventType;
+use App\Models\NotificationOutbox;
 use App\Models\Session;
 use App\Models\SessionTemplate;
 use App\Models\User;
@@ -15,7 +17,9 @@ use App\Services\StatsService;
 use App\Services\TemplateGenerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -221,19 +225,166 @@ class SessionExternalStaffTest extends TestCase
         $this->assertNull(SessionTemplate::where('label', 'Sortie club')->sole()->external_staff_label);
     }
 
+    // ------------------------------------------------------------------ fenêtre depuis la fiche
+
+    /**
+     * Comme « Inscrire un coach », l'intervenant se règle depuis l'onglet Encadrement sans ouvrir
+     * le formulaire d'édition : ouvrir → saisir → enregistrer.
+     */
+    public function test_un_coach_renseigne_lintervenant_depuis_la_fiche(): void
+    {
+        $s = $this->seance();
+
+        Livewire::actingAs(User::factory()->coach()->create())->test(SessionShow::class, ['session' => $s])
+            ->assertSee('Intervenant extérieur')
+            ->call('openExternalStaff')
+            ->assertSet('editingExternalStaff', true)
+            ->set('externalStaffDraft', '  Surveillant de baignade  ')
+            ->call('saveExternalStaff')
+            ->assertSet('editingExternalStaff', false)
+            ->assertSee('Surveillant de baignade')
+            ->assertDontSee('Pas de coach inscrit');
+
+        $this->assertSame('Surveillant de baignade', $s->fresh()->external_staff_label);
+    }
+
+    public function test_la_fenetre_se_preremplit_et_modifie_le_libelle_existant(): void
+    {
+        $s = $this->seance(['external_staff_label' => 'Surveillant de baignade']);
+
+        Livewire::actingAs(User::factory()->admin()->create())->test(SessionShow::class, ['session' => $s])
+            ->call('openExternalStaff')
+            ->assertSet('externalStaffDraft', 'Surveillant de baignade')
+            ->set('externalStaffDraft', 'MNS prestataire')
+            ->call('saveExternalStaff');
+
+        $this->assertSame('MNS prestataire', $s->fresh()->external_staff_label);
+    }
+
+    /** Retirer rend la séance à nouveau « sans coach » : le bandeau revient. */
+    public function test_retirer_lintervenant_fait_revenir_le_bandeau(): void
+    {
+        $s = $this->seance(['external_staff_label' => 'Surveillant de baignade']);
+
+        Livewire::actingAs(User::factory()->coach()->create())->test(SessionShow::class, ['session' => $s])
+            ->assertDontSee('Pas de coach inscrit')
+            ->call('removeExternalStaff')
+            ->assertSee('Pas de coach inscrit');
+
+        $this->assertNull($s->fresh()->external_staff_label);
+    }
+
+    /** Vider le champ puis enregistrer équivaut à retirer — pas de libellé blanc en base. */
+    public function test_enregistrer_un_champ_vide_retire_le_libelle(): void
+    {
+        $s = $this->seance(['external_staff_label' => 'Surveillant de baignade']);
+
+        Livewire::actingAs(User::factory()->coach()->create())->test(SessionShow::class, ['session' => $s])
+            ->call('openExternalStaff')
+            ->set('externalStaffDraft', '   ')
+            ->call('saveExternalStaff');
+
+        $this->assertNull($s->fresh()->external_staff_label);
+    }
+
+    public function test_la_fenetre_borne_le_libelle_a_120_caracteres(): void
+    {
+        $s = $this->seance();
+
+        Livewire::actingAs(User::factory()->coach()->create())->test(SessionShow::class, ['session' => $s])
+            ->call('openExternalStaff')
+            ->set('externalStaffDraft', str_repeat('a', 121))
+            ->call('saveExternalStaff')
+            ->assertHasErrors(['externalStaffDraft' => 'max']);
+
+        $this->assertNull($s->fresh()->external_staff_label);
+    }
+
+    /** Refus : un athlète ne voit pas le geste, et une requête forgée est rejetée par la policy. */
+    public function test_un_athlete_ne_peut_ni_voir_ni_forcer_le_geste(): void
+    {
+        $s = $this->seance();
+        $athlete = User::factory()->create();
+
+        Livewire::actingAs($athlete)->test(SessionShow::class, ['session' => $s])
+            ->assertDontSeeHtml('wire:click="openExternalStaff"')
+            ->call('saveExternalStaff')
+            ->assertForbidden();
+
+        Livewire::actingAs($athlete)->test(SessionShow::class, ['session' => $this->seance(['external_staff_label' => 'Surveillant'])])
+            ->call('removeExternalStaff')
+            ->assertForbidden();
+
+        $this->assertNull($s->fresh()->external_staff_label);
+        // Contrôle positif : le même écran, vu par un coach, propose bien le geste.
+        Livewire::actingAs(User::factory()->coach()->create())->test(SessionShow::class, ['session' => $s])
+            ->assertSeeHtml('wire:click="openExternalStaff"');
+    }
+
+    /**
+     * Refus serveur hors fenêtre de gestion : compétition, séance annulée, séance commencée. Le
+     * bouton y est masqué, mais l'appel direct ne doit rien écrire.
+     *
+     * @return array<string, array{0: array<string, mixed>}>
+     */
+    public static function seancesHorsGestion(): array
+    {
+        return [
+            'compétition' => [['kind' => 'competition', 'discipline_id' => null]],
+            'séance annulée' => [['cancelled_at' => '2026-06-19 10:00:00']],
+            'séance commencée' => [['start_at' => '2026-06-20 11:30:00']],
+        ];
+    }
+
+    /** @param  array<string, mixed>  $attrs */
+    #[DataProvider('seancesHorsGestion')]
+    public function test_le_geste_est_refuse_hors_fenetre_de_gestion(array $attrs): void
+    {
+        $s = $this->seance($attrs);
+        $coach = User::factory()->coach()->create();
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s])
+            ->assertDontSeeHtml('wire:click="openExternalStaff"')
+            ->call('openExternalStaff')
+            ->assertSet('editingExternalStaff', false)
+            ->set('externalStaffDraft', 'Surveillant de baignade')
+            ->call('saveExternalStaff');
+
+        $this->assertNull($s->fresh()->external_staff_label);
+    }
+
+    public function test_le_geste_est_trace_au_journal_daudit_sans_notifier(): void
+    {
+        Notification::fake();
+        $s = $this->seance();
+        $coach = User::factory()->coach()->create();
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s])
+            ->call('openExternalStaff')
+            ->set('externalStaffDraft', 'Surveillant de baignade')
+            ->call('saveExternalStaff');
+
+        $this->assertTrue(AuditLog::where('action', 'update_session')->where('session_id', $s->id)->exists());
+        $this->assertSame(0, NotificationOutbox::count());
+    }
+
     // ------------------------------------------------------------------ fabriques
 
     /** @param  array<string, mixed>  $attrs */
     private function seance(array $attrs = []): Session
     {
-        return Session::create(array_merge([
+        // forceFill : `cancelled_at` n'est pas mass-assignable, une séance annulée passe par là.
+        $s = new Session;
+        $s->forceFill(array_merge([
             'kind' => 'training',
             'title' => 'Natation',
             'discipline_id' => $this->discipline->id,
             'start_at' => Carbon::now()->addDays(3)->setTime(9, 0),
             'duration_min' => 90,
             'created_by' => User::factory()->admin()->create()->id,
-        ], $attrs));
+        ], $attrs))->save();
+
+        return $s;
     }
 
     /** @param  array<string, mixed>  $attrs */

@@ -81,6 +81,18 @@
                     <div style="font-weight:700;font-size:15px">{{ $session->external_staff_label }}</div>
                     <div class="meta">Prestataire extérieur au club</div>
                 </div>
+                {{-- Modifier / retirer, au format des actions de la carte d'un coach. Retrait en
+                     wire:confirm : anodin, réversible, personne n'est prévenu. --}}
+                @if ($manage)
+                    <div class="flex g4" style="flex:0 0 auto">
+                        <button wire:click="openExternalStaff" class="iconbtn" title="Modifier l’intervenant extérieur" aria-label="Modifier l’intervenant extérieur">
+                            <x-icon name="pencil" :size="16" />
+                        </button>
+                        <button wire:click="removeExternalStaff" wire:confirm="Retirer l’intervenant extérieur de cette séance ?" class="iconbtn" title="Retirer l’intervenant extérieur" aria-label="Retirer l’intervenant extérieur">
+                            <x-icon name="x" :size="16" />
+                        </button>
+                    </div>
+                @endif
             </div>
         </div>
     @endif
@@ -96,6 +108,13 @@
             <button wire:click="openCoachPicker" class="btn btn-ghost btn-sm">
                 <x-icon name="user-plus" :size="14" /> Inscrire un coach
             </button>
+            {{-- Intervenant extérieur (#38) : proposé tant qu'aucun n'est signalé ; ensuite, on le
+                 modifie ou le retire depuis sa carte. --}}
+            @unless ($session->external_staff_label)
+                <button wire:click="openExternalStaff" class="btn btn-ghost btn-sm">
+                    <x-icon name="shield" :size="14" /> Intervenant extérieur
+                </button>
+            @endunless
         </div>
     @endif
 
