@@ -7,9 +7,28 @@
 @php($manage = ($canManageCoaches ?? false) && ! $session->isCancelled() && ! $session->hasStarted())
 <div style="display:flex;flex-direction:column;gap:14px">
 
-    {{-- Bandeau d'alerte douce : aucun encadrant (training uniquement, §4.11.4). --}}
-    @if ($isTraining && $session->coaches->isEmpty())
+    {{-- Bandeau d'alerte douce : aucun encadrant (training uniquement, §4.11.4). Un intervenant
+         extérieur signalé (#38) vaut encadrement — la séance n'est pas orpheline, l'alerte se tait. --}}
+    @if ($isTraining && $session->coaches->isEmpty() && ! $session->external_staff_label)
         <x-banner kind="warn">Pas de coach inscrit pour le moment.</x-banner>
+    @endif
+
+    {{-- Intervenant extérieur (#38) : carte au format des encadrants, mais SANS avatar nominatif
+         ni chips de qualifications — rien n'est stocké sur la personne, il n'y a personne à
+         afficher. Indépendante des coachs : un coach du club et un surveillant externe coexistent. --}}
+    @if ($isTraining && $session->external_staff_label)
+        <div>
+            <div class="sect-head"><span class="sect-title">Intervenant extérieur</span></div>
+            <div class="card card-pad flex ac g12">
+                {{-- La pastille `avatar` du design system, mais une icône au lieu d'initiales :
+                     il n'y a précisément pas de nom à porter. --}}
+                <span class="avatar lg" style="color:var(--fg-muted)"><x-icon name="shield" :size="22" /></span>
+                <div class="f1" style="min-width:0">
+                    <div style="font-weight:700;font-size:15px">{{ $session->external_staff_label }}</div>
+                    <div class="meta">Prestataire extérieur au club</div>
+                </div>
+            </div>
+        </div>
     @endif
 
     @if ($session->coaches->isNotEmpty())

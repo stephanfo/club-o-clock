@@ -116,6 +116,9 @@ class TemplateGenerationService
                     'duration_min' => $template->duration_min,
                     'location_id' => $template->location_id,
                     'location_text' => $template->location_text,
+                    // Intervenant extérieur : training uniquement, même garde que discipline_id
+                    // ci-dessus — un modèle competition/club_event ne propage aucun libellé (#38).
+                    'external_staff_label' => $template->kind === 'training' ? $template->external_staff_label : null,
                     'capacity' => $template->capacity,
                     'quota_tag_id' => $template->kind === 'training' ? $template->quota_tag_id : null,
                     'created_by' => $template->created_by,

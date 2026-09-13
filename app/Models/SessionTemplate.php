@@ -18,6 +18,8 @@ class SessionTemplate extends Model
     protected $fillable = [
         'label', 'kind', 'discipline_id', 'day_of_week', 'start_time_of_day', 'duration_min',
         'location_id', 'location_text', 'capacity', 'quota_tag_id',
+        // Intervenant extérieur (#38) — recopié sur chaque séance générée.
+        'external_staff_label',
         'generation_start_date', 'generation_end_date', 'created_by', 'status',
     ];
 

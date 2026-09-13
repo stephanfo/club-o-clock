@@ -54,6 +54,12 @@ class SessionForm extends Component
     public string $location_text = '';
 
     /**
+     * Intervenant extérieur assurant la séance (#38) — surveillant de baignade prestataire, MNS…
+     * Non nominatif par construction : on dit QU'IL Y EN A un, jamais qui c'est. Training seulement.
+     */
+    public string $external_staff_label = '';
+
+    /**
      * Lieu de la séance (#37) : « favori » (catalogue) ou « adhoc » (adresse ponctuelle géocodée).
      * Bascule d'UI uniquement — ce qui fait foi en base, c'est `ad_hoc_address` rempli ou non, et
      * l'exclusion mutuelle est gardée côté serveur (règle de validation), jamais par ce mode.
@@ -150,6 +156,7 @@ class SessionForm extends Component
         $this->duration_min = $s->duration_min;
         $this->location_id = $s->location_id;
         $this->location_text = $s->location_text ?? '';
+        $this->external_staff_label = $s->external_staff_label ?? '';
         $this->ad_hoc_address = $s->ad_hoc_address ?? '';
         $this->ad_hoc_latitude = $s->ad_hoc_latitude !== null ? (float) $s->ad_hoc_latitude : null;
         $this->ad_hoc_longitude = $s->ad_hoc_longitude !== null ? (float) $s->ad_hoc_longitude : null;
@@ -187,6 +194,7 @@ class SessionForm extends Component
             'duration_min' => ['required', 'integer', 'min:1', 'max:1440'],
             'location_id' => ['nullable', 'exists:locations,id'],
             'location_text' => ['nullable', 'string', 'max:255'],
+            'external_staff_label' => ['nullable', 'string', 'max:120'],
             // Exclusion mutuelle lieu favori / adresse ponctuelle (#37), GARDÉE CÔTÉ SERVEUR : la
             // bascule d'UI vide l'autre bloc, mais l'état vient du client — le grisage ne suffit
             // jamais (cf. doctrine des confirmations, CLAUDE.md).
@@ -713,6 +721,11 @@ class SessionForm extends Component
             'ad_hoc_latitude' => $adHocAddress !== null && $data['ad_hoc_latitude'] !== null ? (float) $data['ad_hoc_latitude'] : null,
             'ad_hoc_longitude' => $adHocAddress !== null && $data['ad_hoc_longitude'] !== null ? (float) $data['ad_hoc_longitude'] : null,
             'location_text' => $data['location_text'] ?: null,
+            // Intervenant extérieur : entraînement UNIQUEMENT (#38), refus GARDÉ CÔTÉ SERVEUR.
+            // Sur competition/club_event, coaches[] vaut déjà « accompagnateurs » / « organisateurs »
+            // et il n'y a ni bandeau d'alerte ni bloc qualifications — le besoin ne s'y pose pas.
+            // Le champ y est masqué, mais le masquage côté client ne garde jamais rien.
+            'external_staff_label' => $data['kind'] === 'training' ? ($data['external_staff_label'] ?: null) : null,
             'capacity' => $data['capacity'],
             // Champs spécifiques : on n'écrit que ceux du kind, les autres restent null.
             'quota_tag_id' => $data['kind'] === 'training' ? $data['quota_tag_id'] : null,
