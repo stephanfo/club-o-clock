@@ -233,7 +233,7 @@
                                 <div style="width:150px"><label class="field-label">Longitude</label><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="ad_hoc_longitude" placeholder="-1.17"></div></div>
                             </div>
 
-                            @if (filled($ad_hoc_latitude) && filled($ad_hoc_longitude))
+                            @if (is_numeric($ad_hoc_latitude) && is_numeric($ad_hoc_longitude))
                                 <div wire:ignore>
                                     <div x-data="locationMap({ lat: {{ (float) $ad_hoc_latitude }}, lng: {{ (float) $ad_hoc_longitude }} })"
                                          x-on:location-located.window="relocate($event.detail)">
