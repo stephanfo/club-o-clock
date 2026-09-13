@@ -94,9 +94,10 @@ class SessionShow extends Component
             return ['state' => 'none', 'data' => null];
         }
 
-        $lat = $s->location?->latitude;
-        $lng = $s->location?->longitude;
-        if ($lat === null || $lng === null) {
+        // Lieu favori OU adresse ponctuelle géocodée (#37) : `coordinates()` est le point de
+        // vérité unique, la fiche n'a pas à savoir lequel des deux cas elle traite.
+        $coords = $s->coordinates();
+        if ($coords === null) {
             return ['state' => 'nogeo', 'data' => null];
         }
 
@@ -107,7 +108,7 @@ class SessionShow extends Component
 
         // Toute la durée de la séance, pas son seul instant de départ (#55) : une sortie longue
         // peut partir sous un ciel dégagé et finir sous l'averse.
-        $forecast = $service->forecastRange((float) $lat, (float) $lng, $s->start_at, $s->endsAt());
+        $forecast = $service->forecastRange($coords['lat'], $coords['lng'], $s->start_at, $s->endsAt());
 
         return ['state' => $forecast ? 'full' : 'pending', 'data' => $forecast];
     }

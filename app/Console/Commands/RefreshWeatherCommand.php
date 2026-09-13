@@ -50,18 +50,21 @@ class RefreshWeatherCommand extends Command
     {
         $sessions = Session::query()
             ->whereNull('cancelled_at')
-            ->whereNotNull('location_id')
+            // Lieu favori OU adresse ponctuelle (#37) : le filtre `whereNotNull('location_id')`
+            // seul laissait les secondes sans pré-calcul, donc sans météo hors rendu de fiche.
+            ->where(fn ($q) => $q->whereNotNull('location_id')->orWhereNotNull('ad_hoc_latitude'))
             ->where('start_at', '>', Carbon::now())
             ->where('start_at', '<=', Carbon::now()->addDays(WeatherService::WINDOW_DAYS))
             ->with('location')
             ->get()
-            ->filter(fn (Session $s) => $s->location && $s->location->latitude !== null);
+            ->filter(fn (Session $s) => $s->coordinates() !== null);
 
         $refreshed = 0;
         foreach ($sessions as $s) {
             // Toute la fenêtre de la séance (#55) : pré-calculer la seule heure de départ
             // laisserait la fiche appeler Open-Meteo en plein rendu pour les heures suivantes.
-            $ok = $weather->forecastRange((float) $s->location->latitude, (float) $s->location->longitude, $s->start_at, $s->endsAt());
+            $coords = $s->coordinates();
+            $ok = $weather->forecastRange($coords['lat'], $coords['lng'], $s->start_at, $s->endsAt());
             if ($ok !== null) {
                 $refreshed++;
             }

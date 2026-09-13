@@ -24,7 +24,7 @@
     $end = $s->endsAt()->copy()->setTimezone($tz);
     $participating = $s->registrations->where('status', 'participating')->count();
     $full = $s->capacity && $participating >= $s->capacity;
-    $loc = $s->location_text ?: $s->location?->name;
+    $loc = $s->placeLabel();
     $cancelled = $s->isCancelled();
     $insLabel = $s->capacity
         ? ($full ? 'complet' : $participating.'/'.$s->capacity)

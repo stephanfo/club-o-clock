@@ -613,6 +613,9 @@ CREATE TABLE `sessions` (
   `duration_min` smallint(5) unsigned NOT NULL,
   `location_id` bigint(20) unsigned DEFAULT NULL,
   `location_text` varchar(255) DEFAULT NULL,
+  `ad_hoc_address` varchar(255) DEFAULT NULL,
+  `ad_hoc_latitude` decimal(10,7) DEFAULT NULL,
+  `ad_hoc_longitude` decimal(10,7) DEFAULT NULL,
   `capacity` smallint(5) unsigned DEFAULT NULL,
   `visibility` varchar(255) NOT NULL DEFAULT 'all',
   `created_by` bigint(20) unsigned DEFAULT NULL,
@@ -759,6 +762,7 @@ CREATE TABLE `weather_cache_entries` (
 /*M!100616 SET NOTE_VERBOSITY=@OLD_NOTE_VERBOSITY */;
 
 /*M!999999\- enable the sandbox mode */ 
+SET @OLD_AUTOCOMMIT=@@AUTOCOMMIT, @@AUTOCOMMIT=0;
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (1,'2026_01_01_000010_create_cache_table',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (2,'2026_01_01_000020_create_cache_locks_table',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (3,'2026_01_01_000030_create_categories_table',1);
@@ -796,9 +800,11 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (34,'2026_01_01_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (35,'2026_01_01_000360_create_session_coach_table',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (36,'2026_01_01_000370_create_activity_logs_table',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (37,'2026_01_01_000380_create_apero_flags_table',1);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (38,'2026_08_09_000100_add_channel_and_auth_switches_to_club_settings_table',2);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (39,'2026_08_21_000000_add_pwa_icon_paths_to_club_settings',2);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (40,'2026_08_23_000000_add_code_to_magic_link_tokens',3);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (41,'2026_08_24_000000_add_last_login_at_to_users',4);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (42,'2026_08_24_000010_purge_sent_outbox_secrets',4);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (43,'2026_09_04_000000_drop_is_minor_from_users',5);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (38,'2026_08_21_000000_add_pwa_icon_paths_to_club_settings',2);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (39,'2026_08_23_000000_add_code_to_magic_link_tokens',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (40,'2026_08_24_000000_add_last_login_at_to_users',4);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (41,'2026_08_24_000010_purge_sent_outbox_secrets',4);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (42,'2026_09_04_000000_drop_is_minor_from_users',5);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (43,'2026_09_13_000000_add_ad_hoc_location_to_sessions',6);
+COMMIT;
+SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

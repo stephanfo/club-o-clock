@@ -13,6 +13,7 @@ use App\Models\Registration;
 use App\Models\Session;
 use App\Models\User;
 use App\Notifications\NotificationType;
+use App\Services\GeocodingService;
 use App\Services\GpxRouteService;
 use App\Services\RegistrationService;
 use App\Services\SessionNotificationService;
@@ -51,6 +52,22 @@ class SessionForm extends Component
     public ?int $location_id = null;
 
     public string $location_text = '';
+
+    /**
+     * Lieu de la séance (#37) : « favori » (catalogue) ou « adhoc » (adresse ponctuelle géocodée).
+     * Bascule d'UI uniquement — ce qui fait foi en base, c'est `ad_hoc_address` rempli ou non, et
+     * l'exclusion mutuelle est gardée côté serveur (règle de validation), jamais par ce mode.
+     */
+    public string $locationMode = 'favori';
+
+    public string $ad_hoc_address = '';
+
+    public ?float $ad_hoc_latitude = null;
+
+    public ?float $ad_hoc_longitude = null;
+
+    /** @var array<int, array{name?:string, address?:string, type?:string, lat?:float, lng?:float}> */
+    public array $addressSuggestions = [];
 
     public ?int $capacity = null;
 
@@ -133,6 +150,10 @@ class SessionForm extends Component
         $this->duration_min = $s->duration_min;
         $this->location_id = $s->location_id;
         $this->location_text = $s->location_text ?? '';
+        $this->ad_hoc_address = $s->ad_hoc_address ?? '';
+        $this->ad_hoc_latitude = $s->ad_hoc_latitude !== null ? (float) $s->ad_hoc_latitude : null;
+        $this->ad_hoc_longitude = $s->ad_hoc_longitude !== null ? (float) $s->ad_hoc_longitude : null;
+        $this->locationMode = $s->ad_hoc_address !== null ? 'adhoc' : 'favori';
         $this->capacity = $s->capacity;
         $this->category_ids = $s->categories->pluck('id')->all();
         $this->coach_ids = $s->coaches->pluck('id')->all();
@@ -166,6 +187,16 @@ class SessionForm extends Component
             'duration_min' => ['required', 'integer', 'min:1', 'max:1440'],
             'location_id' => ['nullable', 'exists:locations,id'],
             'location_text' => ['nullable', 'string', 'max:255'],
+            // Exclusion mutuelle lieu favori / adresse ponctuelle (#37), GARDÉE CÔTÉ SERVEUR : la
+            // bascule d'UI vide l'autre bloc, mais l'état vient du client — le grisage ne suffit
+            // jamais (cf. doctrine des confirmations, CLAUDE.md).
+            'ad_hoc_address' => ['nullable', 'string', 'max:255', function ($attr, $value, $fail) {
+                if (filled($value) && $this->location_id !== null) {
+                    $fail('Choisis un lieu favori OU une adresse ponctuelle, pas les deux.');
+                }
+            }],
+            'ad_hoc_latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'ad_hoc_longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'capacity' => ['nullable', 'integer', 'min:1'],
             'category_ids' => ['array'],
             'category_ids.*' => ['exists:categories,id'],
@@ -331,6 +362,51 @@ class SessionForm extends Component
         ], fn ($v) => $v !== null);
     }
 
+    /**
+     * Bascule lieu favori / adresse ponctuelle (#37) : choisir l'un VIDE l'autre. Sans ça, une
+     * séance éditée garderait en état les deux branches et la validation d'exclusion mutuelle la
+     * refuserait alors qu'aucun des deux champs n'a été touché à l'écran.
+     */
+    public function updatedLocationMode(string $value): void
+    {
+        if ($value === 'adhoc') {
+            $this->location_id = null;
+
+            return;
+        }
+
+        $this->ad_hoc_address = '';
+        $this->ad_hoc_latitude = null;
+        $this->ad_hoc_longitude = null;
+        $this->addressSuggestions = [];
+    }
+
+    /**
+     * Hook Livewire : adresse ponctuelle modifiée → rafraîchit les suggestions Nominatim (§4.13.4).
+     * Ne touche pas lat/lng — on peut corriger librement avant de choisir une suggestion.
+     * Portage à l'identique de `CatalogueManager::updatedFormAddress()`.
+     */
+    public function updatedAdHocAddress(?string $value, GeocodingService $geo): void
+    {
+        $this->addressSuggestions = $geo->search((string) $value);
+    }
+
+    /** Applique une suggestion : adresse formatée + coordonnées exactes, carte recentrée côté client. */
+    public function pickSuggestion(int $i): void
+    {
+        $sugg = $this->addressSuggestions[$i] ?? null;
+        // Sans coordonnées la suggestion est inexploitable (ex. entrée de cache d'un ancien format).
+        if (! is_array($sugg) || ! isset($sugg['lat'], $sugg['lng'])) {
+            return;
+        }
+
+        $this->ad_hoc_address = $sugg['address'] ?: ($sugg['name'] ?? '');
+        $this->ad_hoc_latitude = (float) $sugg['lat'];
+        $this->ad_hoc_longitude = (float) $sugg['lng'];
+        $this->addressSuggestions = [];
+        $this->dispatch('location-located', lat: $this->ad_hoc_latitude, lng: $this->ad_hoc_longitude);
+    }
+
     public function save(SessionNotificationService $notifier)
     {
         $data = $this->validate();
@@ -440,10 +516,14 @@ class SessionForm extends Component
         }
 
         $newLocText = $data['location_text'] ?: null;
-        if ($s->location_id !== $data['location_id'] || ($s->location_text ?? null) !== $newLocText) {
+        // Même arbitrage qu'à l'écriture (#37) : une adresse ponctuelle remplie détrône le lieu
+        // favori, sans quoi le diff annoncerait un lieu que `persist()` ne va pas écrire.
+        $newAdHoc = $data['ad_hoc_address'] ?: null;
+        $newLocId = $newAdHoc !== null ? null : $data['location_id'];
+        if ($s->location_id !== $newLocId || ($s->ad_hoc_address ?? null) !== $newAdHoc || ($s->location_text ?? null) !== $newLocText) {
             $changes[] = ['label' => 'Lieu',
-                'before' => $this->locationLabel($s->location_id, $s->location_text),
-                'after' => $this->locationLabel($data['location_id'], $newLocText)];
+                'before' => $this->locationLabel($s->location_id, $s->ad_hoc_address, $s->location_text),
+                'after' => $this->locationLabel($newLocId, $newAdHoc, $newLocText)];
         }
 
         if ($s->capacity !== $data['capacity']) {
@@ -544,13 +624,12 @@ class SessionForm extends Component
         return mb_substr(trim($name) !== '' ? $name : 'Parcours', 0, 160);
     }
 
-    private function locationLabel(?int $id, ?string $text): string
+    /** Miroir de `Session::placeLabel()` pour le journal d'audit : favori, sinon adresse ponctuelle, sinon texte libre (#37). */
+    private function locationLabel(?int $id, ?string $adHoc, ?string $text): string
     {
-        if ($text) {
-            return $text;
-        }
+        $favori = $id !== null ? Location::find($id) : null;
 
-        return $id !== null ? (Location::find($id)?->name ?? '—') : '—';
+        return $favori !== null ? $favori->name : ($adHoc ?? $text ?? '—');
     }
 
     private function quotaTagLabel(?int $id): string
@@ -615,6 +694,8 @@ class SessionForm extends Component
             $routeId = $route->id;
         }
 
+        $adHocAddress = $data['ad_hoc_address'] ?: null;
+
         $payload = [
             'kind' => $data['kind'],
             'title' => $data['title'],
@@ -624,7 +705,13 @@ class SessionForm extends Component
             'discipline_id' => $data['kind'] === 'training' ? $data['discipline_id'] : null,
             'start_at' => Carbon::parse($data['start_at'], $tz),
             'duration_min' => $data['duration_min'],
-            'location_id' => $data['location_id'],
+            // Le lieu écrit se DÉDUIT des données validées, pas de `locationMode` (#37) : une
+            // adresse ponctuelle remplie exclut le lieu favori, et l'inverse. L'exclusion étant
+            // déjà refusée en validation, les deux ne peuvent pas arriver ensemble ici.
+            'location_id' => $adHocAddress !== null ? null : $data['location_id'],
+            'ad_hoc_address' => $adHocAddress,
+            'ad_hoc_latitude' => $adHocAddress !== null && $data['ad_hoc_latitude'] !== null ? (float) $data['ad_hoc_latitude'] : null,
+            'ad_hoc_longitude' => $adHocAddress !== null && $data['ad_hoc_longitude'] !== null ? (float) $data['ad_hoc_longitude'] : null,
             'location_text' => $data['location_text'] ?: null,
             'capacity' => $data['capacity'],
             // Champs spécifiques : on n'écrit que ceux du kind, les autres restent null.

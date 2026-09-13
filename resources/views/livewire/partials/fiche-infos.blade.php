@@ -41,18 +41,31 @@
 @endif
 
 {{-- Lieu --}}
-@if ($session->location || $session->location_text)
+@php
+    // Lieu favori OU adresse ponctuelle (#37) : `placeLabel()` et `coordinates()` portent le
+    // choix, la vue n'a plus à connaître les deux cas. `location_text` redevient la PRÉCISION
+    // (« RDV parking nord ») qui s'ajoute au lieu — sauf quand il EST le libellé, sur les séances
+    // saisies avant #37 : on ne la répète alors pas sous elle-même.
+    $lieuLabel = $session->placeLabel();
+    $lieuAdresse = $session->location?->address;
+    $lieuPrecision = $session->location_text !== $lieuLabel ? $session->location_text : null;
+    $lieuCoords = $session->coordinates();
+@endphp
+@if ($lieuLabel)
     <div>
         <div class="sect-head"><span class="sect-title">Lieu</span></div>
         <div class="card card-pad">
-            <div style="font-weight:700;font-size:15px">{{ $session->location_text ?: $session->location?->name }}</div>
-            @if ($session->location?->address)
-                <div class="meta">{{ $session->location->address }}</div>
+            <div style="font-weight:700;font-size:15px">{{ $lieuLabel }}</div>
+            @if ($lieuAdresse)
+                <div class="meta">{{ $lieuAdresse }}</div>
+            @endif
+            @if ($lieuPrecision)
+                <div class="meta" style="margin-top:4px">{{ $lieuPrecision }}</div>
             @endif
             {{-- Aperçu cartographique du lieu (§4.13.4) — uniquement si géocodé (cohérent avec la météo). --}}
-            @if ($session->location?->latitude && $session->location?->longitude)
+            @if ($lieuCoords)
                 <div wire:ignore style="margin-top:12px">
-                    <div x-data="locationMap({ lat: {{ (float) $session->location->latitude }}, lng: {{ (float) $session->location->longitude }}, lockable: true })"
+                    <div x-data="locationMap({ lat: {{ $lieuCoords['lat'] }}, lng: {{ $lieuCoords['lng'] }}, lockable: true })"
                          class="loc-map-wrap">
                         <div x-ref="map" class="loc-map fiche-loc-map"></div>
                         {{-- Verrou d'interaction : verrouillée, la carte n'est qu'un aperçu (le scroll de
@@ -98,7 +111,7 @@
     $hasContent = ($session->kind === 'training' && $session->content_markdown)
         || $session->kind === 'competition'
         || ($session->kind === 'club_event' && $session->agenda)
-        || $session->location || $session->location_text
+        || $lieuLabel
         || $targetCats->isNotEmpty();
 @endphp
 @unless ($hasContent)
