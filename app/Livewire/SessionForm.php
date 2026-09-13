@@ -382,7 +382,7 @@ class SessionForm extends Component
     }
 
     /**
-     * Hook Livewire : adresse ponctuelle modifiée → rafraîchit les suggestions Nominatim (§4.13.4).
+     * Hook Livewire : adresse ponctuelle modifiée → rafraîchit les suggestions du géocodeur (§4.13.4).
      * Ne touche pas lat/lng — on peut corriger librement avant de choisir une suggestion.
      * Portage à l'identique de `CatalogueManager::updatedFormAddress()`.
      */

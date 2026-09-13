@@ -744,7 +744,7 @@ l'inventaire complet — tous UE ou sans flux de données personnelles identifia
 | Service | Déclenché quand | Donnée transmise | UE / clé |
 |---|---|---|---|
 | **Open-Meteo** | Rafraîchissement météo (cron, J+16) pour chaque lieu de séance | Coordonnées GPS du lieu (pas de donnée personnelle) | UE, gratuit, sans clé |
-| **Nominatim / OpenStreetMap** | Un admin saisit ou modifie l'adresse d'un `Location` | Texte de l'adresse saisie | UE, gratuit, sans clé, 1 req/s (mis en cache) |
+| **Photon / OpenStreetMap** | Un encadrant saisit une adresse — lieu du catalogue, ou adresse ponctuelle de séance | Texte de l'adresse saisie (+ le barycentre du catalogue, comme biais de classement) | UE (`photon.komoot.io`), gratuit, sans clé, mis en cache ; **auto-hébergeable** si l'instance publique devient indisponible |
 | **Email transactionnel** (Brevo par défaut, Scaleway TEM en alternative) | Notification, lien de connexion (magic link), invitation | Email + nom du destinataire, contenu du message | UE, clé API |
 | **Web Push (VAPID)** | Notification poussée à un appareil abonné | Payload chiffré vers l'endpoint du navigateur (Chrome/Firefox/Apple selon appareil) | Protocole standard, pas de service commercial intermédiaire côté club |
 | **Google OAuth** (optionnel) | Connexion via le bouton « Google », si activé | Email + identité du compte Google de l'utilisateur | **Hors UE** (Google) — désactivable en laissant `GOOGLE_CLIENT_ID` vide |

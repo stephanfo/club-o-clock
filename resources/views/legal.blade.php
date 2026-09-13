@@ -66,7 +66,7 @@
     </p>
     <ul>
         <li><b>Open-Meteo</b> (prévisions météo des séances) — service européen, gratuit, sans clé.</li>
-        <li><b>Nominatim / OpenStreetMap</b> (géocodage d'une adresse saisie par l'admin lors de la création d'un lieu) — service européen.</li>
+        <li><b>Photon / OpenStreetMap</b> (géocodage d'une adresse saisie par un encadrant, pour un lieu du catalogue ou une séance) — service européen.</li>
         <li><b>Service d'envoi d'email transactionnel</b> (notifications, liens de connexion) — {!! $legal($settings->legal_mail_provider, 'nom du fournisseur retenu.') !!}</li>
         <li><b>Web Push (VAPID)</b> — notifications navigateur, sans intermédiaire tiers (protocole standard, pas de service commercial).</li>
         <li><b>Google OAuth</b> — uniquement si le club active la connexion via Google (optionnelle).</li>

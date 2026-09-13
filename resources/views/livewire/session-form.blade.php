@@ -192,7 +192,7 @@
                         </select>
                     @else
                         <div style="display:flex;flex-direction:column;gap:10px">
-                            {{-- Autocomplétion Nominatim : choisir une suggestion remplit adresse ET
+                            {{-- Autocomplétion du géocodeur : choisir une suggestion remplit adresse ET
                                  coordonnées — le géocodage manuel n'est qu'un repli. --}}
                             <div style="position:relative">
                                 <div class="ifield @error('ad_hoc_address') is-error @enderror">
