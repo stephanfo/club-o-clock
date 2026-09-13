@@ -73,17 +73,23 @@ class SessionExternalStaffTest extends TestCase
             ->assertSee('Pas de coach inscrit');
     }
 
-    /** Non-régression : un coach du club ET un surveillant externe coexistent légitimement. */
+    /** Un coach du club ET un surveillant externe coexistent légitimement — les coachs en premier. */
     public function test_un_coach_et_un_intervenant_exterieur_saffichent_tous_les_deux(): void
     {
         $coach = User::factory()->coach()->create(['first_name' => 'Vincent', 'last_name' => 'Durand']);
         $s = $this->seance(['external_staff_label' => 'Surveillant de baignade']);
         $s->coaches()->sync([$coach->id]);
 
-        Livewire::actingAs(User::factory()->create())->test(SessionShow::class, ['session' => $s->fresh()])
+        $vue = Livewire::actingAs(User::factory()->create())->test(SessionShow::class, ['session' => $s->fresh()])
             ->assertSee('Vincent Durand')
             ->assertSee('Surveillant de baignade')
             ->assertDontSee('Pas de coach inscrit');
+
+        // Les coachs du club d'abord, l'intervenant ensuite. On compare les PREMIÈRES occurrences :
+        // l'onglet est rendu deux fois (mobile + desktop) dans le même HTML, et un assertSeeInOrder
+        // passerait en enjambant les deux rendus quel que soit l'ordre réel.
+        $html = $vue->html();
+        $this->assertLessThan(mb_strpos($html, 'Intervenant extérieur'), mb_strpos($html, 'Vincent Durand'));
     }
 
     // ------------------------------------------------------------------ compteur admin (§4.16.1)

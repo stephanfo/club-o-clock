@@ -124,18 +124,6 @@
                     </div>
                 @endif
 
-                {{-- Intervenant extérieur récurrent (#38) — training uniquement, comme sur la
-                     séance. C'est le cœur du cas d'usage : la piscine du dimanche se règle une
-                     fois pour la saison au lieu d'être ressaisie sur chaque occurrence. --}}
-                @if ($kind === 'training')
-                    <div>
-                        <label class="field-label">Intervenant extérieur (optionnel)</label>
-                        <div class="ifield"><input class="ifield-input" type="text" maxlength="120" wire:model.blur="external_staff_label" placeholder="ex. Surveillant de baignade (prestataire)"></div>
-                        <div class="meta" style="font-size:12px;margin-top:6px">Recopié sur chaque séance générée, sans nommer la personne.</div>
-                        @error('external_staff_label')<div class="field-error">{{ $message }}</div>@enderror
-                    </div>
-                @endif
-
                 {{-- Catégories ciblées — chips toggle --}}
                 <div>
                     <label class="field-label">Catégories ciblées</label>
@@ -204,6 +192,16 @@
                         </div>
                     @endif
                     <div class="meta" style="font-size:12px;margin-top:10px">Pré-inscrits comme encadrants sur chaque séance générée. Modifiable séance par séance.</div>
+
+                    {{-- Intervenant extérieur récurrent (#38) — au même endroit que sur le formulaire de
+                         séance : avec les encadrants. Training uniquement. C'est le cœur du cas
+                         d'usage : la piscine du dimanche se règle une fois pour la saison. --}}
+                    @if ($kind === 'training')
+                        <label class="field-label" style="margin-top:var(--space-3)">Intervenant extérieur (optionnel)</label>
+                        <div class="ifield"><input class="ifield-input" type="text" maxlength="120" wire:model.blur="external_staff_label" placeholder="ex. Surveillant de baignade (prestataire)"></div>
+                        <div class="meta" style="font-size:12px;margin-top:6px">Recopié sur chaque séance générée, sans nommer la personne.</div>
+                        @error('external_staff_label')<div class="field-error">{{ $message }}</div>@enderror
+                    @endif
                 </div>
             </div>
         </form>
