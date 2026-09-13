@@ -97,7 +97,7 @@ recommandation (§10).
  │ (Brevo /     │ │ (Web Push    │ │ (météo,      │ │ (client OAuth    │
  │  Scaleway)   │ │  standard)   │ │  cache 3h)   │ │  propre au club) │
  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────────┘
-        + OpenRunner Pro (embed iframe, 100% côté client) · OSM/Nominatim (géocodage)
+        + OpenRunner Pro (embed iframe, 100% côté client) · OSM/Photon (géocodage)
 ```
 
 Principe directeur : **tout ce qui peut être servi par le mutualisé déjà payé l'est** ; on ne sort
@@ -399,7 +399,7 @@ indépendantes de la coquille serveur) :
 | **Push web** | **VAPID natif** (`web-push-php`) | FCM (Firebase) — non recommandé | Standard ouvert, **aucun lock-in**, pas de flux hors-UE ; couvre Chrome/Firefox/Edge + **Safari 16.4+** (limite iOS déjà acceptée par le PRD). |
 | **Stockage objets** | **Filesystem hors webroot** | S3-compatible UE (Scaleway/OVH Object Storage) | Volumes faibles (≤ 5 Mo/fichier, ~50-150 users) → le filesystem suffit ; servi par contrôleur PHP avec contrôle d'accès. S3 UE = option si le volume croît. |
 | **Monitoring / erreurs** | Sentry (région UE) | Filet minimal : log fichier rotaté + alerte mail cron | SDK PHP + JS, erreurs front/back. RGPD : choisir la région UE. |
-| **Géocodage** | Nominatim / OSM | Service ouvert UE | Gratuit, UE ; respecter l'usage policy. Usage principal serveur (`GeocodingService::search()`) : **autocomplétion** adresse/POI, ≤ 5 résultats **structurés** (nom + adresse formatée depuis le bloc `address` + type lisible, pas le `display_name` brut), **debounce serveur Livewire 400 ms + ≥ 4 caractères**, cache 6 h, `addressdetails=1`, `accept-language=fr`. La sélection d'une suggestion remplit tous les champs (nom/adresse/type/coords) → **plus de bouton « géocoder » manuel** dans l'UI ; `geocode()` (1 résultat, cache 30 j) reste disponible côté service (météo, scripts). **Aucun appel navigateur** (User-Agent identifiable côté serveur, conforme à la politique 1 req/s). Fallback : **saisie lat/lng manuelle** dans les champs (PRD §4.13.4). |
+| **Géocodage** | **Photon / OSM** (`photon.komoot.io`) | Service ouvert UE | Gratuit, UE, sans clé, **auto-hébergeable**. Usage principal serveur (`GeocodingService::search()`) : **autocomplétion** adresse/POI, ≤ 5 résultats **structurés** (nom + adresse recomposée depuis les champs `housenumber`/`street`/`postcode`/`city` + type lisible déduit d'`osm_value`), **debounce serveur Livewire 400 ms + ≥ 4 caractères**, cache 6 h, `lang=fr`. **Biais géographique** : le barycentre des `Location` non archivés et géocodés est envoyé en `lat`/`lon` — Photon **classe** par distance, il ne filtre pas, donc une compétition lointaine reste trouvable ; catalogue vide ⇒ pas de biais. Les doublons OSM d'un même lieu (même nom à ~100 m) sont **fusionnés**. La sélection d'une suggestion remplit tous les champs (nom/adresse/type/coords) → **plus de bouton « géocoder » manuel** dans l'UI ; `geocode()` (1 résultat, cache 30 j) emploie **le même moteur** et reste disponible côté service (météo, scripts). **Aucun appel navigateur** (User-Agent identifiable côté serveur). Fallback : **saisie lat/lng manuelle** dans les champs (PRD §4.13.4). ⚠️ Photon rend `geometry.coordinates` en **`[longitude, latitude]`**, l'inverse de l'ordre employé partout ailleurs ici. **Nominatim écarté (#63)** : il apparie l'adresse complète et, sur une saisie approximative, rend soit rien, soit une **commune voisine plausible mais fausse** (code postal et commune ignorés) — une donnée erronée se valide sans y penser, là où un silence se remarque. |
 | **Météo** | **Open-Meteo** (figé PRD) | — | Gratuit, sans clé, UE, CC BY 4.0. Cache serveur 3h + pré-calcul cron J-16. |
 
 ### 6.4 Répartition des responsabilités mutualisé ↔ externe
@@ -790,7 +790,7 @@ Légende : ✅ couvert nativement · ⚠️ couvert avec compromis (voir §8) ·
 | **Email** | **Brevo** (UE) | Scaleway TEM, Mailjet | — |
 | **Push** | **Web Push VAPID natif** (`web-push-php`) | — | FCM/Firebase |
 | **Monitoring** | **Sentry (région UE)** | Log fichier + alerte mail | — |
-| **Carte / géocodage** | **OpenStreetMap / Nominatim** | service ouvert UE | — |
+| **Carte / géocodage** | **OpenStreetMap / Photon** (`photon.komoot.io`) | auto-hébergement de Photon ; Nominatim (**écarté** #63) | — |
 | **Parcours / Météo** | **OpenRunner Pro** (embed) · **Open-Meteo** | — (figés PRD) | — |
 | **WYSIWYG** | éditeur **TipTap** (îlot JS dans une vue Blade) + sanitisation PHP faisant foi | — | HTML brut |
 | **Style / UI** | **CSS tokens du design conservés tels quels** (`club-tokens.css` + `club-app.css`) ; composants en Blade/Livewire | Tailwind en utilities mappées aux tokens (complément, pas remplacement) | Tailwind en remplacement du CSS livré |

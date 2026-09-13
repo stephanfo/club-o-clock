@@ -19,7 +19,7 @@ use Tests\TestCase;
  * endroit qui ne revient pas, elle doit avoir météo et carte sans pour autant entrer au catalogue
  * de lieux favoris.
  *
- * Aucun appel réseau : Nominatim et Open-Meteo sont intégralement `Http::fake()`.
+ * Aucun appel réseau : Photon et Open-Meteo sont intégralement `Http::fake()`.
  */
 class SessionAdHocLocationTest extends TestCase
 {
@@ -181,15 +181,15 @@ class SessionAdHocLocationTest extends TestCase
 
     public function test_form_suggestion_fills_address_and_coordinates(): void
     {
-        Http::fake(['nominatim.openstreetmap.org/*' => Http::response([
-            [
-                'name' => 'Piscine olympique',
-                'display_name' => 'Piscine olympique, 12 av. des Sports, 03200 Vichy, France',
-                'addresstype' => 'swimming_pool',
-                'address' => ['house_number' => '12', 'road' => 'av. des Sports', 'postcode' => '03200', 'city' => 'Vichy', 'country' => 'France'],
-                'lat' => '46.1234567', 'lon' => '3.4234567',
+        // ⚠️ `coordinates` est `[longitude, latitude]` chez Photon (cf. GeocodingTest).
+        Http::fake(['photon.komoot.io/*' => Http::response(['features' => [[
+            'geometry' => ['coordinates' => [3.4234567, 46.1234567]],
+            'properties' => [
+                'name' => 'Piscine olympique', 'housenumber' => '12', 'street' => 'av. des Sports',
+                'postcode' => '03200', 'city' => 'Vichy', 'country' => 'France',
+                'osm_key' => 'leisure', 'osm_value' => 'swimming_pool',
             ],
-        ])]);
+        ]]])]);
 
         Livewire::actingAs($this->coach())->test(SessionForm::class)
             ->set('locationMode', 'adhoc')
@@ -203,11 +203,11 @@ class SessionAdHocLocationTest extends TestCase
     /**
      * Repli du PRD §4.13.4 quand le géocodeur ne trouve rien : aucune suggestion, pas de plantage,
      * et les coordonnées saisies à la main suffisent à porter météo et carte. C'est ce repli qui
-     * dispense d'un second bouton « Géocoder » — il taperait le même Nominatim que l'autocomplétion.
+     * dispense d'un second bouton « Géocoder » — il taperait le même Photon que l'autocomplétion.
      */
     public function test_manual_coordinates_are_the_fallback_when_geocoder_finds_nothing(): void
     {
-        Http::fake(['nominatim.openstreetmap.org/*' => Http::response([])]);
+        Http::fake(['photon.komoot.io/*' => Http::response(['features' => []])]);
 
         $composant = Livewire::actingAs($this->coach())->test(SessionForm::class)
             ->set('locationMode', 'adhoc')

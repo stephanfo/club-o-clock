@@ -16,16 +16,15 @@ use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Tests\TestCase;
 
-// Géocodage Nominatim + météo Open-Meteo (PRD §4.13.4/.5).
+// Géocodage Photon/OSM + météo Open-Meteo (PRD §4.13.4/.5). Les pièges propres au moteur
+// (ordre des coordonnées, doublons OSM, biais géographique) sont couverts par GeocodingTest.
 class WeatherGeocodingTest extends TestCase
 {
     use RefreshDatabase;
 
     public function test_geocode_returns_coords(): void
     {
-        Http::fake(['nominatim.openstreetmap.org/*' => Http::response([
-            ['lat' => '47.3700000', 'lon' => '-1.1700000'],
-        ])]);
+        $this->photonFake([$this->feature()]);
 
         $coords = app(GeocodingService::class)->geocode('Piscine d\'Ancenis');
 
@@ -35,22 +34,14 @@ class WeatherGeocodingTest extends TestCase
 
     public function test_geocode_returns_null_on_empty_result(): void
     {
-        Http::fake(['nominatim.openstreetmap.org/*' => Http::response([])]);
+        $this->photonFake([]);
 
         $this->assertNull(app(GeocodingService::class)->geocode('lieu introuvable xyz'));
     }
 
     public function test_search_maps_structured_results_and_caches(): void
     {
-        Http::fake(['nominatim.openstreetmap.org/*' => Http::response([
-            [
-                'name' => 'Piscine Alphéa',
-                'display_name' => 'Piscine Alphéa, 12 Rue du Stade, 44150 Ancenis, France',
-                'addresstype' => 'swimming_pool',
-                'address' => ['house_number' => '12', 'road' => 'Rue du Stade', 'postcode' => '44150', 'city' => 'Ancenis', 'country' => 'France'],
-                'lat' => '47.3700000', 'lon' => '-1.1700000',
-            ],
-        ])]);
+        $this->photonFake([$this->feature()]);
 
         $res = app(GeocodingService::class)->search('piscine ancenis');
 
@@ -65,16 +56,18 @@ class WeatherGeocodingTest extends TestCase
         Http::assertSentCount(1);
     }
 
-    public function test_search_falls_back_to_display_name_when_no_address_block(): void
+    /** Résultat dépouillé (ni nom, ni voie) : le titre retombe sur la commune, et le type reste nul. */
+    public function test_search_falls_back_to_the_city_when_the_feature_has_no_name(): void
     {
-        Http::fake(['nominatim.openstreetmap.org/*' => Http::response([
-            ['display_name' => 'Quelque part, Loire-Atlantique', 'lat' => '47.0', 'lon' => '-1.0'],
-        ])]);
+        $this->photonFake([[
+            'geometry' => ['coordinates' => [-1.0, 47.0]],
+            'properties' => ['city' => 'Ancenis-Saint-Géréon', 'country' => 'France'],
+        ]]);
 
         $res = app(GeocodingService::class)->search('quelque part');
 
-        $this->assertSame('Quelque part', $res[0]['name']);
-        $this->assertSame('Quelque part, Loire-Atlantique', $res[0]['address']);
+        $this->assertSame('Ancenis-Saint-Géréon', $res[0]['name']);
+        $this->assertSame('Ancenis-Saint-Géréon, France', $res[0]['address']);
         $this->assertNull($res[0]['type']);
     }
 
@@ -88,22 +81,14 @@ class WeatherGeocodingTest extends TestCase
 
     public function test_search_returns_empty_on_failure(): void
     {
-        Http::fake(['nominatim.openstreetmap.org/*' => Http::response('', 500)]);
+        Http::fake(['photon.komoot.io/*' => Http::response('', 500)]);
 
         $this->assertSame([], app(GeocodingService::class)->search('lieu introuvable'));
     }
 
     public function test_catalogue_pick_suggestion_fills_all_fields(): void
     {
-        Http::fake(['nominatim.openstreetmap.org/*' => Http::response([
-            [
-                'name' => 'Piscine Alphéa',
-                'display_name' => 'Piscine Alphéa, 12 Rue du Stade, 44150 Ancenis, France',
-                'addresstype' => 'swimming_pool',
-                'address' => ['house_number' => '12', 'road' => 'Rue du Stade', 'postcode' => '44150', 'city' => 'Ancenis', 'country' => 'France'],
-                'lat' => '47.3700000', 'lon' => '-1.1700000',
-            ],
-        ])]);
+        $this->photonFake([$this->feature()]);
         $admin = User::factory()->admin()->create();
 
         // Champs nom/type laissés vides → la sélection les remplit aussi (clic = tout auto-rempli).
@@ -122,15 +107,7 @@ class WeatherGeocodingTest extends TestCase
 
     public function test_catalogue_pick_suggestion_keeps_user_name(): void
     {
-        Http::fake(['nominatim.openstreetmap.org/*' => Http::response([
-            [
-                'name' => 'Piscine Alphéa',
-                'display_name' => 'Piscine Alphéa, Ancenis',
-                'addresstype' => 'swimming_pool',
-                'address' => ['road' => 'Rue du Stade', 'city' => 'Ancenis'],
-                'lat' => '47.37', 'lon' => '-1.17',
-            ],
-        ])]);
+        $this->photonFake([$this->feature()]);
         $admin = User::factory()->admin()->create();
 
         // Nom déjà saisi par le coach → préservé (la suggestion ne l'écrase pas).
@@ -140,6 +117,30 @@ class WeatherGeocodingTest extends TestCase
             ->set('form.address', 'piscine ancenis')
             ->call('pickSuggestion', 0)
             ->assertSet('form.name', 'Piscine du club');
+    }
+
+    /**
+     * Un `feature` GeoJSON Photon. ⚠️ `coordinates` est `[longitude, latitude]` — l'inverse de
+     * l'ordre employé partout ailleurs ici (cf. GeocodingTest).
+     *
+     * @return array<string, mixed>
+     */
+    private function feature(): array
+    {
+        return [
+            'geometry' => ['coordinates' => [-1.17, 47.37]],
+            'properties' => [
+                'name' => 'Piscine Alphéa', 'housenumber' => '12', 'street' => 'Rue du Stade',
+                'postcode' => '44150', 'city' => 'Ancenis', 'country' => 'France',
+                'osm_key' => 'leisure', 'osm_value' => 'swimming_pool',
+            ],
+        ];
+    }
+
+    /** @param  list<array<string, mixed>>  $features */
+    private function photonFake(array $features): void
+    {
+        Http::fake(['photon.komoot.io/*' => Http::response(['features' => $features])]);
     }
 
     private function openMeteoFake(Carbon $slot): void
@@ -215,9 +216,7 @@ class WeatherGeocodingTest extends TestCase
 
     public function test_catalogue_geocode_action_fills_coords(): void
     {
-        Http::fake(['nominatim.openstreetmap.org/*' => Http::response([
-            ['lat' => '47.3700000', 'lon' => '-1.1700000'],
-        ])]);
+        $this->photonFake([$this->feature()]);
         $admin = User::factory()->admin()->create();
 
         Livewire::actingAs($admin)->test(CatalogueManager::class, ['type' => 'location'])
