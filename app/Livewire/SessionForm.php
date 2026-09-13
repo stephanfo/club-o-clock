@@ -415,12 +415,20 @@ class SessionForm extends Component
     }
 
     /**
-     * Hook Livewire : adresse ponctuelle modifiée → rafraîchit les suggestions du géocodeur (§4.13.4).
-     * Ne touche pas lat/lng — on peut corriger librement avant de choisir une suggestion.
-     * Portage à l'identique de `CatalogueManager::updatedFormAddress()`.
+     * Hook Livewire : adresse ponctuelle modifiée À LA MAIN → rafraîchit les suggestions du
+     * géocodeur (§4.13.4) et EFFACE les coordonnées.
+     *
+     * Écart assumé avec `CatalogueManager::updatedFormAddress()`, qui les garde : sur une séance,
+     * une adresse retapée sans choisir de suggestion restait associée aux coordonnées de la
+     * précédente — météo et carte d'un autre endroit, sans rien à l'écran pour le signaler. Une
+     * adresse sans coordonnées ne porte ni météo ni carte, ce qui est honnête. Choisir une
+     * suggestion les remplit (`pickSuggestion()` écrit côté serveur et ne repasse pas par ce hook),
+     * et la saisie manuelle de lat/lng reste possible une fois l'adresse posée.
      */
     public function updatedAdHocAddress(?string $value, GeocodingService $geo): void
     {
+        $this->ad_hoc_latitude = null;
+        $this->ad_hoc_longitude = null;
         $this->addressSuggestions = $geo->search((string) $value);
     }
 

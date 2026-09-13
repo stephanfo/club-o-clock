@@ -250,6 +250,33 @@ class SessionAdHocLocationTest extends TestCase
         $this->assertSame(['lat' => 46.1234567, 'lng' => 3.4234567], $s->coordinates());
     }
 
+    /**
+     * Revue avant mise en production — une adresse retapée à la main, sans choisir de suggestion,
+     * gardait les coordonnées de l'adresse précédente : « Brest » enregistrée avec la météo et la
+     * carte de Vichy. Retaper l'adresse efface les coordonnées ; la suggestion les remplit.
+     */
+    public function test_retyping_the_address_clears_stale_coordinates(): void
+    {
+        Http::fake(['photon.komoot.io/*' => Http::response(['features' => []])]);
+        $s = $this->seance([
+            'ad_hoc_address' => '12 av. des Sports, 03200 Vichy',
+            'ad_hoc_latitude' => 46.1234567, 'ad_hoc_longitude' => 3.4234567,
+        ]);
+
+        Livewire::actingAs($this->coach())->test(SessionForm::class, ['session' => $s])
+            // Contrôle positif : à l'ouverture, les coordonnées existantes sont bien là.
+            ->assertSet('ad_hoc_latitude', 46.1234567)
+            ->set('ad_hoc_address', 'Brest, Finistère')
+            ->assertSet('ad_hoc_latitude', null)
+            ->assertSet('ad_hoc_longitude', null)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $s->refresh();
+        $this->assertSame('Brest, Finistère', $s->ad_hoc_address);
+        $this->assertNull($s->coordinates());
+    }
+
     /** Une saisie qui n'est pas un nombre est refusée par la validation, pas par une 500. */
     public function test_non_numeric_coordinates_are_refused_by_validation(): void
     {
