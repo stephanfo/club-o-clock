@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\SessionShow;
+use App\Models\ClubSettings;
 use App\Models\Location;
 use App\Models\Session;
 use App\Models\User;
@@ -66,6 +67,12 @@ class WeatherRangeTest extends TestCase
         return Carbon::now()->addDays(2)->setTime($h, $m, 0);
     }
 
+    /** L'heure du club correspondant à un instant — jamais l'heure littérale saisie. */
+    private function heureClub(Carbon $instant): string
+    {
+        return $instant->copy()->setTimezone(ClubSettings::current()->timezone)->format('H').'h';
+    }
+
     public function test_agrege_toutes_les_heures_couvertes_et_non_la_seule_premiere(): void
     {
         $debut = $this->creneau(9, 30);
@@ -82,8 +89,9 @@ class WeatherRangeTest extends TestCase
         $this->assertSame(3.2, $w['precipMm']);           // cumul
         $this->assertSame(225, $w['windDeg']);            // secteur dominant (SO, 2 heures sur 3)
         $this->assertSame(80, $w['code']);                // le plus sévère de la fenêtre
-        $this->assertSame(9, $w['hourStart']);
-        $this->assertSame(11, $w['hourEnd']);
+        // Bornes rendues en instants UTC : la conversion en heure du club appartient à la vue.
+        $this->assertSame(9, $w['hourStart']->hour);
+        $this->assertSame(11, $w['hourEnd']->hour);
     }
 
     public function test_un_seul_appel_http_pour_n_heures_et_une_ligne_de_cache_par_heure(): void
@@ -107,7 +115,14 @@ class WeatherRangeTest extends TestCase
         $second = app(WeatherService::class)->forecastRange(self::LAT, self::LNG, $debut, $fin);
 
         Http::assertSentCount(1);
-        $this->assertSame($premier, $second);
+        // Comparaison par valeur : les bornes sont des Carbon, deux instances égales ne sont pas
+        // le même objet.
+        $this->assertSame(
+            array_diff_key($premier, ['hourStart' => 0, 'hourEnd' => 0]),
+            array_diff_key($second, ['hourStart' => 0, 'hourEnd' => 0]),
+        );
+        $this->assertTrue($premier['hourStart']->equalTo($second['hourStart']));
+        $this->assertTrue($premier['hourEnd']->equalTo($second['hourEnd']));
     }
 
     public function test_seance_tenant_dans_une_heure_rend_le_meme_resultat_qu_avant(): void
@@ -125,8 +140,8 @@ class WeatherRangeTest extends TestCase
         $this->assertSame(12.0, $w['windMax']);
         $this->assertSame(0.4, $w['precipMm']);
         $this->assertSame(3, $w['code']);
-        $this->assertSame(18, $w['hourStart']);
-        $this->assertSame(18, $w['hourEnd']);
+        $this->assertSame(18, $w['hourStart']->hour);
+        $this->assertSame(18, $w['hourEnd']->hour);
         $this->assertSame(1, WeatherCacheEntry::count());
     }
 
@@ -171,6 +186,31 @@ class WeatherRangeTest extends TestCase
         $this->assertSame(80, $w['code']);
     }
 
+    public function test_la_requete_demande_des_creneaux_en_utc(): void
+    {
+        // `timezone=auto` faisait renvoyer les libellés en heure LOCALE du lieu (Europe/Paris,
+        // +2 h l'été) alors que `start_at` est un Carbon UTC : l'index tombait deux heures trop
+        // tôt. Le test qui échoue si quelqu'un remet `auto`.
+        $debut = $this->creneau(9, 30);
+        $this->fakeHeures($debut, $this->troisHeures());
+
+        app(WeatherService::class)->forecastRange(self::LAT, self::LNG, $debut, $debut->copy()->addMinutes(105));
+
+        Http::assertSent(fn ($r) => $r['timezone'] === 'UTC');
+    }
+
+    public function test_le_sous_titre_annonce_les_heures_du_club_et_non_utc(): void
+    {
+        // 06:30 UTC = 08:30 à Paris : la cartouche parle l'heure du club, comme tout le reste.
+        $debut = $this->creneau(6, 30);
+        $this->fakeHeures($debut, $this->troisHeures());
+
+        $this->fiche($debut, 180)
+            ->assertViewHas('weatherState', 'full')
+            ->assertSee('08h')
+            ->assertDontSee('06h');
+    }
+
     public function test_severite_neige_forte_lemporte_sur_averses_faibles(): void
     {
         // max() sur le code WMO brut donnerait 80 : la numérotation n'est pas un ordre de sévérité.
@@ -203,14 +243,15 @@ class WeatherRangeTest extends TestCase
         $debut = $this->creneau(9, 30);
         $this->fakeHeures($debut, $this->troisHeures());   // 12 °C → 19 °C : bien au-dessus de 2 °C
 
+        $fin = $debut->copy()->addMinutes(105);
+
+        // La cellule « Temp. » porte deux lignes datées : départ puis arrivée, en heure du club.
         $this->fiche($debut, 105)
             ->assertViewHas('weatherState', 'full')
-            // La flèche est soudée à la valeur d'arrivée dans un span (elle serait orpheline en
-            // bout de première ligne sur mobile) : la plage se lit en deux morceaux.
             ->assertSee('12°')
-            ->assertSee('→ 19°')
+            ->assertSee('19°')
             ->assertSee('12–24')
-            ->assertSee('Prévision 09h–11h');
+            ->assertSee('Prévision '.$this->heureClub($debut).'–'.$this->heureClub($fin));
     }
 
     public function test_la_cartouche_tait_la_plage_sous_le_seuil_de_deux_degres(): void
@@ -221,11 +262,12 @@ class WeatherRangeTest extends TestCase
             ['temp' => 13.4, 'prob' => 10, 'mm' => 0.0, 'wind' => 12.4, 'deg' => 225, 'code' => 0],
         ]);
 
-        // Assertion négative appariée au contrôle positif du test précédent, même écran.
+        // Assertion négative appariée au contrôle positif du test précédent, même écran : la
+        // température d'arrivée n'est PAS annoncée sous le seuil, là où elle l'est au-dessus.
         $this->fiche($debut, 105)
             ->assertViewHas('weatherState', 'full')
-            ->assertDontSee('→')
             ->assertSee('12°')
-            ->assertSee('Prévision 09h–10h');
+            ->assertDontSee('13°')
+            ->assertSee('Prévision '.$this->heureClub($debut).'–'.$this->heureClub($debut->copy()->addHour()));
     }
 }

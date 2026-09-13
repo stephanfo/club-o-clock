@@ -28,8 +28,10 @@
         // le vent, lui, se compare une fois arrondi, puisque c'est ainsi qu'il s'affiche.
         $plageTemp = $tDeb !== null && $tFin !== null && abs($tFin - $tDeb) >= 2;
         $plageVent = $vMin !== null && $vMax !== null && round($vMin) != round($vMax);
-        $hDeb = $weather['hourStart'] ?? null;
-        $hFin = $weather['hourEnd'] ?? null;
+        // Bornes rendues en heure du club, comme toute autre date de l'application — le service
+        // ne manipule que des instants UTC.
+        $hDeb = ($weather['hourStart'] ?? null)?->copy()->setTimezone($tz);
+        $hFin = ($weather['hourEnd'] ?? null)?->copy()->setTimezone($tz);
     @endphp
     <div class="card card-pad wx">
         <div class="wx-top">
@@ -45,10 +47,10 @@
                 <div class="meta" style="font-size:12.5px">
                     @if ($hDeb === null)
                         Prévision
-                    @elseif ($hFin === null || $hFin === $hDeb)
-                        Prévision {{ sprintf('%02dh', $hDeb) }}
+                    @elseif ($hFin === null || $hFin->equalTo($hDeb))
+                        Prévision {{ $hDeb->format('H') }}h
                     @else
-                        Prévision {{ sprintf('%02dh', $hDeb) }}–{{ sprintf('%02dh', $hFin) }}
+                        Prévision {{ $hDeb->format('H') }}h–{{ $hFin->format('H') }}h
                     @endif
                 </div>
             </div>
@@ -68,10 +70,19 @@
             </div>
             <div class="wx-cell">
                 <div class="eyebrow"><x-icon name="gauge" :size="12" style="color:var(--fg-soft)" /> Temp.</div>
-                {{-- La flèche reste soudée à la valeur d'arrivée : dans une colonne de grille 1fr,
-                     la plage passe à la ligne dès 390 px, et une flèche orpheline en fin de
-                     première ligne se lit mal. --}}
-                <div class="v">@if ($tDeb === null)—@elseif ($plageTemp){{ round($tDeb) }}° <span style="white-space:nowrap">→ {{ round($tFin) }}°</span>@else{{ round($tDeb) }}°@endif</div>
+                {{-- Deux lignes assumées, départ puis arrivée, chacune datée : à 360 px la
+                     cellule n'offre que six caractères, « 12° → 19° » y passait à la ligne et la
+                     flèche restait orpheline. Même anatomie que la cellule Vent voisine — grande
+                     valeur à gauche, qualifiant discret à droite —, et l'heure dit enfin d'où
+                     vient chaque température. --}}
+                @if ($tDeb === null)
+                    <div class="v">—</div>
+                @elseif ($plageTemp)
+                    <div class="flex ac g6"><span class="v">{{ round($tDeb) }}°</span><span class="meta" style="font-size:11px">{{ $hDeb->format('H') }}h</span></div>
+                    <div class="flex ac g6"><span class="v">{{ round($tFin) }}°</span><span class="meta" style="font-size:11px">{{ $hFin->format('H') }}h</span></div>
+                @else
+                    <div class="v">{{ round($tDeb) }}°</div>
+                @endif
             </div>
         </div>
         <div class="wx-source"><x-icon name="cloud" :size="12" /> Source : Open-Meteo · CC BY 4.0</div>

@@ -69,7 +69,7 @@ class WeatherService
      * Dégradé gracieux inchangé : si l'appel échoue, on agrège sur les heures dont on dispose
      * (cache périmé compris) plutôt que de rendre null.
      *
-     * @return array{tempStart:?float,tempEnd:?float,windMin:?float,windMax:?float,windDeg:?int,precipProb:?int,precipMm:?float,code:?int,hourStart:int,hourEnd:int}|null
+     * @return array{tempStart:?float,tempEnd:?float,windMin:?float,windMax:?float,windDeg:?int,precipProb:?int,precipMm:?float,code:?int,hourStart:Carbon,hourEnd:Carbon}|null
      */
     public function forecastRange(float $lat, float $lng, Carbon $start, Carbon $end): ?array
     {
@@ -114,7 +114,7 @@ class WeatherService
         $fenetre = [];
         foreach ($slots as $slot) {
             if (isset($connues[self::key($slot)])) {
-                $fenetre[(int) $slot->format('G')] = $connues[self::key($slot)];
+                $fenetre[] = ['slot' => $slot, 'prevision' => $connues[self::key($slot)]];
             }
         }
 
@@ -152,30 +152,32 @@ class WeatherService
      * Le service ne rend que des valeurs brutes : le seuil d'affichage de la plage de température
      * est une règle de présentation, elle vit dans la cartouche.
      *
-     * @param  array<int, array<string, mixed>>  $fenetre
+     * @param  array<int, array{slot:Carbon, prevision:array<string, mixed>}>  $fenetre
      * @return array<string, mixed>
      */
     private static function agreger(array $fenetre): array
     {
-        $heures = array_keys($fenetre);
-        $premiere = $fenetre[$heures[0]];
-        $derniere = $fenetre[$heures[count($heures) - 1]];
+        $previsions = array_column($fenetre, 'prevision');
+        $premiere = $previsions[0];
+        $derniere = $previsions[count($previsions) - 1];
 
-        $vents = array_values(array_filter(array_map(fn ($p) => $p['wind'] ?? null, $fenetre), fn ($v) => $v !== null));
-        $probas = array_values(array_filter(array_map(fn ($p) => $p['precipProb'] ?? null, $fenetre), fn ($v) => $v !== null));
-        $mms = array_values(array_filter(array_map(fn ($p) => $p['precipMm'] ?? null, $fenetre), fn ($v) => $v !== null));
+        $vents = array_values(array_filter(array_map(fn ($p) => $p['wind'] ?? null, $previsions), fn ($v) => $v !== null));
+        $probas = array_values(array_filter(array_map(fn ($p) => $p['precipProb'] ?? null, $previsions), fn ($v) => $v !== null));
+        $mms = array_values(array_filter(array_map(fn ($p) => $p['precipMm'] ?? null, $previsions), fn ($v) => $v !== null));
 
         return [
             'tempStart' => self::flottant($premiere['temp'] ?? null),
             'tempEnd' => self::flottant($derniere['temp'] ?? null),
             'windMin' => $vents === [] ? null : self::flottant(min($vents)),
             'windMax' => $vents === [] ? null : self::flottant(max($vents)),
-            'windDeg' => self::dominante($fenetre),
+            'windDeg' => self::dominante($previsions),
             'precipProb' => $probas === [] ? null : (int) max($probas),
             'precipMm' => $mms === [] ? null : round(array_sum($mms), 1),
-            'code' => Weather::worst(array_map(fn ($p) => isset($p['code']) ? (int) $p['code'] : null, array_values($fenetre))),
-            'hourStart' => $heures[0],
-            'hourEnd' => $heures[count($heures) - 1],
+            'code' => Weather::worst(array_map(fn ($p) => isset($p['code']) ? (int) $p['code'] : null, $previsions)),
+            // Instants UTC des heures extrêmes couvertes : c'est la VUE qui les passe en heure du
+            // club, comme toute autre date de l'application.
+            'hourStart' => $fenetre[0]['slot'],
+            'hourEnd' => $fenetre[count($fenetre) - 1]['slot'],
         ];
     }
 
@@ -184,11 +186,11 @@ class WeatherService
      * première direction qui y tombe — pour que la flèche de la cartouche corresponde à une heure
      * réelle plutôt qu'à une moyenne d'angles, qui n'a pas de sens autour du nord.
      *
-     * @param  array<int, array<string, mixed>>  $fenetre
+     * @param  array<int, array<string, mixed>>  $previsions
      */
-    private static function dominante(array $fenetre): ?int
+    private static function dominante(array $previsions): ?int
     {
-        $degres = array_values(array_filter(array_map(fn ($p) => $p['windDeg'] ?? null, $fenetre), fn ($v) => $v !== null));
+        $degres = array_values(array_filter(array_map(fn ($p) => $p['windDeg'] ?? null, $previsions), fn ($v) => $v !== null));
         if ($degres === []) {
             return null;
         }
@@ -245,7 +247,10 @@ class WeatherService
                 'longitude' => $lng,
                 'hourly' => 'temperature_2m,precipitation_probability,precipitation,wind_speed_10m,wind_direction_10m,weather_code',
                 'forecast_days' => self::WINDOW_DAYS,
-                'timezone' => 'auto',
+                // UTC et non `auto` : `auto` renvoie les libellés en heure locale du LIEU, alors
+                // que les créneaux sont des Carbon UTC (config app.timezone). L'index tombait donc
+                // deux heures trop tôt l'été. L'heure du club n'intervient qu'à l'affichage.
+                'timezone' => 'UTC',
             ]);
 
             if (! $res->ok()) {
