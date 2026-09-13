@@ -245,6 +245,12 @@
                     @endif
                 </div>
 
+                {{-- Précision (optionnelle) — s'AJOUTE au lieu au lieu de le remplacer (#37). --}}
+                <div>
+                    <label class="field-label">Précision (optionnel)</label>
+                    <div class="ifield"><input class="ifield-input" type="text" wire:model.blur="location_text" placeholder="RDV parking nord…"></div>
+                </div>
+
                 @if ($isTraining)
                     <div>
                         <label class="field-label">Tag quota<x-struct-tag :show="$edit" /></label>
@@ -254,12 +260,6 @@
                         </select>
                     </div>
                 @endif
-
-                {{-- Précision (optionnelle) — s'AJOUTE au lieu au lieu de le remplacer (#37). --}}
-                <div>
-                    <label class="field-label">Précision (optionnel)</label>
-                    <div class="ifield"><input class="ifield-input" type="text" wire:model.blur="location_text" placeholder="RDV parking nord…"></div>
-                </div>
 
                 {{-- Lien externe (competition & club_event) --}}
                 @if (!$isTraining)
