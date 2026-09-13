@@ -165,12 +165,28 @@ const tous = [];
 // S5 — Admin pur : ni inscription athlète, ni CTA coach (bug corrigé).
 // ───────────────────────────────────────────────────────────────────
 {
+  // Le scénario POSE sa prémisse au lieu de l'espérer (doctrine du harnais, cf. 90aa0b4 / #47).
+  // La base de démo est longue durée et partagée avec la recette manuelle : un clic dans l'écran
+  // d'édition des rôles suffit à donner « athlète » à l'admin. S5 accusait alors le message
+  // applicatif — pourtant exact, puisqu'un athlète sans catégorie reçoit bien `no_category` —
+  // d'un défaut qui n'était que de la donnée (#59). Et rien ne rattrapait ça : l'empreinte de
+  // dérive de run.mjs ne compte que des LIGNES, un rôle modifié sur un compte existant ne fait
+  // bouger aucun compteur. La pollution y était invisible par construction.
+  const rolesAdmin = sql("SELECT roles FROM users WHERE email='admin@demo.club'");
+  sql("UPDATE users SET roles=JSON_ARRAY('admin') WHERE email='admin@demo.club'");
+
   const sA = seanceFuture(); // le refus porte sur les RÔLES de l'admin, pas sur l'heure
   const s = new Scenario(`S5 · Admin pur (ni coach ni athlète) — séance ${sA}`);
+  s.check('prémisse posée : admin sans rôle athlète ni coach',
+          sql("SELECT roles FROM users WHERE email='admin@demo.club'") === '["admin"]',
+          `rôles trouvés avant pose : ${rolesAdmin}`);
   const { ctx, page } = await session(browser, 'admin@demo.club', MOBILE);
 
   await fiche(page, sA);
   const b8 = await barreMobile(page);
+  // Contrôle positif apparié : la barre rend bien QUELQUE CHOSE — sans quoi la regex ci-dessous
+  // serait verte sur un bloc vide tout aussi fautif.
+  s.check('barre d\'action : un motif de refus est rendu', !!b8, b8 === null ? 'barre absente' : `« ${b8?.slice(0, 40)} »`);
   s.check('message « pas athlète »', /n'est pas athlète|pas athlète/i.test(b8 || ''), b8?.slice(0, 60));
   s.check('pas de bouton « M\'inscrire comme coach »',
           await page.getByRole('button', { name: /inscrire comme coach/i }).count() === 0);
@@ -183,6 +199,15 @@ const tous = [];
   s.check('séance sans coach : toujours pas de CTA coach',
           await page.getByRole('button', { name: /inscrire comme coach/i }).count() === 0);
   await s.shot(page, 's5-admin-pur');
+
+  // Remise en état : les rôles retrouvent EXACTEMENT ce qu'ils étaient — y compris une base déjà
+  // polluée, qu'il n'appartient pas à un scénario de nettoyer en douce.
+  sql(rolesAdmin
+    ? `UPDATE users SET roles='${rolesAdmin}' WHERE email='admin@demo.club'`
+    : "UPDATE users SET roles=NULL WHERE email='admin@demo.club'");
+  s.check('rôles de l\'admin restaurés',
+          sql("SELECT IFNULL(roles,'') r FROM users WHERE email='admin@demo.club'") === rolesAdmin,
+          `attendu ${rolesAdmin || '(vide)'}`);
 
   tous.push(s.report());
   await ctx.close();
