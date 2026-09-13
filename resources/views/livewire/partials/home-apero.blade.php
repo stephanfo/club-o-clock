@@ -4,7 +4,7 @@
         <div class="sect-head"><span class="sect-title">Apéro à venir</span><x-chope :size="15" style="color:var(--apero)" /></div>
         <div class="card" style="overflow:hidden">
             @foreach ($aperoUpcoming as $s)
-                @php $loc = $s->location_text ?: $s->location?->name; @endphp
+                @php $loc = $s->placeLabel(); @endphp
                 <a href="{{ route('sessions.show', $s) }}" wire:navigate class="row row-press"
                    style="padding:12px 14px;{{ ! $loop->last ? 'border-bottom:1px solid var(--divider)' : '' }}">
                     <span class="apero-dot"><x-chope :size="14" /></span>

@@ -148,7 +148,7 @@
                     $border = $cls === 'competition' ? 'accent' : $cls;
                     $top = max(0, ($st->hour + $st->minute / 60 - $h0) * $rowH);
                     $height = max(40, ($s->duration_min / 60) * $rowH - 4);
-                    $loc = $s->location_text ?: $s->location?->name;
+                    $loc = $s->placeLabel();
                     $participating = $s->registrations->where('status', 'participating')->count();
                     $full = $s->capacity && $participating >= $s->capacity;
                     $insLabel = $s->capacity ? ($full ? 'complet' : $participating.'/'.$s->capacity) : $participating.' inscrit'.($participating > 1 ? 's' : '');

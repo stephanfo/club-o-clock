@@ -612,6 +612,9 @@ CREATE TABLE `sessions` (
   `duration_min` smallint unsigned NOT NULL,
   `location_id` bigint unsigned DEFAULT NULL,
   `location_text` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ad_hoc_address` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ad_hoc_latitude` decimal(10,7) DEFAULT NULL,
+  `ad_hoc_longitude` decimal(10,7) DEFAULT NULL,
   `capacity` smallint unsigned DEFAULT NULL,
   `visibility` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'all',
   `created_by` bigint unsigned DEFAULT NULL,
@@ -802,3 +805,4 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (39,'2026_08_23_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (40,'2026_08_24_000000_add_last_login_at_to_users',4);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (41,'2026_08_24_000010_purge_sent_outbox_secrets',4);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (42,'2026_09_04_000000_drop_is_minor_from_users',5);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (43,'2026_09_13_000000_add_ad_hoc_location_to_sessions',6);

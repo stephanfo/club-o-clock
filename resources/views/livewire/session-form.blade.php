@@ -161,30 +161,104 @@
                     </div>
                 </div>
 
-                {{-- Lieu + tag quota --}}
-                <div class="{{ $isTraining ? 'form-row2' : '' }}">
-                    <div>
-                        <label class="field-label">Lieu<x-struct-tag :show="$edit" /></label>
+                {{-- ═══ Lieu (#37) ═══
+                     Deux branches EXCLUSIVES : un lieu du catalogue, ou une adresse ponctuelle
+                     géocodée pour l'endroit qui ne revient pas (compétition, événement club) —
+                     laquelle porte alors la météo et la carte sans polluer la bibliothèque de
+                     lieux favoris. Choisir l'une vide l'autre (`updatedLocationMode`), et
+                     l'exclusion est re-refusée côté serveur. Le bloc « adresse ponctuelle » est un
+                     portage à l'identique du catalogue (catalogue-editor), donc fidèle par
+                     construction. Les 3 kind y ont droit : un entraînement peut exceptionnellement
+                     se tenir ailleurs. --}}
+                <div>
+                    <label class="field-label">Lieu<x-struct-tag :show="$edit" /></label>
+                    <div class="seg" style="margin-bottom:10px" role="tablist" aria-label="Type de lieu">
+                        <button type="button" role="tab" wire:click="$set('locationMode', 'favori')"
+                                class="seg-item{{ $locationMode === 'favori' ? ' on' : '' }}"
+                                aria-selected="{{ $locationMode === 'favori' ? 'true' : 'false' }}">
+                            <x-icon name="star" :size="14" /> Lieu favori
+                        </button>
+                        <button type="button" role="tab" wire:click="$set('locationMode', 'adhoc')"
+                                class="seg-item{{ $locationMode === 'adhoc' ? ' on' : '' }}"
+                                aria-selected="{{ $locationMode === 'adhoc' ? 'true' : 'false' }}">
+                            <x-icon name="map-pin" :size="14" /> Adresse ponctuelle
+                        </button>
+                    </div>
+
+                    @if ($locationMode === 'favori')
                         <select class="input" wire:model="location_id">
                             <option value="">—</option>
                             @foreach ($locations as $loc)<option value="{{ $loc->id }}">{{ $loc->name }}</option>@endforeach
                         </select>
-                    </div>
-                    @if ($isTraining)
-                        <div>
-                            <label class="field-label">Tag quota<x-struct-tag :show="$edit" /></label>
-                            <select class="input" wire:model="quota_tag_id">
-                                <option value="">Aucun</option>
-                                @foreach ($quotaTags as $tag)<option value="{{ $tag->id }}">{{ $tag->label }}</option>@endforeach
-                            </select>
+                    @else
+                        <div style="display:flex;flex-direction:column;gap:10px">
+                            {{-- Autocomplétion Nominatim : choisir une suggestion remplit adresse ET
+                                 coordonnées — le géocodage manuel n'est qu'un repli. --}}
+                            <div style="position:relative">
+                                <div class="ifield @error('ad_hoc_address') is-error @enderror">
+                                    <x-icon name="search" :size="15" style="color:var(--fg-muted);flex:0 0 auto" />
+                                    <input class="ifield-input" type="text" wire:model.live.debounce.400ms="ad_hoc_address"
+                                           placeholder="Cherche une adresse ou un nom de lieu…" autocomplete="off">
+                                    <span wire:loading wire:target="ad_hoc_address" class="meta" style="font-size:11px;flex:0 0 auto">…</span>
+                                </div>
+                                @error('ad_hoc_address')<div class="field-error">{{ $message }}</div>@enderror
+                                @if (count($addressSuggestions))
+                                    {{-- z-index élevé : la carte Leaflet en dessous monte ses panes jusqu'à ~700. --}}
+                                    <div class="card" style="position:absolute;z-index:1200;left:0;right:0;margin-top:4px;max-height:280px;overflow:auto;box-shadow:var(--shadow-md)">
+                                        @foreach ($addressSuggestions as $i => $sugg)
+                                            <button type="button" class="row-press" wire:click="pickSuggestion({{ $i }})" wire:key="sess-sugg-{{ $i }}"
+                                                    style="display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;padding:10px 12px;background:none;border:none;border-bottom:1px solid var(--divider);cursor:pointer">
+                                                <x-icon name="map-pin" :size="15" style="color:var(--brand);flex:0 0 auto;margin-top:2px" />
+                                                <span style="min-width:0;flex:1">
+                                                    <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                                                        <span style="font-weight:600;font-size:13.5px">{{ $sugg['name'] ?? '' }}</span>
+                                                        @if (! empty($sugg['type']))<span class="chip chip-line chip-sm">{{ $sugg['type'] }}</span>@endif
+                                                    </span>
+                                                    <span class="meta" style="display:block;font-size:12px;margin-top:1px;line-height:1.3">{{ $sugg['address'] ?? '' }}</span>
+                                                </span>
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+
+                            {{-- Coordonnées : auto-remplies par la sélection, modifiables. Sans elles
+                                 l'adresse reste affichée mais ne porte ni météo ni carte. --}}
+                            <div class="flex g8 wrap" style="align-items:flex-end">
+                                <div style="width:150px"><label class="field-label">Latitude</label><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="ad_hoc_latitude" placeholder="47.37"></div></div>
+                                <div style="width:150px"><label class="field-label">Longitude</label><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="ad_hoc_longitude" placeholder="-1.17"></div></div>
+                                <button type="button" class="btn btn-ghost btn-sm" wire:click="geocodeAdHoc"
+                                        wire:loading.attr="disabled" wire:target="geocodeAdHoc">
+                                    <x-icon name="map-pin" :size="14" /> Géocoder
+                                </button>
+                            </div>
+
+                            @if (filled($ad_hoc_latitude) && filled($ad_hoc_longitude))
+                                <div wire:ignore>
+                                    <div x-data="locationMap({ lat: {{ (float) $ad_hoc_latitude }}, lng: {{ (float) $ad_hoc_longitude }} })"
+                                         x-on:location-located.window="relocate($event.detail)">
+                                        <div x-ref="map" class="loc-map"></div>
+                                    </div>
+                                </div>
+                            @endif
                         </div>
                     @endif
                 </div>
 
-                {{-- Lieu libre (optionnel) --}}
+                @if ($isTraining)
+                    <div>
+                        <label class="field-label">Tag quota<x-struct-tag :show="$edit" /></label>
+                        <select class="input" wire:model="quota_tag_id">
+                            <option value="">Aucun</option>
+                            @foreach ($quotaTags as $tag)<option value="{{ $tag->id }}">{{ $tag->label }}</option>@endforeach
+                        </select>
+                    </div>
+                @endif
+
+                {{-- Précision (optionnelle) — s'AJOUTE au lieu au lieu de le remplacer (#37). --}}
                 <div>
-                    <label class="field-label">Lieu libre (optionnel)</label>
-                    <div class="ifield"><input class="ifield-input" type="text" wire:model.blur="location_text" placeholder="…ou précise une adresse"></div>
+                    <label class="field-label">Précision (optionnel)</label>
+                    <div class="ifield"><input class="ifield-input" type="text" wire:model.blur="location_text" placeholder="RDV parking nord…"></div>
                 </div>
 
                 {{-- Lien externe (competition & club_event) --}}

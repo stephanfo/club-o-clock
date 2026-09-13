@@ -41,7 +41,7 @@
                         <div class="dsp-7" style="font-size:26px;margin-top:6px">{{ $next->title }}</div>
                         <div style="font-size:var(--text-sm);color:var(--fg-on-dark-soft);margin-top:4px">
                             {{ $next->duration_min }} min
-                            @if ($next->location_text || $next->location) · {{ $next->location_text ?: $next->location?->name }}@endif
+                            @if ($next->placeLabel()) · {{ $next->placeLabel() }}@endif
                         </div>
                         <div class="flex ac g6 wrap" style="margin-top:12px">
                             @if ($nextIsCoach)
@@ -145,7 +145,7 @@
                                 <div class="dsp" style="font-size:38px;color:var(--paper);margin-top:6px;line-height:1">{{ $next->title }}</div>
                                 <div style="color:var(--fg-on-dark-soft);margin-top:10px;font-size:var(--text-sm)">
                                     {{ $next->duration_min }} min
-                                    @if ($next->location_text || $next->location) · {{ $next->location_text ?: $next->location?->name }}@endif
+                                    @if ($next->placeLabel()) · {{ $next->placeLabel() }}@endif
                                 </div>
                                 <div class="flex ac jb" style="margin-top:var(--space-4)">
                                     @if ($nextIsCoach)

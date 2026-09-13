@@ -17,6 +17,8 @@ class Session extends Model
     protected $fillable = [
         'kind', 'title', 'discipline_id', 'start_at', 'duration_min',
         'location_id', 'location_text', 'capacity', 'visibility',
+        // Adresse ponctuelle géocodée (#37) — alternative exclusive au lieu favori.
+        'ad_hoc_address', 'ad_hoc_latitude', 'ad_hoc_longitude',
         'created_by', 'source_template_id',
         // training
         'quota_tag_id', 'content_markdown', 'content_attachment_path',
@@ -33,6 +35,8 @@ class Session extends Model
         'duration_min' => 'integer',
         'capacity' => 'integer',
         'cancelled_at' => 'datetime',
+        'ad_hoc_latitude' => 'decimal:7',
+        'ad_hoc_longitude' => 'decimal:7',
     ];
 
     /**
@@ -167,6 +171,46 @@ class Session extends Model
     public function location(): BelongsTo
     {
         return $this->belongsTo(Location::class);
+    }
+
+    /**
+     * Libellé du lieu de la séance (#37) — point de vérité unique de l'affichage, partagé par les
+     * six vues qui montrent un lieu (carte de séance, plan de semaine, accueil ×2, apéro, fiche).
+     *
+     * Avant #37 ces vues faisaient `location_text ?: location?->name` : le texte libre *remplaçait*
+     * le nom du lieu. Le champ libre redevenant une simple précision, l'ordre s'inverse — mais le
+     * dernier terme garde la RÉTROCOMPATIBILITÉ : les `location_text` déjà saisis qui contiennent
+     * en réalité une adresse continuent de s'afficher exactement comme avant. Aucune migration de
+     * données, aucun texte existant perdu ni réinterprété.
+     */
+    public function placeLabel(): ?string
+    {
+        $favori = $this->location;
+
+        return $favori !== null ? $favori->name : ($this->ad_hoc_address ?? $this->location_text);
+    }
+
+    /**
+     * Coordonnées de la séance (#37) : celles du lieu favori, sinon celles de l'adresse ponctuelle.
+     * Météo (SessionShow, weather:refresh) et carte (fiche-infos) passent par ici sans jamais
+     * savoir lequel des deux cas elles traitent.
+     *
+     * @return array{lat: float, lng: float}|null
+     */
+    public function coordinates(): ?array
+    {
+        $favori = $this->location;
+        if ($favori !== null) {
+            // Un lieu favori non géocodé ne retombe PAS sur l'adresse ponctuelle : les deux sont
+            // exclusifs, et les coordonnées d'un autre lieu seraient un mensonge, pas un repli.
+            return $favori->latitude === null || $favori->longitude === null
+                ? null
+                : ['lat' => (float) $favori->latitude, 'lng' => (float) $favori->longitude];
+        }
+
+        return $this->ad_hoc_latitude === null || $this->ad_hoc_longitude === null
+            ? null
+            : ['lat' => (float) $this->ad_hoc_latitude, 'lng' => (float) $this->ad_hoc_longitude];
     }
 
     /** @return BelongsTo<User, $this> */

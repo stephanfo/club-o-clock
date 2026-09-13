@@ -311,7 +311,7 @@
                         </div>
                         <div class="meta" style="margin-top:var(--space-2)">
                             {{ $startLocal->format('H:i') }} — {{ $endLocal->format('H:i') }} · {{ $session->duration_min }} min
-                            @if ($session->location_text || $session->location) · {{ $session->location_text ?: $session->location?->name }}@endif
+                            @if ($session->placeLabel()) · {{ $session->placeLabel() }}@endif
                         </div>
                     </div>
 

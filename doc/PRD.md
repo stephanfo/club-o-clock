@@ -324,7 +324,7 @@ Pattern commun : seed au déploiement, **renommage rétroactif** (référence pa
 | **Types d'épreuve** (§4.6.2) | Admin uniquement | `Triathlon`, `Duathlon`, `Aquathlon`, `Course à pied`, `Trail`, `Autre` | 1 (`competition` uniquement), 0 sinon |
 | **Tags de quota** (§4.10) | Admin uniquement | aucun | 0 ou 1 (`training` uniquement) |
 | **Qualifications** (§4.11.3) | Admin uniquement | `BF1-5`, `BNSSA`, `MNS`, `PSC1`, `PSE1`, `AFPS` | N (M:N via `UserQualification`) |
-| **Lieux** (§4.13.4) | Coachs au fil de l'eau, admin gère/archive | aucun | 0 ou 1 par Session + champ libre `locationText` |
+| **Lieux** (§4.13.4) | Coachs au fil de l'eau, admin gère/archive | aucun | 0 ou 1 par Session, **ou** une adresse ponctuelle géocodée propre à la séance (exclusifs) + précision libre `locationText` |
 
 #### 4.6.1 Disciplines
 - Référencées par `Session.disciplineId` et `SessionTemplate.disciplineId` — sur les `training` uniquement (§4.7).
@@ -775,11 +775,13 @@ Les deux sources peuvent coexister sur une même séance (URL OR Pro **et** GPX)
 #### 4.13.4 Lieux et géocodage
 **Bibliothèque `Location`** (cf. §4.6) : nom, adresse, latitude, longitude, type, notes, `is_archived`. **Coachs créent au fil de l'eau**, **admin gère/archive**.
 
-À la création de séance, le coach choisit dans la liste OU tape un `locationText` libre (géocodé via un service ouvert). **Override par séance** : surcharge possible du `locationText` même en partant d'un `Location`.
+À la création de séance, le coach choisit **soit** un lieu de la bibliothèque, **soit** une **adresse ponctuelle** propre à cette séance — les deux sont **exclusifs**. L'adresse ponctuelle est **géocodée via le même service ouvert** et bénéficie donc, exactement comme un lieu favori, de l'**aperçu cartographique** et de la **météo prévisionnelle** (§4.13.5). Elle répond au cas de la compétition ou de l'événement qui se tient dans un endroit qui ne revient pas : le renseigner **ne doit pas** faire entrer une entrée à usage unique dans la bibliothèque de lieux favoris. Elle vit **sur la séance et nulle part ailleurs** — ni promotion vers la bibliothèque, ni réutilisation d'une séance à l'autre.
+
+`locationText` est, lui, une **précision libre** (« RDV parking nord ») qui **s'ajoute** au lieu retenu au lieu de le remplacer, et qui n'est jamais géocodée. Les séances antérieures dont le `locationText` tient lieu d'adresse continuent de s'afficher à l'identique : aucune reprise de données.
 
 **Saisie assistée de l'adresse (gestion des `Location`)** : un champ unique propose une **autocomplétion** — la recherche porte sur une **adresse OU un nom de lieu** et affiche des suggestions au fil de la frappe (fournies par un service de géocodage ouvert), présentées de façon lisible (**nom du lieu en titre, adresse en dessous, type de lieu**) plutôt qu'en chaîne brute concaténée. La **sélection d'une suggestion auto-remplit** nom (si vide), adresse, type (si déductible) et coordonnées (latitude/longitude). Les coordonnées restent éditables à la main si besoin. Évaluation en temps quasi-constant attendue (suggestions mises en cache, requêtes limitées pour respecter la politique d'usage du service).
 
-**Aperçu cartographique** : dès qu'un `Location` est géocodé, sa **localisation est affichée sur une carte** (marqueur) — dans le **formulaire de lieu** (recentrée en direct à la sélection d'une suggestion) **et en consultation de séance** (bloc « Lieu » de la fiche, uniquement si le lieu est géocodé).
+**Aperçu cartographique** : dès qu'un lieu est géocodé — `Location` de la bibliothèque **ou** adresse ponctuelle de séance —, sa **localisation est affichée sur une carte** (marqueur) — dans le **formulaire de lieu** et dans le **formulaire de séance** (recentrée en direct à la sélection d'une suggestion) **et en consultation de séance** (bloc « Lieu » de la fiche, uniquement si le lieu est géocodé).
 
 **Échec / lieu non trouvé** : si aucune suggestion ne correspond, **saisie manuelle de lat/lng** possible directement dans les champs coordonnées. Pas de fallback en cascade.
 
