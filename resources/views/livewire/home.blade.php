@@ -34,7 +34,7 @@
                     <a href="{{ route('sessions.show', $next) }}" wire:navigate class="home-featured">
                         <div class="flex ac jb">
                             <span class="eyebrow" style="color:var(--brand-200);white-space:nowrap">
-                                <x-icon name="zap" :size="13" style="display:inline;vertical-align:-2px" /> Prochaine · {{ $next->start_at->copy()->setTimezone($tz)->locale('fr')->isoFormat('ddd HH:mm') }}
+                                <x-icon name="zap" :size="13" style="display:inline;vertical-align:-2px" /> Prochaine · {{ $next->start_at->copy()->setTimezone($tz)->locale('fr')->isoFormat('ddd D MMM · HH:mm') }}
                             </span>
                             @if ($next->hasApero())<x-chope :size="20" style="color:var(--accent-200)" />@endif
                         </div>
@@ -138,7 +138,7 @@
                             <div class="home-hero-body">
                                 <div class="flex ac jb">
                                     <div class="eyebrow" style="color:var(--brand-200)">
-                                        Prochaine · {{ $next->start_at->copy()->setTimezone($tz)->locale('fr')->isoFormat('ddd HH:mm') }}
+                                        Prochaine · {{ $next->start_at->copy()->setTimezone($tz)->locale('fr')->isoFormat('ddd D MMM · HH:mm') }}
                                     </div>
                                     @if ($next->hasApero())<x-chope :size="22" style="color:var(--accent-200)" />@endif
                                 </div>
