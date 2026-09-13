@@ -786,6 +786,8 @@ Les deux sources peuvent coexister sur une même séance (URL OR Pro **et** GPX)
 #### 4.13.5 Météo prévisionnelle
 - **Source** : service **gratuit ou peu coûteux**, **hébergé UE**, licence permissive, idéalement sans clé d'API. **Cible : Open-Meteo** (CC BY 4.0). Mention obligatoire de la source en pied de cartouche si Open-Meteo retenu.
 - **Paramètres affichés** : température 2 m, probabilité de précipitations, précipitations (mm), vent (km/h + direction), code météo (pictogramme).
+- **Portée : la durée de la séance, pas son instant de départ.** Une sortie longue peut partir sous un ciel dégagé et finir sous l'averse ; la prévision doit renseigner la question posée (« comment je m'habille ») sur **tout le créneau**. Elle annonce donc l'**évolution** de la température, les **extrêmes** de vent, le **maximum** de probabilité de pluie, le **cumul** des précipitations, et le pictogramme du phénomène **le plus sévère** rencontré — pas le plus tardif ni le plus précoce. La **plage horaire couverte** est affichée, pour que l'origine des valeurs soit lisible. Une séance tenant dans une seule heure affiche des valeurs ponctuelles, comme auparavant.
+- **Pas de déroulé heure par heure** ni de courbe : la cartouche répond à « je m'habille comment », pas « montre-moi la journée ».
 - **Logique** : affichage sur séances géocodées uniquement, et seulement si la séance est dans la fenêtre **J-16**. Si lieu non géocodé → cartouche masquée. Si > 16 j → cartouche absente, note discrète.
 - **Cache serveur 3h** par couple `(lieu, créneau horaire)` pour ne pas marteler la source. Pré-calcul périodique pour les séances de la fenêtre.
 

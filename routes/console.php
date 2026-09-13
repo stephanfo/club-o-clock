@@ -41,8 +41,9 @@ Schedule::command('notifications:drain')->everyFiveMinutes()->withoutOverlapping
 // Pré-calcul météo J-16 (§4.13.5) — échéance horaire, cadence < TTL 3 h.
 Schedule::command('weather:refresh --if-due')->everyFiveMinutes()->withoutOverlapping(15);
 
-// Élagage des jetons d'auth expirés/consommés (MagicLinkToken, InvitationToken — Prunable). Borne
-// la croissance des tables et purge l'email résiduel des liens consommés (minimisation §4.3).
+// Élagage de tout modèle Prunable : jetons d'auth expirés/consommés (MagicLinkToken,
+// InvitationToken) et cache météo dont le créneau est passé (WeatherCacheEntry). Borne la
+// croissance des tables et purge l'email résiduel des liens consommés (minimisation §4.3).
 Schedule::command('club:prune-tokens --if-due')->everyFiveMinutes()->withoutOverlapping(120);
 
 // La remise à zéro de la démo (plan OS7) n'est PAS planifiée ici : elle a sa propre tâche cron,

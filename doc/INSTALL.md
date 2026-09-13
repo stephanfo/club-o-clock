@@ -886,6 +886,7 @@ puis le contrôle du bundle réellement servi (§10) et le chargement d'une **vr
 php artisan club:vapid-keys        # (re)générer les clés push
 php artisan notifications:drain    # forcer l'envoi de la file
 php artisan weather:refresh        # rafraîchir le cache météo
+php artisan club:prune-tokens      # élaguer jetons d'auth périmés et cache météo échu
 php artisan optimize:clear         # purger tous les caches
 composer check                     # porte de dev : style, analyse, dérives, tests — JAMAIS en prod
 ```

@@ -105,7 +105,9 @@ class SessionShow extends Component
             return ['state' => 'far', 'data' => null];
         }
 
-        $forecast = $service->forecast((float) $lat, (float) $lng, $s->start_at);
+        // Toute la durée de la séance, pas son seul instant de départ (#55) : une sortie longue
+        // peut partir sous un ciel dégagé et finir sous l'averse.
+        $forecast = $service->forecastRange((float) $lat, (float) $lng, $s->start_at, $s->endsAt());
 
         return ['state' => $forecast ? 'full' : 'pending', 'data' => $forecast];
     }
