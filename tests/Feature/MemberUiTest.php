@@ -6,6 +6,9 @@ use App\Livewire\Admin\MemberCreate;
 use App\Livewire\Admin\MemberList;
 use App\Livewire\Admin\MemberShow;
 use App\Models\Category;
+use App\Models\Location;
+use App\Models\Registration;
+use App\Models\Session;
 use App\Models\User;
 use App\Support\AgeCategory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -156,6 +159,39 @@ class MemberUiTest extends TestCase
         $this->assertTrue($member->categories->contains(
             fn ($c) => $c->id === $elite->id && ! $c->pivot->is_primary
         ));
+    }
+
+    /**
+     * Revue avant mise en production — l'historique d'inscriptions n'affichait que le lieu favori :
+     * une adresse ponctuelle (#37) ou un ancien lieu en texte libre n'y apparaissaient pas, là où
+     * tous les autres écrans passent par `Session::placeLabel()`.
+     */
+    public function test_show_registrations_display_every_kind_of_place(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $member = User::factory()->create();
+        $lieu = Location::create(['name' => 'Stade nautique', 'created_by' => $admin->id]);
+
+        foreach ([
+            ['title' => 'Au favori', 'location_id' => $lieu->id],
+            ['title' => 'Ponctuelle', 'ad_hoc_address' => '12 av. des Sports, 03200 Vichy'],
+            ['title' => 'Ancienne', 'location_text' => 'Parking du vieux pont'],
+        ] as $i => $attrs) {
+            $s = Session::create(array_merge([
+                'kind' => 'club_event', 'start_at' => Carbon::now()->addDays(3 + $i)->setTime(19, 0),
+                'duration_min' => 60, 'created_by' => $admin->id,
+            ], $attrs));
+            Registration::create([
+                'session_id' => $s->id, 'user_id' => $member->id,
+                'status' => 'participating', 'registered_at' => Carbon::now(),
+            ]);
+        }
+
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $member])
+            ->set('tab', 'histo')
+            ->assertSee('Stade nautique')
+            ->assertSee('12 av. des Sports, 03200 Vichy')
+            ->assertSee('Parking du vieux pont');
     }
 
     // §4.1.5 confie l'identité à l'adhérent — mais un mineur P1 n'a pas de compte : personne ne
