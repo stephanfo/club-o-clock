@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\WeatherCacheEntry;
+use App\Support\Weather;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 
@@ -42,7 +44,7 @@ class WeatherService
             return $entry->forecast;
         }
 
-        $fresh = $this->fetch($lat, $lng, $slot);
+        $fresh = $this->fetchMany($lat, $lng, [$slot])[self::key($slot)] ?? null;
         if ($fresh === null) {
             return $entry?->forecast; // stale-while-error : on garde la dernière prévision connue.
         }
@@ -55,14 +57,187 @@ class WeatherService
         return $fresh;
     }
 
+    /**
+     * Prévision agrégée sur TOUTE la durée d'une séance (#55) — une séance longue n'a pas une
+     * météo mais plusieurs : partir à 12 °C sous un ciel dégagé et finir à 19 °C sous l'averse.
+     *
+     * Ne coûte aucun appel réseau supplémentaire : `fetch()` reçoit déjà toutes les heures de la
+     * fenêtre J-16 et n'en gardait qu'une. Une ligne de cache par heure, même clé, même TTL ; le
+     * réseau n'est sollicité que si une heure manque ou a dépassé le TTL, et un seul appel alimente
+     * alors toutes les heures.
+     *
+     * Dégradé gracieux inchangé : si l'appel échoue, on agrège sur les heures dont on dispose
+     * (cache périmé compris) plutôt que de rendre null.
+     *
+     * @return array{tempStart:?float,tempEnd:?float,windMin:?float,windMax:?float,windDeg:?int,precipProb:?int,precipMm:?float,code:?int,hourStart:int,hourEnd:int}|null
+     */
+    public function forecastRange(float $lat, float $lng, Carbon $start, Carbon $end): ?array
+    {
+        if (! $this->inWindow($start)) {
+            return null;
+        }
+
+        $lat = round($lat, 4);
+        $lng = round($lng, 4);
+        $slots = self::slots($start, $end);
+
+        $entries = WeatherCacheEntry::query()
+            ->where('latitude', $lat)->where('longitude', $lng)
+            ->whereIn('slot', array_map(fn (Carbon $s) => $s->format('Y-m-d H:i:s'), $slots))
+            ->get()->keyBy(fn (WeatherCacheEntry $e) => self::key($e->slot));
+
+        $limite = Carbon::now()->subHours(self::TTL_HOURS);
+        $connues = [];
+        $manque = false;
+        foreach ($slots as $slot) {
+            $entry = $entries[self::key($slot)] ?? null;
+            if ($entry) {
+                // Gardée même périmée : c'est la réserve du stale-while-error.
+                $connues[self::key($slot)] = $entry->forecast;
+            }
+            if (! $entry || $entry->fetched_at->lessThanOrEqualTo($limite)) {
+                $manque = true;
+            }
+        }
+
+        if ($manque) {
+            foreach ($this->fetchMany($lat, $lng, $slots) ?? [] as $cle => $prevision) {
+                $connues[$cle] = $prevision;
+                WeatherCacheEntry::updateOrCreate(
+                    ['latitude' => $lat, 'longitude' => $lng, 'slot' => Carbon::createFromFormat('Y-m-d H', $cle)->startOfHour()],
+                    ['forecast' => $prevision, 'fetched_at' => Carbon::now()],
+                );
+            }
+        }
+
+        // Remises dans l'ordre de la séance : l'agrégat lit la première et la dernière heure.
+        $fenetre = [];
+        foreach ($slots as $slot) {
+            if (isset($connues[self::key($slot)])) {
+                $fenetre[(int) $slot->format('G')] = $connues[self::key($slot)];
+            }
+        }
+
+        return $fenetre === [] ? null : self::agreger($fenetre);
+    }
+
+    /**
+     * Heures pleines couvertes par [start, end], bornes incluses.
+     *
+     * Une fin tombant PILE sur l'heure pleine n'ouvre pas l'heure suivante : une séance 18:00 →
+     * 19:00 tient dans la seule heure 18 (non-régression), là où 09:30 → 11:15 couvre 09, 10 et 11.
+     *
+     * @return array<int, Carbon>
+     */
+    private static function slots(Carbon $start, Carbon $end): array
+    {
+        $curseur = $start->copy()->setTime($start->hour, 0, 0);
+        $derniere = $end->copy()->setTime($end->hour, 0, 0);
+        if ($derniere->equalTo($end) && $derniere->greaterThan($curseur)) {
+            $derniere->subHour();
+        }
+
+        $slots = [];
+        while ($curseur->lessThanOrEqualTo($derniere)) {
+            $slots[] = $curseur->copy();
+            $curseur->addHour();
+        }
+
+        return $slots;
+    }
+
+    /**
+     * Agrège les prévisions horaires d'une fenêtre, indexées par heure et dans l'ordre.
+     *
+     * Le service ne rend que des valeurs brutes : le seuil d'affichage de la plage de température
+     * est une règle de présentation, elle vit dans la cartouche.
+     *
+     * @param  array<int, array<string, mixed>>  $fenetre
+     * @return array<string, mixed>
+     */
+    private static function agreger(array $fenetre): array
+    {
+        $heures = array_keys($fenetre);
+        $premiere = $fenetre[$heures[0]];
+        $derniere = $fenetre[$heures[count($heures) - 1]];
+
+        $vents = array_values(array_filter(array_map(fn ($p) => $p['wind'] ?? null, $fenetre), fn ($v) => $v !== null));
+        $probas = array_values(array_filter(array_map(fn ($p) => $p['precipProb'] ?? null, $fenetre), fn ($v) => $v !== null));
+        $mms = array_values(array_filter(array_map(fn ($p) => $p['precipMm'] ?? null, $fenetre), fn ($v) => $v !== null));
+
+        return [
+            'tempStart' => self::flottant($premiere['temp'] ?? null),
+            'tempEnd' => self::flottant($derniere['temp'] ?? null),
+            'windMin' => $vents === [] ? null : self::flottant(min($vents)),
+            'windMax' => $vents === [] ? null : self::flottant(max($vents)),
+            'windDeg' => self::dominante($fenetre),
+            'precipProb' => $probas === [] ? null : (int) max($probas),
+            'precipMm' => $mms === [] ? null : round(array_sum($mms), 1),
+            'code' => Weather::worst(array_map(fn ($p) => isset($p['code']) ? (int) $p['code'] : null, array_values($fenetre))),
+            'hourStart' => $heures[0],
+            'hourEnd' => $heures[count($heures) - 1],
+        ];
+    }
+
+    /**
+     * Direction dominante : le secteur cardinal le plus fréquent de la fenêtre, rendu par la
+     * première direction qui y tombe — pour que la flèche de la cartouche corresponde à une heure
+     * réelle plutôt qu'à une moyenne d'angles, qui n'a pas de sens autour du nord.
+     *
+     * @param  array<int, array<string, mixed>>  $fenetre
+     */
+    private static function dominante(array $fenetre): ?int
+    {
+        $degres = array_values(array_filter(array_map(fn ($p) => $p['windDeg'] ?? null, $fenetre), fn ($v) => $v !== null));
+        if ($degres === []) {
+            return null;
+        }
+
+        $comptes = [];
+        foreach ($degres as $deg) {
+            $secteur = Weather::direction((int) $deg);
+            $comptes[$secteur] = ($comptes[$secteur] ?? 0) + 1;
+        }
+        arsort($comptes);
+        $dominant = array_key_first($comptes);
+
+        foreach ($degres as $deg) {
+            if (Weather::direction((int) $deg) === $dominant) {
+                return (int) $deg;
+            }
+        }
+
+        return (int) $degres[0];
+    }
+
+    private static function flottant(float|int|null $v): ?float
+    {
+        return $v === null ? null : (float) $v;
+    }
+
+    /**
+     * Clé d'indexation d'un créneau horaire (heure pleine). Accepte n'importe quel Carbon : les
+     * créneaux viennent tantôt du calcul (Illuminate), tantôt du cast Eloquent du modèle.
+     */
+    private static function key(CarbonInterface $slot): string
+    {
+        return $slot->format('Y-m-d H');
+    }
+
     /** Le créneau est-il dans la fenêtre [maintenant, J-16] ? */
     public function inWindow(Carbon $slot): bool
     {
         return $slot->isFuture() && $slot->lessThanOrEqualTo(Carbon::now()->addDays(self::WINDOW_DAYS));
     }
 
-    /** Appel Open-Meteo (borné à 4 s, jamais d'exception remontée). */
-    private function fetch(float $lat, float $lng, Carbon $slot): ?array
+    /**
+     * Appel Open-Meteo (borné à 4 s, jamais d'exception remontée) : UN seul appel quel que soit le
+     * nombre de créneaux demandés — la réponse porte déjà toutes les heures de la fenêtre J-16.
+     *
+     * @param  array<int, Carbon>  $slots
+     * @return array<string, array<string, mixed>>|null prévisions indexées par créneau
+     */
+    private function fetchMany(float $lat, float $lng, array $slots): ?array
     {
         try {
             $res = Http::timeout(4)->get(self::ENDPOINT, [
@@ -82,19 +257,23 @@ class WeatherService
                 return null;
             }
 
-            $i = array_search($slot->format('Y-m-d\TH:00'), $h['time'], true);
-            if ($i === false) {
-                return null;
+            $out = [];
+            foreach ($slots as $slot) {
+                $i = array_search($slot->format('Y-m-d\TH:00'), $h['time'], true);
+                if ($i === false) {
+                    continue; // Heure absente de la réponse : on agrégera sur les autres.
+                }
+                $out[self::key($slot)] = [
+                    'temp' => self::at($h, 'temperature_2m', $i),
+                    'precipProb' => self::at($h, 'precipitation_probability', $i),
+                    'precipMm' => self::at($h, 'precipitation', $i),
+                    'wind' => self::at($h, 'wind_speed_10m', $i),
+                    'windDeg' => self::at($h, 'wind_direction_10m', $i),
+                    'code' => self::at($h, 'weather_code', $i),
+                ];
             }
 
-            return [
-                'temp' => self::at($h, 'temperature_2m', $i),
-                'precipProb' => self::at($h, 'precipitation_probability', $i),
-                'precipMm' => self::at($h, 'precipitation', $i),
-                'wind' => self::at($h, 'wind_speed_10m', $i),
-                'windDeg' => self::at($h, 'wind_direction_10m', $i),
-                'code' => self::at($h, 'weather_code', $i),
-            ];
+            return $out === [] ? null : $out;
         } catch (\Throwable) {
             return null;
         }

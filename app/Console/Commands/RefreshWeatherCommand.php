@@ -59,7 +59,9 @@ class RefreshWeatherCommand extends Command
 
         $refreshed = 0;
         foreach ($sessions as $s) {
-            $ok = $weather->forecast((float) $s->location->latitude, (float) $s->location->longitude, $s->start_at);
+            // Toute la fenêtre de la séance (#55) : pré-calculer la seule heure de départ
+            // laisserait la fiche appeler Open-Meteo en plein rendu pour les heures suivantes.
+            $ok = $weather->forecastRange((float) $s->location->latitude, (float) $s->location->longitude, $s->start_at, $s->endsAt());
             if ($ok !== null) {
                 $refreshed++;
             }
