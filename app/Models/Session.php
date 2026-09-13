@@ -17,6 +17,8 @@ class Session extends Model
     protected $fillable = [
         'kind', 'title', 'discipline_id', 'start_at', 'duration_min',
         'location_id', 'location_text', 'capacity', 'visibility',
+        // Intervenant extérieur (#38) — training uniquement, non nominatif.
+        'external_staff_label',
         // Adresse ponctuelle géocodée (#37) — alternative exclusive au lieu favori.
         'ad_hoc_address', 'ad_hoc_latitude', 'ad_hoc_longitude',
         'created_by', 'source_template_id',

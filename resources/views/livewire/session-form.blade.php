@@ -462,6 +462,17 @@
                         </div>
                     @endif
 
+                    {{-- Intervenant extérieur (#38) : entraînement uniquement — sur une compétition
+                         ou un événement club, coaches[] vaut déjà accompagnateurs / organisateurs.
+                         Non nominatif : on signale QU'IL Y EN A un, jamais qui. Le masquage ici ne
+                         garde rien — la nullification hors training est faite à la persistance. --}}
+                    @if ($isTraining)
+                        <label class="field-label" style="margin-top:var(--space-3)">Intervenant extérieur (optionnel)</label>
+                        <div class="ifield"><input class="ifield-input" type="text" maxlength="120" wire:model.blur="external_staff_label" placeholder="ex. Surveillant de baignade (prestataire)"></div>
+                        <div class="meta" style="font-size:var(--text-xs);margin-top:6px">Sans nommer la personne. Suffit à lever l'alerte « pas de coach inscrit ».</div>
+                        @error('external_staff_label')<div class="field-error">{{ $message }}</div>@enderror
+                    @endif
+
                     {{-- Qualifications combinées des encadrants sélectionnés (§4.11.4). Temps réel :
                          recalculé à chaque toggleCoach. Training uniquement (comme la fiche). --}}
                     @if ($isTraining && $selectedCoaches->isNotEmpty())

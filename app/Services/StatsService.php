@@ -233,8 +233,11 @@ class StatsService
         })->sortByDesc('total')->values()->all();
 
         $futureWithoutCoach = $this->applySessionFilters(
+            // Un intervenant extérieur signalé (#38) vaut encadrement : la piscine du dimanche
+            // tenue par un surveillant prestataire n'est pas une séance « sans coach » à traiter.
             Session::query()->where('kind', 'training')->whereNull('cancelled_at')
-                ->where('start_at', '>', Carbon::now())->doesntHave('coaches'),
+                ->where('start_at', '>', Carbon::now())->doesntHave('coaches')
+                ->whereNull('external_staff_label'),
             $f
         )->count();
 

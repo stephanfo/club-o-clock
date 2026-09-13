@@ -42,6 +42,9 @@ class TemplateForm extends Component
 
     public string $location_text = '';
 
+    /** Intervenant extérieur récurrent (#38) : réglé une fois pour la saison. Training seulement. */
+    public string $external_staff_label = '';
+
     public ?int $capacity = null;
 
     public ?int $quota_tag_id = null;
@@ -80,6 +83,7 @@ class TemplateForm extends Component
         $this->duration_min = $t->duration_min;
         $this->location_id = $t->location_id;
         $this->location_text = $t->location_text ?? '';
+        $this->external_staff_label = $t->external_staff_label ?? '';
         $this->capacity = $t->capacity;
         $this->quota_tag_id = $t->quota_tag_id;
         $this->category_ids = $t->categories->pluck('id')->all();
@@ -103,6 +107,7 @@ class TemplateForm extends Component
             'duration_min' => ['required', 'integer', 'min:1', 'max:1440'],
             'location_id' => ['nullable', 'exists:locations,id'],
             'location_text' => ['nullable', 'string', 'max:255'],
+            'external_staff_label' => ['nullable', 'string', 'max:120'],
             'capacity' => ['nullable', 'integer', 'min:1'],
             'quota_tag_id' => ['nullable', 'exists:quota_tags,id'],
             'category_ids' => ['array'],
@@ -186,6 +191,8 @@ class TemplateForm extends Component
             'duration_min' => $data['duration_min'],
             'location_id' => $data['location_id'],
             'location_text' => $data['location_text'] ?: null,
+            // Training uniquement, gardé côté serveur comme sur la séance (#38).
+            'external_staff_label' => $data['kind'] === 'training' ? ($data['external_staff_label'] ?: null) : null,
             'capacity' => $data['capacity'],
             'quota_tag_id' => $data['kind'] === 'training' ? $data['quota_tag_id'] : null,
             'generation_start_date' => $data['generation_start_date'],
