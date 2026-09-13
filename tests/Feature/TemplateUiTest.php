@@ -336,6 +336,33 @@ class TemplateUiTest extends TestCase
     }
 
     /**
+     * Revue avant mise en production — une plage inversée (fin avant début) n'a aucune occurrence :
+     * la modale et le refus annonçaient « déjà entièrement générée », ce qui est faux et
+     * n'indique pas quoi corriger.
+     */
+    public function test_relaunch_with_an_inverted_range_says_so(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $tpl = SessionTemplate::factory()->create([
+            'created_by' => $admin->id, 'day_of_week' => 1,
+            'generation_start_date' => '2026-09-01', 'generation_end_date' => '2026-09-30',
+        ]);
+
+        Livewire::actingAs($admin)->test(TemplateList::class)
+            ->call('openRelaunch', $tpl->id)
+            ->set('relaunchStart', '2027-09-30')
+            ->set('relaunchEnd', '2027-09-01')
+            ->assertSee('la date de fin précède la date de début', false)
+            ->assertDontSee('déjà entièrement générée', false)
+            ->call('relaunch')
+            ->assertSee('La date de fin précède la date de début', false)
+            ->assertDontSee('Aucune séance à créer', false)
+            ->assertSet('relaunchId', $tpl->id);
+
+        $this->assertSame(0, Session::where('source_template_id', $tpl->id)->count());
+    }
+
+    /**
      * #40 — la colonne droite du formulaire annonçait « À l'enregistrement — N séances » et
      * « N séances indépendantes seront créées » même en édition, où save() ne génère rien.
      */

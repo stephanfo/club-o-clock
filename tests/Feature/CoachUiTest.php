@@ -127,6 +127,41 @@ class CoachUiTest extends TestCase
         $this->assertFalse($s->coaches()->whereKey($coach->id)->exists());
     }
 
+    /**
+     * Revue avant mise en production — avec un intervenant extérieur signalé (#38), retirer le
+     * dernier coach ne laisse pas la séance « sans encadrement » : les deux dialogs le disaient.
+     */
+    public function test_last_coach_dialogs_account_for_external_staff(): void
+    {
+        $s = $this->makeSession();
+        $coach = User::factory()->coach()->create();
+        $s->coaches()->attach($coach->id);
+
+        // Contrôle positif : sans intervenant, l'avertissement reste celui d'avant.
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s])
+            ->call('unregisterCoach', $coach->id)
+            ->assertSee('sans encadrement', false);
+
+        $s->forceFill(['external_staff_label' => 'Surveillant de baignade'])->save();
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s->fresh()])
+            ->call('unregisterCoach', $coach->id)
+            ->assertSet('lastCoachConfirm.coach_id', $coach->id)
+            ->assertDontSee('sans encadrement', false)
+            ->assertSee('Surveillant de baignade', false)
+            ->assertSee('plus aucun coach du club', false);
+
+        // Même règle pour la bascule coach → athlète du dernier coach, lancée par un admin.
+        $dual = User::factory()->athleteCoach()->create();
+        $s->coaches()->sync([$dual->id]);
+
+        Livewire::actingAs(User::factory()->admin()->create())->test(SessionShow::class, ['session' => $s->fresh()])
+            ->call('flipToAthlete', $dual->id)
+            ->assertSet('flipConfirm.last_coach', true)
+            ->assertDontSee('sans encadrement', false)
+            ->assertSee('plus aucun coach du club', false);
+    }
+
     public function test_self_flip_to_athlete_opens_confirm_then_enrolls(): void
     {
         $s = $this->makeSession(capacity: 5);

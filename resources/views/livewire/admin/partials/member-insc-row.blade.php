@@ -10,7 +10,7 @@
         <div class="flex ac g6">
             <span style="font-weight:700;font-size:14px;{{ $cancelled ? 'text-decoration:line-through;text-decoration-color:var(--fg-muted)' : '' }}">{{ $s?->title ?? 'Séance' }}</span>
         </div>
-        <div class="meta" style="font-size:12px">{{ $s?->start_at?->translatedFormat('j M Y · H:i') }}@if ($s?->location) · {{ $s->location->name }}@endif</div>
+        <div class="meta" style="font-size:12px">{{ $s?->start_at?->translatedFormat('j M Y · H:i') }}@if ($s?->placeLabel()) · {{ $s->placeLabel() }}@endif</div>
     </div>
     <span class="chip chip-sm {{ $st['cls'] }}" style="flex:0 0 auto">{{ $st['l'] }}</span>
 </div>

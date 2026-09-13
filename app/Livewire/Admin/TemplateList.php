@@ -86,7 +86,14 @@ class TemplateList extends Component
         $this->authorize('generate', $tpl);
 
         // Refus gardé CÔTÉ SERVEUR : le bouton grisé à 0 ne suffit pas, son état vient du client.
-        // Un non-effet remonte en orange (flash('warn')), pas en vert.
+        // Un non-effet remonte en orange (flash('warn')), pas en vert. La plage inversée d'abord :
+        // elle n'a aucune occurrence, et « déjà entièrement générée » n'y dirait pas quoi corriger.
+        if ($this->rangeInverted()) {
+            session()->flash('warn', 'La date de fin précède la date de début.');
+
+            return;
+        }
+
         if ($this->missingOccurrences()->isEmpty()) {
             session()->flash('warn', 'Aucune séance à créer : la plage est déjà entièrement générée.');
 
@@ -102,6 +109,18 @@ class TemplateList extends Component
 
         $this->relaunchId = null;
         session()->flash('status', $created->count().' nouvelles séances générées.');
+    }
+
+    /** Plage de relance saisie à l'envers (fin avant début) ? */
+    public function getRelaunchRangeInvertedProperty(): bool
+    {
+        return $this->rangeInverted();
+    }
+
+    private function rangeInverted(): bool
+    {
+        return $this->relaunchStart && $this->relaunchEnd
+            && Carbon::parse($this->relaunchEnd)->lt(Carbon::parse($this->relaunchStart));
     }
 
     /**

@@ -142,7 +142,7 @@
             <div class="card card-pad" style="border-color:var(--brand-200);background:var(--brand-50);margin-top:14px">
                 <div class="flex ac" style="gap:10px">
                     <span class="num" style="font-size:42px;line-height:1;color:var(--brand-700);flex:0 0 auto">{{ $this->relaunchCount }}</span>
-                    <div><div style="font-weight:700;font-size:15px">nouvelles séances</div><div class="meta" style="font-size:12.5px;margin-top:2px">{{ $this->relaunchCount === 0 ? 'cette plage est déjà entièrement générée' : "s'ajoutent aux existantes" }}</div></div>
+                    <div><div style="font-weight:700;font-size:15px">nouvelles séances</div><div class="meta" style="font-size:12.5px;margin-top:2px">{{ $this->relaunchRangeInverted ? 'la date de fin précède la date de début' : ($this->relaunchCount === 0 ? 'cette plage est déjà entièrement générée' : "s'ajoutent aux existantes") }}</div></div>
                 </div>
             </div>
 

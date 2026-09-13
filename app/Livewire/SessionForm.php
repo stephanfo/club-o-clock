@@ -68,9 +68,16 @@ class SessionForm extends Component
 
     public string $ad_hoc_address = '';
 
-    public ?float $ad_hoc_latitude = null;
+    /**
+     * Coordonnées en TEXTE, pas en `?float` : saisies à la main, elles arrivent du client sous
+     * forme de chaîne, et en français avec une virgule (« 47,37 »). Une propriété typée float
+     * refusait la chaîne avant toute validation — TypeError, donc erreur 500. Normalisées par
+     * `updatedAdHocLatitude()` / `updatedAdHocLongitude()`, validées `numeric`, converties à
+     * l'écriture.
+     */
+    public ?string $ad_hoc_latitude = null;
 
-    public ?float $ad_hoc_longitude = null;
+    public ?string $ad_hoc_longitude = null;
 
     /** @var array<int, array{name?:string, address?:string, type?:string, lat?:float, lng?:float}> */
     public array $addressSuggestions = [];
@@ -158,8 +165,8 @@ class SessionForm extends Component
         $this->location_text = $s->location_text ?? '';
         $this->external_staff_label = $s->external_staff_label ?? '';
         $this->ad_hoc_address = $s->ad_hoc_address ?? '';
-        $this->ad_hoc_latitude = $s->ad_hoc_latitude !== null ? (float) $s->ad_hoc_latitude : null;
-        $this->ad_hoc_longitude = $s->ad_hoc_longitude !== null ? (float) $s->ad_hoc_longitude : null;
+        $this->ad_hoc_latitude = $s->ad_hoc_latitude !== null ? (string) (float) $s->ad_hoc_latitude : null;
+        $this->ad_hoc_longitude = $s->ad_hoc_longitude !== null ? (string) (float) $s->ad_hoc_longitude : null;
         $this->locationMode = $s->ad_hoc_address !== null ? 'adhoc' : 'favori';
         $this->capacity = $s->capacity;
         $this->category_ids = $s->categories->pluck('id')->all();
@@ -389,13 +396,39 @@ class SessionForm extends Component
         $this->addressSuggestions = [];
     }
 
+    public function updatedAdHocLatitude(?string $value): void
+    {
+        $this->ad_hoc_latitude = self::coordonneeSaisie($value);
+    }
+
+    public function updatedAdHocLongitude(?string $value): void
+    {
+        $this->ad_hoc_longitude = self::coordonneeSaisie($value);
+    }
+
+    /** Saisie manuelle d'une coordonnée : espaces retirés, virgule décimale acceptée, vide = null. */
+    private static function coordonneeSaisie(?string $value): ?string
+    {
+        $value = str_replace(',', '.', trim((string) $value));
+
+        return $value === '' ? null : $value;
+    }
+
     /**
-     * Hook Livewire : adresse ponctuelle modifiée → rafraîchit les suggestions du géocodeur (§4.13.4).
-     * Ne touche pas lat/lng — on peut corriger librement avant de choisir une suggestion.
-     * Portage à l'identique de `CatalogueManager::updatedFormAddress()`.
+     * Hook Livewire : adresse ponctuelle modifiée À LA MAIN → rafraîchit les suggestions du
+     * géocodeur (§4.13.4) et EFFACE les coordonnées.
+     *
+     * Écart assumé avec `CatalogueManager::updatedFormAddress()`, qui les garde : sur une séance,
+     * une adresse retapée sans choisir de suggestion restait associée aux coordonnées de la
+     * précédente — météo et carte d'un autre endroit, sans rien à l'écran pour le signaler. Une
+     * adresse sans coordonnées ne porte ni météo ni carte, ce qui est honnête. Choisir une
+     * suggestion les remplit (`pickSuggestion()` écrit côté serveur et ne repasse pas par ce hook),
+     * et la saisie manuelle de lat/lng reste possible une fois l'adresse posée.
      */
     public function updatedAdHocAddress(?string $value, GeocodingService $geo): void
     {
+        $this->ad_hoc_latitude = null;
+        $this->ad_hoc_longitude = null;
         $this->addressSuggestions = $geo->search((string) $value);
     }
 
@@ -409,10 +442,10 @@ class SessionForm extends Component
         }
 
         $this->ad_hoc_address = $sugg['address'] ?: ($sugg['name'] ?? '');
-        $this->ad_hoc_latitude = (float) $sugg['lat'];
-        $this->ad_hoc_longitude = (float) $sugg['lng'];
+        $this->ad_hoc_latitude = (string) (float) $sugg['lat'];
+        $this->ad_hoc_longitude = (string) (float) $sugg['lng'];
         $this->addressSuggestions = [];
-        $this->dispatch('location-located', lat: $this->ad_hoc_latitude, lng: $this->ad_hoc_longitude);
+        $this->dispatch('location-located', lat: (float) $sugg['lat'], lng: (float) $sugg['lng']);
     }
 
     public function save(SessionNotificationService $notifier)
