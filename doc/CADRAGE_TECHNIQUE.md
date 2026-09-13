@@ -520,6 +520,7 @@ la transaction), **paresseux** (calculé à l'affichage), ou **explicitement exc
 | **Pré-calcul météo J-16** (§4.13.5) | ✅ **Oui** | Rafraîchit le cache (TTL 3h) des séances géocodées à venir → affichage instantané, source non martelée. Seule tâche réellement incontournable. |
 | **Drain de l'`outbox`** notifications (§7.14) | ✅ **Oui** | Vide la file d'envois push/email par lots. |
 | **Élagage des jetons d'auth** (§4.3) | ✅ **Oui** | `club:prune-tokens` — borne la croissance des tables et purge l'email résiduel des liens consommés (minimisation). |
+| **Élagage du cache météo** (§4.13.5) | ✅ **Oui** | Même tâche : `WeatherCacheEntry` est `Prunable` sur le créneau passé. Pas de commande dédiée — `model:prune` balaie déjà `app/Models` sans restriction, et la garde d'échéance existe. Critère `slot` et non `fetched_at` : une entrée périmée dont le créneau est à venir est la réserve du *stale-while-error*. |
 | **Reset de la démo** (plan OS7) | ✅ **Oui** | `demo:reset` — instance de démonstration uniquement (`DEMO_MODE`), fenêtre nocturne. |
 | Reset surclassements / nouvelle année (§4.5) | ❌ **Non** | Devenu **action admin manuelle** (§7.9). |
 | Sauvegardes BDD/fichiers (§6) | ❌ **Non** | **Natif OVH** (quotidien 30j / fichiers J-14, §8.2). |

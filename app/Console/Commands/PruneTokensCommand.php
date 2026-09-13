@@ -6,7 +6,11 @@ use App\Services\DuePeriodGuard;
 use Illuminate\Console\Command;
 
 /**
- * Enveloppe rattrapable de `model:prune` (élagage des jetons d'auth expirés/consommés).
+ * Enveloppe rattrapable de `model:prune` — élagage de TOUT modèle `Prunable` : jetons d'auth
+ * expirés/consommés (MagicLinkToken, InvitationToken) et entrées de cache météo dont le créneau
+ * est passé (WeatherCacheEntry). Le nom `club:prune-tokens` désigne l'enveloppe historique ; elle
+ * ne restreint volontairement aucun modèle (pas de `--model`), tout `Prunable` d'`app/Models` est
+ * ramassé.
  *
  * `model:prune` appartient au framework : on ne lui ajoute pas d'option maison. Cette enveloppe
  * porte la garde d'échéance, pour la même raison que les autres tâches périodiques — sur un cron
@@ -21,7 +25,7 @@ class PruneTokensCommand extends Command
     protected $signature = 'club:prune-tokens
         {--if-due : N\'exécuter que si l\'élagage du jour n\'a pas déjà eu lieu}';
 
-    protected $description = 'Élague les jetons d\'authentification expirés et consommés.';
+    protected $description = 'Élague les données périmées : jetons d\'authentification et cache météo.';
 
     public function handle(DuePeriodGuard $guard): int
     {
@@ -42,6 +46,9 @@ class PruneTokensCommand extends Command
 
     /**
      * Retourne true si l'élagage s'est terminé sans erreur (seul un succès honore l'échéance).
+     *
+     * `model:prune` est appelé SANS `--model` : il balaie `app/Models` et ramasse tout ce qui porte
+     * le trait. Rendre un modèle élagable suffit donc à l'inscrire ici — ne pas restreindre.
      *
      * La purge des secrets résiduels de l'outbox vivait ici : elle rescannait chaque jour toutes
      * les lignes `sent`, pour toujours et à coût croissant, alors qu'OutboxDrainer retire le jeton
