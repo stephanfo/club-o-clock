@@ -7,5 +7,7 @@ import './gpx';
 import './back';
 // Modales : fermeture par Échap, et garde contre la modale rejouée par le retour arrière de wire:navigate.
 import './dialog';
+// Planning Semaine mobile : position de la liste à l'arrivée et au retour arrière (#69).
+import './planning';
 // Web Push : expose window.clubPush (souscription PushManager + sync serveur) — onglet Notifs (J8.6).
 import './push';

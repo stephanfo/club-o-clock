@@ -9,6 +9,42 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Ajouté
 
+- **Une séance peut avoir sa propre adresse, avec carte et météo.** Une compétition ou un événement
+  club se tient souvent dans un endroit qui ne reviendra pas. Le seul moyen de le renseigner était un
+  texte libre, jamais géocodé : ces séances n'avaient ni carte ni météo. L'autre voie, créer un lieu
+  favori pour chaque adresse, encombrait la bibliothèque d'entrées à usage unique. Le formulaire de
+  séance propose désormais, **au choix**, un lieu favori ou une **adresse ponctuelle** : elle est
+  géocodée comme un lieu du catalogue, affiche la même carte et la même météo, et ne vit que sur la
+  séance. Retaper l'adresse efface les coordonnées de la précédente, pour qu'une carte ne pointe
+  jamais ailleurs que ce qui est écrit ; des coordonnées saisies à la main acceptent la virgule.
+
+- **Un intervenant extérieur peut être signalé sur un entraînement.** Un surveillant de baignade ou
+  un MNS prestataire n'a pas de compte : la séance paraissait « sans encadrement » alors qu'elle
+  l'était. Un champ facultatif le mentionne sans nommer la personne, sur la séance ou directement sur
+  le modèle, qui le recopie sur chaque séance générée. La fiche l'affiche dans l'onglet Encadrement,
+  le bandeau « Pas de coach inscrit » disparaît, et la séance sort du compteur admin des séances sans
+  coach. Retirer le dernier coach du club le rappelle au lieu d'annoncer une séance sans encadrement.
+
+- **La fiche adhérent permet de corriger le nom d'un enfant.** Un enfant sans compte ne peut pas
+  corriger lui-même son identité, et la fiche admin n'éditait que l'email et la date de naissance :
+  une faute de frappe dans son nom était définitive. La correction est tracée dans les journaux
+  d'audit et d'activité ; elle n'ouvre aucun accès et ne recalcule aucune catégorie.
+
+- **La vue Semaine sur téléphone affiche l'heure de fin.** Chaque carte répétait sous l'en-tête le
+  jour qui y était déjà affiché. Sa colonne de gauche porte maintenant la plage horaire, début et fin
+  : l'heure de fin n'apparaissait jusqu'ici que sur la fiche de séance.
+
+- **La vue Semaine sur téléphone s'ouvre sur le jour courant.** Elle s'ouvrait en haut de liste,
+  donc sur lundi, même un samedi : il fallait défiler à chaque arrivée pour atteindre la suite. La
+  liste se positionne maintenant sur aujourd'hui, ou sur le prochain jour de la semaine qui a des
+  séances ; les jours passés restent accessibles en remontant. Le positionnement n'a lieu qu'à
+  l'arrivée : s'inscrire depuis une carte ou revenir sur la semaine ne fait jamais sauter la liste.
+  Au retour d'une fiche séance, la liste reprend là où on l'avait laissée, et changer de semaine
+  repart du haut au lieu de garder le défilement de la semaine quittée.
+
+- **Le panneau de détail d'un modèle montre tout ce qu'il génère** : type, discipline, lieu,
+  capacité et catégories ciblées, soit la moitié du formulaire qui manquait à la relecture.
+
 - **Suppression définitive d'une séance annulée, réservée à l'admin.** L'annulation couvrait la
   séance qui n'a pas lieu ; rien ne couvrait la séance qui **n'aurait jamais dû exister** — un
   doublon, une saisie erronée. Elle restait affichée « annulée » indéfiniment, ce qui était faux :
@@ -25,6 +61,33 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   dans la barre collante, qui garde le geste réversible sous le pouce.
 
 ### Corrigé
+
+- **Le bouton retour ramenait au formulaire qu'on venait d'enregistrer.** Après l'édition d'une
+  séance, « Planning » renvoyait au formulaire, parce que l'écran quitté restait dans l'historique du
+  navigateur. Le retour remonte maintenant directement à l'écran qu'il annonce. Enregistrer plusieurs
+  fois un parcours n'oblige plus non plus à autant de retours pour en sortir.
+
+- **Revenir au planning après s'être inscrit réaffichait l'état d'avant.** Le retour restaurait la
+  page telle qu'on l'avait quittée, sans « Tu participes ». Elle se met à jour dès l'arrivée, et
+  seulement si une action a eu lieu entre-temps.
+
+- **Les cartes de séance pouvaient afficher le contenu d'une autre séance** après un changement de
+  semaine ou de filtre : l'affichage les mettait à jour par position à l'écran et non par identité.
+  Sur iPhone, les en-têtes de jour de la vue Semaine gardaient de même les dates de la semaine
+  précédente.
+
+- **Les apéros à venir s'affichaient sans date sur l'accueil.** « ven. 18:30 » deux fois de suite
+  pour deux apéros à trois semaines d'écart : l'accueil affiche maintenant le quantième et le mois.
+
+- **Retirer le fichier GPX déposé dans un parcours ouvrait une erreur 500.** Le retrait annule
+  désormais le dépôt en cours et, en édition, ramène aux statistiques du parcours enregistré.
+
+- **L'historique d'inscriptions de la fiche adhérent n'affichait que les lieux favoris** : les
+  séances à adresse libre y apparaissaient sans lieu.
+
+- **Le cache météo n'était jamais purgé** et grossissait indéfiniment, une ligne par créneau. Les
+  créneaux passés sont désormais élagués par la tâche de nettoyage existante ; les prévisions à venir
+  restent en réserve, servies si Open-Meteo est injoignable.
 
 - **Un adhérent de 17 ans pouvait être traité comme majeur, et perdre son parent garant.** La
   minorité se calculait sur l'« âge de saison » — l'âge atteint au 31 août de fin de saison —, une
@@ -134,6 +197,36 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   échoue si une tâche redevient dépendante d'une minute absolue.
 
 ### Modifié
+
+- **La météo couvre toute la durée de la séance, et plus seulement son départ.** Une sortie de trois
+  heures affichait la température et le vent de la première heure. La fiche donne désormais la plage
+  de température, le vent minimal et maximal, et retient le temps le plus défavorable du créneau
+  (une neige forte passe devant une averse faible).
+
+- **Le géocodage d'adresse passe de Nominatim à Photon.** Même donnée OpenStreetMap, même service
+  ouvert, européen et sans clé, mais un moteur conçu pour la recherche au fil de la frappe. Nominatim
+  ignorait le code postal et la commune sur une saisie approximative : « 5 rue du Stade 44150
+  Ancenis » rendait une rue du Stade **à Pannecé**, à 25 km, une adresse fausse mais plausible qu'on
+  valide sans y penser. Les suggestions sont en outre classées au plus près des lieux du club, sans
+  écarter une compétition lointaine. Les mentions légales, le cadrage et le guide d'installation
+  suivent. *Aucun réglage à changer sur une instance existante.*
+
+- **Rompre une tutelle depuis l'administration demande un accusé de réception.** Le geste prévient le
+  jeune et son garant sans pouvoir se dédire ; l'écran admin se contentait d'un bouton rouge, là où
+  le même geste côté parent exigeait déjà une case cochée. La confirmation nomme maintenant les deux
+  personnes prévenues, et le refus est gardé côté serveur.
+
+- **L'écran des modèles ne promet plus une génération qui n'a pas lieu.** Modifier un modèle ne crée
+  aucune séance, mais l'écran annonçait « N séances seront créées ». Il dit désormais ce que le modèle
+  a déjà généré, et renvoie vers « Relancer / prolonger » pour une nouvelle plage. Le bouton
+  « Générer & enregistrer », qui rejouait la plage déjà générée et affichait « 0 séance générée » en
+  vert, est retiré. La relance ne compte plus que les séances réellement manquantes, refuse une
+  plage où il n'en manque aucune et signale une plage dont les dates sont inversées.
+
+- **Sur téléphone, les dialogs d'action définitive gardent la sortie sûre en haut.** Le pied des
+  dialogs remonte l'action principale au-dessus d'« Annuler », convention juste pour un choix, pas
+  pour une suppression : l'action irréversible se retrouvait sous le pouce. Les dialogs destructifs
+  font désormais l'inverse ; rien ne change sur ordinateur.
 
 - ⚠️ **Une séance dont le créneau est terminé ne peut plus être annulée.** La borne est la **fin**
   (début + durée) et non le début : une séance annulée sur place — orage, gymnase fermé — l'est

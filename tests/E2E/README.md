@@ -40,7 +40,7 @@ node tests/E2E/scenarios.mjs    # S1–S5   gardes d'inscription et bascule de r
 node tests/E2E/parcours.mjs     # S7–S17, S21  parcours métier, cloisonnement, alertes parent
 node tests/E2E/retour.mjs       # R1–R3   navigation « retour » : pile d'historique et fraîcheur
 node tests/E2E/comptes.mjs      # S18–S20 messages d'auth, correction d'email, suspension d'accès
-node tests/E2E/responsive.mjs   # S6, S24-S26  bascule mobile/desktop, rendu des cartes, morphing
+node tests/E2E/responsive.mjs   # S6, S24-S27  bascule mobile/desktop, rendu des cartes, morphing, ouverture de semaine
 ```
 
 Sortie : une ligne par assertion (✅/❌), code de sortie non nul si un scénario échoue.
@@ -107,6 +107,7 @@ des requêtes brutes. Les deux **refusent de s'exécuter si `APP_ENV != local`**
 | S24 | Semaine mobile | la carte porte la plage horaire, l'en-tête de jour garde la date | consignes |
 | S25 | Dialog destructif | sur mobile, la sortie sûre n'est pas sous l'action irréversible | consignes |
 | S26 | Morphing des cartes | clés distinctes, aucun contenu croisé après semaine ou filtre | consignes |
+| S27 | Semaine mobile | s'ouvre sur le jour courant ; ni morphing, ni retour arrière, ni changement de semaine ne recalent | #69 |
 | D1 | RGPD | suppression refusée pour un garant de P1 | §8.4 |
 | D2 | Tutelle | rupture P2 + `AuditLog guardianship_severed` | §6 |
 | D3 | Bascule de saison | double validation, suspension de masse, réactivation, nouvelle année | §8.8 |

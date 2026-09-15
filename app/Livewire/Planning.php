@@ -190,6 +190,25 @@ class Planning extends Component
         return $query->get();
     }
 
+    /**
+     * Groupe de jour sur lequel la vue Semaine mobile se positionne à l'arrivée (#69) : le jour
+     * courant s'il porte des séances, sinon le prochain jour peuplé de la semaine. Nul hors de la
+     * semaine courante, ou quand plus rien ne reste : la liste reste alors en haut.
+     *
+     * Les jours vides n'ont pas de groupe rendu, d'où la recherche parmi les clés de `$grouped`
+     * (dans l'ordre de `start_at`, donc chronologiques).
+     *
+     * @param  Collection<string, Collection<int, Session>>  $grouped
+     */
+    private function arrivalDay(Collection $grouped, Carbon $from, Carbon $to, string $todayStr): ?string
+    {
+        if ($this->view !== 'week' || $todayStr < $from->toDateString() || $todayStr > $to->toDateString()) {
+            return null;
+        }
+
+        return $grouped->keys()->first(fn (string $day) => $day >= $todayStr);
+    }
+
     public function render()
     {
         [$from, $to] = $this->window();
@@ -219,6 +238,8 @@ class Planning extends Component
             }
         }
 
+        $todayStr = $this->now()->toDateString();
+
         return view('livewire.planning', [
             'sessions' => $sessions,
             'grouped' => $grouped,
@@ -228,7 +249,8 @@ class Planning extends Component
             'to' => $to,
             'disciplines' => Discipline::whereNull('archived_at')->orderBy('sort_order')->get(),
             'tz' => $tz,
-            'todayStr' => $this->now()->toDateString(),
+            'todayStr' => $todayStr,
+            'arrivalDay' => $this->arrivalDay($grouped, $from, $to, $todayStr),
             ...$this->subjectViewData(),
         ]);
     }

@@ -119,7 +119,8 @@
             </div>
         @endif
 
-        <div class="plan-scroll-m">
+        {{-- #69 — position de la liste à l'arrivée et au retour arrière : cf. resources/js/planning.js. --}}
+        <div class="plan-scroll-m" x-data="planningSemaine" x-on:alpine:navigating.document="memoriser">
             @if ($view === 'week')
                 {{-- Liste par jour (header sticky) --}}
                 @php $hasAny = false; @endphp
@@ -135,7 +136,7 @@
                              recompose pas un élément `position:sticky` sur simple changement de
                              texte — le numéro du jour et le compteur restaient ceux de la semaine
                              précédente jusqu'au prochain scroll (issue #32). --}}
-                        <div class="plan-daygroup-m" wire:key="daygroup-{{ $dayStr }}">
+                        <div class="plan-daygroup-m" wire:key="daygroup-{{ $dayStr }}" @if ($dayStr === $arrivalDay) data-arrivee @endif>
                             <div class="plan-dayhead-m">
                                 <span class="num" style="font-size:18px;{{ $isToday ? 'color:var(--accent)' : '' }}">{{ $day->format('j') }}</span>
                                 <span class="dsp-7" style="font-size:16px;text-transform:capitalize">{{ $day->locale('fr')->isoFormat('dddd') }}</span>
