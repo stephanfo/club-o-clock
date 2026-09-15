@@ -364,6 +364,8 @@ class NotificationContexteSujetTest extends TestCase
 
     public function test_le_parent_distingue_ses_alertes_de_celles_de_son_enfant(): void
     {
+        // Séances figées au 5 septembre : la page Alertes les masque 7 jours après leur fin (#79).
+        $this->travelTo(Carbon::parse('2026-09-06 10:00', 'Europe/Paris'));
         [$garant, $enfant] = $this->famille();
         $seance = $this->seance('Natation jeunes');
         $sienne = $this->seance('Trail du dimanche');

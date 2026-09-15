@@ -945,6 +945,14 @@ La matrice §4.15.3 est **propre à chaque utilisateur**. Le parent gère ses op
 - **Rejeu des échecs** : relancer les envois en échec.
 - **Accès** : **admin uniquement** (acte de gouvernance, cohérent avec l'accès aux journaux §4.18). La consultation ne ré-émet jamais ; seules les actions explicites (annuler / pousser / rejouer) agissent sur la file.
 
+#### 4.15.7 Page Alertes (adhérent)
+Chaque adhérent retrouve dans l'application les **notifications push qu'il a reçues**, avec un compteur de non-lues (cloche + navigation) remis à zéro à l'ouverture de la page.
+
+- **Visibilité** : une alerte liée à une séance reste affichée **jusqu'à 7 jours après la fin de la séance**, quelle que soit sa date d'envoi — une compétition annoncée longtemps à l'avance ne disparaît pas avant d'avoir eu lieu. Séance annulée : même règle sur la fin prévue ; séance supprimée : 7 jours après le créneau connu. Une alerte **sans séance** (tutelle, compte…) reste affichée **60 jours** après son envoi.
+- **Retrait manuel** : l'adhérent retire une alerte d'un geste, sans confirmation, ou **vide la liste** après confirmation. Le retrait ne vaut **que pour lui** et ne supprime rien : l'historique des envois (§4.15.6) reste complet, et la notification d'origine (push, email) n'est pas touchée. Pas de restauration.
+- **Regroupement** : les alertes d'un même envoi portant sur la même séance et le même type, mais sur des sujets différents (§4.15.5), forment **une seule entrée** qui nomme chacun (« Toi, Léa et Tom · … ») ; la retirer les retire toutes. Deux déclenchements distincts restent deux entrées.
+- Les alertes retirées ou expirées **ne comptent plus** parmi les non-lues.
+
 ### 4.16 Dashboard statistiques bureau
 
 #### 4.16.1 Indicateurs V1

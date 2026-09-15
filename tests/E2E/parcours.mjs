@@ -574,13 +574,14 @@ async function ongletMobile(page, nom) {
   tous.push(s.report());
 }
 
-// ── S21 · Alertes d'un garant lui-même athlète (PRD §4.15.5) ──────────
+// ── S21 · Alertes d'un garant lui-même athlète (PRD §4.15.5, §4.15.7) ──
 // Sandrine est le cas exact que le rendu générique rendait illisible : garante de deux enfants ET
-// athlète. Ses notifications et celles de ses enfants arrivent sur le même compte — rien ne les
-// distinguait. On pose deux alertes déterministes plutôt que d'espérer les bonnes dans le jeu de
-// démo, et on les retire ensuite (règle « restaurer l'état »).
+// athlète. Ses notifications et celles de ses enfants arrivent sur le même compte. Depuis #79, les
+// lignes d'un même envoi forment UNE carte qui nomme chacun, et son × les retire toutes. On pose
+// deux alertes déterministes plutôt que d'espérer les bonnes dans le jeu de démo, et on les
+// supprime ensuite (règle « restaurer l'état »).
 {
-  const s = new Scenario('S21 · Alertes — un garant distingue les siennes de celles de ses enfants');
+  const s = new Scenario('S21 · Alertes — carte regroupée garant + enfant, retrait par ×');
   const repere = repereJournaux();
 
   const sandrine = Number(sql("SELECT id FROM users WHERE email='sandrine@demo.club'"));
@@ -591,6 +592,7 @@ async function ongletMobile(page, nom) {
   // Ouvrir la page marque TOUT lu : sans ce relevé, le run laisserait le jeu de démo sans badge
   // d'alertes non lues — une trace invisible, et le premier écran du pitch appauvri.
   const nonLues = sql(`SELECT IFNULL(GROUP_CONCAT(id),'') v FROM notification_outbox WHERE user_id=${sandrine} AND read_at IS NULL`);
+  const avant = Number(sql('SELECT IFNULL(MAX(id),0) FROM notification_outbox'));
 
   const alerte = (payload) => sql(
     "INSERT INTO notification_outbox (type, channel, payload, user_id, status, attempts, sent_at, created_at, updated_at) "
@@ -599,25 +601,30 @@ async function ongletMobile(page, nom) {
 
   alerte(`{"session_id":${cible},"subject_id":${jade},"subject_first_name":"Jade"}`); // pour son enfant
   alerte(`{"session_id":${cible}}`);                                                  // pour elle-même
+  const posees = `SELECT COUNT(*) FROM notification_outbox WHERE id>${avant} AND user_id=${sandrine}`;
 
   const { ctx, page } = await session(browser, 'sandrine@demo.club', MOBILE);
   await page.goto(`${BASE}/alertes`, { waitUntil: 'networkidle' });
   const txt = await page.locator('body').innerText();
 
-  s.check('l\'alerte de l\'enfant est nommée', /Jade · Annulation de séance/.test(txt));
+  s.check('une seule carte nomme la garante et l\'enfant', (txt.match(/Toi et Jade · Annulation de séance/g) ?? []).length === 1);
   s.check('la séance concernée est nommée', txt.includes(titre), titre);
-  // Assertion négative appariée au contrôle positif ci-dessus : la liste n'est pas vide, et sa
-  // propre alerte y figure bien — sans être attribuée à quelqu'un d'autre.
-  s.check('sa propre alerte reste sans prénom', !/Sandrine · Annulation/.test(txt)
-    && (txt.match(/Annulation de séance/g) ?? []).length >= 2);
+  s.check('bouton « Tout effacer » présent', await page.locator('button:visible', { hasText: 'Tout effacer' }).count() === 1);
   s.checkJs(page);
   await s.shot(page, 's21-alertes-garant-mobile');
 
   await page.setViewportSize(DESKTOP);
   await page.reload({ waitUntil: 'networkidle' });
   await s.shot(page, 's21-alertes-garant-desktop');
+
+  // × de la carte regroupée : les deux lignes sont masquées, la carte quitte l'écran.
+  const carte = page.locator('.card:visible', { hasText: 'Toi et Jade' });
+  await carte.locator('button[aria-label="Retirer l\'alerte"]').click();
+  await page.waitForFunction(() => !document.body.innerText.includes('Toi et Jade'));
+  s.check('le × masque les deux lignes du groupe', sql(`${posees} AND dismissed_at IS NOT NULL`) === '2');
   await ctx.close();
 
+  sql(`DELETE FROM notification_outbox WHERE id>${avant} AND user_id=${sandrine}`);
   purgeJournaux(repere);
   if (nonLues) sql(`UPDATE notification_outbox SET read_at=NULL WHERE id IN (${nonLues})`);
   tous.push(s.report());
