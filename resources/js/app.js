@@ -11,3 +11,5 @@ import './dialog';
 import './planning';
 // Web Push : expose window.clubPush (souscription PushManager + sync serveur) — onglet Notifs (J8.6).
 import './push';
+// Barre de navigation basse décollée en PWA iOS après rotation ou reprise, et panneau ?diag=viewport (#42).
+import './viewport';
