@@ -101,7 +101,7 @@ des requêtes brutes. Les deux **refusent de s'exécuter si `APP_ENV != local`**
 | S14 | Écrans admin | rendus et non vides pour l'admin | §8.6 |
 | S15 | Sélecteur d'athlètes | suspendu et déjà-inscrits exclus | §2, §3.4 |
 | S16 | Séance pleine | file d'attente rejointe, statut `waitlist` | §1.4 |
-| S17 | Quota — mécanisme C | déblocage coach : bouton actif/désactivé, promotion, `AuditLog` | §1.4, §3.4 |
+| S17 | Quota — mécanisme C | débloquer (dialog, accusé, promotion, chip) puis refermer, desktop et mobile ; refus athlète ; `AuditLog` | §1.4, §3.4 |
 | S21 | Alertes d'un garant | ses alertes et celles de son enfant se distinguent (préfixe, séance nommée) | §5, §6 |
 | S23 | Retour après enregistrement | la fiche revient à sa destination annoncée, pas au formulaire | consignes |
 | S24 | Semaine mobile | la carte porte la plage horaire, l'en-tête de jour garde la date | consignes |
@@ -152,7 +152,7 @@ statut, files, promotions, apéros, file d'envoi, journaux), et **fait échouer 
 
 Deux fuites réelles ont été trouvées ainsi, toutes deux invisibles depuis le début :
 
-- **S17 ne restaurait qu'un promu sur deux.** `fillQuota` promeut **toute** la file quota d'un coup
+- **S17 ne restaurait qu'un promu sur deux.** Le déblocage (`fillQuota`, devenu `releaseQuota` avec #66) promeut **toute** la file quota d'un coup
   (§4.10.4) ; la remise en état ne portait que sur le premier. Le jeu de démo perdait une entrée de
   file quota à **chaque** run, définitivement.
 - **Les notifications de promotion restaient « en attente ».** Ce n'est pas cosmétique : le prochain

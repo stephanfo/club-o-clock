@@ -198,6 +198,18 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Modifié
 
+- **Le déblocage du quota reste actif jusqu'à la séance.** Débloquer la file « quota dépassé » ne
+  valait que pour l'instant du clic : un athlète hors quota qui s'inscrivait ensuite repartait en
+  attente malgré les places libres, et un désistement ou une hausse de capacité ne profitait qu'à la
+  file « séance pleine ». Le bouton **« Débloquer le quota »** pose désormais un état sur la séance.
+  Jusqu'à la séance, l'athlète hors quota s'inscrit directement tant qu'il reste des places ; une
+  place qui se libère revient au premier de la file quota une fois la file « séance pleine » servie.
+  Séance pleine, les hors-quota attendent dans l'ordre d'arrivée, et celui qui attendait avant le
+  déblocage n'est pas doublé. Le déblocage est possible file vide (ouvrir la séance la veille), passe
+  par un dialog qui nomme les promu·e·s et demande un accusé de réception dès qu'il notifie, se
+  referme sans désinscrire personne, et repart à zéro si le tag de quota change ou si la séance est
+  réactivée. Une chip « Quota débloqué » le signale sur la fiche, athlètes compris. (#66)
+
 - **La météo couvre toute la durée de la séance, et plus seulement son départ.** Une sortie de trois
   heures affichait la température et le vent de la première heure. La fiche donne désormais la plage
   de température, le vent minimal et maximal, et retient le temps le plus défavorable du créneau

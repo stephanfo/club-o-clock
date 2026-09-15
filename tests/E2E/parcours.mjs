@@ -410,184 +410,155 @@ async function ongletMobile(page, nom) {
   return ((await t.getAttribute('class')) || '').includes('on');
 }
 
-// ── S17 · Mécanisme C — déblocage coach de la file quota (PRD §4.10.4) ─
-// Le bouton « Remplir avec la file quota » est rendu DEUX fois (mobile l.198, desktop l.352) :
-// on vérifie les deux, sinon une dérive de l'un passerait inaperçue. Contrôle négatif apparié
-// sur une séance dont la file « séance pleine » non vide doit désactiver le bouton.
+// ── S17 · Mécanisme C — déblocage du quota jusqu'à la séance (PRD §4.10.4, #66) ─
+// Le déblocage est un ÉTAT de la séance : le coach l'ouvre par un dialog (liste des promu·e·s,
+// accusé de réception), la chip « Quota débloqué » le montre à tous, et « Refermer le quota » le
+// retire. Le geste est rendu dans les deux coquilles : desktop (colonne Gestion) et mobile (bloc
+// Gestion de l'onglet Infos) — on vérifie les deux, et le refus côté athlète.
 {
-  const s = new Scenario('S17 · Mécanisme C — remplir avec la file quota');
+  const s = new Scenario('S17 · Mécanisme C — débloquer puis refermer le quota');
 
-  // La file quota est POSÉE par le scénario, pas cherchée dans le jeu de démo (#35, #46) — comme
-  // S21 le fait déjà pour ses alertes. Le seed ne contient qu'une entrée de file quota, sur une
-  // séance qui devient passée : le scénario levait dès ce jour-là. On ne garde du seed que les
-  // préconditions structurelles de $canFillQuota (session-show.blade.php:54) — file capacity vide
-  // et places libres — et on fabrique l'entrée de file, retirée en fin de scénario.
+  // La file quota est POSÉE par le scénario, pas cherchée dans le jeu de démo (#35, #46). On ne
+  // garde du seed que les préconditions structurelles : séance taguée, future, non débloquée,
+  // file capacity vide et places libres (sinon le déblocage ne promeut personne).
   const sq = seance(`kind='training' AND cancelled_at IS NULL AND start_at > NOW()
+      AND quota_tag_id IS NOT NULL AND quota_released_at IS NULL
       AND NOT EXISTS (SELECT 1 FROM registrations r2 WHERE r2.session_id=sessions.id
                       AND r2.status='waitlist' AND r2.waitlist_reason='capacity')
       AND (capacity IS NULL OR capacity > (SELECT COUNT(*) FROM registrations r3
                       WHERE r3.session_id=sessions.id AND r3.status='participating'))`);
 
-  // L'athlète mis en file est réellement éligible à la séance : le bloc « Quota dépassé » le nomme,
-  // et un inscrit hors catégorie serait un état que l'application ne produit jamais.
-  const enFile = ligne(`SELECT u.id uid FROM users u
+  // L'athlète mis en file est réellement éligible à la séance : le dialog le nomme, et un inscrit
+  // hors catégorie serait un état que l'application ne produit jamais. Marie est écartée : c'est
+  // elle qui joue l'athlète simple du contrôle de refus.
+  const [enFile, prenom] = ligne(`SELECT u.id uid, u.first_name prenom FROM users u
       JOIN user_category uc ON uc.user_id = u.id
       JOIN session_category k ON k.category_id = uc.category_id AND k.session_id = ${sq}
       WHERE u.is_active = 1 AND u.athlete_access_suspended = 0 AND JSON_CONTAINS(u.roles, '"athlete"')
+        AND u.email <> 'marie@demo.club'
         AND NOT EXISTS (SELECT 1 FROM registrations r WHERE r.session_id = ${sq} AND r.user_id = u.id)
-      LIMIT 1`, `un athlète éligible à la séance ${sq}`)[0];
+      LIMIT 1`, `un athlète éligible à la séance ${sq}`);
+
+  // Instantané de la file AVANT l'action : le déblocage promeut TOUTE la file d'un coup, et la
+  // remise en état doit la reposer entière (S17 a déjà appauvri le jeu de démo à chaque run).
+  const fileAvant = sql(`SELECT IFNULL(GROUP_CONCAT(user_id ORDER BY user_id), '') v FROM registrations
+      WHERE session_id=${sq} AND status='waitlist' AND waitlist_reason='quota_exceeded'`);
+  const journaux = repereJournaux();
   sql(`INSERT INTO registrations (session_id, user_id, status, waitlist_reason, registered_at, created_at, updated_at)
        VALUES (${sq}, ${enFile}, 'waitlist', 'quota_exceeded', NOW(), NOW(), NOW())`);
+  const file = [fileAvant, enFile].filter(Boolean).join(',');
 
-  const wq = sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${sq} AND status='waitlist' AND waitlist_reason='quota_exceeded'`);
-  const wcap = sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${sq} AND status='waitlist' AND waitlist_reason='capacity'`);
-  s.check(`prérequis : file quota non vide (séance ${sq})`, Number(wq) >= 1, `n=${wq}`);
-  s.check('prérequis : file « séance pleine » vide', wcap === '0', `n=${wcap}`);
-
-  const promu = sql(`SELECT u.email FROM registrations r JOIN users u ON u.id=r.user_id WHERE r.session_id=${sq} AND r.waitlist_reason='quota_exceeded' ORDER BY r.registered_at LIMIT 1`);
-  const prenom = sql(`SELECT u.first_name FROM registrations r JOIN users u ON u.id=r.user_id WHERE r.session_id=${sq} AND r.waitlist_reason='quota_exceeded' ORDER BY r.registered_at LIMIT 1`);
   const coachSq = sql(`SELECT u.email FROM session_coach sc JOIN users u ON u.id=sc.user_id WHERE sc.session_id=${sq} LIMIT 1`) || 'admin@demo.club';
+  const coachId = sql(`SELECT id FROM users WHERE email='${coachSq}'`);
 
-  // — Contrôle négatif : file « séance pleine » NON vide → bouton rendu mais désactivé —
-  // Une séance saturée n'a pas forcément de file quota : sans en fabriquer une, le bloc ne serait
-  // pas rendu du tout et l'assertion ne prouverait rien. On l'ajoute puis on la retire.
+  // — Refus : un athlète simple ne voit ni le geste ni la chip (quota encore fermé) —
   {
-    // Même traitement que la cible principale : le seed n'a plus de file « séance pleine » sur une
-    // séance future, on la pose ici (et on la retire plus bas).
-    const bloquee = seance(`kind='training' AND cancelled_at IS NULL AND start_at > NOW()
-        AND id <> ${sq}`);
-    const enFileCap = ligne(`SELECT id uid FROM users
-        WHERE JSON_CONTAINS(roles, '"athlete"') AND is_active = 1
-          AND id NOT IN (SELECT user_id FROM registrations WHERE session_id = ${bloquee})
-        LIMIT 1`, `un athlète pour la file « séance pleine » de ${bloquee}`)[0];
-    sql(`INSERT INTO registrations (session_id, user_id, status, waitlist_reason, registered_at, created_at, updated_at)
-         VALUES (${bloquee}, ${enFileCap}, 'waitlist', 'capacity', NOW(), NOW(), NOW())`);
-    const coachBl = sql(`SELECT u.email FROM session_coach sc JOIN users u ON u.id=sc.user_id WHERE sc.session_id=${bloquee} LIMIT 1`) || 'admin@demo.club';
-    const cobaye = sql(`SELECT id FROM users WHERE id NOT IN (SELECT user_id FROM registrations WHERE session_id=${bloquee}) AND JSON_CONTAINS(roles, '"athlete"') LIMIT 1`);
-    sql(`INSERT INTO registrations (session_id, user_id, status, waitlist_reason, registered_at, created_at, updated_at) VALUES (${bloquee}, ${cobaye}, 'waitlist', 'quota_exceeded', NOW(), NOW(), NOW())`);
-
-    const { ctx, page } = await session(browser, coachBl, DESKTOP);
-    await fiche(page, bloquee);
+    const { ctx, page } = await session(browser, 'marie@demo.club', DESKTOP);
+    await fiche(page, sq);
     const txt = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
-    const btn29 = page.locator('.fiche-desktop button[wire\\:click="fillQuota"]').first();
-    s.check('contrôle négatif : bouton quota rendu', await btn29.count() > 0);
-    const cls = (await btn29.getAttribute('class')) || '';
-    s.check('contrôle négatif : bouton DÉSACTIVÉ (file « séance pleine » non vide)', cls.includes('is-disabled'), cls);
-    s.check('contrôle négatif : bouton non cliquable (attribut disabled)', await btn29.isDisabled().catch(() => false));
-    s.check('contrôle négatif : la condition est expliquée à l\'écran', /séance pleine .{0,10} est vide/i.test(txt), txt.slice(0, 0));
-    await s.shot(page, 's17-quota-desactive');
+    s.check('athlète : fiche rendue (contrôle positif)', /inscrit/i.test(txt));
+    s.check('athlète : aucun bouton de déblocage',
+            await page.locator('button[wire\\:click="openReleaseConfirm"]').count() === 0);
+    s.check('athlète : pas de chip tant que le quota est fermé', !/quota débloqué/i.test(txt));
     await ctx.close();
-
-    sql(`DELETE FROM registrations WHERE session_id=${bloquee} AND user_id IN (${cobaye}, ${enFileCap})`);
-    s.check('contrôle négatif : état restauré',
-            sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${bloquee}
-                 AND user_id IN (${cobaye}, ${enFileCap})`) === '0');
   }
 
-  // Instantané AVANT l'action, pour une remise en état complète.
-  //
-  // `fillQuota` promeut TOUTE la file quota d'un coup (§4.10.4), pas seulement le premier : la
-  // restauration ne portait que sur `promu` et laissait les autres en `participating`. Mesuré sur
-  // une base fraîchement seedée : la file contenait marie ET laura, laura était restaurée, marie
-  // restait promue — le jeu de démo perdait une entrée de file quota à CHAQUE run, définitivement,
-  // et le run suivant partait donc d'un jeu appauvri.
-  const fileAvant = sql(`SELECT IFNULL(GROUP_CONCAT(user_id ORDER BY user_id), '') v FROM registrations
-      WHERE session_id=${sq} AND status='waitlist' AND waitlist_reason='quota_exceeded'`) || '0';
+  // — DESKTOP coach : dialog, accusé de réception, déblocage —
+  {
+    const { ctx, page } = await session(browser, coachSq, DESKTOP);
+    await fiche(page, sq);
 
-  // Repère dans la file d'envoi : la promotion notifie les promus. Sans repère, on ne saurait pas
-  // distinguer les lignes créées par CE run de celles que le jeu de démo contient déjà — et on ne
-  // peut pas purger toute la table sans détruire une partie du jeu.
-  const journaux = repereJournaux();
+    const btn = page.locator('.fiche-desktop button[wire\\:click="openReleaseConfirm"]');
+    s.check('bouton « Débloquer le quota » présent (desktop)', await btn.count() > 0);
+    await btn.first().click({ timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(900);
 
-  // — Cas positif, DESKTOP : le bouton est actif et la promotion s'exécute —
-  const { ctx, page } = await session(browser, coachSq, DESKTOP);
-  await fiche(page, sq);
+    const dlg = page.locator('.dialog:visible');
+    const txtDlg = ((await dlg.innerText().catch(() => '')) || '').replace(/\s+/g, ' ');
+    s.check('dialog ouvert', txtDlg.length > 0);
+    s.check('le dialog nomme l\'athlète promu', txtDlg.includes(prenom), prenom);
+    s.check('accusé de réception chiffré présent', /je comprends que \d+ athlète/i.test(txtDlg), txtDlg.slice(0, 160));
+    const armeAvant = await dlg.locator('.dialog-foot button[wire\\:click="releaseQuota"]').count();
+    s.check('bouton non armé tant que la case n\'est pas cochée', armeAvant === 0, `n=${armeAvant}`);
+    await s.shot(page, 's17-quota-dialog');
 
-  const bodyAvant = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
-  s.check('bloc « Quota dépassé » affiché', /quota dépassé/i.test(bodyAvant));
-  s.check('l\'athlète en attente y est nommé', bodyAvant.includes(prenom), prenom);
+    await dlg.locator('#txt-debloquer-quota').click();
+    await page.waitForTimeout(700);
+    const valider = dlg.locator('.dialog-foot button[wire\\:click="releaseQuota"]');
+    s.check('case cochée : bouton armé', await valider.count() === 1);
+    await valider.click({ timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(1800);
 
-  const btn = page.locator('.fiche-desktop button[wire\\:click="fillQuota"]').first();
-  s.check('bouton « Remplir avec la file quota » présent (desktop)', await btn.count() > 0);
-  const clsBtn = (await btn.getAttribute('class')) || '';
-  s.check('bouton actif (préconditions réunies)', !clsBtn.includes('is-disabled'), clsBtn);
-  await s.shot(page, 's17-quota-avant');
+    s.check('séance débloquée en base (quota_released_by = le coach)',
+            sql(`SELECT IFNULL(quota_released_by, '-') v FROM sessions WHERE id=${sq}`) === coachId);
+    s.check('athlète promu en participating, attribué au coach',
+            sql(`SELECT CONCAT(status,'/',IFNULL(promoted_by,'-')) v FROM registrations WHERE session_id=${sq} AND user_id=${enFile}`) === `participating/${coachId}`);
+    s.check('AuditLog quota_release puis promote_quota_exceeded',
+            sql(`SELECT COUNT(DISTINCT action) n FROM audit_logs WHERE id>${journaux.audit} AND session_id=${sq}
+                 AND action IN ('quota_release','promote_quota_exceeded')`) === '2');
 
-  // Timeout court + échec explicite : si le bouton est désactivé à tort, on veut un ❌ lisible
-  // dans le rapport, pas un crash Playwright de 30 s qui interrompt toute la suite.
-  const clique = await btn.click({ timeout: 5000 }).then(() => true).catch(() => false);
-  s.check('le bouton est réellement cliquable', clique);
-  await page.waitForTimeout(1800);
+    const body = (await page.locator('.fiche-desktop').innerText()).replace(/\s+/g, ' ');
+    s.check('chip « Quota débloqué » affichée', /quota débloqué/i.test(body));
+    s.check('le bouton devient « Refermer le quota »',
+            await page.locator('.fiche-desktop button[wire\\:click="closeQuota"]').count() === 1);
+    s.check('l\'athlète promu apparaît chez les inscrits', body.includes(prenom), prenom);
+    await s.shot(page, 's17-quota-debloque');
+    await ctx.close();
+  }
 
-  // Effet en base : promotion tracée (promoted_by = le coach qui a cliqué).
-  const apres = sql(`SELECT status FROM registrations WHERE session_id=${sq} AND user_id=(SELECT id FROM users WHERE email='${promu}')`);
-  s.check('athlète promu en participating', apres === 'participating', `statut=${apres}`);
-  const by = sql(`SELECT promoted_by FROM registrations WHERE session_id=${sq} AND user_id=(SELECT id FROM users WHERE email='${promu}')`);
-  const karine = sql(`SELECT id FROM users WHERE email='${coachSq}'`);
-  s.check('promotion attribuée au coach (promoted_by)', by === karine, `${by} (attendu ${karine})`);
-  const audit = sql(`SELECT COUNT(*) n FROM audit_logs WHERE action='promote_quota_exceeded' AND session_id=${sq}`);
-  s.check('AuditLog promote_quota_exceeded émis', Number(audit) >= 1, `n=${audit}`);
+  // — Athlète sur la séance débloquée : la chip est là, pas le geste —
+  {
+    const { ctx, page } = await session(browser, 'marie@demo.club', MOBILE);
+    await fiche(page, sq);
+    const txt = (await page.locator('.fiche-mobile').innerText()).replace(/\s+/g, ' ');
+    s.check('athlète : chip « Quota débloqué » visible (mobile)', /quota débloqué/i.test(txt));
+    s.check('athlète : pas de « Refermer le quota »',
+            await page.locator('button[wire\\:click="closeQuota"]').count() === 0);
+    await s.shot(page, 's17-quota-athlete-mobile');
+    await ctx.close();
+  }
 
-  // Effet à l'écran : le flash annonce la promotion, et l'athlète a changé de bloc.
-  const bodyApres = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
-  s.check('flash de confirmation affiché', /promu/i.test(bodyApres), bodyApres.slice(0, 120));
-  // La file quota étant vidée, le bloc « Quota dépassé » et son bouton disparaissent.
-  s.check('le bloc « Quota dépassé » a disparu', !/quota dépassé/i.test(bodyApres));
-  s.check('le bouton de déblocage a disparu',
-          await page.locator('.fiche-desktop button[wire\\:click="fillQuota"]').count() === 0);
-  // Contrôle positif apparié : la page n'est pas simplement vide, l'athlète est bien listé ailleurs.
-  s.check('l\'athlète promu apparaît chez les inscrits', bodyApres.includes(prenom), prenom);
-  await s.shot(page, 's17-quota-apres');
-  await ctx.close();
+  // — MOBILE coach : refermer depuis le bloc Gestion de l'onglet Infos —
+  {
+    const { ctx, page } = await session(browser, coachSq, MOBILE);
+    await fiche(page, sq);
+    const fermer = page.locator('.fiche-mobile button[wire\\:click="closeQuota"]:visible').first();
+    s.check('« Refermer le quota » présent en mobile (onglet Infos)', await fermer.count() === 1);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+    s.check('pas de débordement horizontal (mobile)', !overflow);
+    await fermer.scrollIntoViewIfNeeded().catch(() => {});
+    await s.shot(page, 's17-quota-mobile');
+    page.once('dialog', (d) => d.accept());   // wire:confirm
+    await fermer.click({ timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+    s.check('quota refermé en base',
+            sql(`SELECT IFNULL(quota_released_at, '-') v FROM sessions WHERE id=${sq}`) === '-');
+    s.check('le promu reste inscrit après fermeture',
+            sql(`SELECT status FROM registrations WHERE session_id=${sq} AND user_id=${enFile}`) === 'participating');
+    s.check('AuditLog quota_close émis',
+            sql(`SELECT COUNT(*) n FROM audit_logs WHERE id>${journaux.audit} AND session_id=${sq} AND action='quota_close'`) === '1');
+    s.check('le bouton redevient « Débloquer le quota »',
+            await page.locator('.fiche-mobile button[wire\\:click="openReleaseConfirm"]:visible').count() > 0);
+    await ctx.close();
+  }
 
-  // — Remise en état, puis vérification du rendu MOBILE sur l'état restauré —
-  // TOUTE la file, et pas le seul `promu` : cf. l'instantané plus haut.
+  // — Remise en état : file entière, état de séance, journaux, entrée posée par le scénario —
   sql(`UPDATE registrations SET status='waitlist', waitlist_reason='quota_exceeded', promoted_at=NULL, promoted_by=NULL
-       WHERE session_id=${sq} AND user_id IN (${fileAvant})`);
+       WHERE session_id=${sq} AND user_id IN (${file})`);
+  sql(`DELETE FROM registrations WHERE session_id=${sq} AND user_id=${enFile}`);
+  sql(`UPDATE sessions SET quota_released_at=NULL, quota_released_by=NULL WHERE id=${sq}`);
   purgeJournaux(journaux);
 
-  const restaure = sql(`SELECT CONCAT(status,'/',IFNULL(waitlist_reason,'-'),'/',IFNULL(promoted_by,'-')) v FROM registrations WHERE session_id=${sq} AND user_id=(SELECT id FROM users WHERE email='${promu}')`);
-  s.check('état restauré', restaure === 'waitlist/quota_exceeded/-', restaure);
-  const fileApres = sql(`SELECT IFNULL(GROUP_CONCAT(user_id ORDER BY user_id), '') v FROM registrations
-      WHERE session_id=${sq} AND status='waitlist' AND waitlist_reason='quota_exceeded'`);
-  s.check('état restauré : TOUTE la file quota, pas seulement le promu',
-          fileApres === fileAvant, `${fileApres || 'vide'} (attendu ${fileAvant})`);
-  s.check('état restauré : aucune trace de promotion sur les inscriptions de la file',
-          sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${sq} AND user_id IN (${fileAvant}) AND promoted_at IS NOT NULL`) === '0');
+  s.check('état restauré : TOUTE la file quota d\'avant',
+          sql(`SELECT IFNULL(GROUP_CONCAT(user_id ORDER BY user_id), '') v FROM registrations
+               WHERE session_id=${sq} AND status='waitlist' AND waitlist_reason='quota_exceeded'`) === fileAvant,
+          `attendu « ${fileAvant} »`);
+  s.check('état restauré : entrée posée par le scénario retirée',
+          sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${sq} AND user_id=${enFile}`) === '0');
   s.check('journaux restaurés (audit, activité, envois)',
           sql(`SELECT (SELECT COUNT(*) FROM audit_logs WHERE id>${journaux.audit})
                     + (SELECT COUNT(*) FROM activity_logs WHERE id>${journaux.activite})
                     + (SELECT COUNT(*) FROM notification_outbox WHERE id>${journaux.envois}) n`) === '0');
-
-  {
-    const { ctx, page } = await session(browser, coachSq, MOBILE);
-    await fiche(page, sq);
-    s.check('onglet Waitlist ouvert (mobile)', await ongletMobile(page, 'waitlist'));
-    const btnM = page.locator('.fiche-mobile button[wire\\:click="fillQuota"]').first();
-    s.check('bouton présent aussi en mobile', await btnM.count() > 0);
-    const clsM = (await btnM.getAttribute('class')) || '';
-    s.check('bouton actif en mobile', !clsM.includes('is-disabled'), clsM);
-    // Pas de débordement horizontal sur la barre d'action.
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
-    s.check('pas de débordement horizontal (mobile)', !overflow);
-    await s.shot(page, 's17-quota-mobile');
-    await ctx.close();
-  }
-
-  // — Refus : un athlète simple ne peut pas déclencher le mécanisme C —
-  {
-    const { ctx, page } = await session(browser, 'marie@demo.club', DESKTOP);
-    await fiche(page, sq);
-    const n = await page.locator('button[wire\\:click="fillQuota"]').count();
-    s.check('athlète simple : aucun bouton de déblocage', n === 0, `n=${n}`);
-    await ctx.close();
-  }
-
-  // L'entrée de file posée en tête de scénario est retirée en dernier : les vérifications de
-  // restauration ci-dessus la comptent encore, puisqu'elles contrôlent l'état d'AVANT `fillQuota`.
-  sql(`DELETE FROM registrations WHERE session_id=${sq} AND user_id=${enFile}`);
-  s.check('état restauré (entrée de file posée par le scénario)',
-          sql(`SELECT COUNT(*) n FROM registrations WHERE session_id=${sq} AND user_id=${enFile}`) === '0');
 
   tous.push(s.report());
 }

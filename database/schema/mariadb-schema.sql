@@ -625,6 +625,8 @@ CREATE TABLE `sessions` (
   `cancelled_at` timestamp NULL DEFAULT NULL,
   `cancelled_by` bigint(20) unsigned DEFAULT NULL,
   `quota_tag_id` bigint(20) unsigned DEFAULT NULL,
+  `quota_released_at` timestamp NULL DEFAULT NULL,
+  `quota_released_by` bigint(20) unsigned DEFAULT NULL,
   `content_markdown` longtext DEFAULT NULL,
   `content_attachment_path` varchar(255) DEFAULT NULL,
   `event_type_id` bigint(20) unsigned DEFAULT NULL,
@@ -648,11 +650,13 @@ CREATE TABLE `sessions` (
   KEY `sessions_location_id_foreign` (`location_id`),
   KEY `sessions_route_id_foreign` (`route_id`),
   KEY `sessions_source_template_id_foreign` (`source_template_id`),
+  KEY `sessions_quota_released_by_foreign` (`quota_released_by`),
   CONSTRAINT `sessions_cancelled_by_foreign` FOREIGN KEY (`cancelled_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `sessions_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `sessions_discipline_id_foreign` FOREIGN KEY (`discipline_id`) REFERENCES `disciplines` (`id`) ON DELETE SET NULL,
   CONSTRAINT `sessions_event_type_id_foreign` FOREIGN KEY (`event_type_id`) REFERENCES `event_types` (`id`) ON DELETE SET NULL,
   CONSTRAINT `sessions_location_id_foreign` FOREIGN KEY (`location_id`) REFERENCES `locations` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `sessions_quota_released_by_foreign` FOREIGN KEY (`quota_released_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `sessions_quota_tag_id_foreign` FOREIGN KEY (`quota_tag_id`) REFERENCES `quota_tags` (`id`) ON DELETE SET NULL,
   CONSTRAINT `sessions_route_id_foreign` FOREIGN KEY (`route_id`) REFERENCES `gpx_routes` (`id`) ON DELETE SET NULL,
   CONSTRAINT `sessions_source_template_id_foreign` FOREIGN KEY (`source_template_id`) REFERENCES `session_templates` (`id`) ON DELETE SET NULL
@@ -809,5 +813,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (41,'2026_08_24_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (42,'2026_09_04_000000_drop_is_minor_from_users',5);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (43,'2026_09_13_000000_add_ad_hoc_location_to_sessions',6);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (44,'2026_09_13_000010_add_external_staff_label_to_sessions',7);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (45,'2026_09_15_000000_add_quota_release_to_sessions',8);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

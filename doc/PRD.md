@@ -529,10 +529,16 @@ si C < N :
     si capacité disponible → status = 'participating'
     sinon                  → status = 'waitlist', reason = 'capacity'
 sinon (C >= N) :
-    afficher bandeau d'avertissement à l'athlète
-    si confirmé → status = 'waitlist', reason = 'quota_exceeded'
-    sinon       → annule l'inscription
+    si le quota de la séance est débloqué (mécanisme C) :
+        si capacité disponible → status = 'participating'      (sans bandeau)
+        sinon                  → status = 'waitlist', reason = 'quota_exceeded'
+    sinon :
+        afficher bandeau d'avertissement à l'athlète
+        si confirmé → status = 'waitlist', reason = 'quota_exceeded'
+        sinon       → annule l'inscription
 ```
+
+Sur une séance débloquée **et pleine**, l'athlète hors quota rejoint la file `quota_exceeded`, pas la file `capacity` : entre hors-quota, l'ordre d'arrivée est conservé, et celui qui attendait avant le déblocage n'est pas doublé par celui qui s'inscrit après.
 
 #### 4.10.4 Trois mécanismes de promotion
 
@@ -543,10 +549,14 @@ si la file 'capacity' de la séance est non vide :
     promouvoir le 1er FIFO timestamp → status = 'participating'
     notifier l'athlète promu (push + email)
     répéter tant qu'il reste des places ET des athlètes en 'capacity'
+sinon, si le quota de la séance est débloqué (mécanisme C) :
+    promouvoir le 1er FIFO timestamp de la file 'quota_exceeded'
+    (même notification, même répétition)
 sinon :
     la file 'quota_exceeded' n'est PAS touchée par ce mécanisme.
-    Elle reste en attente d'un déblocage manuel (mécanisme C).
 ```
+
+« Place libérée » couvre le désistement, l'annulation d'une inscription et la hausse de capacité d'une séance.
 
 ##### Mécanisme B — Auto-promotion silencieuse sur libération de son propre quota
 Si l'athlète A se désinscrit d'une séance du tag T cette semaine (ou si la séance est annulée), pour chacune de ses inscriptions `waitlist quota_exceeded` sur **une autre séance du même tag dans la même semaine** :
@@ -556,16 +566,19 @@ Si l'athlète A se désinscrit d'une séance du tag T cette semaine (ou si la s�
 
 Le mécanisme B ne dépend pas du timestamp FIFO de la file `quota_exceeded` pour décider **si** A est promu — c'est A qui libère son propre quota. Les autres athlètes en `quota_exceeded` derrière A restent en attente d'un déblocage coach.
 
-##### Mécanisme C — Déblocage manuel coach de `quota_exceeded`
-Action globale **« Remplir avec quota_exceeded »** sur la séance :
-- **Précondition stricte** : `capacity` vide ET places restantes (bouton désactivé sinon, infobulle).
-- Au clic, le système promeut **autant d'athlètes de `quota_exceeded` que de places restantes**, en FIFO timestamp.
-- Champ « motif » **optionnel** partagé pour tout le batch.
-- `AuditLog` : **N entrées individuelles** `action = 'promote_quota_exceeded'`, une par athlète promu (`actorId` = coach, `targetId` = athlète promu, `sessionId`, `motif` partagé).
+##### Mécanisme C — Déblocage du quota par le coach
+Action **« Débloquer le quota »** sur la séance. Le déblocage est un **état de la séance**, actif jusqu'à ce que le coach le referme ou que la séance commence :
+- **Précondition** : séance future, non annulée, portant un tag de quota. Possible **même file `quota_exceeded` vide** (ouvrir la séance la veille, avant que quiconque n'attende).
+- **Au clic**, le système promeut **autant d'athlètes de `quota_exceeded` que de places restantes**, en FIFO timestamp, une fois la file `capacity` servie (elle passe devant).
+- **Tant que le quota est débloqué** : l'inscription hors quota ne bloque plus (§4.10.3) et le mécanisme A pioche aussi dans `quota_exceeded`.
+- Champ « motif » **optionnel** partagé pour le geste et le batch.
+- `AuditLog` : une entrée `action = 'quota_release'` pour le geste (`motif`), puis **N entrées individuelles** `action = 'promote_quota_exceeded'`, une par athlète promu (`actorId` = coach, `targetId` = athlète promu, `sessionId`, `motif` partagé). Les promotions automatiques qui suivent (mécanisme A) gardent leur `ActivityLog` avec acteur système.
 - Notif push + email aux athlètes promus.
 - Le compteur de quota des athlètes promus s'incrémente naturellement (effet recherché).
+- **Refermer le quota** : les athlètes déjà promus **restent inscrits** ; seules les inscriptions suivantes retrouvent la règle normale. `AuditLog action = 'quota_close'`.
+- **Piste hors V1** : déblocage automatique X heures avant le début.
 
-> **Non-conflit A/B/C** : A pioche dans `capacity` sur place libérée, B traite le propre quota libéré par l'athlète sur sa propre file `quota_exceeded`, C est une action coach explicite sur la file `quota_exceeded` quand `capacity` est vide. Périmètres disjoints.
+> **Non-conflit A/B/C** : A pioche dans `capacity` sur place libérée, puis dans `quota_exceeded` si le quota de la séance est débloqué ; B traite le propre quota libéré par l'athlète sur sa propre file `quota_exceeded` ; C est l'état posé par le coach, qui étend A et §4.10.3 jusqu'à la séance. La file `capacity` passe toujours devant la file `quota_exceeded`.
 
 #### 4.10.5 Override coach
 Le coach peut **forcer une inscription `participating`**, en outrepassant quota et/ou capacité.
@@ -591,11 +604,14 @@ Le coach peut **forcer une inscription `participating`**, en outrepassant quota 
 - Bandeau d'avertissement systématique avant validation d'une inscription qui partira en waitlist pour cause de quota.
 - **Compteurs visibles dans le profil athlète, regroupés par tag** (et non par discipline) : « cette semaine : 1/1 piscine, 0/2 home-trainer-collectif, 2/3 endurance ». Les séances sans tag n'apparaissent dans aucun compteur.
 - **Vue coach** : sur la liste des inscrits/waitlist, indication visuelle du statut (`quota_exceeded` vs `capacity`) et du nb de séances déjà faites cette semaine.
-- **Vue coach (gestion de séance)** : bouton **« Remplir avec quota_exceeded »** disponible uniquement si `capacity` vide ET places restantes. Désactivé sinon. Au clic, modale de confirmation : nombre d'athlètes qui seront promus, liste nominative, champ « motif » optionnel partagé, action « Confirmer » / « Annuler ».
+- **Vue coach (gestion de séance)** : bouton **« Débloquer le quota »** sur toute séance future, non annulée et taguée. Au clic, modale de confirmation : ce que le déblocage change jusqu'à la séance, liste nominative des athlètes promus, champ « motif » optionnel partagé ; dès qu'au moins un athlète est promu, accusé de réception chiffré (« Je comprends que N athlètes seront prévenu·e·s ») avant d'armer le bouton. Une fois débloqué, le bouton devient **« Refermer le quota »** (simple confirmation).
+- **Chip « Quota débloqué »** sur la fiche séance, visible de tous — athlètes compris, pour qu'ils sachent pouvoir s'inscrire.
 
 #### 4.10.8 Cas limites
 - **Semaine N→N+1** (dimanche soir / lundi matin) : compteurs distincts.
 - **Séance à cheval** entre deux semaines : appartient à la semaine de sa date de début.
+- **Changement du tag de quota d'une séance** (ou retrait du tag) : le déblocage (§4.10.4 C) est remis à zéro. Les athlètes déjà promus restent inscrits.
+- **Restauration d'une séance annulée** : le déblocage est remis à zéro ; le coach le rouvre s'il le veut.
 - **Modification du `maxPerWeek` d'un tag** : inscriptions existantes pas remises en cause, seule la prochaine évaluation utilise le nouveau quota.
 - **Ajout d'un tag a posteriori** sur une séance avec inscrits : **recalcul automatique** ; les inscrits qui dépassent le nouveau quota sont remis en `waitlist quota_exceeded` avec notif.
 - **Changement de discipline d'une séance déjà taguée** : aucun effet de bord (tag universel).

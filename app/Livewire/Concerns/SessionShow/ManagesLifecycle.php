@@ -81,7 +81,12 @@ trait ManagesLifecycle
             return;
         }
 
-        $this->session->forceFill(['cancelled_at' => null, 'cancelled_by' => null])->save();
+        // Le déblocage du quota (#66) ne survit pas à l'annulation : la séance réactivée repart
+        // de la règle normale, au coach de rouvrir s'il le veut.
+        $this->session->forceFill([
+            'cancelled_at' => null, 'cancelled_by' => null,
+            'quota_released_at' => null, 'quota_released_by' => null,
+        ])->save();
 
         // §4.14.4 : restaure les flags apéro garés dont l'inscription est toujours active.
         $apero->restoreOnSessionUncancel($this->session);

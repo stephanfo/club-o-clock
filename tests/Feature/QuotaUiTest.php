@@ -89,7 +89,9 @@ class QuotaUiTest extends TestCase
         $this->svc()->register($s, $a, $a, confirmQuota: true);
 
         Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s])
-            ->call('fillQuota');
+            ->call('openReleaseConfirm')
+            ->set('releaseCheck', true)
+            ->call('releaseQuota');
 
         $this->assertDatabaseHas('registrations', [
             'session_id' => $s->id, 'user_id' => $a->id, 'status' => 'participating',

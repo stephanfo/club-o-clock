@@ -51,8 +51,11 @@
     // Vue coach/admin (§4.10.5/.7) : surcapacité, badges override, déblocage quota.
     $isStaff = $me && ($me->hasRole('coach') || $me->hasRole('admin'));
     $overCapacity = $session->capacity !== null ? max(0, $participating->count() - $session->capacity) : 0;
-    $canFillQuota = $wlCap->isEmpty() && $wlQuota->isNotEmpty()
-        && ($session->capacity === null || $participating->count() < $session->capacity);
+    // Déblocage du quota (#66) : séance taguée, future, non annulée — file quota vide comprise.
+    $canToggleQuota = ($me?->can('update', $session) ?? false)
+        && $session->quota_tag_id !== null && ! $session->isCancelled() && ! $started;
+    // Chip visible de TOUS, athlètes compris : c'est elle qui leur dit qu'ils peuvent s'inscrire.
+    $quotaReleased = $session->isQuotaReleased() && ! $session->isCancelled() && ! $started;
 
     // Onglets fiche mobile — n'afficher que ceux qui portent quelque chose d'utile.
     // Règle : Infos + Apéro toujours (l'apéro garde son CTA « J'offre l'apéro » même vide).
@@ -148,6 +151,9 @@
                     @else
                         <span class="chip chip-sm chip-line">{{ $participating->count() }} inscrit·e·s</span>
                     @endif
+                    @if ($quotaReleased)
+                        <span class="chip chip-sm chip-blue"><x-icon name="unlock" :size="12" /> Quota débloqué</span>
+                    @endif
                     @if ($myStatus === 'participating')
                         <span class="chip chip-sm chip-green"><x-icon name="check" :size="12" /> {{ $participeChip }}</span>
                     @elseif ($myStatus === 'waitlist')
@@ -172,14 +178,20 @@
                      Hors de la barre collante : elle porte le CTA d'inscription, et un bouton rouge
                      qui notifie tous les inscrits n'a rien à faire à côté, au pouce. --}}
                 @if (! $session->isCancelled())
-                    @can('cancel', $session)
-                        <div>
-                            <div class="eyebrow" style="margin-bottom:6px">Gestion</div>
-                            <button wire:click="openCancelConfirm" class="btn btn-danger btn-block">
-                                <x-icon name="x" :size="15" /> Annuler la séance
-                            </button>
+                    @php($canCancelHere = auth()->user()?->can('cancel', $session) ?? false)
+                    @if ($canToggleQuota || $canCancelHere)
+                        <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+                            <div class="eyebrow">Gestion</div>
+                            @if ($canToggleQuota)
+                                @include('livewire.partials.quota-deblocage')
+                            @endif
+                            @if ($canCancelHere)
+                                <button wire:click="openCancelConfirm" class="btn btn-danger btn-block">
+                                    <x-icon name="x" :size="15" /> Annuler la séance
+                                </button>
+                            @endif
                         </div>
-                    @endcan
+                    @endif
                 @else
                     {{-- Séance annulée : la barre collante offre « Restaurer », ce bloc offre son
                          pendant définitif. Le geste se fait en deux temps — annuler puis supprimer —
@@ -224,16 +236,10 @@
                 @endif
                 @if ($wlQuota->isNotEmpty())
                     @include('livewire.partials.registrant-block', ['title' => 'Quota dépassé', 'sub' => 'quota_exceeded · FIFO', 'list' => $wlQuota, 'removeMethod' => 'removeAthlete'])
-                    @can('update', $session)
-                        {{-- Mécanisme C (§4.10.4) : déblocage coach de la file quota. --}}
-                        <button wire:click="fillQuota" @disabled(! $canFillQuota)
-                                class="btn btn-primary btn-block {{ $canFillQuota ? '' : 'is-disabled' }}">
-                            <x-icon name="chevron-up" :size="16" /> Remplir avec la file quota
-                        </button>
-                        @unless ($canFillQuota)
-                            <div class="meta tc" style="font-size:var(--text-xs)">Disponible quand la file « séance pleine » est vide et qu'il reste des places.</div>
-                        @endunless
-                    @endcan
+                    {{-- Même geste que le bloc Gestion de l'onglet Infos : c'est ici que le coach voit la file. --}}
+                    @if ($canToggleQuota)
+                        @include('livewire.partials.quota-deblocage')
+                    @endif
                 @endif
                 </div>
             </div>
@@ -365,6 +371,9 @@
                                 @if ($overCapacity > 0)
                                     <span class="chip chip-sm chip-warn">surcapacité +{{ $overCapacity }}</span>
                                 @endif
+                                @if ($quotaReleased)
+                                    <span class="chip chip-sm chip-blue"><x-icon name="unlock" :size="12" /> Quota débloqué</span>
+                                @endif
                                 @if ($myStatus === 'participating')
                                     <span class="chip chip-sm chip-green"><x-icon name="check" :size="12" /> {{ $participeChip }}</span>
                                 @elseif ($myStatus === 'waitlist')
@@ -382,7 +391,7 @@
                                 {{-- L'intertitre suit les actions et ne se rend pas seul : depuis que
                                      l'annulation est bornée à la fin du créneau, une séance passée
                                      sans inscription à déplacer ne laissait qu'un « Gestion » vide. --}}
-                                @php($aDesActions = $canEnrollOther || $wlQuota->isNotEmpty() || auth()->user()->can('cancel', $session))
+                                @php($aDesActions = $canEnrollOther || $canToggleQuota || auth()->user()->can('cancel', $session))
                                 @if ($aDesActions)
                                 <div class="eyebrow" style="margin:14px 0 6px">Gestion</div>
                                 {{-- Inscription d'un athlète par le bureau (§4.9.7). --}}
@@ -391,17 +400,9 @@
                                         <x-icon name="user-plus" :size="16" /> Inscrire un athlète
                                     </button>
                                 @endif
-                                {{-- Mécanisme C (§4.10.4) : déblocage de la file quota_exceeded. --}}
-                                @if ($wlQuota->isNotEmpty())
-                                    <button wire:click="fillQuota" @disabled(! $canFillQuota)
-                                            class="btn btn-primary btn-block {{ $canFillQuota ? '' : 'is-disabled' }}" style="margin-bottom:var(--space-2)">
-                                        <x-icon name="chevron-up" :size="16" /> Remplir avec la file quota
-                                    </button>
-                                    @unless ($canFillQuota)
-                                        <div class="meta" style="font-size:var(--text-xs);margin-bottom:var(--space-2)">
-                                            Disponible quand la file « séance pleine » est vide et qu'il reste des places.
-                                        </div>
-                                    @endunless
+                                {{-- Mécanisme C (§4.10.4, #66) : déblocage du quota jusqu'à la séance. --}}
+                                @if ($canToggleQuota)
+                                    <div style="margin-bottom:var(--space-3)">@include('livewire.partials.quota-deblocage')</div>
                                 @endif
                                 {{-- @can('cancel') et non le @can('update') du bloc : la policy porte la
                                      borne de fin de créneau (§4.7), le bouton disparaît de lui-même
@@ -492,6 +493,49 @@
                 <button type="button" class="btn btn-danger{{ $cancelCheck ? '' : ' is-disabled' }}"
                         @if ($cancelCheck) wire:click="cancel" @endif wire:loading.attr="disabled" wire:target="cancel">
                     <x-icon name="x" :size="14" /> Annuler la séance
+                </button>
+            </x-slot:footer>
+        </x-dialog>
+    @endif
+
+    {{-- Dialog « Débloquer le quota » (#66) — niveau 3 dès qu'il promeut : les promu·e·s sont
+         notifié·e·s sans que l'envoi puisse se dédire. File vide, rien ne part : la case disparaît,
+         le dialog reste pour dire ce que le geste change jusqu'à la séance. --}}
+    @if ($confirmingRelease)
+        @php($nPromus = $releaseCandidates->count())
+        <x-dialog title="Débloquer le quota" sub="{{ $session->title }}" :width="520" close="dismissReleaseConfirm">
+            <div style="display:flex;flex-direction:column;gap:12px">
+                <x-conseq-row icon="unlock" label="Jusqu'à la séance">
+                    Les athlètes hors quota #{{ $session->quotaTag?->code }} s'inscrivent sans avertissement tant qu'il reste des places. Séance pleine, ils attendent dans la file quota, dans leur ordre d'arrivée.
+                </x-conseq-row>
+                @if ($nPromus > 0)
+                    <x-conseq-row icon="bell" label="{{ $nPromus > 1 ? 'Promu·e·s' : 'Promu·e' }}" tone="warn">
+                        {{ $releaseCandidates->map(fn ($r) => $r->user?->fullName())->filter()->join(', ', ' et ') }}
+                        {{ $nPromus > 1 ? 'passent inscrit·e·s et sont prévenu·e·s.' : 'passe inscrit·e et est prévenu·e.' }}
+                    </x-conseq-row>
+                @else
+                    <x-conseq-row icon="users" label="File quota">Personne à promouvoir maintenant.</x-conseq-row>
+                @endif
+                <x-conseq-row icon="rotate-ccw" label="Réversible">Tu peux refermer le quota à tout moment ; les promu·e·s restent inscrit·e·s.</x-conseq-row>
+            </div>
+            <div style="margin-top:14px">
+                <label class="field-label" for="release-motif">Motif (optionnel)</label>
+                <div class="ifield"><input id="release-motif" class="ifield-input" type="text" maxlength="140" wire:model="releaseMotif" placeholder="Ex. places restantes la veille"></div>
+            </div>
+            {{-- Toggle sur la rangée ET sur le x-check (vrai <button>, focusable) ; .stop sur le check. --}}
+            @if ($nPromus > 0)
+                <div class="flex ac g10" style="margin-top:14px;font-size:14px;cursor:pointer" wire:click="$toggle('releaseCheck')">
+                    <x-check :on="$releaseCheck" wire:click.stop="$toggle('releaseCheck')" aria-labelledby="txt-debloquer-quota" />
+                    <span id="txt-debloquer-quota">{{ $nPromus > 1 ? "Je comprends que {$nPromus} athlètes seront prévenu·e·s" : 'Je comprends que 1 athlète sera prévenu·e' }}.</span>
+                </div>
+            @endif
+
+            @php($armed = $nPromus === 0 || $releaseCheck)
+            <x-slot:footer>
+                <button type="button" class="btn btn-ghost" wire:click="dismissReleaseConfirm">Annuler</button>
+                <button type="button" class="btn btn-primary{{ $armed ? '' : ' is-disabled' }}"
+                        @if ($armed) wire:click="releaseQuota" @endif wire:loading.attr="disabled" wire:target="releaseQuota">
+                    <x-icon name="unlock" :size="14" /> Débloquer le quota
                 </button>
             </x-slot:footer>
         </x-dialog>

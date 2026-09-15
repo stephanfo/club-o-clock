@@ -175,7 +175,7 @@ class QuotaTest extends TestCase
         $rb = $this->svc()->register($s, $b, $b, confirmQuota: true);
 
         // s a 0 participating, 2 places libres, file capacity vide → mécanisme C promeut les 2.
-        $promoted = $this->svc()->fillFromQuotaExceeded($s, $coach, motif: 'créneau ouvert');
+        $promoted = $this->svc()->releaseQuota($s, $coach, motif: 'créneau ouvert', acknowledged: true);
 
         $this->assertSame(2, $promoted);
         $this->assertSame('participating', $ra->fresh()->status);
@@ -185,8 +185,10 @@ class QuotaTest extends TestCase
         ]);
     }
 
-    public function test_mechanism_c_blocked_when_capacity_queue_not_empty(): void
+    public function test_mechanism_c_serves_capacity_queue_before_quota_exceeded(): void
     {
+        // #66 : la précondition « file capacity vide » disparaît du geste, mais pas la priorité —
+        // la file capacity passe toujours devant. Séance pleine : le déblocage ne promeut personne.
         $tag = $this->tag(maxPerWeek: 5);
         $s = $this->makeSession($tag, capacity: 1);
         $coach = User::factory()->coach()->create();
@@ -194,10 +196,11 @@ class QuotaTest extends TestCase
         $a = $this->athlete();
         $b = $this->athlete();
         $this->svc()->register($s, $a, $a);  // participating (capacité 1)
-        $this->svc()->register($s, $b, $b);  // waitlist capacity (quota non atteint)
+        $rb = $this->svc()->register($s, $b, $b);  // waitlist capacity (quota non atteint)
 
-        $this->expectException(RuntimeException::class);
-        $this->svc()->fillFromQuotaExceeded($s, $coach);
+        $this->assertSame(0, $this->svc()->releaseQuota($s, $coach));
+        $this->assertSame('capacity', $rb->fresh()->waitlist_reason);
+        $this->assertNotNull($s->fresh()->quota_released_at);
     }
 
     public function test_override_forces_participating_over_quota_and_capacity(): void
