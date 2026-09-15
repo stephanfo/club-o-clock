@@ -41,8 +41,13 @@ class NotificationOutbox extends Model
      */
     public const VOLATILE_PAYLOAD_KEYS = ['subject_first_name'];
 
+    /** Visibilité d'une alerte sur la page Alertes (#79) : après la fin de sa séance, ou après l'envoi. */
+    public const DAYS_AFTER_SESSION = 7;
+
+    public const DAYS_WITHOUT_SESSION = 60;
+
     protected $fillable = [
-        'type', 'channel', 'payload', 'user_id', 'status', 'attempts', 'available_at', 'sent_at', 'read_at',
+        'type', 'channel', 'payload', 'user_id', 'status', 'attempts', 'available_at', 'sent_at', 'read_at', 'dismissed_at',
     ];
 
     /**
@@ -71,6 +76,7 @@ class NotificationOutbox extends Model
         'available_at' => 'datetime',
         'sent_at' => 'datetime',
         'read_at' => 'datetime',
+        'dismissed_at' => 'datetime',
     ];
 
     /** @return BelongsTo<User, $this> */
@@ -80,18 +86,37 @@ class NotificationOutbox extends Model
     }
 
     /**
-     * Alertes visibles par l'utilisateur sur la page Alertes (push envoyés, 60 j) —
+     * Alertes visibles par l'utilisateur sur la page Alertes (push envoyés, ni masqués ni expirés) —
      * base commune du listing, du badge de non-lus et du marquage lu (revue UX 2026-07-11).
      *
      * @return Builder<self>
      */
     public static function alertsFor(int $userId): Builder
     {
+        // Rattachement à la séance par le payload JSON (aucune clé étrangère, cf. SessionDeletionService).
+        $seance = fn ($q) => $q->selectRaw('1')->from('sessions')
+            ->whereRaw("sessions.id = JSON_EXTRACT(notification_outbox.payload, '$.session_id')");
+        $creneauFige = "JSON_UNQUOTE(JSON_EXTRACT(notification_outbox.payload, '$.session_start_at'))";
+
         return self::query()
             ->where('user_id', $userId)
             ->where('status', 'sent')
             ->where('channel', 'push')
-            ->where('created_at', '>=', now()->subDays(60));
+            ->whereNull('dismissed_at')
+            // Visibilité (#79) : une alerte de séance vit jusqu'à 7 jours après la FIN de la séance,
+            // quelle que soit sa date d'envoi — une compétition annoncée trois mois plus tôt reste là.
+            // Annulée : même règle sur la fin prévue. Supprimée : le créneau figé au payload
+            // (toIso8601String en UTC, d'où les 19 premiers caractères). Sans séance : 60 jours d'envoi.
+            ->where(fn ($q) => $q
+                ->whereExists(fn ($s) => $seance($s)->whereRaw(
+                    'DATE_ADD(sessions.start_at, INTERVAL sessions.duration_min + ? MINUTE) >= ?',
+                    [self::DAYS_AFTER_SESSION * 1440, now()]
+                ))
+                ->orWhere(fn ($q) => $q->whereNotExists($seance)->whereRaw("$creneauFige IS NOT NULL")
+                    ->whereRaw("STR_TO_DATE(LEFT($creneauFige, 19), '%Y-%m-%dT%H:%i:%s') >= ?", [now()->subDays(self::DAYS_AFTER_SESSION)]))
+                ->orWhere(fn ($q) => $q->whereNotExists($seance)->whereRaw("$creneauFige IS NULL")
+                    ->where('created_at', '>=', now()->subDays(self::DAYS_WITHOUT_SESSION)))
+            );
     }
 
     /** @var array<int,int> cache par requête du compteur de non-lus (badge rendu 2×/page : sidebar + cloche mobile). */

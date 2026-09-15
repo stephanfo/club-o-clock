@@ -434,6 +434,7 @@ CREATE TABLE `notification_outbox` (
   `available_at` timestamp NULL DEFAULT NULL,
   `sent_at` timestamp NULL DEFAULT NULL,
   `read_at` timestamp NULL DEFAULT NULL,
+  `dismissed_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -814,5 +815,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (42,'2026_09_04_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (43,'2026_09_13_000000_add_ad_hoc_location_to_sessions',6);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (44,'2026_09_13_000010_add_external_staff_label_to_sessions',7);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (45,'2026_09_15_000000_add_quota_release_to_sessions',8);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (46,'2026_09_16_000000_add_dismissed_at_to_notification_outbox',9);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
