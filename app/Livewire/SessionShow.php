@@ -206,6 +206,10 @@ class SessionShow extends Component
             'isStaff' => $isCoachMember,
             'canEnrollOther' => $isCoachMember && ! $this->session->hasStarted() && ! $this->session->isCancelled(),
             'selectableAthletes' => $this->pickingAthlete ? $this->selectableAthletes() : collect(),
+            // Déblocage du quota (#66) : liste nominative des promu·e·s, calculée à l'ouverture seulement.
+            'releaseCandidates' => $this->confirmingRelease
+                ? app(RegistrationService::class)->quotaReleaseCandidates($this->session)
+                : collect(),
             // Suppression définitive (§4.7) : la policy dit QUI (admin, séance annulée), le service
             // dit CE QUI reste rattaché. On sépare les deux pour pouvoir EXPLIQUER un refus au lieu
             // de laisser l'admin le découvrir au clic — même partage que GpxRouteShow::canDelete.

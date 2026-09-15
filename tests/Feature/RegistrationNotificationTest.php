@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\NotificationOutbox;
+use App\Models\QuotaTag;
 use App\Models\Registration;
 use App\Models\Session;
 use App\Models\User;
@@ -26,7 +27,7 @@ class RegistrationNotificationTest extends TestCase
         return app(RegistrationService::class);
     }
 
-    private function makeSession(?int $capacity = null): Session
+    private function makeSession(?int $capacity = null, bool $tagged = false): Session
     {
         return $this->targetCategory(Session::create([
             'kind' => 'training',
@@ -34,6 +35,10 @@ class RegistrationNotificationTest extends TestCase
             'start_at' => Carbon::now()->addDays(2)->setTime(19, 0),
             'duration_min' => 90,
             'capacity' => $capacity,
+            // Le déblocage du quota exige un tag (#66) : sans tag, il n'y a pas de quota.
+            'quota_tag_id' => $tagged
+                ? QuotaTag::firstOrCreate(['code' => 'piscine'], ['label' => 'Piscine', 'max_per_week' => 1])->id
+                : null,
             'created_by' => User::factory()->coach()->create()->id,
         ])); // séance ciblant la catégorie ouverte (§4.5).
     }
@@ -60,7 +65,7 @@ class RegistrationNotificationTest extends TestCase
     public function test_coach_quota_unblock_notifies_each_promoted(): void
     {
         // Mécanisme C (§4.10.4) : déblocage manuel coach de la file quota_exceeded.
-        $s = $this->makeSession(capacity: null);
+        $s = $this->makeSession(capacity: null, tagged: true);
         $coach = User::factory()->coach()->create();
         $a = $this->athlete();
         $b = $this->athlete();
@@ -73,7 +78,7 @@ class RegistrationNotificationTest extends TestCase
             ]);
         }
 
-        $promoted = $this->service()->fillFromQuotaExceeded($s, $coach);
+        $promoted = $this->service()->releaseQuota($s, $coach, acknowledged: true);
 
         $this->assertSame(2, $promoted);
         // 2 promus × (push + email) = 4 lignes.
@@ -91,7 +96,7 @@ class RegistrationNotificationTest extends TestCase
     /** Nombre de SELECT sur `sessions` pendant le déblocage d'une file de $promus athlètes. */
     private function lecturesDeSeance(int $promus): int
     {
-        $s = $this->makeSession(capacity: null);
+        $s = $this->makeSession(capacity: null, tagged: true);
         $coach = User::factory()->coach()->create();
 
         for ($i = 0; $i < $promus; $i++) {
@@ -110,7 +115,7 @@ class RegistrationNotificationTest extends TestCase
             }
         });
 
-        $this->service()->fillFromQuotaExceeded($s, $coach);
+        $this->service()->releaseQuota($s, $coach, acknowledged: true);
 
         return $lectures;
     }

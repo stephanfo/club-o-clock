@@ -37,6 +37,7 @@ class Session extends Model
         'duration_min' => 'integer',
         'capacity' => 'integer',
         'cancelled_at' => 'datetime',
+        'quota_released_at' => 'datetime',
         'ad_hoc_latitude' => 'decimal:7',
         'ad_hoc_longitude' => 'decimal:7',
     ];
@@ -80,6 +81,16 @@ class Session extends Model
     public function isCancelled(): bool
     {
         return $this->cancelled_at !== null;
+    }
+
+    /**
+     * Quota débloqué par le coach (#66, §4.10.4) : jusqu'à la séance, le quota ne bloque plus
+     * l'inscription et le mécanisme A pioche aussi dans la file `quota_exceeded`. N'a de sens que
+     * sur une séance taguée : sans tag, il n'y a pas de quota à débloquer.
+     */
+    public function isQuotaReleased(): bool
+    {
+        return $this->quota_released_at !== null && $this->quota_tag_id !== null;
     }
 
     /** Séance commencée → inscriptions/désinscriptions bloquées sur les 3 kind (§4.9.1). */

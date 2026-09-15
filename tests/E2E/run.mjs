@@ -14,7 +14,7 @@ const echecs = [];
  * une remise en état incomplète ne se voyait que des runs plus tard, quand un scénario partait d'un
  * jeu appauvri — et parfois jamais, l'assertion devenant simplement moins exigeante.
  *
- * Deux fuites réelles ont vécu ainsi : `fillQuota` (S17) promeut TOUTE la file quota d'un coup mais
+ * Deux fuites réelles ont vécu ainsi : le déblocage du quota (S17) promeut TOUTE la file quota d'un coup mais
  * la restauration ne portait que sur le premier promu — le jeu perdait une entrée de file à CHAQUE
  * run —, et les notifications de promotion restaient « en attente », donc bel et bien envoyables par
  * le prochain passage du cron, pour des promotions défaites depuis.

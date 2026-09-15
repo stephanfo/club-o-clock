@@ -9,7 +9,7 @@ use Illuminate\Support\Collection;
 use RuntimeException;
 
 // Inscriptions : self-service au nom du sujet (§4.9, §4.10) + gestion par le bureau (§4.9.7)
-// + déblocage de la file quota (mécanisme C §4.10.4).
+// + déblocage du quota de la séance (mécanisme C §4.10.4, #66).
 trait ManagesEnrollment
 {
     /** Bandeau « dépassement de quota » affiché tant que l'athlète n'a pas confirmé (§4.10.3). */
@@ -196,19 +196,70 @@ trait ManagesEnrollment
             ->get();
     }
 
-    /** Mécanisme C (§4.10.4) : déblocage coach de la file quota_exceeded. */
-    public function fillQuota(RegistrationService $service, ?string $motif = null): void
+    // ─────────────────────────  Déblocage du quota (mécanisme C §4.10.4, #66)  ─────────────────
+
+    /** Dialog « Débloquer le quota » ouvert ? */
+    public bool $confirmingRelease = false;
+
+    /** Accusé de réception des notifications aux promus — arme le bouton quand il y en a. */
+    public bool $releaseCheck = false;
+
+    /** Motif optionnel, partagé par le geste et chaque promotion (AuditLog). */
+    public string $releaseMotif = '';
+
+    public function openReleaseConfirm(): void
     {
         $this->authorize('update', $this->session); // coach/admin
-        $motif = $motif === null ? null : (mb_substr(trim($motif), 0, 140) ?: null);
+        $this->releaseCheck = false;   // jamais pré-cochée : la case n'a de valeur que relue
+        $this->releaseMotif = '';
+        $this->confirmingRelease = true;
+    }
+
+    public function dismissReleaseConfirm(): void
+    {
+        $this->confirmingRelease = false;
+        $this->releaseCheck = false;
+    }
+
+    public function releaseQuota(RegistrationService $service): void
+    {
+        $this->authorize('update', $this->session);
+        $motif = mb_substr(trim($this->releaseMotif), 0, 140) ?: null;
 
         try {
-            $n = $service->fillFromQuotaExceeded($this->session, auth()->user(), $motif);
-            session()->flash('status', $n > 0 ? "{$n} athlète·s promu·e·s." : 'Aucune place à débloquer.');
+            // L'accusé est relu CÔTÉ SERVICE, sous verrou : le bouton grisé ne garde rien, et la
+            // file a pu grossir depuis l'ouverture du dialog.
+            $n = $service->releaseQuota($this->session, auth()->user(), $motif, acknowledged: $this->releaseCheck);
+            $this->dismissReleaseConfirm();
+            session()->flash('status', match ($n) {
+                0 => 'Quota débloqué jusqu\'à la séance.',
+                1 => 'Quota débloqué : 1 athlète promu·e.',
+                default => "Quota débloqué : {$n} athlètes promu·e·s.",
+            });
         } catch (RuntimeException $e) {
-            session()->flash('warn', $e->getMessage());
+            if ($e->getMessage() === RegistrationService::RELEASE_NEEDS_ACK) {
+                // Le dialog reste ouvert sur la liste à jour : le coach relit avant de confirmer.
+                $this->releaseCheck = false;
+                session()->flash('warn', 'La file d\'attente a changé : vérifie la liste des promu·e·s avant de confirmer.');
+            } else {
+                $this->dismissReleaseConfirm();
+                session()->flash('warn', $e->getMessage());
+            }
         }
 
+        // Le service a écrit l'état sur SA copie verrouillée : relire les colonnes, pas seulement
+        // les relations, sans quoi la fiche afficherait l'ancien état jusqu'à la requête suivante.
+        $this->session->refresh();
+        $this->refreshSession();
+    }
+
+    public function closeQuota(RegistrationService $service): void
+    {
+        $this->authorize('update', $this->session);
+        $service->closeQuota($this->session, auth()->user());
+        session()->flash('status', 'Quota refermé : les inscrit·e·s promu·e·s le restent.');
+
+        $this->session->refresh(); // cf. releaseQuota()
         $this->refreshSession();
     }
 }

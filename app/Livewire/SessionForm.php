@@ -777,6 +777,11 @@ class SessionForm extends Component
 
         if ($this->session && $this->session->exists) {
             $oldCapacity = $this->session->capacity;
+            // Le déblocage du quota (#66) portait sur l'ANCIEN tag : un autre tag, ou plus de tag
+            // (passage en compétition compris), le remet à zéro. Les promu·e·s restent inscrit·e·s.
+            if ($this->session->quota_tag_id !== $payload['quota_tag_id']) {
+                $this->session->forceFill(['quota_released_at' => null, 'quota_released_by' => null]);
+            }
             $this->session->update($payload);
             AuditLogger::record('update_session', auth()->user(), ['session_id' => $this->session->id]);
             // Promotion FIFO si la capacité a augmenté (mécanisme A étendu, E2).

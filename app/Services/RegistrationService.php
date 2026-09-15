@@ -50,6 +50,13 @@ class RegistrationService
     public const CATEGORY_MISMATCH = 'category_mismatch';
 
     /**
+     * Levée quand le déblocage du quota promouvrait des athlètes (donc les notifierait) sans que le
+     * coach en ait accusé réception. Évaluée SOUS VERROU : la file a pu grossir entre l'ouverture
+     * du dialog, qui annonçait zéro promu, et le clic.
+     */
+    public const RELEASE_NEEDS_ACK = 'release_needs_ack';
+
+    /**
      * Traduit une sentinelle d'inscription en message utilisateur (sinon renvoie le message tel
      * quel — les autres RuntimeException du service portent déjà un libellé français). Utilisée
      * par les composants qui flashent l'erreur (SessionShow, Planning).
@@ -68,6 +75,8 @@ class RegistrationService
      * Inscrit $target sur $session (action menée par $actor : soi, parent, ou coach).
      * Applique l'algo quota (§4.10.3) : sous quota → file `capacity` ; au-dessus → file
      * `quota_exceeded` (après confirmation explicite, sinon QUOTA_NEEDS_CONFIRM est levé).
+     * Séance au quota débloqué (#66) : le quota ne bloque plus, sans bandeau — sauf séance pleine,
+     * où l'athlète hors quota prend son rang dans la file `quota_exceeded`.
      *
      * @param  bool  $confirmQuota  l'athlète a accepté de partir en `quota_exceeded`.
      */
@@ -133,7 +142,15 @@ class RegistrationService
             $overQuota = $this->quota->isOverQuota($target, $locked, excludeSessionId: $locked->id);
 
             // Algo §4.10.3 : le quota prime sur la capacité pour le motif de waitlist.
-            if ($overQuota) {
+            if ($overQuota && $locked->isQuotaReleased()) {
+                // Quota débloqué (#66) : plus de bandeau, une place libre est prise. Séance pleine,
+                // l'athlète rejoint la file `quota_exceeded` et non `capacity` : les hors-quota
+                // gardent entre eux leur ordre d'arrivée, et celui qui attendait AVANT le
+                // déblocage n'est pas doublé par celui qui arrive après. Refermer le quota n'a
+                // alors rien à défaire — chacun est déjà dans la file de sa situation.
+                $status = $full ? 'waitlist' : 'participating';
+                $reason = $full ? 'quota_exceeded' : null;
+            } elseif ($overQuota) {
                 if (! $confirmQuota) {
                     throw new RuntimeException(self::QUOTA_NEEDS_CONFIRM);
                 }
@@ -241,40 +258,94 @@ class RegistrationService
     }
 
     /**
-     * Mécanisme C (§4.10.4) : déblocage manuel coach. Promeut autant d'athlètes de
-     * `quota_exceeded` (FIFO) qu'il reste de places. Précondition : file `capacity` vide
-     * ET places restantes. Une entrée AuditLog `promote_quota_exceeded` par athlète promu.
+     * Athlètes que le déblocage du quota promouvrait maintenant : la file `quota_exceeded` en FIFO,
+     * à hauteur des places restantes une fois la file `capacity` servie — elle passe devant
+     * (§4.10.4). Sert au dialog de confirmation (liste nominative) et, sous verrou, au geste.
      *
-     * @return int nombre d'athlètes promus.
+     * @return EloquentCollection<int, Registration>
      */
-    public function fillFromQuotaExceeded(Session $session, User $coach, ?string $motif = null): int
+    public function quotaReleaseCandidates(Session $session, bool $lock = false): EloquentCollection
+    {
+        $seats = $this->freeSeats($session);
+
+        if ($seats !== PHP_INT_MAX) {
+            $seats -= Registration::query()
+                ->where('session_id', $session->id)
+                ->where('status', 'waitlist')->where('waitlist_reason', 'capacity')
+                ->count();
+        }
+
+        if ($seats <= 0) {
+            return new EloquentCollection;
+        }
+
+        return Registration::query()
+            ->where('session_id', $session->id)
+            ->where('status', 'waitlist')->where('waitlist_reason', 'quota_exceeded')
+            ->orderBy('registered_at')
+            ->with('user')
+            ->when($lock, fn ($q) => $q->lockForUpdate())
+            ->when($seats !== PHP_INT_MAX, fn ($q) => $q->limit($seats))
+            ->get();
+    }
+
+    /**
+     * Mécanisme C (§4.10.4, #66) : le coach débloque le quota de la séance, jusqu'à ce qu'il le
+     * referme ou que la séance commence. Au clic, promotion FIFO de la file `quota_exceeded` à
+     * hauteur des places restantes ; ensuite, `register()` et `promoteNext()` lisent l'état.
+     *
+     * Possible file vide : ouvrir la séance la veille, avant que quiconque n'attende. Une entrée
+     * AuditLog `quota_release` pour le geste, puis une `promote_quota_exceeded` par athlète promu.
+     *
+     * @param  bool  $acknowledged  le coach a accusé réception des notifications aux promus.
+     * @return int nombre d'athlètes promus depuis la file `quota_exceeded`.
+     */
+    public function releaseQuota(Session $session, User $coach, ?string $motif = null, bool $acknowledged = false): int
     {
         $promoted = [];
 
-        $count = DB::transaction(function () use ($session, $coach, $motif, &$promoted) {
+        $count = DB::transaction(function () use ($session, $coach, $motif, $acknowledged, &$promoted) {
             $locked = Session::query()->lockForUpdate()->findOrFail($session->getKey());
 
-            $hasCapacityQueue = Registration::query()
-                ->where('session_id', $locked->id)
-                ->where('status', 'waitlist')->where('waitlist_reason', 'capacity')
-                ->exists();
-
-            if ($hasCapacityQueue) {
-                throw new RuntimeException('Vide d\'abord la file « séance pleine » avant de débloquer le quota.');
+            if ($locked->hasStarted()) {
+                throw new RuntimeException('Séance commencée : le quota ne se débloque plus.');
+            }
+            if ($locked->isCancelled()) {
+                throw new RuntimeException('Séance annulée.');
+            }
+            if ($locked->quota_tag_id === null) {
+                throw new RuntimeException('Cette séance ne porte pas de tag de quota.');
+            }
+            if ($locked->isQuotaReleased()) {
+                return 0; // double-tap : déjà débloqué, rien à refaire.
             }
 
-            $seats = $this->freeSeats($locked);
-            if ($seats <= 0) {
-                return 0;
+            $candidates = $this->quotaReleaseCandidates($locked, lock: true);
+
+            if ($candidates->isNotEmpty() && ! $acknowledged) {
+                throw new RuntimeException(self::RELEASE_NEEDS_ACK);
             }
 
-            $candidates = Registration::query()
-                ->where('session_id', $locked->id)
-                ->where('status', 'waitlist')->where('waitlist_reason', 'quota_exceeded')
-                ->orderBy('registered_at')
-                ->lockForUpdate()
-                ->limit($seats)
-                ->get();
+            // Une file `capacity` non vide avec des places libres est anormale (le mécanisme A la
+            // tient à jour), mais elle passe devant : on la sert AVANT de poser l'état, sans quoi
+            // promoteNext() piocherait déjà dans `quota_exceeded`.
+            while ($this->freeSeats($locked) > 0) {
+                $before = count($promoted);
+                $this->promoteNext($locked, $promoted);
+                if (count($promoted) === $before) {
+                    break;
+                }
+            }
+
+            $locked->forceFill([
+                'quota_released_at' => Carbon::now(),
+                'quota_released_by' => $coach->id,
+            ])->save();
+
+            AuditLogger::record('quota_release', $coach, [
+                'session_id' => $locked->id,
+                'motif' => $motif,
+            ]);
 
             foreach ($candidates as $reg) {
                 $reg->update([
@@ -306,6 +377,25 @@ class RegistrationService
         $this->notifyPromoted($promoted);
 
         return $count;
+    }
+
+    /**
+     * Referme le quota débloqué (#66). Les athlètes déjà promus RESTENT inscrits : seules les
+     * inscriptions suivantes retrouvent la règle normale. AuditLog `quota_close`.
+     */
+    public function closeQuota(Session $session, User $coach): void
+    {
+        DB::transaction(function () use ($session, $coach) {
+            $locked = Session::query()->lockForUpdate()->findOrFail($session->getKey());
+
+            if ($locked->quota_released_at === null) {
+                return; // déjà refermé : idempotent.
+            }
+
+            $locked->forceFill(['quota_released_at' => null, 'quota_released_by' => null])->save();
+
+            AuditLogger::record('quota_close', $coach, ['session_id' => $locked->id]);
+        });
     }
 
     /** Crée ou réactive la ligne d'inscription (unique session,user). */
@@ -473,6 +563,8 @@ class RegistrationService
 
     /**
      * Promeut le 1er de la file `capacity` (FIFO registered_at ASC). Appelé sous verrou.
+     * Quota débloqué (#66) : file `capacity` vide, il pioche dans `quota_exceeded`, toujours en
+     * FIFO — c'est ce qui couvre désistement, annulation d'inscription et hausse de capacité.
      * Le promu est collecté dans $promoted pour la notif `waitlist_promoted` (émise après commit).
      *
      * @param  list<Registration>  $promoted
@@ -486,6 +578,16 @@ class RegistrationService
             ->orderBy('registered_at')
             ->lockForUpdate()
             ->first();
+
+        if (! $next && $session->isQuotaReleased()) {
+            $next = Registration::query()
+                ->where('session_id', $session->id)
+                ->where('status', 'waitlist')
+                ->where('waitlist_reason', 'quota_exceeded')
+                ->orderBy('registered_at')
+                ->lockForUpdate()
+                ->first();
+        }
 
         if (! $next) {
             return;
@@ -584,7 +686,7 @@ class RegistrationService
     /**
      * Mécanisme A étendu (E2) : après une hausse de capacité, promeut en FIFO tous les athlètes
      * en file `capacity` tant que des places restent disponibles. Appelé par SessionForm::persist().
-     * Ne touche pas la file `quota_exceeded` (mécanisme C, déblocage manuel uniquement).
+     * Ne pioche dans la file `quota_exceeded` que si le quota de la séance est débloqué (#66).
      */
     public function onCapacityIncreased(Session $session): void
     {
