@@ -183,7 +183,7 @@
                         <div style="display:flex;flex-direction:column;gap:var(--space-3)">
                             <div class="eyebrow">Gestion</div>
                             @if ($canToggleQuota)
-                                @include('livewire.partials.quota-deblocage')
+                                @include('livewire.partials.quota-deblocage', ['quotaKey' => 'm-infos'])
                             @endif
                             @if ($canCancelHere)
                                 <button wire:click="openCancelConfirm" class="btn btn-danger btn-block">
@@ -238,7 +238,7 @@
                     @include('livewire.partials.registrant-block', ['title' => 'Quota dépassé', 'sub' => 'quota_exceeded · FIFO', 'list' => $wlQuota, 'removeMethod' => 'removeAthlete'])
                     {{-- Même geste que le bloc Gestion de l'onglet Infos : c'est ici que le coach voit la file. --}}
                     @if ($canToggleQuota)
-                        @include('livewire.partials.quota-deblocage')
+                        @include('livewire.partials.quota-deblocage', ['quotaKey' => 'm-wl'])
                     @endif
                 @endif
                 </div>
@@ -402,7 +402,7 @@
                                 @endif
                                 {{-- Mécanisme C (§4.10.4, #66) : déblocage du quota jusqu'à la séance. --}}
                                 @if ($canToggleQuota)
-                                    <div style="margin-bottom:var(--space-3)">@include('livewire.partials.quota-deblocage')</div>
+                                    <div style="margin-bottom:var(--space-3)">@include('livewire.partials.quota-deblocage', ['quotaKey' => 'dk'])</div>
                                 @endif
                                 {{-- @can('cancel') et non le @can('update') du bloc : la policy porte la
                                      borne de fin de créneau (§4.7), le bouton disparaît de lui-même

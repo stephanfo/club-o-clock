@@ -539,6 +539,17 @@ async function ongletMobile(page, nom) {
             sql(`SELECT COUNT(*) n FROM audit_logs WHERE id>${journaux.audit} AND session_id=${sq} AND action='quota_close'`) === '1');
     s.check('le bouton redevient « Débloquer le quota »',
             await page.locator('.fiche-mobile button[wire\\:click="openReleaseConfirm"]:visible').count() > 0);
+
+    // Rouvrir juste après, SANS recharger : le morphing réutilisait le <button> de « Refermer », et
+    // le gestionnaire wire:confirm posé à son initialisation survivait au retrait de l'attribut —
+    // la confirmation « Refermer le quota ? » s'affichait avant le dialog de déblocage.
+    let confirmNatif = null;
+    page.once('dialog', (d) => { confirmNatif = d.message(); d.dismiss(); });
+    await page.locator('.fiche-mobile button[wire\\:click="openReleaseConfirm"]:visible').first().click({ timeout: 5000 }).catch(() => {});
+    await page.waitForTimeout(1200);
+    page.removeAllListeners('dialog');
+    s.check('rouvrir : aucune confirmation native résiduelle', confirmNatif === null, confirmNatif || '');
+    s.check('rouvrir : le dialog de déblocage s\'ouvre', await page.locator('.dialog:visible').count() === 1);
     await ctx.close();
   }
 
