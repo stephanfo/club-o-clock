@@ -227,6 +227,137 @@ tous.push(s.report());
   tous.push(s26.report());
 }
 
+// ── S27 · #69 · Semaine mobile : la liste s'ouvre sur le jour courant ──
+// Le CHOIX du jour (courant, prochain peuplé, rien hors semaine courante) est couvert par PHPUnit
+// (PlanningWeekArrivalTest, horloge figée). Ici, ce que PHPUnit ne voit pas : le défilement réel,
+// et qu'il ne se rejoue ni sur un morphing, ni au retour arrière, ni en changeant de semaine.
+{
+  const s27 = new Scenario('S27 · Semaine mobile — ouverture sur le jour courant (#69)');
+
+  // Le jeu de démo ne garantit pas de séance AVANT aujourd'hui dans la semaine : sans elle, le jour
+  // courant est déjà en tête et « la liste est positionnée » ne prouverait rien. On en pose une le
+  // lundi à 10 h UTC (même date en heure club, été comme hiver), et on la retire à la fin.
+  const tz = sql('SELECT timezone FROM club_settings LIMIT 1') || 'Europe/Paris';
+  const aujourdhui = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
+  const rang = (new Date(aujourdhui + 'T12:00:00Z').getUTCDay() + 6) % 7;   // 0 = lundi
+  const lundi = new Date(Date.parse(aujourdhui + 'T12:00:00Z') - rang * 86400000).toISOString().slice(0, 10);
+  const titre = 'E2E #69 séance du lundi';
+  const admin = sql("SELECT id FROM users WHERE email='admin@demo.club'");
+  if (rang > 0) {
+    sql(`INSERT INTO sessions (kind, title, start_at, duration_min, visibility, created_by, created_at, updated_at)
+         VALUES ('training', '${titre}', '${lundi} 10:00:00', 60, 'all', ${admin}, NOW(), NOW())`);
+  }
+
+  const { ctx, page } = await session(browser, 'marie@demo.club', MOBILE);
+  const etat = () => page.evaluate(() => {
+    const c = [...document.querySelectorAll('.plan-scroll-m')].find((e) => e.offsetParent);
+    const a = c.querySelector('[data-arrivee]');
+    const groupes = [...c.querySelectorAll('.plan-daygroup-m')];
+    return {
+      top: Math.round(c.scrollTop),
+      max: c.scrollHeight - c.clientHeight,
+      arrivee: a?.getAttribute('wire:key') ?? null,
+      avant: a ? groupes.indexOf(a) : -1,
+      ecart: a ? Math.round(a.getBoundingClientRect().top - c.getBoundingClientRect().top) : null,
+      premier: groupes[0]?.getAttribute('wire:key') ?? null,
+    };
+  });
+  const defiler = (y) => page.evaluate((y) => {
+    [...document.querySelectorAll('.plan-scroll-m')].find((e) => e.offsetParent).scrollTop = y;
+  }, y);
+
+  // 1. Arrivée
+  await page.goto(`${BASE}/planning`, { waitUntil: 'networkidle' });
+  const arrivee = await etat();
+  await page.screenshot({ path: new URL('./shots/s27-arrivee-mobile.png', import.meta.url).pathname });
+  if (s27.check('un jour d\'arrivée est désigné dans la semaine courante', arrivee.arrivee !== null, arrivee.arrivee ?? 'aucun')) {
+    // Contrôle positif : des jours existent AU-DESSUS — sinon « positionné » vaudrait pour une liste
+    // qui n'a simplement pas bougé.
+    s27.check('des jours antérieurs restent rendus au-dessus', arrivee.avant > 0 || rang === 0,
+              rang === 0 ? 'lundi : aucun jour antérieur possible' : `${arrivee.avant} groupe(s) au-dessus`);
+    // Aligné en haut — ou défilé au maximum quand la fin de semaine est trop courte pour y monter.
+    s27.check('le groupe du jour est en haut de la liste, sans défilement manuel',
+              Math.abs(arrivee.ecart) <= 1 || arrivee.top >= arrivee.max - 1,
+              `écart ${arrivee.ecart}px, défilement ${arrivee.top}/${arrivee.max}`);
+  }
+
+  // 2. Un morphing Livewire ne ramène pas au jour courant
+  await defiler(0);
+  await page.evaluate(() => window.Livewire.all()[0].$wire.$refresh());
+  await page.waitForTimeout(1200);
+  s27.check('un re-rendu Livewire ne rejoue pas le positionnement', (await etat()).top === 0,
+            `défilement ${(await etat()).top}`);
+
+  // 3. Retour arrière depuis une fiche séance : la position quittée est rendue. On vise une position
+  // NON NULLE et distincte de l'arrivée : 0 serait aussi le résultat d'un retour sans restauration.
+  const cible = arrivee.top !== arrivee.max ? arrivee.max : Math.floor(arrivee.max / 2);
+  await defiler(cible);
+  await page.waitForTimeout(200);
+  s27.check('la position de départ diffère de celle de l\'arrivée', cible !== arrivee.top,
+            `départ ${cible}, arrivée ${arrivee.top}`);
+  // Une carte DÉJÀ à l'écran : avant de cliquer, Playwright fait défiler jusqu'à sa cible, ce qui
+  // déplacerait la liste avant même le départ si l'on visait la première carte du lundi.
+  const visible = await page.evaluate(() => {
+    const c = [...document.querySelectorAll('.plan-scroll-m')].find((e) => e.offsetParent);
+    const cadre = c.getBoundingClientRect();
+    return [...c.querySelectorAll('.scard-row')].findIndex((k) => {
+      const r = k.getBoundingClientRect();
+      return r.height > 0 && r.top >= cadre.top + 48 && r.bottom <= cadre.bottom - 160;
+    });
+  });
+  s27.check('une carte est visible à la position de départ', visible >= 0);
+  await page.locator('.plan-scroll-m .scard-row:visible').nth(Math.max(visible, 0)).click();
+  s27.check('le clic n\'a pas déplacé la liste', Math.abs((await etat()).top - cible) <= 1);
+  await page.waitForURL(/\/seances\/\d+/);
+  await page.waitForLoadState('networkidle');
+  await page.locator('[onclick*="clubBack"]:visible').first().click();
+  await page.waitForURL(/\/planning/);
+  await page.waitForTimeout(1500);
+  const retour = await etat();
+  s27.check('au retour arrière, la liste reprend la position quittée', Math.abs(retour.top - cible) <= 1,
+            `attendu ${cible}, obtenu ${retour.top}`);
+
+  // 4. Changer de semaine repart du haut ; revenir sur la semaine courante ne recale pas
+  await defiler(retour.max);
+  await page.waitForTimeout(200);
+  const avantSuivant = await etat();
+  await page.locator('.plan-weeknav button[aria-label="Suivant"]').click();
+  await page.waitForTimeout(1200);
+  const suivante = await etat();
+  s27.check('contrôle positif : la semaine suivante est bien rendue', suivante.premier !== avantSuivant.premier,
+            `${avantSuivant.premier} → ${suivante.premier}`);
+  s27.check('la semaine suivante s\'ouvre en haut', avantSuivant.top > 0 && suivante.top === 0,
+            `défilement ${avantSuivant.top} → ${suivante.top}`);
+  s27.check('hors semaine courante, aucun jour n\'est désigné', suivante.arrivee === null);
+  await page.locator('.plan-weeknav button[aria-label="Précédent"]').click();
+  await page.waitForTimeout(1200);
+  const revenue = await etat();
+  s27.check('revenir sur la semaine courante ne force pas le recalage',
+            revenue.arrivee !== null && revenue.top === 0, `défilement ${revenue.top}, jour ${revenue.arrivee}`);
+  s27.checkJs(page);
+  await ctx.close();
+
+  // 5. Desktop : grille inchangée, rien ne défile
+  {
+    const { ctx, page } = await session(browser, 'marie@demo.club', DESKTOP);
+    await page.goto(`${BASE}/planning`, { waitUntil: 'networkidle' });
+    const y = await page.evaluate(() => window.scrollY);
+    s27.check('desktop : la grille est rendue', await page.locator('.wk-grid-dk').isVisible());
+    s27.check('desktop : la page ne défile pas à l\'arrivée', y === 0, `${y}px`);
+    await page.screenshot({ path: new URL('./shots/s27-desktop.png', import.meta.url).pathname });
+    s27.checkJs(page);
+    await ctx.close();
+  }
+
+  // Restauration du jeu de démo
+  if (rang > 0) {
+    sql(`DELETE FROM sessions WHERE title='${titre}'`);
+    s27.check('séance temporaire retirée', sql(`SELECT COUNT(*) FROM sessions WHERE title='${titre}'`) === '0');
+  }
+
+  tous.push(s27.report());
+}
+
 await browser.close();
 const ok = tous.every(Boolean);
 console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES SCÉNARIOS RESPONSIVE PASSENT' : '❌ AU MOINS UN SCÉNARIO RESPONSIVE ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);
