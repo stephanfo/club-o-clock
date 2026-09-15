@@ -748,6 +748,11 @@ body:has(.scrim) { overflow: hidden; }
         padding-bottom: calc(var(--botnav-top) + var(--fiche-actions-h) + 12px);
         min-height: 100dvh;
     }
+    /* Alertes : même bande blanche que la fiche (c1816ad). Le gris de .pa-scroll s'arrêtait à la
+       dernière carte, et le blanc de .fiche-mobile remplissait le reste jusqu'à la botnav — flagrant
+       depuis que les alertes expirent et se retirent (#79), la liste étant souvent courte.
+       Fond gris porté par le conteneur entier, sur toute la hauteur (100dvh, cf. ci-dessus). */
+    .alerts-screen .fiche-mobile { background: var(--app-bg); min-height: 100dvh; }
     /* La mini-barre fiche n'a pas sa propre fleur (le héros fondu en porte une, cf. ::before). */
     .topbar-fiche::before { display: none; }
     /* Héros fondu : même dégradé horizontal que la topbar → jonction invisible sous la mini-barre.
