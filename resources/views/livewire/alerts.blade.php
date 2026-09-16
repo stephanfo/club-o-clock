@@ -20,8 +20,8 @@
                 <div style="display:flex;flex-direction:column;gap:8px">
                     <div class="flex" style="justify-content:flex-end">
                         <button type="button" class="btn btn-ghost btn-sm"
-                        wire:click="dismissAll" wire:confirm="Effacer toutes les alertes de la liste ?"
-                        wire:loading.attr="disabled" wire:target="dismissAll">Tout effacer</button>
+                                wire:click="openDismissAllConfirm"
+                                wire:loading.attr="disabled" wire:target="openDismissAllConfirm">Tout effacer</button>
                     </div>
                     @foreach ($alerts as $alert)
                         @include('livewire.partials.alert-item', ['alert' => $alert, 'shell' => 'm'])
@@ -39,8 +39,8 @@
             </div>
             @if ($alerts->isNotEmpty())
                 <button type="button" class="btn btn-ghost btn-sm"
-                        wire:click="dismissAll" wire:confirm="Effacer toutes les alertes de la liste ?"
-                        wire:loading.attr="disabled" wire:target="dismissAll">Tout effacer</button>
+                        wire:click="openDismissAllConfirm"
+                        wire:loading.attr="disabled" wire:target="openDismissAllConfirm">Tout effacer</button>
             @endif
             <a href="{{ route('profil', ['tab' => 'notifs']) }}" wire:navigate class="btn btn-ghost btn-sm">
                 <x-icon name="settings" :size="15" /> Préférences notifs
@@ -59,4 +59,29 @@
             @endif
         </div>
     </div>
+
+    {{-- Dialog « Tout effacer » — niveau 2 (destructif, sans accusé de réception) : le geste ne
+         notifie personne et n'engage que la liste de celui qui le fait, mais il ne se défait pas
+         depuis l'écran et porte au-delà de ce qui est affiché. Pas de chiffre : une carte peut
+         regrouper plusieurs lignes d'outbox, annoncer un nombre de lignes mentirait sur ce qui
+         disparaît, et la liste plafonne de toute façon à MAX_CARDS. --}}
+    @if ($confirmingDismissAll)
+        <x-dialog danger title="Retirer toutes les alertes" :width="480" close="dismissDismissAllConfirm">
+            <div style="display:flex;flex-direction:column;gap:12px">
+                <x-conseq-row icon="eye-off" label="Toute la liste" tone="warn">
+                    Toutes tes alertes disparaissent de cet écran, y compris les plus anciennes que la liste ne montre pas.
+                </x-conseq-row>
+                <x-conseq-row icon="bell" label="Sans effet sur les envois">
+                    Rien n'est supprimé : les notifications restent tracées, et les prochaines s'afficheront normalement.
+                </x-conseq-row>
+            </div>
+            <x-slot:footer>
+                <button type="button" class="btn btn-ghost" wire:click="dismissDismissAllConfirm">Annuler</button>
+                <button type="button" class="btn btn-danger"
+                        wire:click="dismissAll" wire:loading.attr="disabled" wire:target="dismissAll">
+                    <x-icon name="eye-off" :size="14" /> Tout retirer
+                </button>
+            </x-slot:footer>
+        </x-dialog>
+    @endif
 </div>
