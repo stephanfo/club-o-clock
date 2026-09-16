@@ -22,6 +22,21 @@ jour du constat** et ajoutées **à la suite**, en ordre chronologique.
 
 ## 2026-09-03 — Parents non-athlètes et pré-inscription des familles
 
+> **Sort.** Consolidée le 2026-09-14. Le point 1 (date de naissance obligatoire) est suivi en
+> [#70](https://github.com/stephanfo/club-o-clock/issues/70), la pré-inscription elle-même en
+> [#71](https://github.com/stephanfo/club-o-clock/issues/71) — voir l'entrée du 2026-09-14. Les
+> trois points d'import, que ni #70 ni #71 ne touchent, ont été portés le même jour : le point 2
+> (rôle `athlete` forcé) en [#75](https://github.com/stephanfo/club-o-clock/issues/75), qui reprend
+> aussi la date encore obligatoire à l'import — la contrepartie de #70 sur l'autre chemin de
+> création —, et le point 3 (bornes de date divergentes) en
+> [#73](https://github.com/stephanfo/club-o-clock/issues/73), tenu pour un bug : une date acceptée
+> par le formulaire bloque un import ultérieur tout entier.
+>
+> **Le point 4 ne donne pas lieu à une issue**, après examen : qu'une famille dont le parent n'est
+> ni en base ni dans le fichier produise une ligne en erreur est le **comportement juste** d'un
+> import tout-ou-rien — refuser vaut mieux que deviner un garant. La gêne qu'il décrit est celle de
+> la saisie en amont, et c'est #71 qui la traite, en laissant la famille se déclarer elle-même.
+
 **Ce qu'on observe.** Le modèle traite le garant comme une **relation** (§4.2), pas comme un rôle —
 c'est juste, mais la création d'un « parent pur » (quelqu'un qui n'existe dans le club que comme
 garant) n'est outillée nulle part et se heurte à quatre frottements :
@@ -69,6 +84,11 @@ statut de garant doit rester une relation, sans dériver vers un rôle `parent` 
 ---
 
 ## 2026-09-03 — Suivi de délivrabilité des emails (Brevo)
+
+> **Sort.** Portée le 2026-09-14 en [#76](https://github.com/stephanfo/club-o-clock/issues/76),
+> avec l'arbitrage de cette entrée repris tel quel : **délivrabilité oui, engagement non**. Pas de
+> jalon fixé — le contournement (tableau de bord Brevo) ne perd aucune donnée, et c'est le seul des
+> quatre chantiers ouverts qui touche une dépendance externe.
 
 **Ce qu'on observe.** L'outbox s'arrête à `sent`
 ([migration](https://github.com/stephanfo/club-o-clock/blob/main/database/migrations/2026_01_01_000220_create_notification_outbox_table.php)), qui
@@ -136,6 +156,12 @@ est-il arrivé ? » se répond entièrement sans savoir s'il a été lu.
 ---
 
 ## 2026-09-03 — L'import CSV écrase une identité sans le dire
+
+> **Sort.** Portée le 2026-09-14 en [#74](https://github.com/stephanfo/club-o-clock/issues/74),
+> sans changement de comportement : l'aperçu nommera les fiches qu'il s'apprête à écraser. L'issue
+> forme un lot avec [#73](https://github.com/stephanfo/club-o-clock/issues/73) et
+> [#75](https://github.com/stephanfo/club-o-clock/issues/75) — même écran, même service, comme le
+> pressentait la dernière ligne de cette entrée.
 
 **Ce qu'on observe.** À l'import, une adresse email déjà présente en base ne produit pas d'erreur :
 la ligne bascule en **mise à jour**, et `importUpdate()` écrase `first_name`, `last_name` et `dob`
@@ -387,3 +413,76 @@ comptes verrouillés dehors, refus de couper un moyen d'auth) ·
 une boîte) ·
 [member-show.blade.php](https://github.com/stephanfo/club-o-clock/blob/main/resources/views/livewire/admin/member-show.blade.php) (carte Tutelle,
 masquage de la rupture, bloc résiduel « bientôt disponible »).
+
+---
+
+## 2026-09-14 — Ce que le formulaire de pré-inscription collecte, et que la plateforme ne sait pas garder
+
+**Ce qu'on observe.** L'entrée du 2026-09-03 décrivait la pré-inscription vue du bureau : la saisie
+manuelle, les parents à deviner, la date de naissance inventée. En regardant cette fois le
+**formulaire externe réellement utilisé à la rentrée**, un autre constat apparaît — deux des six
+données qu'il collecte n'ont **aucun endroit où atterrir** dans l'application :
+
+1. **La personne à prévenir en cas d'urgence et son numéro.** Le PRD exclut le stockage du
+   téléphone au titre de la minimisation (§3.2, §11). La donnée existe donc, le club l'a, elle est
+   utile au bord du terrain — et elle vit dans un tableur, hors de l'outil, consultable par
+   personne au moment où elle servirait.
+2. **L'acceptation du règlement intérieur.** Ni le document, ni sa version, ni la trace de qui a
+   accepté quoi et quand n'existent nulle part. Le règlement lui-même n'est pas dans l'outil : il
+   n'est pas une `InformationPage` (celles-ci ne sont ni versionnées ni lisibles hors connexion, or
+   un futur adhérent doit pouvoir le lire avant d'avoir un compte, et un consentement sans version
+   est une preuve vide).
+
+Les quatre autres champs — nom, prénom, email, date de naissance — tombent sans friction sur le
+modèle existant. C'est bien le **résidu** qui bloque l'automatisation, pas le gros du formulaire.
+
+Constat voisin, soulevé dans la même discussion : le club envisage un **trombinoscope**, avec accord
+de diffusion des coordonnées entre adhérents. Il se heurte au même manque (aucun registre de
+consentement) plus deux obstacles qui lui sont propres — l'hébergement de photos est hors-V1 (§3.2),
+et rendre un numéro visible **d'autres adhérents** est d'un tout autre calibre que le rendre visible
+du seul bureau.
+
+**Ce qu'on fait aujourd'hui.** Le formulaire externe reste la source, et le tableur qui en sort
+reste le seul endroit où vivent le contact d'urgence et les acceptations du règlement. Le bureau
+recopie à la main les quatre champs que l'outil sait tenir, et garde les deux autres hors ligne.
+Pour le parent pur, le contournement du 2026-09-03 tient toujours (créer à la main, décocher
+« athlète », date conventionnelle `01/01/1980`).
+
+**La piste.** Arbitrage rendu le 2026-09-14, porté en issues :
+
+- Le **contact d'urgence entre dans le modèle**, exclusion §3.2 levée pour ce seul usage : nom +
+  téléphone, lisibles **admin et coach uniquement**, jamais d'un autre adhérent ni d'un export
+  athlète, conservés tant que le compte vit et effacés à l'anonymisation. Base légale : intérêt
+  vital. Le PRD est à amender dans la même PR, pas après coup.
+- Un registre de consentements **générique** (`user_id`, type, version, accordé le, révoqué le),
+  dont le règlement intérieur est le premier usage et sur lequel le trombinoscope se branchera.
+- Le **règlement** devient un document versionné porté par les paramètres club, avec une URL
+  publique stable par version.
+- La **soumission ne crée rien** : elle dépose un dossier que l'admin valide. Le postulat du §4.1.3
+  (« l'email saisi par l'admin est réputé vérifié ») tient donc toujours — la validation reste le
+  point où le club engage sa responsabilité sur l'adresse.
+- La **cotisation reste hors-V1** : aucun marqueur de paiement sur le dossier, la validation reste
+  un geste humain dont les motifs vivent hors de l'outil.
+
+Reste ouvert et non tranché : l'enfant déclaré dans **deux dossiers** (parents séparés) — doublon
+signalé à l'admin, ou personne refusée dans le second dossier ?
+
+**Traces.** [#70](https://github.com/stephanfo/club-o-clock/issues/70) (date de naissance
+facultative pour un garant non-athlète) · [#71](https://github.com/stephanfo/club-o-clock/issues/71)
+(pré-inscriptions de saison) · [#72](https://github.com/stephanfo/club-o-clock/issues/72)
+(trombinoscope) · [#30](https://github.com/stephanfo/club-o-clock/issues/30) (gestion déléguée : la
+maille « foyer » de #71 lui prépare le terrain sans le préempter) · PRD §3.2 (hors-V1 : téléphone,
+paiements, hébergement de photos), §4.1.3 (flow de création), §4.4 (bascule de saison), §11 (RGPD) ·
+[InformationPage.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Models/InformationPage.php)
+(ni version, ni lecture hors connexion) ·
+[MemberCreate.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Livewire/Admin/MemberCreate.php)
+(`dob` requis) ·
+[MemberService.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Services/MemberService.php)
+(catégorie dérivée attachée sans regarder les rôles) ·
+[StatsService.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Services/StatsService.php)
+et [SeasonService.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Services/SeasonService.php)
+(tous deux filtrés sur le rôle `athlete` : le garant pur en est **déjà** exclu — la date bidon ne
+fausse pas les statistiques, contrairement à ce qu'on pouvait craindre) ·
+[InvitationToken.php](https://github.com/stephanfo/club-o-clock/blob/main/app/Models/InvitationToken.php)
+(`Prunable`, modèle de purge repris pour les dossiers non validés) · entrée du 2026-09-03 sur les
+parents non-athlètes.
