@@ -613,6 +613,23 @@ async function ongletMobile(page, nom) {
   s.checkJs(page);
   await s.shot(page, 's21-alertes-garant-mobile');
 
+  // « Tout effacer » ouvre un dialog de niveau 2 et ne masque RIEN tant qu'il n'est pas validé.
+  // On l'ouvre et on l'annule sans jamais confirmer : valider poserait `dismissed_at` sur TOUTES
+  // les alertes de Sandrine, y compris celles du jeu de démo, que la remise en état ne connaît pas.
+  await page.setViewportSize(MOBILE);
+  await page.locator('button:visible', { hasText: 'Tout effacer' }).click();
+  await page.waitForSelector('.dialog:visible', { timeout: 5000 });
+  // innerText, pas le HTML : le titre et les labels passent en capitales par `text-transform`.
+  const dlg = (await page.locator('.dialog:visible').innerText()).toLowerCase();
+  s.check('le dialog énonce ce qui disparaît', dlg.includes('retirer toutes les alertes') && dlg.includes('toute la liste'), dlg.slice(0, 80));
+  await s.shot(page, 's21-alertes-tout-effacer-mobile');
+
+  await page.locator('.dialog:visible button', { hasText: 'Annuler' }).click();
+  await page.waitForFunction(() => !document.querySelector('.dialog'));
+  s.check('annuler ne masque aucune alerte', sql(`${posees} AND dismissed_at IS NOT NULL`) === '0');
+  s.check('la carte est toujours là après annulation', // contrôle positif de l'assertion ci-dessus
+          (await page.locator('body').innerText()).includes('Toi et Jade · Annulation de séance'));
+
   await page.setViewportSize(DESKTOP);
   await page.reload({ waitUntil: 'networkidle' });
   await s.shot(page, 's21-alertes-garant-desktop');

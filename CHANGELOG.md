@@ -60,6 +60,173 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   aurait obligé à changer d'appareil au milieu. Il vit dans le bloc « Gestion » de la fiche et non
   dans la barre collante, qui garde le geste réversible sous le pouce.
 
+- **Le parent garant d'un enfant peut enfin être changé.** Le lien se posait à la création de la
+  fiche — formulaire ou import — et ne se reprenait plus jamais : pour en changer, il fallait rompre
+  puis rattacher, or la rupture est refusée à un enfant sans compte propre, et à raison — elle le
+  laisserait sans garant **et** sans accès. Le garant d'un enfant était donc **définitif**. Un
+  divorce, un décès, un changement de responsable légal, une simple erreur de saisie : aucune issue
+  dans l'outil, et un message de la fiche qui conseillait de « reparenter » un geste qui n'existait
+  pas. Une action **Changer de garant** rompt et rattache dans la même transaction : l'état « sans
+  garant » n'existe à aucun instant, pas même en cas d'échec, ce qui rend le geste sûr là où
+  l'enchaînement de deux actions ne l'était pas. Elle demande une confirmation forte — la
+  conséquence est nommée, la case à cocher arme le bouton, et le refus est gardé côté serveur. Seul
+  le garant sortant est prévenu : l'enfant, lui, n'a rien perdu. Le geste sert aussi le pupille
+  arrivé à dix-huit ans sans compte propre — celui dont le garant était autrement indéplaçable **et**
+  insupprimable —, sans pour autant permettre de placer un adulte sous tutelle : substituer un
+  garant n'est pas en créer un.
+
+- **Les notifications disent enfin qui elles concernent et de quelle séance il s'agit.** Un parent
+  garant est souvent adhérent lui-même : ses notifications et celles de ses enfants arrivaient sur le
+  même compte, dans la même boîte, avec des textes **rigoureusement identiques**. « Une séance à
+  laquelle tu es inscrit·e est annulée » — la sienne ou celle de son enfant ? Deux enfants inscrits à
+  deux séances différentes produisaient deux messages indiscernables. Et le lien menait à une fiche
+  qui parlait du parent, alors que la notification parlait de l'enfant.
+
+  Une notification adressée au garant **nomme désormais l'enfant** (« Hugo · Annulation de séance ») et
+  son lien ouvre la fiche **avec cet enfant pour sujet consulté** — le parent voit son inscription et
+  peut agir pour lui sans rien rebasculer à la main. Ses propres notifications, elles, restent nues :
+  le préfixe signale précisément qu'il s'agit de quelqu'un d'autre.
+
+  Dans la foulée, le corps du message dit **quelle** séance et **quand** (« Natation jeunes · sam. 5
+  sept. · 18:00 ») au lieu de répéter le titre sous une autre forme, et le récapitulatif d'affectation
+  d'un coach annonce son volume et sa plage. Une notification se comprend maintenant sans ouvrir
+  l'application — ce qui décide, en pratique, de la garder activée. Le prénom transporté pour composer
+  le titre est **effacé de la file dès l'envoi** : il a servi, il n'a pas à y dormir.
+
+- **Un garde-fou contre le déploiement d'un affichage périmé.** Les fichiers que le navigateur lit
+  vraiment ne sont pas ceux qu'on écrit : une moulinette (`npm run build`) compresse les seconds en
+  premiers, et seuls les premiers partent en ligne — hors Git, par transfert séparé. Oublier de
+  relancer la moulinette ne provoquait **aucune erreur** : le site tournait avec l'ancien affichage,
+  et rien ne le signalait. C'est arrivé pendant le développement de cette version.
+
+  `npm run build` inscrit désormais dans le résultat l'empreinte des fichiers dont il sort, et
+  `composer check` la confronte aux fichiers actuels — en nommant ceux qui ont bougé depuis. Même
+  principe que le contrôle qui existait déjà pour la structure de la base. Un bundle *sans*
+  empreinte est refusé lui aussi : ne pas savoir d'où il sort ne doit pas se lire comme une garantie
+  qu'il est à jour. Le contrôle est rejouable sur le serveur après transfert.
+
+- **Annuler une séance depuis un téléphone.** L'annulation était la seule action d'encadrement
+  absente du format mobile — restaurer, inscrire un athlète et remplir la file quota y étaient déjà.
+  Elle rejoint le bloc « Gestion » de l'onglet Infos. Volontairement hors de la barre d'action
+  collante : un bouton rouge qui prévient tous les inscrits n'a rien à faire sous le pouce, à côté
+  du bouton d'inscription.
+
+- **La touche Échap ferme la modale ouverte.** Sauf l'éditeur de débrief, où une touche mal placée
+  ferait perdre le texte en cours.
+
+- **Icônes PWA personnalisables par le club.** Elles étaient des fichiers du dépôt
+  (`public/icons/`) : un club qui les remplaçait entrait en conflit à chaque `git pull`,
+  indéfiniment. Elles se téléversent désormais depuis *Paramètres du club* — trois PNG aux
+  dimensions exactes (192, 512, et 180 pour iOS) — et sont stockées comme le logo, hors de l'arbre
+  Git. Sans téléversement, l'application sert le jeu livré : une instance neuve reste installable
+  en PWA sans aucune étape, et la démo publique ne porte le branding d'aucun club. Un bouton
+  rétablit le jeu par défaut. L'icône iOS est aplatie sur fond blanc à la réception (iOS rend
+  autrement la transparence en noir), et les dimensions sont refusées si elles ne sont pas exactes
+  — une icône hors format casse l'installation PWA sans le moindre message d'erreur.
+
+  ⚠️ Un appareil où la PWA est **déjà installée** conserve l'ancienne icône jusqu'à sa
+  réinstallation : limite des PWA, sans contournement côté serveur.
+
+- **Tests navigateur (E2E)** : harnais Playwright rejouant 20 scénarios dans un vrai navigateur —
+  clics, attente des mises à jour Livewire, vérification en base et captures aux formats mobile et
+  desktop. Couvre les gardes d'inscription, la bascule de rôle coach/athlète, la tutelle parentale,
+  le cloisonnement admin, et — derrière un drapeau explicite — les parcours destructifs (RGPD,
+  rupture de tutelle, bascule de saison). Le déblocage coach de la file quota (mécanisme C, §4.10.4)
+  y est couvert de bout en bout : bouton actif et désactivé, promotion effective, `AuditLog` émis.
+  Volontairement **hors de `composer check`** : la porte de qualité reste PHPUnit.
+  Voir [`tests/E2E/README.md`](https://github.com/stephanfo/club-o-clock/blob/main/tests/E2E/README.md).
+- **Poste de développement en conteneurs** ([`doc/DOCKER_LOCAL.md`](doc/DOCKER_LOCAL.md), et deux
+  `Dockerfile` versionnés dans `docker/`) : de quoi lancer l'application, la porte de qualité et le
+  harnais navigateur **sans installer PHP, MySQL ni les navigateurs** sur sa machine — seuls Git,
+  Docker et Node restent nécessaires. Le mode d'emploi consigne les deux pièges qui coûtent le plus
+  de temps : le harnais E2E code son adresse en dur et exige donc de partager la pile réseau du
+  conteneur applicatif, et le paquet `default-mysql-client` de Debian installe en réalité le client
+  MariaDB — `schema:dump` lancé là produit un dump MySQL que l'intégration continue rejette. Le
+  garde-fou qui empêche un envoi réel vers les adresses du jeu de démonstration est posé sur le
+  conteneur, jamais dans le `.env`.
+
+  Ça ne change **rien à la cible de déploiement** : l'application se déploie toujours sur un
+  hébergement mutualisé, sans Docker.
+- **Supervision du traitement automatique** : l'écran des envois indique si le cron tourne encore.
+  Sans lui, une tâche planifiée interrompue (quota d'hébergement, chemin PHP changé, crontab perdue
+  au transfert) laissait les notifications s'accumuler sans qu'aucun signe ne l'annonce — le premier
+  symptôme étant un adhérent non prévenu d'une annulation. Trois états : actif, interrompu depuis
+  plus de 15 minutes, jamais observé (installation neuve, sans alarme).
+- **Tests du club vide** : les écrans membre et administration sont vérifiés dans l'état d'un club
+  fraîchement installé — catalogues seedés, un seul administrateur, aucune séance ni adhérent.
+  C'est l'état que le développement ne rencontre jamais et que chaque club rencontre en premier.
+- **Procédure de restauration de sauvegarde** ([`doc/INSTALL.md`](doc/INSTALL.md) §9.1), à répéter
+  avant la mise en production : restauration dans une base séparée, contrôle des clés étrangères et
+  des index, vérification qu'aucune migration n'est en attente.
+
+### Modifié
+
+- **« Tout effacer » les alertes demande une vraie confirmation.** Le bouton se contentait d'une
+  petite fenêtre du navigateur, celle qui convient à un geste anodin qu'on refait d'un clic. Or il
+  vide toute la liste, y compris les alertes plus anciennes qu'elle n'affiche pas, et rien ne les
+  rappelle ensuite. Il ouvre maintenant la même fenêtre de confirmation que les autres actions
+  destructives, qui énonce ce qui disparaît et rappelle que les notifications elles-mêmes restent
+  tracées. Le retrait d'une alerte à l'unité, lui, ne change pas.
+
+- **Le déblocage du quota reste actif jusqu'à la séance.** Débloquer la file « quota dépassé » ne
+  valait que pour l'instant du clic : un athlète hors quota qui s'inscrivait ensuite repartait en
+  attente malgré les places libres, et un désistement ou une hausse de capacité ne profitait qu'à la
+  file « séance pleine ». Le bouton **« Débloquer le quota »** pose désormais un état sur la séance.
+  Jusqu'à la séance, l'athlète hors quota s'inscrit directement tant qu'il reste des places ; une
+  place qui se libère revient au premier de la file quota une fois la file « séance pleine » servie.
+  Séance pleine, les hors-quota attendent dans l'ordre d'arrivée, et celui qui attendait avant le
+  déblocage n'est pas doublé. Le déblocage est possible file vide (ouvrir la séance la veille), passe
+  par un dialog qui nomme les promu·e·s et demande un accusé de réception dès qu'il notifie, se
+  referme sans désinscrire personne, et repart à zéro si le tag de quota change ou si la séance est
+  réactivée. Une chip « Quota débloqué » le signale sur la fiche, athlètes compris. (#66)
+
+- **La météo couvre toute la durée de la séance, et plus seulement son départ.** Une sortie de trois
+  heures affichait la température et le vent de la première heure. La fiche donne désormais la plage
+  de température, le vent minimal et maximal, et retient le temps le plus défavorable du créneau
+  (une neige forte passe devant une averse faible).
+
+- **Le géocodage d'adresse passe de Nominatim à Photon.** Même donnée OpenStreetMap, même service
+  ouvert, européen et sans clé, mais un moteur conçu pour la recherche au fil de la frappe. Nominatim
+  ignorait le code postal et la commune sur une saisie approximative : « 5 rue du Stade 44150
+  Ancenis » rendait une rue du Stade **à Pannecé**, à 25 km, une adresse fausse mais plausible qu'on
+  valide sans y penser. Les suggestions sont en outre classées au plus près des lieux du club, sans
+  écarter une compétition lointaine. Les mentions légales, le cadrage et le guide d'installation
+  suivent. *Aucun réglage à changer sur une instance existante.*
+
+- **Rompre une tutelle depuis l'administration demande un accusé de réception.** Le geste prévient le
+  jeune et son garant sans pouvoir se dédire ; l'écran admin se contentait d'un bouton rouge, là où
+  le même geste côté parent exigeait déjà une case cochée. La confirmation nomme maintenant les deux
+  personnes prévenues, et le refus est gardé côté serveur.
+
+- **L'écran des modèles ne promet plus une génération qui n'a pas lieu.** Modifier un modèle ne crée
+  aucune séance, mais l'écran annonçait « N séances seront créées ». Il dit désormais ce que le modèle
+  a déjà généré, et renvoie vers « Relancer / prolonger » pour une nouvelle plage. Le bouton
+  « Générer & enregistrer », qui rejouait la plage déjà générée et affichait « 0 séance générée » en
+  vert, est retiré. La relance ne compte plus que les séances réellement manquantes, refuse une
+  plage où il n'en manque aucune et signale une plage dont les dates sont inversées.
+
+- **Sur téléphone, les dialogs d'action définitive gardent la sortie sûre en haut.** Le pied des
+  dialogs remonte l'action principale au-dessus d'« Annuler », convention juste pour un choix, pas
+  pour une suppression : l'action irréversible se retrouvait sous le pouce. Les dialogs destructifs
+  font désormais l'inverse ; rien ne change sur ordinateur.
+
+- ⚠️ **Une séance dont le créneau est terminé ne peut plus être annulée.** La borne est la **fin**
+  (début + durée) et non le début : une séance annulée sur place — orage, gymnase fermé — l'est
+  souvent quelques minutes après l'heure, et les inscrits doivent être prévenus. Passé la fin, la
+  séance a **eu lieu** : l'annuler l'effacerait rétroactivement des statistiques de fréquentation et
+  notifierait les inscrits d'une annulation sans objet. Le bouton disparaît alors de lui-même.
+
+  *Changement de comportement pour les coachs : annuler une séance passée « pour faire le ménage »
+  n'est plus possible.* Entre le début et la fin du créneau, l'annulation reste possible mais devient
+  **définitive** — la restauration, elle, est bornée au début — et la confirmation l'annonce
+  désormais explicitement au lieu de promettre une réversibilité qui n'existait plus.
+
+- **Trois gestes destructifs demandent un accusé de réception.** Annuler une séance, suspendre
+  l'accès athlète d'un adhérent et rompre une tutelle notifient des tiers sans possibilité de se
+  dédire. Comme la bascule de saison le faisait déjà, le bouton n'est armé qu'une fois cochée une
+  case qui **chiffre** la conséquence (« Je comprends que 12 inscrit·e·s seront prévenu·e·s »). La
+  garde est **serveur** : un bouton grisé contourné ne déclenche rien.
+
 ### Corrigé
 
 - **Le bouton retour ramenait au formulaire qu'on venait d'enregistrer.** Après l'édition d'une
@@ -195,170 +362,6 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   **rattrapables** : chacune n'honore qu'une exécution par période, et reprend une échéance manquée
   à la passe suivante au lieu de la perdre. Un test balaie les 60 minutes de démarrage possibles et
   échoue si une tâche redevient dépendante d'une minute absolue.
-
-### Modifié
-
-- **Le déblocage du quota reste actif jusqu'à la séance.** Débloquer la file « quota dépassé » ne
-  valait que pour l'instant du clic : un athlète hors quota qui s'inscrivait ensuite repartait en
-  attente malgré les places libres, et un désistement ou une hausse de capacité ne profitait qu'à la
-  file « séance pleine ». Le bouton **« Débloquer le quota »** pose désormais un état sur la séance.
-  Jusqu'à la séance, l'athlète hors quota s'inscrit directement tant qu'il reste des places ; une
-  place qui se libère revient au premier de la file quota une fois la file « séance pleine » servie.
-  Séance pleine, les hors-quota attendent dans l'ordre d'arrivée, et celui qui attendait avant le
-  déblocage n'est pas doublé. Le déblocage est possible file vide (ouvrir la séance la veille), passe
-  par un dialog qui nomme les promu·e·s et demande un accusé de réception dès qu'il notifie, se
-  referme sans désinscrire personne, et repart à zéro si le tag de quota change ou si la séance est
-  réactivée. Une chip « Quota débloqué » le signale sur la fiche, athlètes compris. (#66)
-
-- **La météo couvre toute la durée de la séance, et plus seulement son départ.** Une sortie de trois
-  heures affichait la température et le vent de la première heure. La fiche donne désormais la plage
-  de température, le vent minimal et maximal, et retient le temps le plus défavorable du créneau
-  (une neige forte passe devant une averse faible).
-
-- **Le géocodage d'adresse passe de Nominatim à Photon.** Même donnée OpenStreetMap, même service
-  ouvert, européen et sans clé, mais un moteur conçu pour la recherche au fil de la frappe. Nominatim
-  ignorait le code postal et la commune sur une saisie approximative : « 5 rue du Stade 44150
-  Ancenis » rendait une rue du Stade **à Pannecé**, à 25 km, une adresse fausse mais plausible qu'on
-  valide sans y penser. Les suggestions sont en outre classées au plus près des lieux du club, sans
-  écarter une compétition lointaine. Les mentions légales, le cadrage et le guide d'installation
-  suivent. *Aucun réglage à changer sur une instance existante.*
-
-- **Rompre une tutelle depuis l'administration demande un accusé de réception.** Le geste prévient le
-  jeune et son garant sans pouvoir se dédire ; l'écran admin se contentait d'un bouton rouge, là où
-  le même geste côté parent exigeait déjà une case cochée. La confirmation nomme maintenant les deux
-  personnes prévenues, et le refus est gardé côté serveur.
-
-- **L'écran des modèles ne promet plus une génération qui n'a pas lieu.** Modifier un modèle ne crée
-  aucune séance, mais l'écran annonçait « N séances seront créées ». Il dit désormais ce que le modèle
-  a déjà généré, et renvoie vers « Relancer / prolonger » pour une nouvelle plage. Le bouton
-  « Générer & enregistrer », qui rejouait la plage déjà générée et affichait « 0 séance générée » en
-  vert, est retiré. La relance ne compte plus que les séances réellement manquantes, refuse une
-  plage où il n'en manque aucune et signale une plage dont les dates sont inversées.
-
-- **Sur téléphone, les dialogs d'action définitive gardent la sortie sûre en haut.** Le pied des
-  dialogs remonte l'action principale au-dessus d'« Annuler », convention juste pour un choix, pas
-  pour une suppression : l'action irréversible se retrouvait sous le pouce. Les dialogs destructifs
-  font désormais l'inverse ; rien ne change sur ordinateur.
-
-- ⚠️ **Une séance dont le créneau est terminé ne peut plus être annulée.** La borne est la **fin**
-  (début + durée) et non le début : une séance annulée sur place — orage, gymnase fermé — l'est
-  souvent quelques minutes après l'heure, et les inscrits doivent être prévenus. Passé la fin, la
-  séance a **eu lieu** : l'annuler l'effacerait rétroactivement des statistiques de fréquentation et
-  notifierait les inscrits d'une annulation sans objet. Le bouton disparaît alors de lui-même.
-
-  *Changement de comportement pour les coachs : annuler une séance passée « pour faire le ménage »
-  n'est plus possible.* Entre le début et la fin du créneau, l'annulation reste possible mais devient
-  **définitive** — la restauration, elle, est bornée au début — et la confirmation l'annonce
-  désormais explicitement au lieu de promettre une réversibilité qui n'existait plus.
-
-- **Trois gestes destructifs demandent un accusé de réception.** Annuler une séance, suspendre
-  l'accès athlète d'un adhérent et rompre une tutelle notifient des tiers sans possibilité de se
-  dédire. Comme la bascule de saison le faisait déjà, le bouton n'est armé qu'une fois cochée une
-  case qui **chiffre** la conséquence (« Je comprends que 12 inscrit·e·s seront prévenu·e·s »). La
-  garde est **serveur** : un bouton grisé contourné ne déclenche rien.
-
-### Ajouté
-
-- **Le parent garant d'un enfant peut enfin être changé.** Le lien se posait à la création de la
-  fiche — formulaire ou import — et ne se reprenait plus jamais : pour en changer, il fallait rompre
-  puis rattacher, or la rupture est refusée à un enfant sans compte propre, et à raison — elle le
-  laisserait sans garant **et** sans accès. Le garant d'un enfant était donc **définitif**. Un
-  divorce, un décès, un changement de responsable légal, une simple erreur de saisie : aucune issue
-  dans l'outil, et un message de la fiche qui conseillait de « reparenter » un geste qui n'existait
-  pas. Une action **Changer de garant** rompt et rattache dans la même transaction : l'état « sans
-  garant » n'existe à aucun instant, pas même en cas d'échec, ce qui rend le geste sûr là où
-  l'enchaînement de deux actions ne l'était pas. Elle demande une confirmation forte — la
-  conséquence est nommée, la case à cocher arme le bouton, et le refus est gardé côté serveur. Seul
-  le garant sortant est prévenu : l'enfant, lui, n'a rien perdu. Le geste sert aussi le pupille
-  arrivé à dix-huit ans sans compte propre — celui dont le garant était autrement indéplaçable **et**
-  insupprimable —, sans pour autant permettre de placer un adulte sous tutelle : substituer un
-  garant n'est pas en créer un.
-
-- **Les notifications disent enfin qui elles concernent et de quelle séance il s'agit.** Un parent
-  garant est souvent adhérent lui-même : ses notifications et celles de ses enfants arrivaient sur le
-  même compte, dans la même boîte, avec des textes **rigoureusement identiques**. « Une séance à
-  laquelle tu es inscrit·e est annulée » — la sienne ou celle de son enfant ? Deux enfants inscrits à
-  deux séances différentes produisaient deux messages indiscernables. Et le lien menait à une fiche
-  qui parlait du parent, alors que la notification parlait de l'enfant.
-
-  Une notification adressée au garant **nomme désormais l'enfant** (« Hugo · Annulation de séance ») et
-  son lien ouvre la fiche **avec cet enfant pour sujet consulté** — le parent voit son inscription et
-  peut agir pour lui sans rien rebasculer à la main. Ses propres notifications, elles, restent nues :
-  le préfixe signale précisément qu'il s'agit de quelqu'un d'autre.
-
-  Dans la foulée, le corps du message dit **quelle** séance et **quand** (« Natation jeunes · sam. 5
-  sept. · 18:00 ») au lieu de répéter le titre sous une autre forme, et le récapitulatif d'affectation
-  d'un coach annonce son volume et sa plage. Une notification se comprend maintenant sans ouvrir
-  l'application — ce qui décide, en pratique, de la garder activée. Le prénom transporté pour composer
-  le titre est **effacé de la file dès l'envoi** : il a servi, il n'a pas à y dormir.
-
-- **Un garde-fou contre le déploiement d'un affichage périmé.** Les fichiers que le navigateur lit
-  vraiment ne sont pas ceux qu'on écrit : une moulinette (`npm run build`) compresse les seconds en
-  premiers, et seuls les premiers partent en ligne — hors Git, par transfert séparé. Oublier de
-  relancer la moulinette ne provoquait **aucune erreur** : le site tournait avec l'ancien affichage,
-  et rien ne le signalait. C'est arrivé pendant le développement de cette version.
-
-  `npm run build` inscrit désormais dans le résultat l'empreinte des fichiers dont il sort, et
-  `composer check` la confronte aux fichiers actuels — en nommant ceux qui ont bougé depuis. Même
-  principe que le contrôle qui existait déjà pour la structure de la base. Un bundle *sans*
-  empreinte est refusé lui aussi : ne pas savoir d'où il sort ne doit pas se lire comme une garantie
-  qu'il est à jour. Le contrôle est rejouable sur le serveur après transfert.
-
-- **Annuler une séance depuis un téléphone.** L'annulation était la seule action d'encadrement
-  absente du format mobile — restaurer, inscrire un athlète et remplir la file quota y étaient déjà.
-  Elle rejoint le bloc « Gestion » de l'onglet Infos. Volontairement hors de la barre d'action
-  collante : un bouton rouge qui prévient tous les inscrits n'a rien à faire sous le pouce, à côté
-  du bouton d'inscription.
-
-- **La touche Échap ferme la modale ouverte.** Sauf l'éditeur de débrief, où une touche mal placée
-  ferait perdre le texte en cours.
-
-- **Icônes PWA personnalisables par le club.** Elles étaient des fichiers du dépôt
-  (`public/icons/`) : un club qui les remplaçait entrait en conflit à chaque `git pull`,
-  indéfiniment. Elles se téléversent désormais depuis *Paramètres du club* — trois PNG aux
-  dimensions exactes (192, 512, et 180 pour iOS) — et sont stockées comme le logo, hors de l'arbre
-  Git. Sans téléversement, l'application sert le jeu livré : une instance neuve reste installable
-  en PWA sans aucune étape, et la démo publique ne porte le branding d'aucun club. Un bouton
-  rétablit le jeu par défaut. L'icône iOS est aplatie sur fond blanc à la réception (iOS rend
-  autrement la transparence en noir), et les dimensions sont refusées si elles ne sont pas exactes
-  — une icône hors format casse l'installation PWA sans le moindre message d'erreur.
-
-  ⚠️ Un appareil où la PWA est **déjà installée** conserve l'ancienne icône jusqu'à sa
-  réinstallation : limite des PWA, sans contournement côté serveur.
-
-- **Tests navigateur (E2E)** : harnais Playwright rejouant 20 scénarios dans un vrai navigateur —
-  clics, attente des mises à jour Livewire, vérification en base et captures aux formats mobile et
-  desktop. Couvre les gardes d'inscription, la bascule de rôle coach/athlète, la tutelle parentale,
-  le cloisonnement admin, et — derrière un drapeau explicite — les parcours destructifs (RGPD,
-  rupture de tutelle, bascule de saison). Le déblocage coach de la file quota (mécanisme C, §4.10.4)
-  y est couvert de bout en bout : bouton actif et désactivé, promotion effective, `AuditLog` émis.
-  Volontairement **hors de `composer check`** : la porte de qualité reste PHPUnit.
-  Voir [`tests/E2E/README.md`](https://github.com/stephanfo/club-o-clock/blob/main/tests/E2E/README.md).
-- **Poste de développement en conteneurs** ([`doc/DOCKER_LOCAL.md`](doc/DOCKER_LOCAL.md), et deux
-  `Dockerfile` versionnés dans `docker/`) : de quoi lancer l'application, la porte de qualité et le
-  harnais navigateur **sans installer PHP, MySQL ni les navigateurs** sur sa machine — seuls Git,
-  Docker et Node restent nécessaires. Le mode d'emploi consigne les deux pièges qui coûtent le plus
-  de temps : le harnais E2E code son adresse en dur et exige donc de partager la pile réseau du
-  conteneur applicatif, et le paquet `default-mysql-client` de Debian installe en réalité le client
-  MariaDB — `schema:dump` lancé là produit un dump MySQL que l'intégration continue rejette. Le
-  garde-fou qui empêche un envoi réel vers les adresses du jeu de démonstration est posé sur le
-  conteneur, jamais dans le `.env`.
-
-  Ça ne change **rien à la cible de déploiement** : l'application se déploie toujours sur un
-  hébergement mutualisé, sans Docker.
-- **Supervision du traitement automatique** : l'écran des envois indique si le cron tourne encore.
-  Sans lui, une tâche planifiée interrompue (quota d'hébergement, chemin PHP changé, crontab perdue
-  au transfert) laissait les notifications s'accumuler sans qu'aucun signe ne l'annonce — le premier
-  symptôme étant un adhérent non prévenu d'une annulation. Trois états : actif, interrompu depuis
-  plus de 15 minutes, jamais observé (installation neuve, sans alarme).
-- **Tests du club vide** : les écrans membre et administration sont vérifiés dans l'état d'un club
-  fraîchement installé — catalogues seedés, un seul administrateur, aucune séance ni adhérent.
-  C'est l'état que le développement ne rencontre jamais et que chaque club rencontre en premier.
-- **Procédure de restauration de sauvegarde** ([`doc/INSTALL.md`](doc/INSTALL.md) §9.1), à répéter
-  avant la mise en production : restauration dans une base séparée, contrôle des clés étrangères et
-  des index, vérification qu'aucune migration n'est en attente.
-
-### Corrigé
 
 - Fiche séance : le bloc « Je participe » d'un coach-athlète ignorait les gardes de catégorie et de
   suspension, laissant une action que le serveur refusait systématiquement. Le motif du refus est

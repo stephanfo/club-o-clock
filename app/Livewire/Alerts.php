@@ -28,6 +28,14 @@ class Alerts extends Component
     /** Écart maximal entre deux lignes d'un même envoi (routage parent/enfant, §4.15.5). */
     private const GROUP_WINDOW_SECONDS = 120;
 
+    /**
+     * Dialog « Tout effacer » ouvert ? Le retrait d'UNE carte est anodin et réversible d'un coup
+     * d'œil (wire:confirm natif) ; vider la liste entière ne l'est pas — il porte aussi sur les
+     * alertes que la liste ne montre pas (elle plafonne à MAX_CARDS) et ne se défait pas depuis
+     * l'écran. D'où un dialog de niveau 2 qui en énonce les conséquences.
+     */
+    public bool $confirmingDismissAll = false;
+
     public function mount(): void
     {
         NotificationOutbox::alertsFor(auth()->id())
@@ -54,12 +62,23 @@ class Alerts extends Component
         NotificationOutbox::forgetUnreadCount(auth()->id());
     }
 
+    public function openDismissAllConfirm(): void
+    {
+        $this->confirmingDismissAll = true;
+    }
+
+    public function dismissDismissAllConfirm(): void
+    {
+        $this->confirmingDismissAll = false;
+    }
+
     /** « Tout effacer » : masque toutes les alertes visibles de l'utilisateur. */
     public function dismissAll(): void
     {
         NotificationOutbox::alertsFor(auth()->id())->update(['dismissed_at' => now()]);
 
         NotificationOutbox::forgetUnreadCount(auth()->id());
+        $this->confirmingDismissAll = false;
     }
 
     public function render()

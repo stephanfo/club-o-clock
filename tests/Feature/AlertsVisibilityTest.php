@@ -148,6 +148,34 @@ class AlertsVisibilityTest extends TestCase
         $this->assertSame([$etrangere->id], $this->visibles($autre));
     }
 
+    /**
+     * « Tout effacer » est destructif (toute la liste, sans retour arrière depuis l'écran) : il
+     * passe par un dialog de niveau 2, pas par le `wire:confirm` natif de l'anodin réversible.
+     */
+    public function test_tout_effacer_passe_par_un_dialog_et_ne_masque_rien_avant_validation(): void
+    {
+        $u = User::factory()->create();
+        $this->alerte($u, ['session_id' => $this->seance()->id]);
+
+        $c = Livewire::actingAs($u)->test(Alerts::class)
+            ->assertSet('confirmingDismissAll', false)
+            ->assertDontSee('Retirer toutes les alertes')   // le dialog n'est pas là au départ
+            ->assertSee('Tout effacer')                     // contrôle positif : le bouton, lui, y est
+            ->call('openDismissAllConfirm')
+            ->assertSet('confirmingDismissAll', true)
+            ->assertSee('Retirer toutes les alertes');
+
+        // Ouvrir le dialog ne masque rien : le geste attend la validation.
+        $this->assertCount(1, $this->visibles($u));
+
+        $c->call('dismissDismissAllConfirm')
+            ->assertSet('confirmingDismissAll', false);
+        $this->assertCount(1, $this->visibles($u));
+
+        $c->call('dismissAll')->assertSet('confirmingDismissAll', false);
+        $this->assertSame([], $this->visibles($u));
+    }
+
     public function test_refus_masquer_lalerte_dun_autre_compte(): void
     {
         $u = User::factory()->create();
