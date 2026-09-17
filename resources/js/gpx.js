@@ -6,6 +6,8 @@
 // la carte ne sert que sur les fiches GPX, l'inclure partout déclenchait un avertissement de preload
 // CSS inutile sur toutes les autres pages.
 
+import { buildTrack, haversine, locate, slopeAt } from './track';
+
 const MAX_BYTES = 5 * 1024 * 1024; // 5 Mo (§4.13.2)
 
 // Secteurs cardinaux en FRANÇAIS (O, pas W). Doit rester aligné sur GpxRoute::SECTORS côté PHP :
@@ -13,16 +15,6 @@ const MAX_BYTES = 5 * 1024 * 1024; // 5 Mo (§4.13.2)
 const SECTORS = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
 const LOOP_METERS = 250;          // départ ≈ arrivée → parcours en boucle
 const MAX_POLYLINE_POINTS = 200;  // budget de simplification (le serveur retronque à 250)
-
-// Distance haversine entre deux points (mètres).
-function haversine(a, b) {
-    const R = 6371000;
-    const toRad = (d) => (d * Math.PI) / 180;
-    const dLat = toRad(b.lat - a.lat);
-    const dLon = toRad(b.lon - a.lon);
-    const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
-    return 2 * R * Math.asin(Math.sqrt(s));
-}
 
 // Parse un GPX (texte) → tracé + métadonnées. Lève si illisible.
 export function parseGpx(text) {
@@ -117,6 +109,9 @@ export function parseGpx(text) {
         // virages et raccourcit le tracé, ce qui décalerait les bornes de plusieurs centaines de
         // mètres en fin de parcours.
         kmMarkers: kmMarkersFrom(pts, dist),
+        // Tracé indexé par la distance, pour le survol animé (#67). Reste dans le navigateur : le
+        // formulaire (gpxField) ne transmet au serveur que des champs choisis un à un.
+        track: buildTrack(pts),
     };
 }
 
@@ -347,6 +342,19 @@ function gpxField({ stats }) {
     };
 }
 
+// Durée d'un survol complet à ×1 (#67), quelle que soit la longueur du tracé. 30 s au départ,
+// jugées trop rapides à l'essai sur iPhone.
+const FLY_DURATION_MS = 60000;
+
+// Vitesse de défilement visée du fond de carte, en pixels par seconde : c'est elle qui fixe le zoom
+// de suivi. Assez lente pour que l'œil suive et que les tuiles aient le temps d'arriver.
+const FLY_SCROLL_PX_S = 110;
+
+const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// 7412 m → « 7,4 »
+const formatKm = (m) => (m / 1000).toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
 // ── Composant fiche : récupère le GPX stocké et trace sur OSM ──
 function gpxMap({ url, lockable = false }) {
     // L'instance Leaflet vit dans la closure, PAS dans le state Alpine : Alpine proxifierait l'objet
@@ -355,6 +363,17 @@ function gpxMap({ url, lockable = false }) {
     let map = null;
     let bounds = null;     // bornes du tracé, conservées pour recadrer après invalidateSize
     let resizeObs = null;
+    // Survol animé (#67) — hors du state Alpine pour la même raison que `map`.
+    let Leaflet = null;
+    let line = null;
+    let points = null;     // [[lat, lon], …] bruts, pour tracer la portion parcourue
+    let track = null;
+    let doneLine = null;
+    let flyDot = null;
+    let raf = null;
+    let lastFrame = null;
+    let lastPan = 0;
+    let lastDone = 0;
 
     return {
         failed: false,
@@ -367,6 +386,9 @@ function gpxMap({ url, lockable = false }) {
         // quand l'API n'existe pas plutôt que d'offrir un contrôle no-op (cf. limite iOS documentée).
         fsSupported: typeof document !== 'undefined' && document.fullscreenEnabled === true,
         isFs: false,
+
+        // Survol : `on` = panneau ouvert, `playing` = lecture en cours, `d` = mètres parcourus.
+        fly: { ready: false, on: false, playing: false, d: 0, total: 0, speed: 1, ele: null, slope: null },
 
         async init() {
             await this.$nextTick();
@@ -385,9 +407,15 @@ function gpxMap({ url, lockable = false }) {
                     maxZoom: 18,
                     attribution: '&copy; OpenStreetMap',
                 }).addTo(map);
-                const line = L.polyline(parsed.points, { color: '#d4282e', weight: 2 }).addTo(map);
+                line = L.polyline(parsed.points, { color: '#d4282e', weight: 2 }).addTo(map);
                 bounds = line.getBounds();
                 map.fitBounds(bounds, { padding: [16, 16] });
+
+                Leaflet = L;
+                points = parsed.points;
+                track = parsed.track;
+                this.fly.total = track.total;
+                this.fly.ready = track.total > 0;
 
                 // Pastilles du tracé : bornes kilométriques + départ/arrivée. divIcon plutôt qu'une
                 // image : la pastille est du HTML, donc stylée aux tokens du design system et nette
@@ -435,7 +463,9 @@ function gpxMap({ url, lockable = false }) {
                     const el = this.$refs.map;
                     if (el.clientWidth > 0 && el.clientHeight > 0) {
                         map.invalidateSize();
-                        if (bounds) map.fitBounds(bounds, { padding: [16, 16] });
+                        // Pendant la lecture, la caméra suit le point : recadrer sur tout le tracé
+                        // (rotation du téléphone, plein écran) casserait le suivi.
+                        if (bounds && !this.fly.playing) map.fitBounds(bounds, { padding: [16, 16] });
                     }
                 });
                 resizeObs.observe(this.$refs.map);
@@ -487,7 +517,203 @@ function gpxMap({ url, lockable = false }) {
             }
         },
 
+        // ── Survol animé (#67) ──────────────────────────────────────────────────────────────────
+        // Aucune lecture automatique : le fond de carte ne bouge qu'à la demande (données mobiles,
+        // tuiles OSM). La carte peut rester verrouillée — setView/panTo ne passent pas par les
+        // handlers d'interaction que le verrou désactive.
+
+        flyOpen() {
+            if (!this.fly.ready || !map) return;
+            this.fly.on = true;
+            line.setStyle({ opacity: 0.55 });
+            doneLine = Leaflet.polyline([], { color: '#d4282e', weight: 5, interactive: false }).addTo(map);
+            flyDot = Leaflet.marker([track.lat[0], track.lon[0]], {
+                icon: Leaflet.divIcon({ className: 'gpx-kmdot-wrap', html: '<span class="gpx-flydot"></span>', iconSize: [16, 16], iconAnchor: [8, 8] }),
+                keyboard: false,
+                interactive: false,
+                zIndexOffset: 2000,
+            }).addTo(map);
+            this.fly.d = 0;
+            this.flyPlay();
+            // Émis tout de suite, pas à la première image : la fiche séance masque sa barre d'actions
+            // sur cet événement, et le cadrage doit mesurer l'écran une fois la barre partie.
+            this.flyEmit();
+            this.$nextTick(() => requestAnimationFrame(() => this.flyFrameView()));
+        },
+
+        // Cadre carte + panneau + profil altimétrique (quand il suit la carte) dans la partie visible
+        // de l'écran, c'est-à-dire entre les barres fixes du haut et du bas (topbar, actions de la
+        // fiche, barre de navigation). Sur la fiche séance mobile, la carte arrive sous l'en-tête et
+        // le profil tombait sous la barre d'actions. Rien ne bouge si tout est déjà visible.
+        //
+        // Si l'ensemble ne tient pas (Safari et ses barres d'outils mangent une bonne part de la
+        // hauteur), la carte rétrécit le temps du survol, sans descendre sous 260 px : en dessous,
+        // on ne voit plus assez de route autour du point. flyClose lui rend sa hauteur.
+        flyFrameView() {
+            const box = this.$root.querySelector('.gpx-mapbox');
+            if (!box || this.isFs) return;
+            const profile = this.$root.nextElementSibling?.matches('.alt-profile') ? this.$root.nextElementSibling : null;
+            const last = profile && profile.getClientRects().length ? profile : this.$root;
+            const vh = window.innerHeight;
+            let top = 0;
+            let bottom = vh;
+            for (const el of document.querySelectorAll('body *')) {
+                if (el.closest('.leaflet-container')) continue;
+                const position = getComputedStyle(el).position;
+                if (position !== 'fixed' && position !== 'sticky') continue;
+                const r = el.getBoundingClientRect();
+                if (!r.height || r.width < window.innerWidth / 2) continue;   // pastilles, boutons flottants
+                if (r.top <= 0 && r.bottom < vh / 3) top = Math.max(top, r.bottom);
+                else if (r.top > (2 * vh) / 3) bottom = Math.min(bottom, r.top);   // barre d'actions posée sur la navigation
+            }
+            const gap = 8;
+            const start = box.getBoundingClientRect().top;
+            let end = last.getBoundingClientRect().bottom;
+            if (start >= top + gap && end <= bottom - gap) return;
+            const overflow = end - start - (bottom - top - 2 * gap);
+            const mapEl = this.$refs.map;
+            if (overflow > 0 && mapEl) {
+                const height = Math.max(mapEl.offsetHeight - overflow, 260);
+                end -= mapEl.offsetHeight - height;
+                mapEl.style.height = `${height}px`;
+            }
+            box.style.scrollMarginTop = `${top + gap}px`;
+            box.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' });
+        },
+
+        flyClose() {
+            this.flyPause();
+            this.fly.on = false;
+            this.fly.d = 0;
+            doneLine?.remove();
+            flyDot?.remove();
+            doneLine = flyDot = null;
+            line?.setStyle({ opacity: 1 });
+            if (this.$refs.map) this.$refs.map.style.height = '';
+            this.flyEmit();
+        },
+
+        flyToggle() {
+            this.fly.playing ? this.flyPause() : this.flyPlay();
+        },
+
+        flyPlay() {
+            if (!flyDot) return;
+            if (this.fly.d >= this.fly.total) this.fly.d = 0;   // relancer depuis la fin = recommencer
+            this.fly.playing = true;
+            lastFrame = null;
+            this.flyZoom();
+            raf = requestAnimationFrame((t) => this.flyFrame(t));
+        },
+
+        // Pause ou fin : retour à la vue d'ensemble, le point reste où il est.
+        flyPause() {
+            if (raf) cancelAnimationFrame(raf);
+            raf = null;
+            if (!this.fly.playing) return;
+            this.fly.playing = false;
+            this.flyRender(true);
+            map?.fitBounds(bounds, { padding: [16, 16], animate: !reducedMotion() });
+        },
+
+        flySeek(value) {
+            this.fly.d = Math.min(Math.max(Number(value) || 0, 0), this.fly.total);
+            this.flyRender(true);
+        },
+
+        flySpeed(speed) {
+            this.fly.speed = speed;
+            if (this.fly.playing) this.flyZoom();
+        },
+
+        flyFrame(t) {
+            if (!this.fly.playing) return;
+            if (lastFrame !== null) {
+                // Durée fixe à ×1, quelle que soit la longueur : un 90 km vélo se survole aussi vite
+                // qu'un 8 km course à pied. Plafond de 100 ms par image : un onglet remis au premier
+                // plan ne doit pas faire sauter le point au bout du tracé.
+                const dt = Math.min(t - lastFrame, 100);
+                this.fly.d += (dt * this.fly.total * this.fly.speed) / FLY_DURATION_MS;
+            }
+            lastFrame = t;
+            if (this.fly.d >= this.fly.total) {
+                this.fly.d = this.fly.total;
+                this.flyPause();
+                return;
+            }
+            this.flyRender(false);
+            raf = requestAnimationFrame((n) => this.flyFrame(n));
+        },
+
+        // Zoom de suivi calé sur la VITESSE du point, pas fixe : à zoom 16, un 90 km en ×4 fait
+        // défiler le fond à plusieurs milliers de pixels par seconde et la carte ne ferait que charger
+        // des tuiles. On vise FLY_SCROLL_PX_S, borné entre 12 (un long parcours en ×4 reste lisible)
+        // et 17 (au-delà, les tuiles OSM n'apportent plus rien).
+        flyZoom() {
+            const pos = locate(track, this.fly.d);
+            const metersPerSecond = (this.fly.total * this.fly.speed) / (FLY_DURATION_MS / 1000);
+            const wanted = Math.log2((156543.03 * Math.cos((pos.lat * Math.PI) / 180) * FLY_SCROLL_PX_S) / Math.max(metersPerSecond, 1));
+            const zoom = Math.min(Math.max(Math.round(wanted), 12), 17);
+            // Laisse l'animation de zoom finir avant de reprendre le suivi (cf. flyRender).
+            lastPan = performance.now() + 350;
+            map.setView([pos.lat, pos.lon], zoom, { animate: !reducedMotion() });
+        },
+
+        flyRender(force) {
+            if (!flyDot) return;
+            const pos = locate(track, this.fly.d);
+            flyDot.setLatLng([pos.lat, pos.lon]);
+            this.fly.ele = pos.ele;
+            this.fly.slope = slopeAt(track, this.fly.d);
+
+            const now = performance.now();
+            // Portion parcourue redessinée 10 fois par seconde au plus : Leaflet reprojette toute la
+            // ligne à chaque mise à jour, et un GPX de 5 Mo compte des dizaines de milliers de points.
+            if (force || now - lastDone > 100) {
+                lastDone = now;
+                doneLine.setLatLngs(points.slice(0, pos.i + 1).concat([[pos.lat, pos.lon]]));
+            }
+
+            // Suivi CONTINU : la carte reste centrée sur le point à chaque image. Le recentrage par
+            // sauts (panTo quand le point sortait du tiers central) donnait une carte saccadée à
+            // l'essai sur iPhone. panBy sans animation ne fait qu'une translation CSS, et le zoom
+            // borné par la vitesse (flyZoom) limite le nombre de tuiles tirées.
+            if (this.fly.playing && now > lastPan) {
+                const size = map.getSize();
+                const p = map.latLngToContainerPoint([pos.lat, pos.lon]);
+                const dx = p.x - size.x / 2;
+                const dy = p.y - size.y / 2;
+                if (Math.abs(dx) >= 0.5 || Math.abs(dy) >= 0.5) map.panBy([dx, dy], { animate: false });
+            }
+            this.flyEmit();
+        },
+
+        // Le profil altimétrique est rendu serveur, hors de ce composant : il écoute cet événement
+        // pour poser son curseur (cf. <x-alt-profile>).
+        flyEmit() {
+            window.dispatchEvent(new CustomEvent('gpx-flyover', {
+                detail: { active: this.fly.on, km: this.fly.d / 1000 },
+            }));
+        },
+
+        get flyDistance() {
+            return `${formatKm(this.fly.d)} / ${formatKm(this.fly.total)} km`;
+        },
+
+        get flyAltitude() {
+            return this.fly.ele === null ? null : `${Math.round(this.fly.ele)} m`;
+        },
+
+        get flySlope() {
+            if (this.fly.slope === null) return null;
+            const r = Math.round(this.fly.slope) || 0;   // pas de « −0 % »
+            return `${r > 0 ? '+' : r < 0 ? '−' : ''}${Math.abs(r)} %`;
+        },
+
         destroy() {
+            if (raf) cancelAnimationFrame(raf);
+            raf = null;
+            if (this.fly.on) window.dispatchEvent(new CustomEvent('gpx-flyover', { detail: { active: false, km: 0 } }));
             if (this._onFsChange) document.removeEventListener('fullscreenchange', this._onFsChange);
             resizeObs?.disconnect();
             resizeObs = null;

@@ -784,7 +784,8 @@ Toutes les séances peuvent **optionnellement** porter des informations de parco
 #### 4.13.2 GPX
 - Upload direct, max **5 Mo** (côté client ET serveur).
 - **Parsing client uniquement, jamais serveur** (surface d'attaque réduite). Le client extrait distance totale, D+/D-, alt min/max, nb points, durée estimée, et envoie les métadonnées + fichier brut.
-- Affichage du tracé sur fond OpenStreetMap.
+- Affichage du tracé sur fond OpenStreetMap, avec son **profil altimétrique** dessous.
+- **Survol du tracé** (fiche séance et fiche parcours) : à la demande, jamais automatiquement, un point parcourt le tracé et la carte le suit. Lecture/pause, curseur pour se placer n'importe où, vitesse ×1/×2/×4 (un survol complet dure environ 1 min à ×1, quelle que soit la distance). La portion parcourue se distingue du reste, un curseur se déplace sur le profil altimétrique, et la distance parcourue/totale, l'altitude et la pente locale (lissée sur 100 m) du point courant sont affichées. Fonctionne sans déverrouiller la carte. Pas de survol sans GPX (carte OpenRunner seule).
 - **Téléchargement visible à tous les membres connectés** du club (cohérence §4.12 — pas d'info de fiche séance restreinte aux inscrits).
 - **Le GPX déposé sur une séance alimente la bibliothèque de parcours** (§4.20) : la séance le *référence*, elle ne le possède pas. Retirer le parcours d'une séance ne supprime donc jamais le fichier.
 

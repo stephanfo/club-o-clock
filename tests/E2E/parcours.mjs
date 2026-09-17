@@ -780,6 +780,123 @@ async function ongletMobile(page, nom) {
   tous.push(s.report());
 }
 
+// ── S28 · Survol animé du tracé GPX (#67) ──────────────────────────────
+// Sur les DEUX écrans qui portent la carte (fiche séance, fiche parcours) et aux deux formats :
+// lancer, pause, curseur, vitesse, arrêt. La position se lit sur le curseur de lecture (mètres).
+{
+  const s = new Scenario('S28 · Survol animé du tracé GPX');
+  const seanceGpx = seance('route_id IS NOT NULL AND cancelled_at IS NULL');
+  const [routeId] = ligne('SELECT id FROM gpx_routes WHERE archived_at IS NULL AND elevation_profile IS NOT NULL ORDER BY id LIMIT 1',
+    'un parcours avec profil altimétrique');
+  const seanceOr = seance('route_id IS NULL AND route_openrunner_embed_url IS NOT NULL AND cancelled_at IS NULL');
+
+  for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
+    const { ctx, page } = await session(browser, 'vincent@demo.club', viewport);
+    for (const [ecran, url] of [['séance', `${BASE}/seances/${seanceGpx}`], ['parcours', `${BASE}/parcours/${routeId}`]]) {
+      const quoi = `${ecran} ${format}`;
+      await page.goto(url, { waitUntil: 'networkidle' });
+      // Fiche séance mobile : le parcours vit dans son onglet.
+      if (ecran === 'séance' && format === 'mobile') {
+        await page.locator('.fiche-mobile :is(button, [role=tab])', { hasText: /^\s*Parcours\s*$/ }).first().click();
+      }
+      const bouton = page.locator('.gpx-flybtn:visible');
+      await bouton.first().waitFor({ timeout: 8000 }).catch(() => {});
+      if (!s.check(`${quoi} — bouton « Survoler » présent avec un GPX`, await bouton.count() === 1)) continue;
+
+      await bouton.click();
+      const panneau = page.locator('.gpx-fly:visible');
+      const curseur = panneau.locator('.gpx-fly-range');
+      const pos = async () => Number(await curseur.inputValue());
+      await page.waitForTimeout(1500);
+      s.check(`${quoi} — la lecture fait avancer le point`, await pos() > 0, `${await pos()} m`);
+      if (format === 'mobile') {
+        // Cadrage : carte, panneau et profil ramenés ensemble entre l'en-tête et les barres du bas.
+        const cadre = await page.evaluate(() => {
+          const vis = (sel) => [...document.querySelectorAll(sel)].find((e) => e.getClientRects().length);
+          const barres = [...document.querySelectorAll('.topbar, .fiche-actions-m, .botnav')].filter((e) => e.getClientRects().length);
+          const haut = Math.max(0, ...barres.map((e) => e.getBoundingClientRect()).filter((r) => r.top <= 0).map((r) => r.bottom));
+          const bas = Math.min(innerHeight, ...barres.map((e) => e.getBoundingClientRect()).filter((r) => r.top > 0).map((r) => r.top));
+          return { carte: Math.round(vis('.gpx-mapbox').getBoundingClientRect().top), profil: Math.round(vis('.alt-profile').getBoundingClientRect().bottom), haut: Math.round(haut), bas: Math.round(bas) };
+        });
+        s.check(`${quoi} — carte, commandes et profil cadrés dans l'écran`, cadre.carte >= cadre.haut && cadre.profil <= cadre.bas, JSON.stringify(cadre));
+        if (ecran === 'séance') {
+          s.check(`${quoi} — la barre d'inscription reste affichée pendant le survol`, await page.locator('.fiche-actions-m').isVisible());
+        }
+      }
+      s.check(`${quoi} — sans déverrouiller la carte`, await page.locator('.gpx-mapbox .loc-map-veil:visible').count() === 1);
+      // Verrouillée mais sans gris : le voile reste pour laisser passer le scroll, fond transparent.
+      const fondVoile = await page.locator('.gpx-mapbox .loc-map-veil:visible').evaluate((e) => getComputedStyle(e).backgroundColor);
+      s.check(`${quoi} — voile transparent pendant le survol`, fondVoile === 'rgba(0, 0, 0, 0)', fondVoile);
+      s.check(`${quoi} — le curseur du profil altimétrique suit`, await page.locator('.alt-cursor:visible').count() === 1);
+      // Métriques posées sur la carte, et le panneau des commandes tient sur une ligne.
+      const pastille = page.locator('.gpx-mapbox .gpx-fly-info:visible');
+      const info = (await pastille.innerText()).replace(/\s+/g, ' ');
+      s.check(`${quoi} — distance « parcourue / totale » affichée sur la carte`, /\d+,\d \/ \d+,\d km/.test(info), info);
+      const hauteurPanneau = await panneau.evaluate((e) => e.offsetHeight);
+      s.check(`${quoi} — commandes du survol sur une seule ligne`, hauteurPanneau <= 56, `${hauteurPanneau} px`);
+      await s.shot(page, `s28-survol-${ecran === 'séance' ? 'seance' : ecran}-${format}`);
+
+      await panneau.getByRole('button', { name: /mettre en pause/i }).click();
+      const figee = await pos();
+      await page.waitForTimeout(600);
+      s.check(`${quoi} — la pause fige le point`, await pos() === figee);
+
+      const total = Number(await curseur.getAttribute('max'));
+      await curseur.fill(String(Math.round(total / 2)));
+      s.check(`${quoi} — le curseur place le point à mi-parcours`, Math.abs(await pos() - total / 2) < 2, `${await pos()} / ${total}`);
+
+      await panneau.getByRole('button', { name: '×4' }).click();
+      s.check(`${quoi} — vitesse ×4 sélectionnée`, await panneau.getByRole('button', { name: '×4' }).getAttribute('aria-pressed') === 'true');
+      await panneau.getByRole('button', { name: /lancer le survol/i }).click();
+      const depart = await pos();
+      await page.waitForTimeout(1000);
+      // ×4 = tout le tracé en 15 s, soit 6,7 % par seconde. Tolérance large : le navigateur de test
+      // cadence ses images comme il peut.
+      const avance = (await pos()) - depart;
+      s.check(`${quoi} — ×4 avance à la cadence attendue`, avance > (total * 4 / 60) * 0.5, `${Math.round(avance)} m en 1 s`);
+
+      await panneau.getByRole('button', { name: /arrêter le survol/i }).click();
+      await page.waitForTimeout(300);
+      s.check(`${quoi} — arrêter referme le panneau et rend le bouton`,
+        await page.locator('.gpx-fly:visible').count() === 0 && await bouton.count() === 1);
+      s.check(`${quoi} — le curseur du profil disparaît`, await page.locator('.alt-cursor:visible').count() === 0);
+    }
+    s.checkJs(page);
+    await ctx.close();
+  }
+
+  // Écran bas (Safari et ses barres d'outils) : l'ensemble ne tient qu'en réduisant la carte, qui
+  // retrouve sa hauteur à l'arrêt.
+  {
+    const { ctx, page } = await session(browser, 'vincent@demo.club', { width: 390, height: 640 });
+    await page.goto(`${BASE}/seances/${seanceGpx}`, { waitUntil: 'networkidle' });
+    await page.locator('.fiche-mobile :is(button, [role=tab])', { hasText: /^\s*Parcours\s*$/ }).first().click();
+    const carte = page.locator('.gpx-map:visible');
+    await page.locator('.gpx-flybtn:visible').click();
+    await page.waitForTimeout(1200);
+    const pendant = await carte.evaluate((e) => e.offsetHeight);
+    const profilBas = await page.locator('.alt-profile:visible').evaluate((e) => e.getBoundingClientRect().bottom);
+    const barreHaut = await page.locator('.fiche-actions-m').evaluate((e) => e.getBoundingClientRect().top);
+    s.check('séance écran bas — la carte rétrécit pour que le profil tienne au-dessus de la barre d\'inscription', pendant < 400 && pendant >= 260 && profilBas <= barreHaut, `carte ${pendant} px, profil ${Math.round(profilBas)} / barre ${Math.round(barreHaut)}`);
+    await page.locator('.gpx-fly:visible').getByRole('button', { name: /arrêter le survol/i }).click();
+    await page.waitForTimeout(300);
+    s.check('séance écran bas — la carte retrouve sa hauteur à l\'arrêt', await carte.evaluate((e) => e.offsetHeight) === 400);
+    s.checkJs(page);
+    await ctx.close();
+  }
+
+  // Séance OpenRunner seule : pas de données, pas de survol. Contrôle positif : l'embed est là.
+  {
+    const { ctx, page } = await session(browser, 'vincent@demo.club', MOBILE);
+    await fiche(page, seanceOr);
+    await page.waitForTimeout(1500);
+    s.check('OpenRunner seul — la carte OpenRunner est rendue', await page.locator('iframe[src*="openrunner"]').count() > 0);
+    s.check('OpenRunner seul — pas de bouton « Survoler »', await page.locator('.gpx-flybtn').count() === 0);
+    await ctx.close();
+  }
+  tous.push(s.report());
+}
+
 await browser.close();
 const ok = tous.every(Boolean);
 console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES PARCOURS PASSENT' : '❌ AU MOINS UN PARCOURS ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);

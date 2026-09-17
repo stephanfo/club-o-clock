@@ -29,33 +29,11 @@
         {{-- ── Tracé GPX (OpenStreetMap, Leaflet) ── --}}
         @if ($hasGPX)
             <div class="route-stack" @if ($both) x-show="tab === 'gpx'" @endif>
-                {{-- lockable : même verrou que la carte du lieu (§4.13.4). Sans lui, une carte de
-                     400 px capture le scroll de la page sur mobile. --}}
-                <div wire:ignore x-data="gpxMap({ url: '{{ route('gpx-routes.gpx', $gpxRoute) }}', lockable: true })">
-                    <div x-ref="fsWrap" class="gpx-fswrap" x-show="!failed" style="position:relative">
-                        <div x-ref="map" class="gpx-map"></div>
-                        <button type="button" class="gpx-fsbtn" x-show="fsSupported" x-on:click="toggleFullscreen()"
-                                :aria-label="isFs ? 'Quitter le plein écran' : 'Afficher en plein écran'"
-                                :title="isFs ? 'Quitter le plein écran' : 'Plein écran'">
-                            <x-icon name="maximize" :size="16" x-show="!isFs" />
-                            <x-icon name="minimize" :size="16" x-show="isFs" x-cloak />
-                        </button>
-                        <button type="button" class="loc-map-veil" x-show="locked" x-on:click="toggleLock()"
-                                aria-label="Déverrouiller la carte">
-                            <span class="loc-map-veil-pill"><x-icon name="maximize" :size="15" /> Toucher pour interagir</span>
-                        </button>
-                        {{-- Décalé à gauche SEULEMENT si le bouton plein écran est là : sur iOS
-                             (fullscreen indisponible) il occupe seul le coin, sans trou à droite. --}}
-                        <button type="button" class="loc-map-lockbtn" :class="fsSupported && 'gpx-lockbtn'"
-                                x-show="!locked" x-cloak x-on:click="toggleLock()"
-                                aria-label="Verrouiller la carte"
-                                title="Verrouiller la carte"><x-icon name="lock" :size="15" /></button>
-                    </div>
-                    <div class="or-fallback" x-show="failed" x-cloak>
-                        <span class="of-ic"><x-icon name="route" :size="20" /></span>
-                        <div class="f1"><div style="font-weight:700;font-size:14px">Tracé indisponible</div><div class="meta" style="font-size:12.5px;margin-top:2px">Le fichier GPX reste téléchargeable ci-dessous.</div></div>
-                    </div>
-                </div>
+                <x-gpx-map :url="route('gpx-routes.gpx', $gpxRoute)" />
+
+                {{-- Même profil que la fiche parcours : le survol (#67) y pose son curseur. --}}
+                <x-alt-profile :profile="$gpxRoute->elevation_profile" :distance-km="$gpxRoute->distance_km"
+                               :label="'Profil altimétrique de ' . $gpxRoute->name" />
 
                 <div class="card card-pad">
                     <div class="route-metrics">

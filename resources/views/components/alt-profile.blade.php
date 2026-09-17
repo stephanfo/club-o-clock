@@ -123,6 +123,15 @@
                           stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
             </svg>
 
+            {{-- Curseur du survol animé (#67) : piloté par l'événement `gpx-flyover` qu'émet la carte
+                 (gpxMap). Le profil reste rendu serveur ; seul ce trait est client. Même repère que
+                 les graduations (km − $minX) / $spanX, donc le curseur tombe sous la bonne borne. --}}
+            @if ($spanX > 0)
+                <div class="alt-cursor" aria-hidden="true" x-data="{ pos: null }" x-cloak x-show="pos !== null"
+                     x-on:gpx-flyover.window="pos = $event.detail.active ? Math.min(Math.max(($event.detail.km - {{ $minX }}) / {{ $spanX }} * 100, 0), 100) : null"
+                     :style="pos !== null && `left:${pos}%`"></div>
+            @endif
+
             {{-- Réglette X : DANS le cadre (2026-08-02), sous le tracé, séparée par un filet. Hors du
                  SVG malgré tout, comme la gouttière Y : `preserveAspectRatio="none"` déformerait le
                  texte. Le cadre est agrandi d'autant pour que le tracé garde sa hauteur utile. --}}
