@@ -90,6 +90,10 @@ faire les autres.
 - [ ] **Ajouter à mon agenda** (onglet Infos d'une séance à venir) → un fichier `.ics` se télécharge ;
       l'ouvrir ajoute la séance à ton agenda (Google, Apple…) à la bonne heure et au bon lieu. Le bouton
       n'existe pas sur une séance annulée ou passée.
+- [ ] **Abonner mon agenda** (Profil → Notifs → Mon agenda) → « Créer mon adresse d'abonnement »,
+      puis « Ajouter à Google Agenda » ou « Ouvrir dans Apple Calendrier ». Tes inscriptions apparaissent
+      dans l'agenda (patience : jusqu'à 24 h chez Google). « Révoquer le lien » → l'agenda cesse de se
+      mettre à jour.
 
 ### 1.6 L'apéro 🍻
 - [ ] Sur une séance future où **tu participes** : un bouton **« J'offre l'apéro »** + un petit motif

@@ -20,8 +20,12 @@ class Ics
     /** « La veille au soir » : 20 h, heure du club, la veille du jour de la séance. */
     public const RAPPEL_VEILLE = 'veille';
 
-    /** @param list<string> $evenements VEVENT déjà construits par event() */
-    public static function calendar(array $evenements, ?string $nom = null): string
+    /**
+     * @param  list<string>  $evenements  VEVENT déjà construits par event()
+     * @param  string|null  $rafraichir  durée ISO 8601 suggérée aux clients abonnés (ex. PT1H) — Apple
+     *                                   l'honore, Google l'ignore
+     */
+    public static function calendar(array $evenements, ?string $nom = null, ?string $rafraichir = null): string
     {
         $lignes = [
             'BEGIN:VCALENDAR',
@@ -32,6 +36,9 @@ class Ics
         ];
         if ($nom !== null) {
             $lignes[] = 'X-WR-CALNAME:'.self::texte($nom);
+        }
+        if ($rafraichir !== null) {
+            array_push($lignes, 'REFRESH-INTERVAL;VALUE=DURATION:'.$rafraichir, 'X-PUBLISHED-TTL:'.$rafraichir);
         }
 
         $corps = implode("\r\n", array_map(self::plier(...), $lignes))."\r\n";
@@ -50,8 +57,9 @@ class Ics
      * TRANSP:TRANSPARENT (le créneau ne compte plus comme occupé). Jamais de rappel dessus.
      *
      * @param  int|string|null  $rappel  minutes avant le début, self::RAPPEL_VEILLE, ou null
+     * @param  bool  $provisoire  place en liste d'attente : STATUS:TENTATIVE
      */
-    public static function event(Session $session, User $pour, string $prefixe = '', int|string|null $rappel = null): string
+    public static function event(Session $session, User $pour, string $prefixe = '', int|string|null $rappel = null, bool $provisoire = false): string
     {
         $annulee = $session->isCancelled();
         $titre = ($annulee ? 'Annulé — ' : '').$prefixe.$session->title;
@@ -67,7 +75,7 @@ class Ics
             // Les clients ne remplacent un événement déjà importé que si SEQUENCE augmente.
             'SEQUENCE:'.$session->updated_at->timestamp,
             'SUMMARY:'.self::texte($titre),
-            'STATUS:'.($annulee ? 'CANCELLED' : 'CONFIRMED'),
+            'STATUS:'.($annulee ? 'CANCELLED' : ($provisoire ? 'TENTATIVE' : 'CONFIRMED')),
             'TRANSP:'.($annulee ? 'TRANSPARENT' : 'OPAQUE'),
         ];
 

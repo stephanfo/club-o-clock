@@ -943,6 +943,66 @@ async function ongletMobile(page, nom) {
   tous.push(s.report());
 }
 
+// ───────────────────────────────────────────────────────────────────
+// S30 — Abonnement agenda (#39, §4.21.2) : créer l'adresse depuis le profil, la copier, la lire
+//       comme le ferait un agenda, puis la révoquer. Restaure : lignes créées supprimées.
+// ───────────────────────────────────────────────────────────────────
+{
+  const email = 'marie@demo.club';
+  const uid = sql(`SELECT id FROM users WHERE email='${email}'`);
+  const repere = sql('SELECT IFNULL(MAX(id),0) v FROM calendar_feeds');
+  const actives = sql(`SELECT GROUP_CONCAT(id) FROM calendar_feeds WHERE user_id=${uid} AND revoked_at IS NULL`);
+  const s = new Scenario('S30 · Abonnement agenda depuis le profil');
+
+  try {
+    for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
+      sql(`UPDATE calendar_feeds SET revoked_at=NOW() WHERE user_id=${uid} AND revoked_at IS NULL`);
+      const { ctx, page } = await session(browser, email, viewport);
+      await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE });
+      page.on('dialog', (d) => d.accept());
+      await page.goto(`${BASE}/profil?tab=notifs`, { waitUntil: 'networkidle' });
+      const coque = page.locator(format === 'mobile' ? '.profil-mobile' : '.profil-desktop');
+
+      const creer = coque.getByRole('button', { name: /créer mon adresse/i });
+      s.check(`${format} — bouton de création visible sans adresse`, await creer.isVisible());
+      await creer.click();
+      const champ = coque.locator('#agenda-url');
+      await champ.waitFor();
+      const url = await champ.inputValue();
+      const enBase = sql(`SELECT token FROM calendar_feeds WHERE user_id=${uid} AND revoked_at IS NULL`);
+      s.check(`${format} — adresse créée en base et affichée`, enBase.length === 64 && url.endsWith(`/agenda/${enBase}.ics`), url);
+      s.check(`${format} — avertissement de latence affiché`, await coque.getByText(/jusqu'à 24 h chez Google/).isVisible());
+
+      await coque.getByRole('button', { name: /copier/i }).click();
+      await coque.getByText('Copiée').waitFor();
+      s.check(`${format} — l'URL est copiée`, await page.evaluate(() => navigator.clipboard.readText()) === url);
+
+      await coque.getByRole('button', { name: /la veille au soir/i }).click();
+      await page.waitForLoadState('networkidle');
+      s.check(`${format} — rappel enregistré`, sql(`SELECT reminder FROM calendar_feeds WHERE token='${enBase}'`) === 'veille');
+
+      await champ.scrollIntoViewIfNeeded();
+      await s.shot(page, `s30-abonnement-${format}`);
+
+      const anonyme = await browser.newContext(); // aucun cookie : ce que voit un robot d'agenda
+      const lu = await anonyme.request.get(url.replace(/^https?:\/\/[^/]+/, BASE));
+      s.check(`${format} — le flux se lit sans session`, lu.status() === 200 && (await lu.text()).startsWith('BEGIN:VCALENDAR'), String(lu.status()));
+
+      await coque.getByRole('button', { name: /révoquer le lien/i }).click();
+      await creer.waitFor();
+      const apres = await anonyme.request.get(url.replace(/^https?:\/\/[^/]+/, BASE));
+      await anonyme.close();
+      s.check(`${format} — adresse révoquée : 410`, apres.status() === 410, String(apres.status()));
+      s.checkJs(page);
+      await ctx.close();
+    }
+  } finally {
+    sql(`DELETE FROM calendar_feeds WHERE id > ${repere}`);
+    if (actives && actives !== 'NULL') sql(`UPDATE calendar_feeds SET revoked_at=NULL WHERE id IN (${actives})`);
+  }
+  tous.push(s.report());
+}
+
 await browser.close();
 const ok = tous.every(Boolean);
 console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES PARCOURS PASSENT' : '❌ AU MOINS UN PARCOURS ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);

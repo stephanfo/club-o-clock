@@ -115,6 +115,27 @@ CREATE TABLE `cache_locks` (
   KEY `cache_locks_expiration_index` (`expiration`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `calendar_feeds`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `calendar_feeds` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) unsigned NOT NULL,
+  `token` char(64) NOT NULL,
+  `include_waitlist` tinyint(1) NOT NULL DEFAULT 1,
+  `include_coaching` tinyint(1) NOT NULL DEFAULT 1,
+  `include_wards` tinyint(1) NOT NULL DEFAULT 1,
+  `reminder` varchar(10) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `last_used_at` timestamp NULL DEFAULT NULL,
+  `revoked_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `calendar_feeds_token_unique` (`token`),
+  KEY `calendar_feeds_user_id_revoked_at_index` (`user_id`,`revoked_at`),
+  CONSTRAINT `calendar_feeds_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `categories`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -816,5 +837,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (43,'2026_09_13_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (44,'2026_09_13_000010_add_external_staff_label_to_sessions',7);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (45,'2026_09_15_000000_add_quota_release_to_sessions',8);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (46,'2026_09_16_000000_add_dismissed_at_to_notification_outbox',9);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (47,'2026_09_17_000000_create_calendar_feeds_table',10);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

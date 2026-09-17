@@ -692,7 +692,10 @@ same-origin (un fichier refusé est corrompu ou exécutable déguisé) — plus 
 - **Un seul constructeur de VEVENT** pour le fichier ponctuel et le flux d'abonnement : une séance a le même rendu dans les deux.
 - **`UID` par (séance, personne)** — `seance-{id}-u{userId}@{hôte}` — pour qu'un coach dont l'enfant est inscrit à la même séance ait deux événements distincts. **`SEQUENCE` = horodatage de `updated_at`**, croissant à chaque modification, condition pour qu'un client remplace l'événement déjà connu.
 - **Séance annulée** : `STATUS:CANCELLED` n'est pas rendu de façon fiable (Google masque souvent l'événement d'un flux abonné) ; on cumule préfixe du titre, `STATUS:CANCELLED` et `TRANSP:TRANSPARENT`, sans `VALARM`.
-- Flux d'abonnement (lot 2) : jeton en clair sur une table dédiée (secret d'URL ré-affichable, même régime que les endpoints push ; la garde est la révocation), route publique sous `throttle`, `ETag`/`304`.
+- **Flux d'abonnement** : table `calendar_feeds`, jeton de 64 caractères **en clair** (secret d'URL ré-affichable pour un second appareil, même régime que les endpoints push ; la garde est la révocation). Régénérer révoque l'ancienne ligne et recopie les réglages ; les lignes révoquées restent pour répondre **410** plutôt que **404**. Compte désactivé, accès athlète suspendu ou anonymisé → **403**.
+- **Route publique** `GET /agenda/{jeton}.ics`, hors `auth`, sous `throttle:60,1`. `REFRESH-INTERVAL` et `X-PUBLISHED-TTL` à 1 h.
+- **Sans recalcul quand rien n'a changé** : le service réduit d'abord le flux à des entrées légères (séance, personne, préfixe, provisoire). Leur empreinte — avec `updated_at` de la séance et du lieu, les réglages et le jour courant — sert d'`ETag` ; le rendu iCalendar n'est produit que si elle diffère de `If-None-Match`. `last_used_at` s'écrit au plus une fois par heure, par requête directe pour ne pas bouger `updated_at`.
+- **Dédoublonnage** : une séance encadrée où le coach est aussi inscrit ne sort qu'une fois, en « Coach — » (même `UID`).
 
 ## 8. Tensions mutualisé ↔ PRD et compromis
 

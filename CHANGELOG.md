@@ -12,8 +12,14 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 - **On peut ajouter une séance à son agenda perso.** Sur la fiche d'une séance à venir, « Ajouter à
   mon agenda » télécharge un fichier `.ics` que Google Agenda, Apple Calendrier ou Outlook importent :
   titre, horaire, lieu et lien vers la fiche, sans le nom d'aucun inscrit. C'est une copie : un
-  changement d'horaire ou une annulation ne la met pas à jour, et la fiche le dit. L'abonnement
-  tenu à jour suivra (#39).
+  changement d'horaire ou une annulation ne la met pas à jour, et la fiche le dit (#39).
+
+- **On peut abonner son agenda à ses séances.** Profil → Notifs → « Mon agenda » crée une adresse
+  personnelle que Google Agenda, Apple Calendrier ou Outlook relisent d'eux-mêmes : inscriptions,
+  et au choix places en liste d'attente, séances encadrées et séances des enfants. Une séance annulée
+  y reste marquée « Annulé — ». Rappel réglable (aucun, 1 h, 2 h, la veille au soir), honoré par Apple
+  mais pas par Google. L'adresse se révoque ou se régénère à tout moment ; l'écran prévient que Google
+  peut mettre jusqu'à 24 h à se mettre à jour (#39).
 
 - **On peut survoler un parcours GPX.** Un tracé statique dit mal par où on passe (sens, portions
   qui se croisent, aller-retour) et où tombent les montées. Sur la fiche séance comme sur la fiche
