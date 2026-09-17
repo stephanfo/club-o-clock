@@ -907,6 +907,7 @@ ne recevra.
 - **Affectation via `defaultCoachIds[]` à la génération en lot d'un `SessionTemplate`** : **notif récapitulative unique par coach** (cf. §4.8 — évite le spam).
 - **Accès athlète suspendu** : **pas d'email ni de push** à la suspension de masse → **bannière in-app persistante** à la prochaine connexion (cf. §4.4).
 - **Accès athlète réactivé** : **email** à l'utilisateur réactivé individuellement.
+- **Nouveau parent garant** : push + email au **garant entrant** quand un admin rattache un mineur à un garant ou change son garant, et au **pupille** s'il a un compte propre (P2). Le garant sortant reçoit la rupture (§4.2.2), pas cette notification. Informative, hors matrice §4.15.3.
 
 **Pas de rappel temporel automatique avant événement en V1** (J-1, H-2, J-7 etc.), toutes `kind` confondues.
 

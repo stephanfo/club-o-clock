@@ -60,8 +60,8 @@ class TutelleChangementGarantTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['action' => 'guardianship_linked', 'target_id' => $pupille->id]);
     }
 
-    /** Le garant sortant est prévenu ; le pupille, lui, n'a rien perdu. */
-    public function test_seul_le_garant_sortant_est_notifie(): void
+    /** Le garant sortant apprend la rupture ; le pupille, lui, n'a rien perdu (#29 : il apprend le rattachement). */
+    public function test_seul_le_garant_sortant_recoit_la_rupture(): void
     {
         [$sortant, $pupille, $admin] = $this->famille('leo@example.test');
         $entrant = User::factory()->create();
@@ -72,7 +72,8 @@ class TutelleChangementGarantTest extends TestCase
             ->where('user_id', $sortant->id)->count());
         $this->assertSame(0, NotificationOutbox::where('type', 'guardianship_severed')
             ->where('user_id', $pupille->id)->count(), 'Le pupille garde un garant : « rompu » serait faux.');
-        $this->assertSame(0, NotificationOutbox::where('user_id', $entrant->id)->count());
+        $this->assertSame(0, NotificationOutbox::where('type', 'guardianship_severed')
+            ->where('user_id', $entrant->id)->count());
     }
 
     /** Le sujet est posé à la main : un garant de plusieurs enfants doit savoir lequel. */

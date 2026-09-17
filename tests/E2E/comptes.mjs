@@ -256,6 +256,8 @@ const tous = [];
     Number(sql(`SELECT COUNT(*) FROM notification_outbox WHERE user_id=${garantOrigine} AND type='guardianship_severed'`)) > 0);
   s.check('le pupille, lui, n\'est pas prévenu d\'une rupture qu\'il ne subit pas',
     sql(`SELECT COUNT(*) FROM notification_outbox WHERE user_id=${pupille} AND type='guardianship_severed'`) === '0');
+  s.check('le garant entrant est prévenu du rattachement (#29)',
+    Number(sql(`SELECT COUNT(*) FROM notification_outbox WHERE user_id=${entrant} AND type='guardianship_linked'`)) > 0);
   await s.shot(page, 's22-changement-garant-apres');
 
   // Restauration : le lien d'origine ET son horodatage, puis les journaux et la file d'envoi.
@@ -268,6 +270,69 @@ const tous = [];
     sql(`SELECT guardianship_linked_at FROM users WHERE id=${pupille}`) === lieOrigine, lieOrigine);
   s.check('état restauré (journaux et file d\'envoi)',
     sql(`SELECT COUNT(*) FROM audit_logs WHERE target_id=${pupille} AND action='guardianship_linked'`) === '0');
+  s.checkJs(page);
+
+  await ctx.close();
+  tous.push(s.report());
+}
+
+// ── S23 · Rattachement d'un mineur sans garant, avec accusé de réception (#29) ───────
+// Le rattachement prévient le garant sans pouvoir se dédire : il passe par le dialog niveau 3. Le
+// jeu de démo n'a pas d'orphelin de tutelle : on en fabrique un en détachant un pupille P1, qu'on
+// rattache ensuite à son garant d'origine depuis la fiche — et on restaure l'horodatage.
+{
+  const s = new Scenario('S23 · Rattachement à un garant avec accusé de réception');
+  const journaux = repereJournaux();
+
+  const pupille = sql(`SELECT id FROM users
+      WHERE guardian_id IS NOT NULL AND email IS NULL AND anonymized_at IS NULL
+        AND dob > DATE_SUB(CURDATE(), INTERVAL 18 YEAR)
+      ORDER BY id LIMIT 1`);
+  const garant = sql(`SELECT guardian_id FROM users WHERE id=${pupille}`);
+  const lieOrigine = sql(`SELECT guardianship_linked_at FROM users WHERE id=${pupille}`);
+  s.check('prérequis : un pupille P1 et son garant', pupille !== '' && garant !== '', `pupille=${pupille}`);
+  sql(`UPDATE users SET guardian_id=NULL, guardianship_linked_at=NULL WHERE id=${pupille}`);
+
+  const { ctx, page } = await session(browser, 'admin@demo.club', DESKTOP);
+  await page.goto(`${BASE}/admin/adherents/${pupille}`, { waitUntil: 'networkidle' });
+
+  await page.locator('select[wire\\:model="linkGuardianId"]').selectOption(garant);
+  await page.getByRole('button', { name: /Lier ce garant/i }).click();
+  await page.waitForTimeout(700);
+
+  const dlg = page.locator('.dialog, [role="dialog"]').first();
+  const dlgVisible = await dlg.isVisible().catch(() => false);
+  s.check('le bouton ouvre la confirmation au lieu de rattacher', dlgVisible &&
+    sql(`SELECT COALESCE(guardian_id, 0) FROM users WHERE id=${pupille}`) === '0');
+  if (dlgVisible) {
+    const t = (await dlg.innerText()).replace(/\s+/g, ' ');
+    s.check('l\'accusé nomme le garant prévenu', /sera prévenu·e du rattachement/i.test(t), t.slice(0, 160));
+    await s.shot(page, 's23-rattachement-dialog');
+
+    s.check('bouton non armé tant que la case n\'est pas cochée',
+      await dlg.locator('button[wire\\:click="linkGuardian"]').count() === 0);
+    await dlg.locator('[wire\\:click="$toggle(\'linkCheck\')"]').first().click();
+    await page.waitForTimeout(600);
+    s.check('la case cochée arme le bouton',
+      await dlg.locator('button[wire\\:click="linkGuardian"]').count() === 1);
+
+    await dlg.locator('button[wire\\:click="linkGuardian"]').first().click();
+    await page.waitForTimeout(1200);
+  }
+
+  s.check('le pupille est rattaché', sql(`SELECT guardian_id FROM users WHERE id=${pupille}`) === garant);
+  s.check('le garant est prévenu',
+    Number(sql(`SELECT COUNT(*) FROM notification_outbox WHERE user_id=${garant} AND type='guardianship_linked'`)) > 0);
+  await s.shot(page, 's23-rattachement-apres');
+
+  const lieSql = lieOrigine === '' ? 'NULL' : `'${lieOrigine}'`;
+  sql(`UPDATE users SET guardian_id=${garant}, guardianship_linked_at=${lieSql} WHERE id=${pupille}`);
+  purgeJournaux(journaux);
+  s.check('état restauré (lien et horodatage)',
+    sql(`SELECT guardian_id FROM users WHERE id=${pupille}`) === garant &&
+    sql(`SELECT guardianship_linked_at FROM users WHERE id=${pupille}`) === lieOrigine);
+  s.check('état restauré (journaux et file d\'envoi)',
+    sql(`SELECT COUNT(*) FROM notification_outbox WHERE user_id=${garant} AND type='guardianship_linked'`) === '0');
   s.checkJs(page);
 
   await ctx.close();
