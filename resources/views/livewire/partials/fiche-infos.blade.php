@@ -84,6 +84,21 @@
     </div>
 @endif
 
+{{-- Ajout ponctuel à l'agenda perso (#39, §4.21) — même facture que l'album photos. Pas de
+     wire:navigate : c'est un téléchargement. Masqué quand il n'y a plus rien à planifier. --}}
+@unless ($session->isCancelled() || $session->hasEnded())
+    <div>
+        <div class="card card-pad">
+            <a class="btn btn-ghost btn-block" href="{{ route('sessions.ics', $session) }}">
+                <x-icon name="calendar" :size="16" style="flex:0 0 auto" />
+                <span class="f1" style="text-align:left">Ajouter à mon agenda</span>
+                <x-icon name="download" :size="15" style="color:var(--fg-muted);flex:0 0 auto" />
+            </a>
+            <div class="meta" style="font-size:12px;margin-top:8px">Copie de la séance à cet instant : un changement d'horaire ou une annulation ne la mettra pas à jour.</div>
+        </div>
+    </div>
+@endunless
+
 {{-- Météo prévisionnelle (§4.13.5) — masquée pour les séances passées/annulées, et sur desktop
      (colonne droite) quand $noWeather=true (météo déjà rendue dans fiche-side). --}}
 @if (($weatherState ?? 'none') !== 'none' && !($noWeather ?? false))

@@ -87,6 +87,9 @@ faire les autres.
 - [ ] **Météo** : sur une séance à venir (moins de 16 jours) avec un vrai lieu → une **prévision
       météo**. Au-delà → « trop loin ».
 - [ ] Sur la séance **annulée**, un bandeau « Séance annulée » et aucune action possible.
+- [ ] **Ajouter à mon agenda** (onglet Infos d'une séance à venir) → un fichier `.ics` se télécharge ;
+      l'ouvrir ajoute la séance à ton agenda (Google, Apple…) à la bonne heure et au bon lieu. Le bouton
+      n'existe pas sur une séance annulée ou passée.
 
 ### 1.6 L'apéro 🍻
 - [ ] Sur une séance future où **tu participes** : un bouton **« J'offre l'apéro »** + un petit motif

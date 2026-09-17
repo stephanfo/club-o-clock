@@ -79,6 +79,7 @@ Remplacer le tableur Google Sheets actuel par une **PWA** qui offre aux adhéren
 - Paramètres club (identité, fuseau, catalogues, lien d'invitation, bascule de saison).
 - Deux journaux séparés : `AuditLog` (gouvernance) et `ActivityLog` (opérationnel), accès admin uniquement.
 - Pages d'information (notes club) éditables par l'admin, avec visibilité par niveau de rôle et épinglage en bannière d'accueil (ajout post-cadrage, cf. §4.19).
+- Export des séances vers l'agenda personnel : ajout ponctuel d'une séance et abonnement tenu à jour (ajout post-cadrage, cf. §4.21).
 
 ### 3.2 Hors V1 (V2+)
 - Cotisations / paiements en ligne.
@@ -1111,6 +1112,38 @@ Un parcours GPX cesse d'être un attribut jetable de séance (§4.13.2) pour dev
 - **Fiche parcours** : tracé sur fond OpenStreetMap, profil altimétrique, métriques, **séances qui l'utilisent**, téléchargement du GPX.
 - **Cycle de vie** : **archivage soft** (le parcours sort de la liste, ses séances passées restent intactes et consultables) puis suppression dure. Un parcours **utilisé par au moins une séance ne peut pas être supprimé** — seulement archivé. L'archivage **ne détruit pas le fichier** : restaurer un parcours le rend pleinement fonctionnel.
 - **Retirer un parcours d'une séance** ne fait que rompre la référence : le parcours et son fichier restent dans la bibliothèque. Le remplacement d'un parcours par un autre sur une séance est un **changement structurant** (§4.9) et suit le régime de notification des inscrits.
+
+### 4.21 Export vers l'agenda personnel
+
+> **Ajout de périmètre post-cadrage** (2026-09-17, #39). Demande d'athlète : retrouver dans son agenda perso (Google en premier lieu) les séances auxquelles il est inscrit.
+
+Deux gestes distincts, livrés séparément.
+
+#### 4.21.1 Ajout ponctuel d'une séance
+
+- Sur la fiche d'une séance **à venir et non annulée**, tout membre connecté peut télécharger la séance au format agenda standard (iCalendar), importable dans Google Agenda, Apple Calendrier, Outlook.
+- Contenu : titre, début et fin, lieu (nom et adresse), lien vers la fiche. **Aucun nom de tiers**, aucune liste d'inscrits, aucun contenu de séance : l'événement peut finir dans un agenda partagé.
+- C'est une **copie figée** : un report ou une annulation ne la met pas à jour. L'écran le dit à côté du bouton.
+
+#### 4.21.2 Abonnement personnel
+
+- Chaque adhérent peut créer, depuis son profil, une **adresse d'abonnement personnelle** que son agenda relit périodiquement. Aucune adresse n'existe tant qu'il ne l'a pas demandée ; elle est **révocable et régénérable** à tout moment (confirmation simple). Accès athlète suspendu, compte supprimé ou anonymisé → flux fermé. Adresse inconnue → introuvable ; révoquée → explicitement disparue.
+- **Contenu**, réuni dans un seul flux, fenêtre de 60 jours passés à 365 jours à venir :
+
+  | Source | Rendu | Réglage |
+  |---|---|---|
+  | Mes inscriptions actives | événement confirmé | toujours inclus |
+  | Mes places en liste d'attente | provisoire, titre préfixé « ⏳ Liste d'attente — » | case, cochée par défaut |
+  | Les séances que j'encadre (coach) | titre préfixé « Coach — » | case affichée aux coachs, cochée par défaut |
+  | Les séances de mes enfants (parent garant) | titre préfixé du prénom de l'enfant | case affichée aux garants, tous les enfants ou aucun, cochée par défaut |
+
+  Les réglages sont conservés côté serveur : changer d'avis ne demande pas de se réabonner.
+- **Séance annulée** : elle **reste** dans le flux (l'annulation est réversible), titre préfixé « Annulé — », statut annulé, créneau marqué libre. Une séance supprimée définitivement (§3.1) en sort.
+- **Rappel** réglable dans le profil : aucun, 1 h avant, 2 h avant, la veille au soir. Jamais de rappel sur une séance annulée. L'écran précise que seuls certains agendas honorent un rappel sur un calendrier abonné (Apple oui, Google non).
+- **Limite assumée, écrite à l'écran** : un agenda abonné se met à jour avec retard (jusqu'à 24 h chez Google). **L'agenda n'est pas un canal d'alerte** ; les notifications (§4.15) le restent.
+- Minimisation identique à §4.21.1.
+- **Exigences non-fonctionnelles** : le flux est borné dans le temps et se sert sans recalcul quand rien n'a changé ; l'adresse est un secret non devinable.
+- **Hors périmètre** : synchronisation bidirectionnelle, invitations par email, ajout automatique à l'inscription, un calendrier distinct par enfant, rappel envoyé par l'app.
 
 ---
 
