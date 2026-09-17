@@ -134,6 +134,8 @@ class GuardianLifecycleTest extends TestCase
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $minor])
             ->assertSee('sans parent garant')
             ->set('linkGuardianId', $adult->id)
+            ->call('openLink', 'guardian')
+            ->set('linkCheck', true)
             ->call('linkGuardian');
 
         $this->assertSame($adult->id, $minor->fresh()->guardian_id);
@@ -164,6 +166,8 @@ class GuardianLifecycleTest extends TestCase
             ->assertSee('Ajouter un pupille')
             ->set('addingWard', true)
             ->set('linkWardId', $minor->id)
+            ->call('openLink', 'ward')
+            ->set('linkCheck', true)
             ->call('linkWard')
             ->assertHasNoErrors()
             ->assertSet('addingWard', false);
@@ -183,6 +187,8 @@ class GuardianLifecycleTest extends TestCase
         Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $guardian])
             ->set('addingWard', true)
             ->set('linkWardId', $ward->id)
+            ->call('openLink', 'ward')
+            ->set('linkCheck', true)
             ->call('linkWard')
             ->assertHasNoErrors();
 

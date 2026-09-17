@@ -77,6 +77,10 @@ class NotificationRenderer
             return $this->reactivationBody($payload);
         }
 
+        if ($type === NotificationType::GuardianshipLinked) {
+            return $this->linkedBody($payload, $subjectId);
+        }
+
         if (isset($payload['session_title'])) {
             $quand = $this->formatDate($payload['session_start_at'] ?? null);
 
@@ -94,6 +98,26 @@ class NotificationRenderer
         }
 
         return $type->description();
+    }
+
+    /**
+     * Rattachement de tutelle (#29) : deux lecteurs, deux phrases. Le garant entrant lit le prénom
+     * de l'enfant (le titre le porte déjà, le corps dit ce qu'il y gagne) ; le pupille lit le nom de
+     * son nouveau garant — c'est précisément ce qu'il ignore. Replis sans nom : vague plutôt que faux.
+     *
+     * @param  array<string,mixed>  $payload
+     */
+    private function linkedBody(array $payload, ?int $subjectId): string
+    {
+        if ($subjectId !== null) {
+            $prenom = $payload['subject_first_name'] ?? null;
+
+            return $prenom === null ? 'Tu es désormais parent garant d\'un enfant du club' : 'Tu es désormais parent garant de '.$prenom;
+        }
+
+        $garant = $payload['guardian_name'] ?? null;
+
+        return $garant === null ? NotificationType::GuardianshipLinked->description() : 'Ton parent garant est désormais '.$garant;
     }
 
     /**
@@ -201,6 +225,10 @@ class NotificationRenderer
             // garant — le lien vient d'être coupé, l'enfant n'y figure plus, et l'écran serait au
             // mieux déroutant, au pire vide.
             NotificationType::GuardianshipSevered => route('profil'),
+
+            // Rattachement : le garant va voir l'enfant qui vient d'apparaître dans « Mes enfants » ;
+            // le pupille, son profil, où figure son garant.
+            NotificationType::GuardianshipLinked => $subjectId !== null ? route('children') : route('profil'),
 
             // Réactivation d'accès (§4.4) : lue par le garant d'un mineur, elle parle de l'enfant.
             // L'envoyer sur le dashboard du parent ne lui montrait rien de ce qui a changé.

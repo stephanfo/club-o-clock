@@ -17,6 +17,12 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   la fiche séance affiche désormais elle aussi. Rien ne démarre tout seul, et la carte n'a pas besoin
   d'être déverrouillée. Au téléphone, la page se cale d'elle-même pour que carte, commandes et profil
   tiennent ensemble à l'écran, sans masquer le bouton d'inscription.
+- **Un nouveau parent garant est prévenu.** Quand l'admin rattache un mineur à un garant ou lui en
+  change, le garant entrant reçoit « Nouveau parent garant » (push et email), qui nomme l'enfant et
+  ouvre « Mes enfants ». L'enfant qui a son propre compte est prévenu aussi, avec le nom de son
+  nouveau garant. Jusqu'ici, seul le garant sortant l'était. Comme ces envois ne se rattrapent pas,
+  « Lier ce garant » et « Rattacher » demandent désormais une confirmation avec case à cocher, qui
+  nomme les personnes prévenues.
 
 - **Une séance peut avoir sa propre adresse, avec carte et météo.** Une compétition ou un événement
   club se tient souvent dans un endroit qui ne reviendra pas. Le seul moyen de le renseigner était un

@@ -25,6 +25,7 @@ enum NotificationType: string
     case MemberInvitation = 'member_invitation';
     case GuardianshipInvitation = 'guardianship_invitation';
     case GuardianshipSevered = 'guardianship_severed';
+    case GuardianshipLinked = 'guardianship_linked';
 
     /** Libellé FR affiché dans la matrice de préférences (§4.15.3) et l'écran outbox (§4.15.6). */
     public function label(): string
@@ -46,6 +47,7 @@ enum NotificationType: string
             self::MemberInvitation => 'Invitation à rejoindre le club',
             self::GuardianshipInvitation => 'Invitation à créer ton compte',
             self::GuardianshipSevered => 'Lien de tutelle rompu',
+            self::GuardianshipLinked => 'Nouveau parent garant',
         };
     }
 
@@ -110,6 +112,7 @@ enum NotificationType: string
             self::MemberInvitation => 'Ton compte est ouvert : active-le via le lien reçu',
             self::GuardianshipInvitation => 'Un compte autonome t\'est ouvert : active-le via le lien reçu',
             self::GuardianshipSevered => 'Le lien de tutelle a été rompu',
+            self::GuardianshipLinked => 'Un parent garant t\'est rattaché',
         };
     }
 
@@ -117,7 +120,7 @@ enum NotificationType: string
      * Groupes de la matrice de préférences (§4.15.3), dans l'ordre d'affichage. Chaque groupe
      * porte les types qu'un utilisateur peut moduler ; `coachOnly` masque le groupe aux non-coachs.
      * Hors matrice (notifs transactionnelles, toujours émises) : `athlete_reactivated`,
-     * `member_invitation`, `guardianship_invitation` et `guardianship_severed`.
+     * `member_invitation`, `guardianship_invitation`, `guardianship_severed` et `guardianship_linked`.
      *
      * @return list<array{label:string,coachOnly:bool,types:list<self>}>
      */

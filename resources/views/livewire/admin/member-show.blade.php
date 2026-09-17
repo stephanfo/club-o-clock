@@ -185,7 +185,8 @@
                                     @endforeach
                                 </select>
                                 @error('linkGuardianId')<div class="meta" style="margin-top:6px;color:var(--danger)">{{ $message }}</div>@enderror
-                                <button type="button" class="btn btn-primary btn-block" style="margin-top:10px" wire:click="linkGuardian">
+                                <button type="button" class="btn btn-primary btn-block" style="margin-top:10px" wire:click="openLink('guardian')"
+                                        wire:loading.attr="disabled" wire:target="openLink">
                                     <x-icon name="shield" :size="15" /> Lier ce garant
                                 </button>
                             </div>
@@ -233,7 +234,7 @@
                                             </select>
                                             @error('linkWardId')<div class="meta" style="margin-top:6px;color:var(--danger)">{{ $message }}</div>@enderror
                                             <div class="flex g8" style="margin-top:10px">
-                                                <button type="button" class="btn btn-primary btn-sm" wire:click="linkWard"><x-icon name="check" :size="14" /> Rattacher</button>
+                                                <button type="button" class="btn btn-primary btn-sm" wire:click="openLink('ward')" wire:loading.attr="disabled" wire:target="openLink"><x-icon name="check" :size="14" /> Rattacher</button>
                                                 <button type="button" class="btn btn-ghost btn-sm" wire:click="$set('addingWard', false)">Annuler</button>
                                             </div>
                                         </div>
@@ -608,6 +609,36 @@
         </x-dialog>
     @endif
 
+    {{-- ── Dialog « Rattacher » (§4.2, #29) — niveau 3 : le rattachement prévient le garant, et
+         l'enfant s'il a son compte, sans pouvoir se dédire. Même dialog depuis les deux fiches
+         (mineur ou adulte) ; pas `danger` : le geste ouvre une tutelle, il n'en détruit aucune. --}}
+    @if ($linkDialog && ($pair = $this->linkPair()))
+        @php [$lienPupille, $lienGarant] = $pair; @endphp
+        <x-dialog title="Rattacher à un garant" sub="{{ $lienPupille->first_name }} passe sous la tutelle de {{ $lienGarant->fullName() }}." :width="460" close="cancelLink">
+            <div style="display:flex;flex-direction:column;gap:12px">
+                <x-conseq-row icon="shield" label="{{ $lienGarant->fullName() }} obtient l'accès">
+                    Notifications, historique et inscriptions de {{ $lienPupille->first_name }}, en son nom.
+                </x-conseq-row>
+                <x-conseq-row icon="send" label="{{ $lienPupille->email ? 'Les deux comptes sont prévenus' : 'Le garant est prévenu' }}" tone="warn">
+                    L'envoi part immédiatement et ne se rattrape pas. Le geste est tracé.
+                </x-conseq-row>
+            </div>
+            {{-- Accusé de réception CHIFFRANT la conséquence : il nomme les personnes prévenues.
+                 Toggle sur la rangée et sur le x-check (vrai <button>), `.stop` contre la re-bascule. --}}
+            <div class="flex ac g10" style="margin-top:14px;font-size:14px;cursor:pointer" wire:click="$toggle('linkCheck')">
+                <x-check :on="$linkCheck" wire:click.stop="$toggle('linkCheck')" aria-labelledby="txt-rattacher" />
+                <span id="txt-rattacher">Je comprends que {{ $lienPupille->email ? $lienGarant->first_name.' et '.$lienPupille->first_name.' seront prévenu·e·s' : $lienGarant->first_name.' sera prévenu·e' }} du rattachement.</span>
+            </div>
+            @php $lienAction = $linkDialog === 'guardian' ? 'linkGuardian' : 'linkWard'; @endphp
+            <x-slot:footer>
+                <button type="button" class="btn btn-ghost" wire:click="cancelLink">Annuler</button>
+                <button type="button" class="btn btn-primary{{ $linkCheck ? '' : ' is-disabled' }}"
+                        @if ($linkCheck) wire:click="{{ $lienAction }}" @endif
+                        wire:loading.attr="disabled" wire:target="{{ $lienAction }}"><x-icon name="shield" :size="14" /> Rattacher</button>
+            </x-slot:footer>
+        </x-dialog>
+    @endif
+
     {{-- ── Modale : changement de garant (§4.2) — confirmation forte ── --}}
     {{-- ── Dialog « Rompre la tutelle » (P2→P3, §4.2.2) ──
          Niveau 3 de confirmation : le geste notifie le pupille ET le garant, et l'envoi ne se dédit
@@ -667,7 +698,7 @@
                  `.stop` empêche le clic de remonter à la rangée et de re-basculer. --}}
             <div class="flex ac g10" style="margin-top:14px;font-size:14px;cursor:pointer" wire:click="$toggle('relinkCheck')">
                 <x-check :on="$relinkCheck" wire:click.stop="$toggle('relinkCheck')" aria-labelledby="txt-changer-garant" />
-                <span id="txt-changer-garant">Je comprends que {{ $u->guardian?->first_name }} sera prévenu·e de la rupture et perdra l'accès au compte de {{ $u->first_name }}.</span>
+                <span id="txt-changer-garant">Je comprends que {{ $u->guardian?->first_name }} sera prévenu·e de la rupture et perdra l'accès au compte de {{ $u->first_name }}, et que {{ $u->email ? 'le nouveau garant et '.$u->first_name.' seront prévenu·e·s' : 'le nouveau garant sera prévenu·e' }} du rattachement.</span>
             </div>
             <x-slot:footer>
                 <button type="button" class="btn btn-ghost" wire:click="cancelRelink">Annuler</button>

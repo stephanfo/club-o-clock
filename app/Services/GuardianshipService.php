@@ -218,6 +218,8 @@ class GuardianshipService
             ]);
             ActivityLogger::record('guardianship_linked', $actor, ['user_id' => $ward->id]);
         });
+
+        $this->notifyLinked($ward, $guardian);
     }
 
     /**
@@ -290,16 +292,41 @@ class GuardianshipService
             ActivityLogger::record('guardianship_linked', $actor, ['user_id' => $ward->id]);
         });
 
-        // Seul le garant SORTANT est notifié, et par la notification qui dit exactement ce qui lui
-        // arrive : son lien est rompu. Le pupille, lui, n'a rien perdu — lui envoyer « Lien de
-        // tutelle rompu » serait faux ; et le garant entrant vient d'être désigné par l'admin, qui
-        // le voit apparaître dans « Mes enfants ». Dire proprement « ton garant a changé » demande
-        // un type de notification qui n'existe pas encore ; le jour où il existera, c'est ici.
+        // Le garant SORTANT reçoit la notification qui dit exactement ce qui lui arrive : son lien est
+        // rompu. Le pupille, lui, n'a rien perdu — « Lien de tutelle rompu » serait faux : il apprend
+        // le changement par le rattachement, comme le garant entrant (#29).
         if ($formerGuardian !== null) {
             $this->notifier->dispatchTo(NotificationType::GuardianshipSevered, $formerGuardian, [
                 'ward_id' => $ward->id,
                 'subject_id' => $ward->id,
                 'subject_first_name' => $ward->first_name,
+            ]);
+        }
+
+        $this->notifyLinked($ward, $newGuardian);
+    }
+
+    /**
+     * guardianship_linked (#29), commun au rattachement et au changement de garant. Le garant entrant
+     * acquiert l'accès aux données d'un mineur et le droit d'agir en son nom : il doit l'apprendre
+     * autrement qu'en le découvrant à l'écran. Le pupille est prévenu s'il a un compte propre (P2) ;
+     * en P1 il n'a aucun canal, et c'est justement son garant qui reçoit tout.
+     *
+     * Adressage explicite (dispatchTo) : le routage parent/enfant enverrait la copie du pupille P2 à
+     * son garant, qui reçoit déjà la sienne.
+     */
+    private function notifyLinked(User $ward, User $guardian): void
+    {
+        $this->notifier->dispatchTo(NotificationType::GuardianshipLinked, $guardian, [
+            'ward_id' => $ward->id,
+            'subject_id' => $ward->id,
+            'subject_first_name' => $ward->first_name,
+        ]);
+
+        if ($ward->email !== null) {
+            $this->notifier->dispatchTo(NotificationType::GuardianshipLinked, $ward, [
+                'ward_id' => $ward->id,
+                'guardian_name' => $guardian->fullName(),
             ]);
         }
     }

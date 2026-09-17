@@ -366,9 +366,80 @@ class MemberShow extends Component
     /** Garant sélectionné pour rattacher un mineur sans tutelle (geste de rattrapage admin). */
     public ?int $linkGuardianId = null;
 
-    /** Rattache ce mineur sans garant à un adulte actif (GuardianshipService::link, AuditLog). */
+    /**
+     * Dialog de rattachement ouvert, et depuis quelle fiche : 'guardian' (fiche du mineur, on choisit
+     * son garant) ou 'ward' (fiche de l'adulte, on choisit l'enfant). Null quand il est fermé.
+     */
+    public ?string $linkDialog = null;
+
+    /** Accusé de réception : le rattachement prévient le garant (et l'enfant P2) sans se dédire (#29). */
+    public bool $linkCheck = false;
+
+    /**
+     * Ouvre la confirmation du rattachement une fois le choix fait. La case repart à zéro à CHAQUE
+     * ouverture — jamais pré-cochée.
+     */
+    public function openLink(string $sens): void
+    {
+        $this->resetErrorBag();
+        $this->linkCheck = false;
+
+        if (! in_array($sens, ['guardian', 'ward'], true)) {
+            return;
+        }
+
+        if ($this->linkPair($sens) === null) {
+            $sens === 'guardian'
+                ? $this->addError('linkGuardianId', 'Choisis un garant.')
+                : $this->addError('linkWardId', 'Choisis un enfant à rattacher.');
+
+            return;
+        }
+
+        $this->linkDialog = $sens;
+    }
+
+    public function cancelLink(): void
+    {
+        $this->linkDialog = null;
+        $this->linkCheck = false;
+    }
+
+    /**
+     * Couple [pupille, garant] du rattachement en cours, selon la fiche d'où il part. Null tant que
+     * le choix n'est pas fait.
+     *
+     * @return array{0: User, 1: User}|null
+     */
+    public function linkPair(?string $sens = null): ?array
+    {
+        $sens ??= $this->linkDialog;
+
+        $autre = match ($sens) {
+            'guardian' => $this->linkGuardianId ? User::find($this->linkGuardianId) : null,
+            'ward' => $this->linkWardId ? User::find($this->linkWardId) : null,
+            default => null,
+        };
+
+        if ($autre === null) {
+            return null;
+        }
+
+        return $sens === 'guardian' ? [$this->user, $autre] : [$autre, $this->user];
+    }
+
+    /**
+     * Rattache ce mineur sans garant à un adulte actif (GuardianshipService::link, AuditLog).
+     *
+     * L'accusé de réception est gardé ICI, pas seulement par le bouton grisé : l'état vient du
+     * client, et le rattachement prévient des tiers sans pouvoir se dédire.
+     */
     public function linkGuardian(GuardianshipService $service): void
     {
+        if ($this->linkDialog !== 'guardian' || ! $this->linkCheck) {
+            return;
+        }
+
         $guardian = User::find($this->linkGuardianId);
         if (! $guardian) {
             $this->addError('linkGuardianId', 'Choisis un garant.');
@@ -383,6 +454,8 @@ class MemberShow extends Component
             session()->flash('status', 'Garant rattaché — '.$guardian->fullName().' gère désormais la tutelle.');
         } catch (RuntimeException $e) {
             $this->addError('linkGuardianId', $e->getMessage());
+        } finally {
+            $this->cancelLink();
         }
     }
 
@@ -393,7 +466,7 @@ class MemberShow extends Component
 
     public bool $relinkDialog = false;
 
-    /** Accusé de réception : le garant sortant est prévenu, et l'envoi ne se dédit pas. */
+    /** Accusé de réception : les garants sortant et entrant sont prévenus, et l'envoi ne se dédit pas. */
     public bool $relinkCheck = false;
 
     /** Ouvre le dialog. La case repart à zéro à CHAQUE ouverture — jamais pré-cochée (§4.17). */
@@ -452,6 +525,10 @@ class MemberShow extends Component
     /** Rattache un mineur sans garant à cet adhérent (miroir de linkGuardian, vu depuis le parent). */
     public function linkWard(GuardianshipService $service): void
     {
+        if ($this->linkDialog !== 'ward' || ! $this->linkCheck) {
+            return;
+        }
+
         $ward = User::find($this->linkWardId);
         if (! $ward) {
             $this->addError('linkWardId', 'Choisis un enfant à rattacher.');
@@ -467,6 +544,8 @@ class MemberShow extends Component
             session()->flash('status', 'Pupille rattaché — '.$this->user->fullName().' gère désormais la tutelle de '.$ward->fullName().'.');
         } catch (RuntimeException $e) {
             $this->addError('linkWardId', $e->getMessage());
+        } finally {
+            $this->cancelLink();
         }
     }
 
