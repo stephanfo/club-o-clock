@@ -28,9 +28,14 @@
                         x-ref="url" x-on:focus="$event.target.select()">
                     <button type="button" class="btn btn-ghost btn-sm"
                         x-on:click="const champ = $refs.url;
+                            const repli = () => { champ.select(); return document.execCommand('copy') || Promise.reject(); };
                             (navigator.clipboard ? navigator.clipboard.writeText(champ.value) : Promise.reject())
-                                .catch(() => { champ.select(); document.execCommand('copy'); })
-                                .finally(() => { copie = true; setTimeout(() => copie = false, 2000); })">
+                                .catch(repli)
+                                .then(() => { copie = true; setTimeout(() => copie = false, 2000); })
+                                // Échec des deux voies (iOS hors geste utilisateur) : le champ reste
+                                // sélectionné pour une copie à la main — ne jamais annoncer une copie qui
+                                // n'a pas eu lieu.
+                                .catch(() => { champ.select(); })">
                         <x-icon name="link" :size="14" /> <span x-text="copie ? 'Copiée' : 'Copier'">Copier</span>
                     </button>
                 </div>

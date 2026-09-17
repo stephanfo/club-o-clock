@@ -62,7 +62,10 @@ class CalendarFeedService
     /**
      * Entrées du flux, une par (séance, personne concernée).
      *
-     * @return list<array{session: Session, pour: User, prefixe: string, provisoire: bool}>
+     * `maj` est l'horodatage de la dernière modification vue par cette personne — séance, lieu,
+     * inscription ou réglages du flux. Il alimente l'ETag et le `SEQUENCE` du VEVENT.
+     *
+     * @return list<array{session: Session, pour: User, prefixe: string, provisoire: bool, maj: int}>
      */
     public function entries(CalendarFeed $feed): array
     {
@@ -75,8 +78,9 @@ class CalendarFeedService
         // (même UID, un seul événement).
         if ($feed->include_coaching && $user->hasRole('coach')) {
             $user->coachSessions()->with('location')->whereBetween('start_at', [$debut, $fin])->get()
-                ->each(function (Session $s) use (&$entrees, $user) {
-                    $entrees["{$s->id}-{$user->id}"] = ['session' => $s, 'pour' => $user, 'prefixe' => 'Coach — ', 'provisoire' => false];
+                ->each(function (Session $s) use (&$entrees, $user, $feed) {
+                    $entrees["{$s->id}-{$user->id}"] = ['session' => $s, 'pour' => $user, 'prefixe' => 'Coach — ',
+                        'provisoire' => false, 'maj' => self::maj($feed, $s)];
                 });
         }
 
@@ -92,7 +96,7 @@ class CalendarFeedService
             ->whereIn('status', $statuts)
             ->whereHas('session', fn ($q) => $q->whereBetween('start_at', [$debut, $fin]))
             ->get()
-            ->each(function (Registration $r) use (&$entrees, $personnes, $user) {
+            ->each(function (Registration $r) use (&$entrees, $personnes, $user, $feed) {
                 $pour = $personnes->firstWhere('id', $r->user_id);
                 $cle = "{$r->session_id}-{$pour->id}";
                 if (isset($entrees[$cle])) {
@@ -100,7 +104,8 @@ class CalendarFeedService
                 }
                 $attente = $r->status === 'waitlist';
                 $prefixe = ($attente ? '⏳ Liste d\'attente — ' : '').($pour->id === $user->id ? '' : $pour->first_name.' — ');
-                $entrees[$cle] = ['session' => $r->session, 'pour' => $pour, 'prefixe' => $prefixe, 'provisoire' => $attente];
+                $entrees[$cle] = ['session' => $r->session, 'pour' => $pour, 'prefixe' => $prefixe,
+                    'provisoire' => $attente, 'maj' => self::maj($feed, $r->session, $r)];
             });
 
         $entrees = array_values($entrees);
@@ -109,22 +114,39 @@ class CalendarFeedService
         return $entrees;
     }
 
-    /** Empreinte du flux : change dès qu'une séance, un lieu, un réglage ou la fenêtre change. */
+    /**
+     * Horodatage de la dernière modification qui change ce que CETTE personne voit de la séance :
+     * la séance, son lieu, son inscription, et les réglages du flux (rappel, préfixes).
+     */
+    private static function maj(CalendarFeed $feed, Session $session, ?Registration $registration = null): int
+    {
+        return max(array_filter([
+            $session->updated_at?->timestamp,
+            $session->location?->updated_at?->timestamp,
+            $registration?->updated_at?->timestamp,
+            $feed->updated_at?->timestamp,
+        ]) ?: [0]);
+    }
+
+    /** Empreinte du flux : change dès qu'une séance, un lieu, un réglage, le club ou la fenêtre change. */
     public function etag(CalendarFeed $feed, array $entrees): string
     {
-        $morceaux = array_map(fn ($e) => [
-            $e['session']->id, $e['session']->updated_at?->timestamp, $e['session']->location?->updated_at?->timestamp,
-            $e['pour']->id, $e['prefixe'], $e['provisoire'],
-        ], $entrees);
+        $morceaux = array_map(fn ($e) => [$e['session']->id, $e['pour']->id, $e['prefixe'], $e['provisoire'], $e['maj']], $entrees);
+        // Les réglages du club entrent dans le rendu (nom du calendrier, fuseau du rappel « la veille ») :
+        // sans eux, un changement de fuseau resterait invisible aux abonnés jusqu'au changement de date.
+        $club = ClubSettings::current();
 
-        return '"'.sha1(json_encode([$feed->id, $feed->updated_at?->timestamp, Carbon::now()->toDateString(), config('app.url'), $morceaux])).'"';
+        return '"'.sha1(json_encode([
+            $feed->id, $feed->updated_at?->timestamp, Carbon::now()->toDateString(), config('app.url'),
+            $club->name, $club->timezone, $morceaux,
+        ])).'"';
     }
 
     public function render(CalendarFeed $feed, array $entrees): string
     {
         $rappel = $feed->rappel();
         $evenements = array_map(
-            fn ($e) => Ics::event($e['session'], $e['pour'], $e['prefixe'], $rappel, $e['provisoire']),
+            fn ($e) => Ics::event($e['session'], $e['pour'], $e['prefixe'], $rappel, $e['provisoire'], $e['maj']),
             $entrees,
         );
 

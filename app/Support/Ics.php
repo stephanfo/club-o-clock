@@ -58,8 +58,12 @@ class Ics
      *
      * @param  int|string|null  $rappel  minutes avant le début, self::RAPPEL_VEILLE, ou null
      * @param  bool  $provisoire  place en liste d'attente : STATUS:TENTATIVE
+     * @param  int|null  $sequence  horodatage de la dernière modification VUE PAR CETTE PERSONNE ; à
+     *                              défaut, celui de la séance. Une promotion depuis la liste d'attente
+     *                              ou un changement de rappel ne touche pas `sessions.updated_at` : sans
+     *                              ce relais, le client garderait la version « liste d'attente ».
      */
-    public static function event(Session $session, User $pour, string $prefixe = '', int|string|null $rappel = null, bool $provisoire = false): string
+    public static function event(Session $session, User $pour, string $prefixe = '', int|string|null $rappel = null, bool $provisoire = false, ?int $sequence = null): string
     {
         $annulee = $session->isCancelled();
         $titre = ($annulee ? 'Annulé — ' : '').$prefixe.$session->title;
@@ -73,7 +77,7 @@ class Ics
             'DTSTART:'.self::utc($session->start_at),
             'DTEND:'.self::utc($session->endsAt()),
             // Les clients ne remplacent un événement déjà importé que si SEQUENCE augmente.
-            'SEQUENCE:'.$session->updated_at->timestamp,
+            'SEQUENCE:'.($sequence ?? $session->updated_at->timestamp),
             'SUMMARY:'.self::texte($titre),
             'STATUS:'.($annulee ? 'CANCELLED' : ($provisoire ? 'TENTATIVE' : 'CONFIRMED')),
             'TRANSP:'.($annulee ? 'TRANSPARENT' : 'OPAQUE'),

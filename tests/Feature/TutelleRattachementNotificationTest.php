@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Livewire\Admin\MemberShow;
 use App\Models\NotificationOutbox;
 use App\Models\User;
+use App\Notifications\Channels\FakeChannel;
 use App\Notifications\NotificationRenderer;
 use App\Notifications\NotificationType;
+use App\Notifications\OutboxDrainer;
 use App\Services\GuardianshipService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -50,6 +52,29 @@ class TutelleRattachementNotificationTest extends TestCase
         $this->assertNotEmpty($this->lignes($entrant));
         $this->assertNotEmpty($this->lignes($pupille));
         $this->assertEmpty($this->lignes($sortant), 'Le garant sortant reçoit la rupture, pas le rattachement.');
+    }
+
+    /** Minimisation (§4.19) : le nom du garant a servi au corps, il ne dort pas dans la file. */
+    public function test_le_nom_du_garant_est_purge_a_lenvoi(): void
+    {
+        $pupille = $this->mineur('leo@example.test');
+        $garant = User::factory()->create(['first_name' => 'Yanis', 'last_name' => 'Martin']);
+        $this->app->instance(FakeChannel::class, new FakeChannel);
+        config([
+            'club.notifications.channels.push' => FakeChannel::class,
+            'club.notifications.channels.email' => FakeChannel::class,
+        ]);
+
+        app(GuardianshipService::class)->link($pupille, $garant, User::factory()->admin()->create());
+        $ligne = $this->lignes($pupille)->first();
+        $this->assertSame('Yanis Martin', $ligne->payload['guardian_name']); // contrôle positif : tant qu'elle attend
+
+        app(OutboxDrainer::class)->drainNow(NotificationOutbox::whereKey($ligne->id)->get());
+
+        $ligne->refresh();
+        $this->assertSame('sent', $ligne->status);
+        $this->assertArrayNotHasKey('guardian_name', $ligne->payload);
+        $this->assertStringNotContainsString('Martin', json_encode($ligne->payload));
     }
 
     public function test_le_rattachement_dun_orphelin_previent_aussi(): void

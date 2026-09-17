@@ -38,8 +38,11 @@ class NotificationOutbox extends Model
      * partie). Elles sont simplement retirées au passage à `sent` (minimisation RGPD §4.19) : le
      * prénom du sujet n'a servi qu'à composer le titre, et la page Alertes le re-résout depuis
      * `subject_id`, qui reste. Un nom d'enfant ne dort donc pas indéfiniment dans la file.
+     *
+     * Même raison pour `guardian_name` (nom complet du garant, §4.2.1) : il ne sert qu'au corps de
+     * l'alerte de rattachement, dont le rendu retombe sur la description du type sans lui.
      */
-    public const VOLATILE_PAYLOAD_KEYS = ['subject_first_name'];
+    public const VOLATILE_PAYLOAD_KEYS = ['subject_first_name', 'guardian_name'];
 
     /** Visibilité d'une alerte sur la page Alertes (#79) : après la fin de sa séance, ou après l'envoi. */
     public const DAYS_AFTER_SESSION = 7;
