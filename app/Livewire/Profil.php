@@ -3,7 +3,9 @@
 namespace App\Livewire;
 
 use App\Actions\Fortify\PasswordValidationRules;
+use App\Models\CalendarFeed;
 use App\Services\AuthMethodService;
+use App\Services\CalendarFeedService;
 use App\Services\MemberService;
 use App\Services\NotificationPreferenceService;
 use App\Services\PasswordService;
@@ -114,6 +116,45 @@ class Profil extends Component
         $next = ! $this->matrix[$typeValue][$channel];
         $this->matrix[$typeValue][$channel] = $next;
         $prefs->setCell(auth()->user(), $typeValue, $channel, $next);
+    }
+
+    // ── Notifs : abonnement agenda (#39, §4.21.2) ──
+
+    /** Crée l'adresse d'abonnement, ou la régénère (l'ancienne cesse aussitôt de servir). */
+    public function regenerateFeed(CalendarFeedService $feeds): void
+    {
+        $existait = $feeds->active(auth()->user()) !== null;
+        $feeds->regenerate(auth()->user());
+        session()->flash('status', $existait
+            ? 'Nouvelle adresse créée — l\'ancienne ne fonctionne plus.'
+            : 'Adresse d\'abonnement créée.');
+    }
+
+    public function revokeFeed(CalendarFeedService $feeds): void
+    {
+        $feeds->revoke(auth()->user());
+        session()->flash('status', 'Lien révoqué — ton agenda ne recevra plus les séances.');
+    }
+
+    /** Case de contenu ; la source vient du client, d'où la liste fermée. */
+    public function toggleFeedSource(string $source, CalendarFeedService $feeds): void
+    {
+        $feed = $feeds->active(auth()->user());
+        if ($feed === null || ! in_array($source, ['include_waitlist', 'include_coaching', 'include_wards'], true)) {
+            return;
+        }
+
+        $feed->update([$source => ! $feed->{$source}]);
+    }
+
+    public function setFeedReminder(string $reminder, CalendarFeedService $feeds): void
+    {
+        $feed = $feeds->active(auth()->user());
+        if ($feed === null || ! array_key_exists($reminder, CalendarFeed::RAPPELS)) {
+            return;
+        }
+
+        $feed->update(['reminder' => $reminder === '' ? null : $reminder]);
     }
 
     // ── Connexion : mot de passe (§4.1.1, §4.1.5) ──
@@ -321,7 +362,7 @@ class Profil extends Component
 
     // ── Rendu ──
 
-    public function render(QuotaService $quota, NotificationPreferenceService $prefs, MemberService $members, AuthMethodService $authMethods)
+    public function render(QuotaService $quota, NotificationPreferenceService $prefs, MemberService $members, AuthMethodService $authMethods, CalendarFeedService $feeds)
     {
         [$from, $to] = $quota->weekBounds(Carbon::now());
 
@@ -335,6 +376,8 @@ class Profil extends Component
             'canRemovePassword' => auth()->user()->password !== null
                 && $authMethods->keepsAnotherWayIn(auth()->user(), 'password'),
             'demo' => DemoMode::enabled(),
+            'feed' => $this->tab === 'notifs' ? $feeds->active(auth()->user()) : null,
+            'feedHasWards' => $this->tab === 'notifs' && $feeds->hasWards(auth()->user()),
             'quotas' => $quota->weeklyUsage(auth()->user(), Carbon::now()),
             'lastAdmin' => $members->isLastActiveAdmin(auth()->user()),
             // Seconde garde bloquante de requestDeletion (§4.2) : garant d'un pupille P1. Comme

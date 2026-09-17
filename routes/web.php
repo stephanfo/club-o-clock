@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\InvitationActivationController;
 use App\Http\Controllers\Auth\MagicLinkController;
 use App\Http\Controllers\Auth\OAuthController;
+use App\Http\Controllers\CalendarFeedController;
 use App\Http\Controllers\GpxRouteGpxController;
 use App\Http\Controllers\GpxRouteTracesController;
 use App\Http\Controllers\LegalController;
@@ -69,6 +70,13 @@ Route::middleware('guest')->group(function () {
     // bureau comme mineur autonomisé : même jeton, même page.
     Route::get('invitation/{token}', [InvitationActivationController::class, 'activate'])->name('invitation.activate');
 });
+
+// Abonnement agenda (#39, §4.21.2) : relu par l'agenda de l'adhérent, sans session. Le jeton de
+// l'URL est la seule preuve ; throttle contre l'énumération.
+Route::get('/agenda/{token}.ics', [CalendarFeedController::class, 'show'])
+    ->where('token', '[A-Za-z0-9]{64}')
+    ->middleware('throttle:60,1')
+    ->name('agenda.feed');
 
 // --- Espace connecté ---
 Route::middleware(['auth', 'verified'])->group(function () {

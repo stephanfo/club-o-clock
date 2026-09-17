@@ -111,4 +111,6 @@
             @endforeach
         </div>
     </div>
+
+    @include('livewire.profil._agenda')
 </div>
