@@ -1,7 +1,7 @@
 // Scénarios complémentaires — parcours critiques et cas limites (PLAN_TESTS.md §1 à §8).
 // NON destructifs : chaque scénario restaure ce qu'il modifie. Voir destructif.mjs pour le reste.
 import { launch, session, fiche, sql, seance, seanceFuture, ligne, barreMobile, Scenario, MOBILE, DESKTOP, BASE, repereJournaux, purgeJournaux } from './lib.mjs';
-import { writeFileSync, unlinkSync } from 'node:fs';
+import { writeFileSync, unlinkSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -899,6 +899,45 @@ async function ongletMobile(page, nom) {
     await page.waitForTimeout(1500);
     s.check('OpenRunner seul — la carte OpenRunner est rendue', await page.locator('iframe[src*="openrunner"]').count() > 0);
     s.check('OpenRunner seul — pas de bouton « Survoler »', await page.locator('.gpx-flybtn').count() === 0);
+    await ctx.close();
+  }
+  tous.push(s.report());
+}
+
+// ───────────────────────────────────────────────────────────────────
+// S29 — Ajouter une séance à son agenda (#39) : le lien de la fiche télécharge un .ics valide.
+//       Lecture seule, rien à restaurer.
+// ───────────────────────────────────────────────────────────────────
+{
+  const avenir = seanceFuture();
+  const annulee = sql(`SELECT id FROM sessions WHERE cancelled_at IS NOT NULL ORDER BY start_at DESC LIMIT 1`);
+  const titre = sql(`SELECT title FROM sessions WHERE id=${avenir}`);
+  const s = new Scenario(`S29 · Ajouter à mon agenda (séance ${avenir})`);
+
+  for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
+    const { ctx, page } = await session(browser, 'marie@demo.club', viewport);
+    await fiche(page, avenir);
+    const lien = page.getByRole('link', { name: /ajouter à mon agenda/i });
+    s.check(`${format} — le lien est visible sur une séance à venir`, await lien.isVisible());
+    await lien.scrollIntoViewIfNeeded();
+    await s.shot(page, `s29-agenda-${format}`);
+
+    const [dl] = await Promise.all([page.waitForEvent('download'), lien.click()]);
+    const nom = dl.suggestedFilename();
+    const contenu = readFileSync(await dl.path(), 'utf8').replace(/\r\n /g, '');
+    s.check(`${format} — fichier .ics nommé d'après la date`, /^seance-\d{4}-\d{2}-\d{2}-.+\.ics$/.test(nom), nom);
+    s.check(`${format} — calendrier avec un événement de la séance`,
+            contenu.startsWith('BEGIN:VCALENDAR') && contenu.includes('BEGIN:VEVENT')
+            && contenu.includes(`SUMMARY:${titre.replace(/[;,]/g, (c) => '\\' + c)}`), titre);
+    s.checkJs(page);
+    await ctx.close();
+  }
+
+  if (annulee) {
+    const { ctx, page } = await session(browser, 'marie@demo.club', MOBILE);
+    await fiche(page, annulee);
+    s.check('séance annulée — la fiche est bien rendue', await page.locator('.dsp').first().isVisible());
+    s.check('séance annulée — pas de lien agenda', await page.getByRole('link', { name: /ajouter à mon agenda/i }).count() === 0);
     await ctx.close();
   }
   tous.push(s.report());

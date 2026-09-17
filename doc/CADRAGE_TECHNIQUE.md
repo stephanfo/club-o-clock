@@ -685,6 +685,15 @@ same-origin (un fichier refusé est corrompu ou exécutable déguisé) — plus 
 
 ---
 
+### 7.17 Export agenda iCalendar — génération maison (PRD §4.21)
+
+- **Pas de bibliothèque** (`spatie/icalendar-generator` écartée) : le sous-ensemble utile de la RFC 5545 tient en une classe ([app/Support/Ics.php](../app/Support/Ics.php)) — échappement TEXT, pliage à 75 octets sans couper un caractère UTF-8, VEVENT, VALARM. Une dépendance de plus serait une surface de maintenance pour un bénévole solo, sans gain.
+- **Horaires en UTC (`Z`)** : pas de `VTIMEZONE` à embarquer, cohérent avec `Session::start_at` stocké en UTC. Seul le rappel « la veille au soir » se calcule au fuseau du club, puis s'écrit en date absolue UTC.
+- **Un seul constructeur de VEVENT** pour le fichier ponctuel et le flux d'abonnement : une séance a le même rendu dans les deux.
+- **`UID` par (séance, personne)** — `seance-{id}-u{userId}@{hôte}` — pour qu'un coach dont l'enfant est inscrit à la même séance ait deux événements distincts. **`SEQUENCE` = horodatage de `updated_at`**, croissant à chaque modification, condition pour qu'un client remplace l'événement déjà connu.
+- **Séance annulée** : `STATUS:CANCELLED` n'est pas rendu de façon fiable (Google masque souvent l'événement d'un flux abonné) ; on cumule préfixe du titre, `STATUS:CANCELLED` et `TRANSP:TRANSPARENT`, sans `VALARM`.
+- Flux d'abonnement (lot 2) : jeton en clair sur une table dédiée (secret d'URL ré-affichable, même régime que les endpoints push ; la garde est la révocation), route publique sous `throttle`, `ETag`/`304`.
+
 ## 8. Tensions mutualisé ↔ PRD et compromis
 
 Format : *exigence → friction → option idéale → compromis retenu → risque résiduel → réexamen.*

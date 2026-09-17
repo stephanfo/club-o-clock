@@ -9,6 +9,12 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Ajouté
 
+- **On peut ajouter une séance à son agenda perso.** Sur la fiche d'une séance à venir, « Ajouter à
+  mon agenda » télécharge un fichier `.ics` que Google Agenda, Apple Calendrier ou Outlook importent :
+  titre, horaire, lieu et lien vers la fiche, sans le nom d'aucun inscrit. C'est une copie : un
+  changement d'horaire ou une annulation ne la met pas à jour, et la fiche le dit. L'abonnement
+  tenu à jour suivra (#39).
+
 - **On peut survoler un parcours GPX.** Un tracé statique dit mal par où on passe (sens, portions
   qui se croisent, aller-retour) et où tombent les montées. Sur la fiche séance comme sur la fiche
   parcours, le bouton « Survoler » fait avancer un point le long du tracé, carte qui le suit : lecture

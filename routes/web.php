@@ -8,6 +8,7 @@ use App\Http\Controllers\GpxRouteTracesController;
 use App\Http\Controllers\LegalController;
 use App\Http\Controllers\ManifestController;
 use App\Http\Controllers\PushSubscriptionController;
+use App\Http\Controllers\SessionIcsController;
 use App\Livewire\Activation;
 use App\Livewire\Admin\CatalogueManager;
 use App\Livewire\Admin\ClubSettingsForm;
@@ -99,6 +100,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/seances/creer', SessionForm::class)->name('sessions.create');
     Route::get('/seances/{session}', SessionShow::class)->name('sessions.show');
     Route::get('/seances/{session}/modifier', SessionForm::class)->name('sessions.edit');
+    // Ajout ponctuel à l'agenda perso (#39, §4.21) : copie figée d'une séance, pas un abonnement.
+    Route::get('/seances/{session}/agenda.ics', [SessionIcsController::class, 'download'])->name('sessions.ics');
     // Bibliothèque de parcours (J10, PRD §4.20). Le GPX appartient au parcours, plus à la séance.
     // Création/édition = coach + admin (garde fine dans GpxRoutePolicy, rejouée dans save()).
     // Consultation ouverte à tous les membres (GpxRoutePolicy::viewAny).
