@@ -342,8 +342,13 @@ function gpxField({ stats }) {
     };
 }
 
-// Durée d'un survol complet à ×1 (#67), quelle que soit la longueur du tracé.
-const FLY_DURATION_MS = 30000;
+// Durée d'un survol complet à ×1 (#67), quelle que soit la longueur du tracé. 30 s au départ,
+// jugées trop rapides à l'essai sur iPhone.
+const FLY_DURATION_MS = 60000;
+
+// Vitesse de défilement visée du fond de carte, en pixels par seconde : c'est elle qui fixe le zoom
+// de suivi. Assez lente pour que l'œil suive et que les tuiles aient le temps d'arriver.
+const FLY_SCROLL_PX_S = 110;
 
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -530,6 +535,50 @@ function gpxMap({ url, lockable = false }) {
             }).addTo(map);
             this.fly.d = 0;
             this.flyPlay();
+            // Émis tout de suite, pas à la première image : la fiche séance masque sa barre d'actions
+            // sur cet événement, et le cadrage doit mesurer l'écran une fois la barre partie.
+            this.flyEmit();
+            this.$nextTick(() => requestAnimationFrame(() => this.flyFrameView()));
+        },
+
+        // Cadre carte + panneau + profil altimétrique (quand il suit la carte) dans la partie visible
+        // de l'écran, c'est-à-dire entre les barres fixes du haut et du bas (topbar, actions de la
+        // fiche, barre de navigation). Sur la fiche séance mobile, la carte arrive sous l'en-tête et
+        // le profil tombait sous la barre d'actions. Rien ne bouge si tout est déjà visible.
+        //
+        // Si l'ensemble ne tient pas (Safari et ses barres d'outils mangent une bonne part de la
+        // hauteur), la carte rétrécit le temps du survol, sans descendre sous 260 px : en dessous,
+        // on ne voit plus assez de route autour du point. flyClose lui rend sa hauteur.
+        flyFrameView() {
+            const box = this.$root.querySelector('.gpx-mapbox');
+            if (!box || this.isFs) return;
+            const profile = this.$root.nextElementSibling?.matches('.alt-profile') ? this.$root.nextElementSibling : null;
+            const last = profile && profile.getClientRects().length ? profile : this.$root;
+            const vh = window.innerHeight;
+            let top = 0;
+            let bottom = vh;
+            for (const el of document.querySelectorAll('body *')) {
+                if (el.closest('.leaflet-container')) continue;
+                const position = getComputedStyle(el).position;
+                if (position !== 'fixed' && position !== 'sticky') continue;
+                const r = el.getBoundingClientRect();
+                if (!r.height || r.width < window.innerWidth / 2) continue;   // pastilles, boutons flottants
+                if (r.top <= 0 && r.bottom < vh / 3) top = Math.max(top, r.bottom);
+                else if (r.top > (2 * vh) / 3) bottom = Math.min(bottom, r.top);   // barre d'actions posée sur la navigation
+            }
+            const gap = 8;
+            const start = box.getBoundingClientRect().top;
+            let end = last.getBoundingClientRect().bottom;
+            if (start >= top + gap && end <= bottom - gap) return;
+            const overflow = end - start - (bottom - top - 2 * gap);
+            const mapEl = this.$refs.map;
+            if (overflow > 0 && mapEl) {
+                const height = Math.max(mapEl.offsetHeight - overflow, 260);
+                end -= mapEl.offsetHeight - height;
+                mapEl.style.height = `${height}px`;
+            }
+            box.style.scrollMarginTop = `${top + gap}px`;
+            box.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' });
         },
 
         flyClose() {
@@ -540,6 +589,7 @@ function gpxMap({ url, lockable = false }) {
             flyDot?.remove();
             doneLine = flyDot = null;
             line?.setStyle({ opacity: 1 });
+            if (this.$refs.map) this.$refs.map.style.height = '';
             this.flyEmit();
         },
 
@@ -595,18 +645,17 @@ function gpxMap({ url, lockable = false }) {
             raf = requestAnimationFrame((n) => this.flyFrame(n));
         },
 
-        // Zoom de suivi calé sur la VITESSE du point, pas fixe : à zoom 15, un 90 km en ×4 traverse
-        // l'écran en un dixième de seconde et la carte ne ferait que charger des tuiles. On vise une
-        // largeur de vue que le point met ~5 s à traverser, sans jamais dézoomer au-delà de la vue
-        // d'ensemble ni zoomer au-delà de 16.
+        // Zoom de suivi calé sur la VITESSE du point, pas fixe : à zoom 16, un 90 km en ×4 fait
+        // défiler le fond à plusieurs milliers de pixels par seconde et la carte ne ferait que charger
+        // des tuiles. On vise FLY_SCROLL_PX_S, borné entre 12 (un long parcours en ×4 reste lisible)
+        // et 17 (au-delà, les tuiles OSM n'apportent plus rien).
         flyZoom() {
             const pos = locate(track, this.fly.d);
             const metersPerSecond = (this.fly.total * this.fly.speed) / (FLY_DURATION_MS / 1000);
-            const widthPx = map.getSize().x || 1;
-            const wanted = Math.log2((156543.03 * Math.cos((pos.lat * Math.PI) / 180) * widthPx) / (5 * metersPerSecond));
-            const overview = map.getBoundsZoom(bounds, false, Leaflet.point(32, 32));
-            const zoom = Math.min(Math.max(Math.floor(wanted), overview), 16);
-            lastPan = performance.now();
+            const wanted = Math.log2((156543.03 * Math.cos((pos.lat * Math.PI) / 180) * FLY_SCROLL_PX_S) / Math.max(metersPerSecond, 1));
+            const zoom = Math.min(Math.max(Math.round(wanted), 12), 17);
+            // Laisse l'animation de zoom finir avant de reprendre le suivi (cf. flyRender).
+            lastPan = performance.now() + 350;
             map.setView([pos.lat, pos.lon], zoom, { animate: !reducedMotion() });
         },
 
@@ -625,16 +674,16 @@ function gpxMap({ url, lockable = false }) {
                 doneLine.setLatLngs(points.slice(0, pos.i + 1).concat([[pos.lat, pos.lon]]));
             }
 
-            // Recentrage au plus deux fois par seconde, et seulement quand le point sort du tiers
-            // central : c'est chaque déplacement de la vue qui tire des tuiles (politique OSM).
-            if (this.fly.playing && now - lastPan > 500) {
+            // Suivi CONTINU : la carte reste centrée sur le point à chaque image. Le recentrage par
+            // sauts (panTo quand le point sortait du tiers central) donnait une carte saccadée à
+            // l'essai sur iPhone. panBy sans animation ne fait qu'une translation CSS, et le zoom
+            // borné par la vitesse (flyZoom) limite le nombre de tuiles tirées.
+            if (this.fly.playing && now > lastPan) {
                 const size = map.getSize();
                 const p = map.latLngToContainerPoint([pos.lat, pos.lon]);
-                const inside = p.x > size.x / 3 && p.x < (2 * size.x) / 3 && p.y > size.y / 3 && p.y < (2 * size.y) / 3;
-                if (!inside) {
-                    lastPan = now;
-                    map.panTo([pos.lat, pos.lon], { animate: !reducedMotion(), duration: 0.4 });
-                }
+                const dx = p.x - size.x / 2;
+                const dy = p.y - size.y / 2;
+                if (Math.abs(dx) >= 0.5 || Math.abs(dy) >= 0.5) map.panBy([dx, dy], { animate: false });
             }
             this.flyEmit();
         },

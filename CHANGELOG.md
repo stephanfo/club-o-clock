@@ -15,7 +15,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   et pause, curseur pour se placer n'importe où, vitesse ×1, ×2 ou ×4. La distance parcourue,
   l'altitude et la pente du moment s'affichent, et un curseur avance sur le profil altimétrique — que
   la fiche séance affiche désormais elle aussi. Rien ne démarre tout seul, et la carte n'a pas besoin
-  d'être déverrouillée.
+  d'être déverrouillée. Au téléphone, la page se cale d'elle-même pour que carte, commandes et profil
+  tiennent ensemble à l'écran, sans masquer le bouton d'inscription.
 
 - **Une séance peut avoir sa propre adresse, avec carte et météo.** Une compétition ou un événement
   club se tient souvent dans un endroit qui ne reviendra pas. Le seul moyen de le renseigner était un
