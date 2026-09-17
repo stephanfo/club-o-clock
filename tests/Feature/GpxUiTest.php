@@ -209,6 +209,46 @@ class GpxUiTest extends TestCase
             ->assertSee('loc-map-veil', false);
     }
 
+    /**
+     * Survol animé (#67) : la carte de la séance porte les contrôles, et le profil altimétrique —
+     * absent jusque-là de cette fiche — est rendu dessous avec le curseur que le survol pilote.
+     */
+    public function test_the_session_trace_offers_the_flyover_with_its_elevation_profile(): void
+    {
+        $route = GpxRoute::factory()->create();
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Sortie', 'discipline_id' => $this->discipline()->id,
+            'start_at' => Carbon::now()->addDay(), 'duration_min' => 90, 'route_id' => $route->id,
+        ]);
+
+        $this->actingAs(User::factory()->create(['email_verified_at' => now()]))
+            ->get(route('sessions.show', $session))
+            ->assertOk()
+            ->assertSee('gpx-flybtn', false)
+            ->assertSee('Survoler')
+            ->assertSee('aria-label="Vitesse du survol"', false)
+            ->assertSee('alt-profile', false)
+            ->assertSee('gpx-flyover.window', false);
+    }
+
+    /** Une séance OpenRunner seule n'a pas de données de tracé : ni survol ni profil. */
+    public function test_an_openrunner_only_session_has_no_flyover(): void
+    {
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Sortie OR', 'discipline_id' => $this->discipline()->id,
+            'start_at' => Carbon::now()->addDay(), 'duration_min' => 90,
+            'route_openrunner_embed_url' => 'https://www.openrunner.com/route-details/123/embed',
+        ]);
+
+        $this->actingAs(User::factory()->create(['email_verified_at' => now()]))
+            ->get(route('sessions.show', $session))
+            ->assertOk()
+            // Contrôle positif : la section parcours est bien rendue, avec la carte OpenRunner.
+            ->assertSee('openrunner.com/route-details/123/embed', false)
+            ->assertDontSee('gpx-flybtn', false)
+            ->assertDontSee('alt-profile', false);
+    }
+
     /** Le parcours est partagé : sa fiche est atteignable depuis l'onglet Parcours de la séance (J10.C). */
     public function test_session_sheet_links_to_the_route_sheet(): void
     {

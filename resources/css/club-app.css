@@ -719,7 +719,10 @@ textarea.input { resize: vertical; min-height: 70px; line-height: 1.5; }
 .alt-tick { position: absolute; right: 5px; transform: translateY(-50%); font-size: 9.5px; font-weight: 600; color: var(--fg-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* .alt-plot empile le tracé et la réglette X : le SVG prend la place restante (flex:1) et la
    réglette est ancrée en bas. `height:100%` sur le SVG le ferait déborder au lieu de partager. */
-.alt-plot { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.alt-plot { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
+/* Curseur du survol animé (#67) : trait vertical sur la hauteur du TRACÉ, réglette X exclue. */
+.alt-cursor { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px solid var(--ink); pointer-events: none; transform: translateX(-1px); }
+.alt-xruled .alt-cursor { bottom: 17px; }
 .alt-plot > svg { width: 100%; flex: 1; min-height: 0; display: block; }
 
 /* Axe X (2026-08-02) : réglette de distances DANS le cadre, sous le tracé et séparée par un filet.

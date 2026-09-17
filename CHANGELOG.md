@@ -9,6 +9,14 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Ajouté
 
+- **On peut survoler un parcours GPX.** Un tracé statique dit mal par où on passe (sens, portions
+  qui se croisent, aller-retour) et où tombent les montées. Sur la fiche séance comme sur la fiche
+  parcours, le bouton « Survoler » fait avancer un point le long du tracé, carte qui le suit : lecture
+  et pause, curseur pour se placer n'importe où, vitesse ×1, ×2 ou ×4. La distance parcourue,
+  l'altitude et la pente du moment s'affichent, et un curseur avance sur le profil altimétrique — que
+  la fiche séance affiche désormais elle aussi. Rien ne démarre tout seul, et la carte n'a pas besoin
+  d'être déverrouillée.
+
 - **Une séance peut avoir sa propre adresse, avec carte et météo.** Une compétition ou un événement
   club se tient souvent dans un endroit qui ne reviendra pas. Le seul moyen de le renseigner était un
   texte libre, jamais géocodé : ces séances n'avaient ni carte ni météo. L'autre voie, créer un lieu
