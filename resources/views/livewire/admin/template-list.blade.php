@@ -109,7 +109,7 @@
                         @forelse ($selected->defaultCoaches as $c)<span class="chip chip-sm chip-ink">{{ $c->fullName() }}</span>@empty<span class="meta" style="font-size:12px">Aucun</span>@endforelse
                     </div>
 
-                    <x-banner kind="warn"><div>Les séances générées sont <b>indépendantes du modèle</b>. Modifier le modèle ensuite ne propage <b>pas</b> aux séances déjà créées — chacune s'édite séparément.</div></x-banner>
+                    <x-banner kind="warn" style="margin-top:12px"><div>Les séances générées sont <b>indépendantes du modèle</b>. Modifier le modèle ensuite ne propage <b>pas</b> aux séances déjà créées — chacune s'édite séparément.</div></x-banner>
 
                     <button type="button" wire:click="openRelaunch({{ $selected->id }})" class="btn btn-ghost btn-block" style="margin-top:12px;border-color:var(--brand-200);color:var(--brand-700)">
                         <x-icon name="repeat" :size="15" /> Relancer / prolonger la saison
@@ -146,7 +146,7 @@
                 </div>
             </div>
 
-            <x-banner kind="warn"><div>Seules les occurrences <b>non encore générées</b> sont créées. Les séances déjà générées (saisons précédentes, ou cette plage) <b>restent intactes</b>.</div></x-banner>
+            <x-banner kind="warn" style="margin-top:14px"><div>Seules les occurrences <b>non encore générées</b> sont créées. Les séances déjà générées (saisons précédentes, ou cette plage) <b>restent intactes</b>.</div></x-banner>
 
             <x-slot:footer>
                 <button type="button" class="btn btn-ghost" wire:click="closeRelaunch">Annuler</button>

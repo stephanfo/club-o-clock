@@ -728,6 +728,9 @@ async function ongletMobile(page, nom) {
   const [debut, fin] = ligne(
     `SELECT generation_start_date, generation_end_date FROM session_templates WHERE id=${tplId}`,
     'la plage du modèle');
+  // #78 : la bannière d'avertissement se détache du bloc qui la précède (.banner ne porte aucune marge).
+  const ecartBanniere = (racine, motif) => racine.locator('.banner', { hasText: motif }).first()
+    .evaluate((b) => b.getBoundingClientRect().top - b.previousElementSibling.getBoundingClientRect().bottom);
   const s = new Scenario(`S23 · Admin modèles — plus de « Générer & enregistrer » (modèle ${tplId})`);
   // Écran admin : desktop assumé (doctrine projet « Admin sur mobile : assumé desktop »).
   const { ctx, page } = await session(browser, 'admin@demo.club', DESKTOP);
@@ -745,6 +748,8 @@ async function ongletMobile(page, nom) {
   for (const champ of ['Type', 'Discipline', 'Lieu', 'Capacité', 'Catégories ciblées']) {
     s.check(`le panneau affiche « ${champ} »`, panneauMin.includes(champ.toLowerCase()));
   }
+  const ecartDetail = await ecartBanniere(page, /indépendantes du modèle/i);
+  s.check('la bannière du panneau est détachée des coachs (#78)', ecartDetail >= 10, `${ecartDetail}px`);
   await s.shot(page, 's23-panneau-detail');
 
   // La modale de relance dit la vérité : rejouer la plage COURANTE ne crée rien.
@@ -762,6 +767,8 @@ async function ongletMobile(page, nom) {
           /\b0\b/.test(txtModale) && /déjà entièrement générée/i.test(txtModale), txtModale.slice(0, 120));
   const boutonRelancer = modale.getByRole('button', { name: /relancer ·/i }).first();
   s.check('le bouton de relance est refusé à 0', await boutonRelancer.isDisabled().catch(() => true));
+  const ecartModale = await ecartBanniere(modale, /non encore générées/i);
+  s.check('la bannière de la modale est détachée du compteur (#78)', ecartModale >= 10, `${ecartModale}px`);
   await s.shot(page, 's23-modale-relance-zero');
   await modale.getByRole('button', { name: /annuler/i }).first().click();
   await page.waitForTimeout(600);

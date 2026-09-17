@@ -768,7 +768,7 @@ class MemberShow extends Component
             ->where('is_active', true)
             ->whereNull('anonymized_at')
             ->whereKeyNot($this->user->id)
-            ->orderBy('first_name')->orderBy('last_name')
+            ->orderBy('last_name')->orderBy('first_name')
             ->get();
 
         $estMineurGerable = $this->user->isLegallyMinor() && $this->user->anonymized_at === null;
@@ -794,7 +794,7 @@ class MemberShow extends Component
                 ->whereNull('guardian_id')
                 ->whereNull('anonymized_at')
                 ->whereKeyNot($this->user->id)
-                ->orderBy('first_name')->orderBy('last_name')
+                ->orderBy('last_name')->orderBy('first_name')
                 ->get()
             : collect();
 

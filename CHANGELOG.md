@@ -244,6 +244,14 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Corrigé
 
+- **Les listes de garants de la fiche adhérent étaient triées par prénom.** « Choisir un garant »,
+  « Remplacer le garant » et « Rattacher un mineur sans garant » suivent désormais l'ordre de la liste
+  des adhérents et de l'écran de création : nom, puis prénom.
+
+- **Deux avertissements de l'écran Modèles collaient au bloc précédent.** Dans le détail d'un modèle
+  et dans la fenêtre « Relancer / prolonger la saison », l'avertissement est de nouveau séparé du
+  bloc au-dessus.
+
 - **Le bouton retour ramenait au formulaire qu'on venait d'enregistrer.** Après l'édition d'une
   séance, « Planning » renvoyait au formulaire, parce que l'écran quitté restait dans l'historique du
   navigateur. Le retour remonte maintenant directement à l'écran qu'il annonce. Enregistrer plusieurs
