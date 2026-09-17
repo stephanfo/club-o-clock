@@ -72,10 +72,13 @@ Route::middleware('guest')->group(function () {
 });
 
 // Abonnement agenda (#39, §4.21.2) : relu par l'agenda de l'adhérent, sans session. Le jeton de
-// l'URL est la seule preuve ; throttle contre l'énumération.
+// l'URL est la seule preuve. Limite haute : le throttle compte par IP, et Google, Apple ou Outlook
+// relisent tous les abonnés depuis quelques serveurs partagés — à 60/min, un club de plus de 100
+// abonnés Google recevrait des 429 et garderait des agendas périmés. L'énumération reste hors de
+// portée avec un jeton de 64 caractères.
 Route::get('/agenda/{token}.ics', [CalendarFeedController::class, 'show'])
     ->where('token', '[A-Za-z0-9]{64}')
-    ->middleware('throttle:60,1')
+    ->middleware('throttle:600,1')
     ->name('agenda.feed');
 
 // --- Espace connecté ---

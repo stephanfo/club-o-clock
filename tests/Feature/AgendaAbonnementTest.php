@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Livewire\Profil;
 use App\Models\CalendarFeed;
+use App\Models\ClubSettings;
 use App\Models\Discipline;
 use App\Models\Registration;
 use App\Models\Session;
@@ -39,6 +40,14 @@ class AgendaAbonnementTest extends TestCase
         $feed->update($reglages);
 
         return $feed;
+    }
+
+    /** Première ligne du .ics portant cette propriété. */
+    private function ligneIcs(string $ics, string $propriete): string
+    {
+        $ligne = collect(explode("\r\n", $ics))->first(fn ($l) => str_starts_with($l, $propriete.':'));
+
+        return (string) $ligne;
     }
 
     private function lire(CalendarFeed $feed): string
@@ -208,6 +217,42 @@ class AgendaAbonnementTest extends TestCase
         $this->assertStringContainsString('Récente', $ics);
         $this->assertStringNotContainsString('Ancienne', $ics);
         $this->assertStringNotContainsString('Lointaine', $ics);
+    }
+
+    /** Sans SEQUENCE plus grand, un client garde la version « liste d'attente » déjà importée. */
+    public function test_la_sequence_avance_a_la_promotion_et_au_changement_de_rappel(): void
+    {
+        $membre = User::factory()->create();
+        $seance = $this->seance('Natation');
+        $this->inscrire($membre, $seance, 'waitlist');
+        $feed = $this->flux($membre);
+        $sequence = fn () => (int) str_replace('SEQUENCE:', '', $this->ligneIcs($this->lire($feed), 'SEQUENCE'));
+
+        $avant = $sequence();
+
+        $this->travel(2)->seconds();
+        Registration::where('session_id', $seance->id)->update(['status' => 'participating', 'updated_at' => Carbon::now()]);
+        $apresPromotion = $sequence();
+        $this->assertGreaterThan($avant, $apresPromotion, 'La promotion doit faire avancer SEQUENCE.');
+
+        $this->travel(2)->seconds();
+        $feed->update(['reminder' => '60']);
+        $this->assertGreaterThan($apresPromotion, $sequence(), 'Un changement de rappel doit faire avancer SEQUENCE.');
+    }
+
+    /** Le nom du club et son fuseau entrent dans le rendu : l'ETag doit les suivre. */
+    public function test_letag_suit_les_reglages_du_club(): void
+    {
+        $membre = User::factory()->create();
+        $this->inscrire($membre, $this->seance('Natation'));
+        $feed = $this->flux($membre, ['reminder' => 'veille']);
+
+        $etag = $this->get(route('agenda.feed', $feed->token))->headers->get('ETag');
+        $this->get(route('agenda.feed', $feed->token), ['If-None-Match' => $etag])->assertStatus(304);
+
+        $club = ClubSettings::current();
+        $club->update(['timezone' => 'Indian/Reunion']);
+        $this->get(route('agenda.feed', $feed->token), ['If-None-Match' => $etag])->assertOk();
     }
 
     public function test_le_profil_cree_regle_et_revoque_ladresse(): void
