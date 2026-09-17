@@ -228,6 +228,33 @@ class TutelleChangementGarantTest extends TestCase
             ->assertSet('relinkGuardianId', null);
     }
 
+    /**
+     * Les trois listes de la fiche suivent l'ordre de la liste des adhérents et de la création :
+     * nom puis prénom (#77). Prénoms et noms se classent à l'inverse, un tri par prénom échoue.
+     */
+    public function test_les_listes_de_la_fiche_sont_triees_par_nom_puis_prenom(): void
+    {
+        [, $pupille, $admin] = $this->famille();
+        $attendu = [
+            User::factory()->create(['first_name' => 'Zoé', 'last_name' => 'Aubert'])->id,
+            User::factory()->create(['first_name' => 'Yann', 'last_name' => 'Bernard'])->id,
+            User::factory()->create(['first_name' => 'Xavier', 'last_name' => 'Colin'])->id,
+        ];
+        $orphelin = User::factory()->create(['dob' => Carbon::now()->subYears(10)->toDateString(), 'email' => null]);
+        $mineurs = [
+            User::factory()->create(['first_name' => 'Zia', 'last_name' => 'Aubry', 'dob' => Carbon::now()->subYears(9)->toDateString(), 'email' => null])->id,
+            User::factory()->create(['first_name' => 'Yael', 'last_name' => 'Bodin', 'dob' => Carbon::now()->subYears(9)->toDateString(), 'email' => null])->id,
+        ];
+        $ordre = fn (array $ids) => fn ($liste) => $liste->pluck('id')->intersect($ids)->values()->all() === $ids;
+
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $pupille])
+            ->assertViewHas('relinkCandidates', $ordre($attendu));
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => $orphelin])
+            ->assertViewHas('guardianCandidates', $ordre($attendu));
+        Livewire::actingAs($admin)->test(MemberShow::class, ['user' => User::find($attendu[0])])
+            ->assertViewHas('wardCandidates', $ordre($mineurs));
+    }
+
     /** Contrôle positif apparié : l'entrée n'apparaît que là où elle a un sens. */
     public function test_lentree_de_changement_est_absente_sans_garant_et_presente_avec(): void
     {
