@@ -1090,7 +1090,11 @@ function gpxDownload({ url, name }) {
             }
             // Pas d'await avant share() : cf. l'activation transitoire, plus haut.
             event.preventDefault();
-            navigator.share({ files: [fichier], title: name }).catch(() => {
+            // `files` SEUL : un `title` (ou `text`) joint à des fichiers fait de l'appel un partage
+            // à deux éléments sur iOS, et « Enregistrer dans Fichiers » écrit alors un second
+            // fichier « texte » contenant le titre à côté du GPX (vu sur iPhone en PWA installée).
+            // Le nom présenté dans la feuille vient de toute façon de `File.name`.
+            navigator.share({ files: [fichier] }).catch(() => {
                 // Une annulation de la feuille lève AbortError : c'est un refus de l'utilisateur,
                 // pas une erreur — et surtout, ne PAS retomber sur la navigation, qui le piégerait
                 // précisément dans l'aperçu qu'il vient de refuser.
