@@ -1040,18 +1040,29 @@ function locationMap({ lat, lng, lockable = false }) {
  *
  * Partout ailleurs (desktop, Android, Safari onglet) ce composant ne fait rien : le `<a download>`
  * sous-jacent fonctionne, et c'est lui qui s'applique.
+ *
+ * POURQUOI LA GARDE NOMME iOS. `display-mode: standalone` ne dit pas « WebKit » : une PWA Android
+ * installée le renvoie tout autant. S'y fier seul faisait prendre ce détour à Chrome Android, dont
+ * le `<a download>` n'a jamais eu le moindre problème — et qui refuse de partager un `.gpx`, type
+ * absent de la liste d'autorisation de Chromium. Résultat : lien neutralisé, rejet avalé, bouton
+ * mort (#94). Un contournement de plateforme se garde sur la plateforme qu'il vise.
  */
 function gpxDownload({ url, name }) {
     let fichier = null;
 
-    // Le contexte à traiter, et lui seul : PWA installée + partage de fichiers réellement offert.
-    // `canShare({files})` est le seul test fiable — la présence de `navigator.share` ne dit rien du
+    // Le contexte à traiter, et lui seul : PWA installée, sur iOS, avec partage de fichiers offert.
+    // `canShare({files})` est le seul test fiable du dernier point — la présence de `navigator.share` ne dit rien du
     // niveau 2 de l'API, et l'appel exige un contexte sécurisé (HTTPS), donc il est absent en http.
     const enPwa = () => window.matchMedia?.('(display-mode: standalone)').matches
         || window.navigator.standalone === true;
 
+    // iPadOS 13+ se présente comme un Mac : `maxTouchPoints` est ce qui l'en distingue. Sur iOS tout
+    // navigateur est WebKit, donc viser l'appareil suffit à viser le moteur.
+    const surIos = () => /iPad|iPhone|iPod/.test(navigator.userAgent)
+        || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+
     const partageOffert = () => {
-        if (!enPwa() || typeof navigator.canShare !== 'function') {
+        if (!enPwa() || !surIos() || typeof navigator.canShare !== 'function') {
             return false;
         }
         try {
@@ -1094,10 +1105,18 @@ function gpxDownload({ url, name }) {
             // à deux éléments sur iOS, et « Enregistrer dans Fichiers » écrit alors un second
             // fichier « texte » contenant le titre à côté du GPX (vu sur iPhone en PWA installée).
             // Le nom présenté dans la feuille vient de toute façon de `File.name`.
-            navigator.share({ files: [fichier] }).catch(() => {
+            navigator.share({ files: [fichier] }).catch((err) => {
                 // Une annulation de la feuille lève AbortError : c'est un refus de l'utilisateur,
                 // pas une erreur — et surtout, ne PAS retomber sur la navigation, qui le piégerait
                 // précisément dans l'aperçu qu'il vient de refuser.
+                if (err?.name === 'AbortError') {
+                    return;
+                }
+                // Tout autre rejet est un échec réel : le clic a été absorbé pour rien. On rend la
+                // main au lien natif — comme le fait déjà une précharge en échec — pour que le geste
+                // suivant fasse quelque chose, au lieu d'un bouton définitivement mort (#94).
+                this.pret = false;
+                fichier = null;
             });
 
             return true;
