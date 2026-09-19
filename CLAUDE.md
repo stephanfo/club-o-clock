@@ -116,6 +116,7 @@ Deux services tiers sont nommés dans le PRD comme **choix produit**, pas comme 
 - **Langue du projet : français.** Code, commentaires, commits, interface, documentation. Pas d'i18n à introduire prématurément (V1 monolingue assumée).
 - **PWA, pas d'application native** (iOS/Android hors périmètre V1).
 - **Push iOS** : limitation Safari 16.4+ **et PWA installée** assumée. L'email est le fallback documenté.
+- **iOS ET Android, onglet ET application installée.** Le parc est mixte : tout contournement d'une limite d'une plateforme doit être **gardé sur cette plateforme**, jamais sur un signal que l'autre partage. En particulier `display-mode: standalone` ne veut pas dire « iOS » — une PWA Android le renvoie aussi (régression #94 : le chemin de partage écrit pour WebKit a été pris par Chrome Android, où le `<a download>` natif marchait très bien). Et un chemin de repli ne doit **jamais** se terminer par un `catch` muet : une API refusée doit retomber sur le comportement natif, sinon le bouton devient mort sans le moindre signe. Quand une modification touche `resources/js/` ou une API navigateur (partage, téléchargement, notification, `display-mode`, service worker), la vérifier **sur les deux plateformes, dans les deux contextes** avant de conclure.
 - **Amorçage** : il n'y a pas d'inscription publique. Le premier admin se crée par `php artisan club:create-admin` — seul point d'entrée d'une base vide.
 - Quand une règle évoque « à arbitrer au cadrage technique » dans le PRD, **ne pas trancher** : soulever la question si elle bloque, sinon l'ignorer.
 
