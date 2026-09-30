@@ -358,6 +358,79 @@ tous.push(s.report());
   tous.push(s27.report());
 }
 
+// ── S31 · Éditeur de débrief : la zone de texte défile, la page derrière ne bouge pas (#98) ──
+// Un texte long dépassait la zone de saisie sans la faire défiler : le surplus était coupé par la
+// carte, et le doigt, le trackpad ou la molette faisaient défiler la page derrière (iPhone, iPad).
+// Sur un écran bas (clavier Android qui réduit la fenêtre), la zone tombait à 0 px.
+// Aucune écriture : l'édition est annulée, le débrief en base est comparé avant/après.
+{
+  const s31 = new Scenario('S31 · Éditeur de débrief — texte long, mobile, desktop et écran bas (#98)');
+  const [debriefId, sessionId, email] = ligne(`SELECT d.id, d.session_id, u.email FROM debriefs d
+      JOIN users u ON u.id = d.author_id WHERE d.archived_at IS NULL ORDER BY d.id LIMIT 1`, 'un débrief actif');
+  const avant = sql(`SELECT MD5(content_markdown) FROM debriefs WHERE id=${debriefId}`);
+
+  const formats = [
+    { nom: 'mobile', viewport: MOBILE },
+    { nom: 'desktop', viewport: DESKTOP },
+    // Fenêtre réduite par le clavier (Samsung Internet, « resizes-content ») ou paysage.
+    { nom: 'écran bas', viewport: { width: 390, height: 360 } },
+  ];
+
+  for (const { nom, viewport } of formats) {
+    const { ctx, page } = await session(browser, email, viewport);
+    await fiche(page, sessionId);
+    // L'embed OpenRunner du parcours (script tiers) lève sa propre erreur au chargement de la fiche
+    // desktop : hors de notre code. On ne compte que les erreurs levées à partir de l'éditeur.
+    page.__erreursJs.length = 0;
+    const onglet = page.locator('button.tab:visible', { hasText: 'Débriefs' });
+    if (await onglet.count()) await onglet.first().click();
+    await page.locator(`button:visible[wire\\:click="openDebrief(${debriefId})"]`).first().click();
+    const zone = page.locator('.debrief-dialog .wys-area');
+    await zone.waitFor();
+
+    // Texte long : 60 paragraphes, bien au-delà de la hauteur de la zone.
+    await zone.click();
+    await page.keyboard.press('ControlOrMeta+End');
+    for (let i = 1; i <= 60; i++) {
+      await page.keyboard.press('Enter');
+      await page.keyboard.insertText(`Paragraphe ${i} du récit de course, assez long pour occuper une ligne.`);
+    }
+
+    const mesure = () => zone.evaluate((el) => ({
+      scroll: el.scrollHeight, client: el.clientHeight, top: el.scrollTop, page: window.scrollY,
+    }));
+    const m = await mesure();
+    s31.check(`${nom} : la zone de texte garde une hauteur utile`, m.client >= 80, `${m.client}px`);
+    s31.check(`${nom} : la zone de texte est le conteneur qui défile`, m.scroll > m.client, `${m.scroll} > ${m.client}`);
+
+    // Retour au début à la molette, depuis le bas : c'est la zone qui défile, pas la page.
+    await zone.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+    const bas = await mesure();
+    const boite = await zone.boundingBox();
+    await page.mouse.move(boite.x + boite.width / 2, boite.y + boite.height / 2);
+    await page.mouse.wheel(0, -100000);
+    await page.waitForTimeout(400);
+    const haut = await mesure();
+    s31.check(`${nom} : la molette remonte au début du texte`, bas.top > 0 && haut.top === 0, `${bas.top} → ${haut.top}`);
+    s31.check(`${nom} : la page derrière ne défile pas`, haut.page === bas.page, `${bas.page} → ${haut.page}`);
+
+    // Les deux actions restent dans la fenêtre.
+    const pied = await page.locator('.debrief-editor-foot .btn-pink').boundingBox();
+    s31.check(`${nom} : le bouton d'enregistrement est dans la fenêtre`,
+              pied && pied.y >= 0 && pied.y + pied.height <= viewport.height, pied ? `${Math.round(pied.y + pied.height)} / ${viewport.height}` : 'absent');
+
+    await page.screenshot({ path: new URL(`./shots/s31-${nom === 'écran bas' ? 'ecran-bas' : nom}.png`, import.meta.url).pathname });
+    await page.locator('.debrief-editor-foot .btn-ghost').click();
+    await page.locator('.debrief-dialog').waitFor({ state: 'detached' });
+    s31.checkJs(page);
+    await ctx.close();
+  }
+
+  s31.check('le débrief en base est inchangé (édition annulée)',
+            sql(`SELECT MD5(content_markdown) FROM debriefs WHERE id=${debriefId}`) === avant);
+  tous.push(s31.report());
+}
+
 await browser.close();
 const ok = tous.every(Boolean);
 console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES SCÉNARIOS RESPONSIVE PASSENT' : '❌ AU MOINS UN SCÉNARIO RESPONSIVE ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);
