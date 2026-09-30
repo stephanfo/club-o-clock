@@ -256,6 +256,14 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Corrigé
 
+- **Les notifications push pouvaient cesser d'arriver sans que l'écran le montre.** L'interrupteur
+  « Notifications sur cet appareil » restait sur « activées » alors que le serveur avait perdu
+  l'abonnement, et la coupure échouait sans message. L'app renvoie désormais d'elle-même l'abonnement
+  au serveur à l'ouverture (une fois par jour), suit son renouvellement par le navigateur et se
+  réabonne si les clés du serveur ont changé, sans rien demander. L'interrupteur n'affiche
+  « activées » qu'une fois l'abonnement confirmé, propose sinon de réparer, et dit pourquoi une
+  activation ou une coupure a échoué (#96).
+
 - **L'éditeur de débrief était inutilisable sur téléphone et sur iPad.** Sur un texte long, la zone
   de saisie ne défilait pas : le doigt, le trackpad ou la molette faisaient défiler la page derrière,
   et on ne pouvait plus remonter au début du texte. Sur certains Android, le clavier ouvert réduisait

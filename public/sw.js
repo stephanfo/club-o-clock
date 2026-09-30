@@ -63,6 +63,38 @@ self.addEventListener('push', (event) => {
     event.waitUntil(self.registration.showNotification(title, options));
 });
 
+// Le service push a renouvelé l'abonnement (Chrome/FCM le fait sans prévenir) : on transmet le
+// nouvel endpoint au serveur, sinon il continue d'écrire à l'ancien et plus rien n'arrive (#96).
+// Pas de page ici pour lire la balise CSRF : on demande un jeton à /push/jeton, avec le cookie de
+// session. En cas d'échec, la resynchronisation à l'ouverture de l'app (push.js) prend le relais.
+self.addEventListener('pushsubscriptionchange', (event) => {
+    event.waitUntil((async () => {
+        let sub = event.newSubscription || await self.registration.pushManager.getSubscription();
+        const key = event.oldSubscription && event.oldSubscription.options
+            && event.oldSubscription.options.applicationServerKey;
+        if (!sub && key) {
+            sub = await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+        }
+        if (!sub) return;
+
+        const jeton = await fetch('/push/jeton', { redirect: 'manual', cache: 'no-store', headers: { Accept: 'application/json' } });
+        if (!jeton.ok) return;
+        const { token } = await jeton.json();
+
+        const json = sub.toJSON();
+        await fetch('/push/subscriptions', {
+            method: 'POST',
+            redirect: 'manual',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token },
+            body: JSON.stringify({
+                endpoint: sub.endpoint,
+                keys: json.keys,
+                contentEncoding: ((self.PushManager && self.PushManager.supportedContentEncodings) || ['aesgcm'])[0],
+            }),
+        });
+    })().catch((e) => console.warn('[sw] réabonnement reporté à la prochaine ouverture', e)));
+});
+
 // Clic sur la notif : focus un onglet ouvert sur l'URL cible, sinon en ouvre un.
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
