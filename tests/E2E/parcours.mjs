@@ -1003,6 +1003,58 @@ async function ongletMobile(page, nom) {
   tous.push(s.report());
 }
 
+// ───────────────────────────────────────────────────────────────────
+// S32 — Lien vers un onglet (#99) : la notification d'un débrief ouvre la fiche sur l'onglet
+//       Débriefs (mobile) ou amène la section à l'écran (desktop). Un onglet inconnu retombe sur
+//       Infos. Lecture seule, rien à restaurer.
+// ───────────────────────────────────────────────────────────────────
+{
+  const compet = sql(`SELECT session_id FROM debriefs WHERE archived_at IS NULL ORDER BY id LIMIT 1`);
+  const s = new Scenario(`S32 · Lien vers l'onglet Débriefs (séance ${compet})`);
+
+  {
+    const { ctx, page } = await session(browser, 'marie@demo.club', MOBILE);
+    await page.goto(`${BASE}/seances/${compet}?tab=debriefs`, { waitUntil: 'networkidle' });
+    const coque = page.locator('.fiche-mobile');
+    const actif = coque.locator('.tabstrip .tab.on');
+    s.check('mobile — l\'onglet Débriefs est actif à l\'ouverture', (await actif.innerText()).startsWith('Débriefs'), await actif.innerText());
+    const bande = await coque.locator('.tabstrip').boundingBox();
+    const onglet = await actif.boundingBox();
+    s.check('mobile — l\'onglet actif est dans le champ de la barre d\'onglets',
+            onglet.x >= bande.x && onglet.x + onglet.width <= bande.x + bande.width + 1, `x=${Math.round(onglet.x)}`);
+    s.check('mobile — le panneau Débriefs est visible', await coque.locator('.sect-title', { hasText: 'Débriefs' }).isVisible());
+    s.check('mobile — contrôle positif : un débrief est rendu', await coque.locator('.fiche-scroll-m').innerText().then((t) => t.length > 0));
+    await s.shot(page, 's32-onglet-debriefs-mobile');
+
+    await page.goto(`${BASE}/seances/${compet}?tab=nimportequoi`, { waitUntil: 'networkidle' });
+    s.check('mobile — onglet inconnu : retour sur Infos', (await coque.locator('.tabstrip .tab.on').innerText()).startsWith('Infos'));
+    s.checkJs(page);
+    await ctx.close();
+  }
+
+  {
+    const { ctx, page } = await session(browser, 'marie@demo.club', DESKTOP);
+    const section = page.locator('.fiche-desktop [data-section="debriefs"]');
+    const position = async (q) => {
+      await page.goto(`${BASE}/seances/${compet}${q}`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(300);
+      return section.evaluate((el) => el.getBoundingClientRect().top);
+    };
+    // Contrôle positif : sans onglet, la section est sous la ligne de flottaison — sinon « elle est
+    // à l'écran » ne prouverait rien.
+    const sans = await position('');
+    s.check('desktop — contrôle : sans onglet, la section est hors écran', sans > DESKTOP.height, `top=${Math.round(sans)}`);
+    const avec = await position('?tab=debriefs');
+    s.check('desktop — avec ?tab=debriefs, la section est amenée à l\'écran', avec >= 0 && avec < DESKTOP.height, `top=${Math.round(avec)}`);
+    // L'embed OpenRunner (tiers) lève sa propre erreur au chargement : hors du périmètre testé.
+    page.__erreursJs = [];
+    await s.shot(page, 's32-onglet-debriefs-desktop');
+    s.checkJs(page);
+    await ctx.close();
+  }
+  tous.push(s.report());
+}
+
 await browser.close();
 const ok = tous.every(Boolean);
 console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES PARCOURS PASSENT' : '❌ AU MOINS UN PARCOURS ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);

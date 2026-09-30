@@ -88,8 +88,24 @@
     // Source unique de visibilité : un panneau n'est rendu que si son onglet existe (évite un
     // onglet cliquable sans panneau, ou un panneau orphelin, quand une condition évolue).
     $shown = array_column($tabs, 'v');
+    // Onglet d'ouverture (#99) : celui du lien s'il existe sur CETTE fiche, sinon Infos — un
+    // onglet masqué (liste vide, pas une compétition) ou inconnu n'ouvre jamais un panneau vide.
+    $startTab = in_array($initialTab, $shown, true) ? $initialTab : 'infos';
 @endphp
-<div class="fiche-screen" x-data="{ tab: 'infos' }">
+{{-- Ouverture sur un onglet (#99). Mobile : la barre d'onglets défile horizontalement, et
+     l'onglet actif (Débriefs est le dernier) restait hors champ — on la fait glisser jusqu'à lui,
+     sans toucher au défilement de la page. Desktop n'a pas d'onglets : la section visée est amenée
+     à l'écran. Seule la coquille mobile a une barre d'onglets, seule la desktop porte data-section,
+     et offsetParent est null tant qu'une coquille est masquée : chacune n'agit que dans son format.
+     Pas de nom de coquille dans cet attribut : des tests découpent le rendu sur « fiche-mobile ». --}}
+<div class="fiche-screen" x-data="{ tab: @js($startTab) }"
+     x-init="if (tab !== 'infos') $nextTick(() => {
+         const bande = $root.querySelector('.tabstrip');
+         const actif = bande?.querySelector('.tab.on');
+         if (actif && actif.offsetParent) bande.scrollLeft = actif.offsetLeft - (bande.clientWidth - actif.offsetWidth) / 2;
+         const cible = $root.querySelector(`[data-section='${tab}']`);
+         if (cible && cible.offsetParent) cible.scrollIntoView({ block: 'start' });
+     })">
     {{-- Feedback d'action global (revue UX 2026-07-11) : bannière flottante auto-masquée,
          flash('status') = succès (vert) · flash('warn') = refus (orange). --}}
     <x-flash-float />
@@ -329,9 +345,13 @@
                             @include('livewire.partials.fiche-parcours')
                         </div>
                     @endif
-                    @include('livewire.partials.fiche-encadrement')
+                    <div data-section="encadrement">
+                        @include('livewire.partials.fiche-encadrement')
+                    </div>
                     @if ($session->kind === 'competition')
-                        @include('livewire.partials.fiche-debriefs')
+                        <div data-section="debriefs">
+                            @include('livewire.partials.fiche-debriefs')
+                        </div>
                     @endif
                 </div>
 

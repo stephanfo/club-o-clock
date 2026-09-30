@@ -122,6 +122,8 @@ class Alerts extends Component
                 'tintBg' => self::tintBgFor($type),
                 'tintFg' => self::tintFgFor($type),
                 'sessionId' => $sessionId,
+                // Onglet visé (#99) : même règle que le lien du push et de l'email.
+                'tab' => $type?->sessionTab(),
             ];
         })->values();
 
