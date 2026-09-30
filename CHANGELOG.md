@@ -262,6 +262,36 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   d'encadrement. Au téléphone, la barre d'onglets glisse jusqu'à l'onglet ouvert ; sur ordinateur,
   la section est amenée à l'écran. Un onglet absent de la fiche retombe sur Infos (#99).
 
+- **Une place obtenue hors quota ne fait plus tenir deux places pour un quota d'une.** Inscrit
+  vendredi puis promu mardi grâce au déblocage du quota, un athlète gardait les deux, au détriment de
+  quelqu'un qui attendait vendredi. Désormais sa place de vendredi repasse en liste d'attente, à son
+  rang d'origine, et la place libérée va au premier qui attendait — sauf si le quota de vendredi est
+  lui aussi débloqué. Le dialog de quota, la confirmation d'inscription sur séance débloquée et la
+  notification de promotion nomment la séance concernée. Les places obtenues par override ne sont
+  jamais touchées (#103).
+
+- **Les notifications push pouvaient cesser d'arriver sans que l'écran le montre.** L'interrupteur
+  « Notifications sur cet appareil » restait sur « activées » alors que le serveur avait perdu
+  l'abonnement, et la coupure échouait sans message. L'app renvoie désormais d'elle-même l'abonnement
+  au serveur à l'ouverture (une fois par jour), suit son renouvellement par le navigateur et se
+  réabonne si les clés du serveur ont changé, sans rien demander. L'interrupteur n'affiche
+  « activées » qu'une fois l'abonnement confirmé, propose sinon de réparer, et dit pourquoi une
+  activation ou une coupure a échoué (#96).
+
+- **L'éditeur de débrief était inutilisable sur téléphone et sur iPad.** Sur un texte long, la zone
+  de saisie ne défilait pas : le doigt, le trackpad ou la molette faisaient défiler la page derrière,
+  et on ne pouvait plus remonter au début du texte. Sur certains Android, le clavier ouvert réduisait
+  même la zone à rien. Désormais, c'est la zone de texte qui défile. Au téléphone, l'éditeur s'ouvre
+  en feuille pleine largeur qui reste au-dessus du clavier, et sur un écran bas, ce sont l'en-tête et
+  la barre d'outils qui se resserrent, pas la zone de texte (#98).
+
+- **Un texte trop long était coupé sans prévenir.** Un débrief, un contenu de séance, un agenda ou
+  une page d'information de plus de 20 000 caractères perdait sa fin à l'enregistrement. Il est
+  maintenant refusé, avec un message qui donne sa longueur et le maximum (#100).
+
+- **Un refus émis dans une fenêtre ouverte s'affichait derrière elle.** Le message (par exemple
+  « Le débrief est vide ») passe désormais au-dessus de la fenêtre.
+
 - **Les listes de garants de la fiche adhérent étaient triées par prénom.** « Choisir un garant »,
   « Remplacer le garant » et « Rattacher un mineur sans garant » suivent désormais l'ordre de la liste
   des adhérents et de l'écran de création : nom, puis prénom.

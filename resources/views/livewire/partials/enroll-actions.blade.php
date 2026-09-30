@@ -4,6 +4,15 @@
 @php($isDesktop = ($variant ?? 'mobile') === 'desktop')
 @php($block = $isDesktop ? 'btn-block' : 'f1')
 @php($subjName = $subjName ?? null)
+{{-- Confirmations d'inscription : chevauchement d'horaire, et place rendue ailleurs (#103) quand la
+     séance a son quota débloqué — l'inscription y passe sans dialog de quota, mais fait repasser
+     en liste d'attente l'autre séance de la semaine. Les deux peuvent s'additionner. --}}
+@php($requeueNotice = $requeueNotice ?? null)
+@php($conflictLine = $hasConflict ? ($subjName ? "{$subjName} est déjà inscrit·e à une séance qui chevauche ce créneau." : 'Tu es déjà inscrit·e à une séance qui chevauche ce créneau.') : '')
+@php($requeueNow = $requeueNotice ? ($subjName ? "Sa place à {$requeueNotice} repassera en liste d'attente, pour laisser la place à quelqu'un qui attendait." : "Ta place à {$requeueNotice} repassera en liste d'attente, pour laisser la place à quelqu'un qui attendait.") : '')
+@php($requeueLater = $requeueNotice ? ($subjName ? "Si une place lui est attribuée ici, sa place à {$requeueNotice} repassera en liste d'attente." : "Si une place t'est attribuée ici, ta place à {$requeueNotice} repassera en liste d'attente.") : '')
+@php($confirmEnroll = trim($conflictLine.' '.$requeueNow).' '.($subjName ? "L'inscrire quand même ?" : "T'inscrire quand même ?"))
+@php($confirmWl = trim($conflictLine.' '.$requeueLater).' '."Rejoindre quand même la liste d'attente ?")
 {{-- Quitter l'encadrement : une seule définition pour les trois points d'appel (segment, coach-pur,
      coach-athlète bloqué) — trois gardes rédigées séparément divergeaient au premier changement. --}}
 @php($canLeaveCoaching = ($canManageCoaches ?? false) && $session->kind === 'training'
@@ -98,13 +107,13 @@
     @include('livewire.partials.enroll-block-reason')
 @elseif ($isFull)
     <button wire:key="enr-act-joinwl-{{ $session->id }}" wire:click="enroll" wire:loading.attr="disabled" wire:target="enroll"
-            @if ($hasConflict) wire:confirm="{{ $subjName ? "{$subjName} est déjà inscrit·e à une séance qui chevauche ce créneau. Rejoindre quand même la liste d'attente ?" : "Tu es déjà inscrit·e à une séance qui chevauche ce créneau. Rejoindre quand même la liste d'attente ?" }}" @endif
+            @if ($hasConflict || $requeueNotice) wire:confirm="{{ $confirmWl }}" @endif
             class="btn btn-primary {{ $block }}">
         <x-icon name="clock" :size="15" /> {{ $subjName ? "Mettre {$subjName} en liste d'attente" : "Rejoindre la liste d'attente" }}
     </button>
 @else
     <button wire:key="enr-act-enroll-{{ $session->id }}" wire:click="enroll" wire:loading.attr="disabled" wire:target="enroll"
-            @if ($hasConflict) wire:confirm="{{ $subjName ? "{$subjName} est déjà inscrit·e à une séance qui chevauche ce créneau. L'inscrire quand même ?" : "Tu es déjà inscrit·e à une séance qui chevauche ce créneau. T'inscrire quand même ?" }}" @endif
+            @if ($hasConflict || $requeueNotice) wire:confirm="{{ $confirmEnroll }}" @endif
             class="btn btn-primary {{ $block }}">
         <x-icon name="check" :size="15" /> {{ $subjName ? "Inscrire {$subjName}" : "S'inscrire" }}
     </button>

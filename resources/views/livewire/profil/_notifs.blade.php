@@ -3,7 +3,9 @@
      §4.15.2 (groupes ; le groupe Encadrement n'apparaît qu'aux coachs/admins). --}}
 <div style="display:flex;flex-direction:column;gap:16px">
 
-    {{-- Push sur l'appareil (J8.6) — abonnement PushManager, état purement client (window.clubPush).
+    {{-- Push sur l'appareil (J8.6) — abonnement PushManager, piloté par window.clubPush. « Activées »
+         n'est affiché que si le serveur a confirmé l'abonnement ; sinon « à réparer » (#96). Un échec
+         d'activation ou de coupure s'affiche en clair sous le libellé, et l'état précédent reste.
          Distinct des préférences ci-dessous : ici on autorise/coupe le canal push DE CET APPAREIL ;
          la matrice règle quels types passent par push/email. Non couvert par le proto → markup maison
          sur les classes design (card/toggle/meta).
@@ -15,13 +17,17 @@
         x-data="{
             state: 'loading',
             busy: false,
+            error: null,
             async init() { this.state = await window.clubPush.getState(); },
             async toggle() {
                 if (this.busy || this.state === 'denied' || this.state === 'unsupported') return;
                 this.busy = true;
+                this.error = null;
                 try {
                     this.state = this.state === 'on' ? await window.clubPush.disable() : await window.clubPush.enable();
-                } catch (e) { this.state = await window.clubPush.getState(); }
+                } catch (e) {
+                    this.error = window.clubPush.messageFor(e);
+                }
                 this.busy = false;
             }
         }">
@@ -34,10 +40,12 @@
             <div class="meta" style="font-size:12px">
                 <span x-show="state === 'on'">Activées ici — appuie pour les couper sur cet appareil.</span>
                 <span x-show="state === 'off'" x-cloak>Reçois les alertes push sur cet appareil, même l'application fermée.</span>
+                <span x-show="state === 'repair'" x-cloak>Le club ne peut plus joindre cet appareil. Appuie pour réactiver les notifications.</span>
                 <span x-show="state === 'denied'" x-cloak>Bloquées par le navigateur. Autorise les notifications dans ses réglages.</span>
                 <span x-show="state === 'unsupported'" x-cloak>Cet appareil ou navigateur ne gère pas les notifications push.</span>
                 <span x-show="state === 'loading'">Vérification…</span>
             </div>
+            <div class="field-error" role="alert" x-show="error" x-text="error" x-cloak></div>
         </div>
     </div>
     @endif

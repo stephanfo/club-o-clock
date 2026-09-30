@@ -18,7 +18,7 @@ import vm from 'node:vm';
 const racine = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /** Charge public/sw.js dans une portée feinte et renvoie ses écouteurs + la portée. */
-function chargerServiceWorker(clients) {
+function chargerServiceWorker(clients, { pushManager = {}, fetch = async () => ({}) } = {}) {
     const ecouteurs = {};
     const ouvertes = [];
 
@@ -27,7 +27,7 @@ function chargerServiceWorker(clients) {
         addEventListener: (type, handler) => {
             ecouteurs[type] = handler;
         },
-        registration: { showNotification: async () => {} },
+        registration: { showNotification: async () => {}, pushManager },
         skipWaiting: async () => {},
         clients: {
             matchAll: async () => clients,
@@ -46,7 +46,7 @@ function chargerServiceWorker(clients) {
         Promise,
         console,
         caches: { open: async () => ({ addAll: async () => {} }), keys: async () => [], delete: async () => {} },
-        fetch: async () => ({}),
+        fetch,
     });
 
     vm.runInContext(readFileSync(join(racine, 'public', 'sw.js'), 'utf8'), contexte);
@@ -140,4 +140,66 @@ test('aucune fenêtre ouverte : on en ouvre une', async () => {
     const { ouvertes } = await cliquer('/seances/12', []);
 
     assert.deepEqual(ouvertes, ['https://club.test/seances/12']);
+});
+
+// ── pushsubscriptionchange (#96) : le nouvel endpoint doit parvenir au serveur ──
+
+/** Rejoue pushsubscriptionchange ; renvoie les appels fetch et les abonnements créés. */
+async function renouveler(evenement, { jetonOk = true, existant = null } = {}) {
+    const appels = [];
+    const crees = [];
+    const nouvel = (endpoint) => ({ endpoint, toJSON: () => ({ keys: { p256dh: 'P', auth: 'A' } }) });
+    const { ecouteurs } = chargerServiceWorker([], {
+        pushManager: {
+            getSubscription: async () => existant,
+            subscribe: async (options) => {
+                crees.push(options);
+
+                return nouvel('https://push.test/recree');
+            },
+        },
+        fetch: async (url, init = {}) => {
+            appels.push({ url, init });
+
+            return url === '/push/jeton'
+                ? { ok: jetonOk, json: async () => ({ token: 'JETON-FRAIS' }) }
+                : { ok: true };
+        },
+    });
+
+    let attendu;
+    ecouteurs.pushsubscriptionchange({ ...evenement, waitUntil: (p) => { attendu = p; } });
+    await attendu;
+
+    return { appels, crees, nouvel };
+}
+
+test('le nouvel abonnement fourni par le navigateur est transmis avec un jeton frais', async () => {
+    const { appels } = await renouveler({ newSubscription: { endpoint: 'https://push.test/neuf', toJSON: () => ({ keys: { p256dh: 'P', auth: 'A' } }) } });
+
+    assert.equal(appels.length, 2);
+    assert.equal(appels[0].url, '/push/jeton');
+    assert.equal(appels[1].url, '/push/subscriptions');
+    assert.equal(appels[1].init.method, 'POST');
+    assert.equal(appels[1].init.headers['X-CSRF-TOKEN'], 'JETON-FRAIS');
+    assert.equal(JSON.parse(appels[1].init.body).endpoint, 'https://push.test/neuf');
+});
+
+test('sans nouvel abonnement, on se réabonne avec la clé de l\'ancien', async () => {
+    const cle = new Uint8Array([1, 2, 3]).buffer;
+    const { appels, crees } = await renouveler({ oldSubscription: { options: { applicationServerKey: cle } } });
+
+    assert.equal(crees.length, 1);
+    assert.equal(crees[0].applicationServerKey, cle);
+    assert.equal(crees[0].userVisibleOnly, true);
+    assert.equal(JSON.parse(appels[1].init.body).endpoint, 'https://push.test/recree');
+});
+
+test('session perdue : rien n\'est posté, et l\'événement ne lève pas', async () => {
+    const { appels } = await renouveler(
+        { newSubscription: { endpoint: 'https://push.test/neuf', toJSON: () => ({ keys: {} }) } },
+        { jetonOk: false },
+    );
+
+    assert.deepEqual(appels.map((a) => a.url), ['/push/jeton']);
 });

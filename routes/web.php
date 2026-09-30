@@ -95,6 +95,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Abonnements Web Push de l'appareil courant (J8.6, PRD §4.15). Activés depuis l'onglet Notifs.
     Route::post('/push/subscriptions', [PushSubscriptionController::class, 'store'])->name('push.subscribe');
     Route::delete('/push/subscriptions', [PushSubscriptionController::class, 'destroy'])->name('push.unsubscribe');
+    Route::get('/push/jeton', [PushSubscriptionController::class, 'token'])->name('push.token');
 
     // Alertes / centre de notifications (PRD §4.15)
     Route::get('/alertes', Alerts::class)->name('alerts');

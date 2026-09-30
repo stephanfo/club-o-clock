@@ -89,7 +89,9 @@ class RegistrationService
             && $target->guardian_id !== $actor->id
             && ($actor->hasRole('coach') || $actor->hasRole('admin'));
 
-        $registration = DB::transaction(function () use ($session, $target, $actor, $confirmQuota, $byStaff) {
+        $cascade = [];
+
+        $registration = DB::transaction(function () use ($session, $target, $actor, $confirmQuota, $byStaff, &$cascade) {
             // Re-fetch verrouillé : sérialise les inscriptions concurrentes sur la même séance (§4.9.5).
             $locked = Session::query()->with(['quotaTag', 'categories'])->lockForUpdate()->findOrFail($session->getKey());
 
@@ -174,6 +176,12 @@ class RegistrationService
                 'override_reason' => null,
             ]);
 
+            // #103 : place obtenue hors quota (séance débloquée) → l'autre place de la semaine est
+            // réévaluée. Les promus de sa file sont notifiés après commit, comme partout ailleurs.
+            if ($overQuota && $status === 'participating') {
+                $this->reevaluateOtherPlace($locked, $registration, $cascade);
+            }
+
             // §4.9.7 : inscription_by_coach quand un coach/admin inscrit un tiers ; inscription_for_other
             // pour le parent inscrivant son enfant ; inscription pour soi-même.
             $action = match (true) {
@@ -194,8 +202,13 @@ class RegistrationService
         // §4.9.7 « Notif à l'athlète » : la cible inscrite par le bureau est prévenue (push + email).
         // Distinct de l'override (§4.10.5) qui émet CoachOverride depuis overrideRegister().
         if ($byStaff) {
-            $this->notifier->dispatch(NotificationType::EnrolledByCoach, $target, $session->payloadNotification());
+            $this->notifier->dispatch(NotificationType::EnrolledByCoach, $target, [
+                ...$session->payloadNotification(),
+                ...self::requeuedPayload($registration),
+            ]);
         }
+
+        $this->notifyPromoted($cascade);
 
         return $registration;
     }
@@ -347,6 +360,11 @@ class RegistrationService
                 'motif' => $motif,
             ]);
 
+            // #103 : seuls les promus qui tiennent déjà une autre place de la semaine sont réévalués.
+            // Repérés en UNE requête : un déblocage promeut toute la file d'un coup, et une
+            // vérification par promu rendait le coût proportionnel à la file.
+            $holdingElsewhere = $this->holdingOtherPlace($locked, $candidates->pluck('user_id')->all());
+
             foreach ($candidates as $reg) {
                 $reg->update([
                     'status' => 'participating',
@@ -369,6 +387,10 @@ class RegistrationService
                 ]);
 
                 $promoted[] = $reg;
+
+                if (isset($holdingElsewhere[$reg->user_id])) {
+                    $this->reevaluateOtherPlace($locked, $reg, $promoted);
+                }
             }
 
             return $candidates->count();
@@ -579,7 +601,10 @@ class RegistrationService
             ->lockForUpdate()
             ->first();
 
+        $horsQuota = false;
+
         if (! $next && $session->isQuotaReleased()) {
+            $horsQuota = true;
             $next = Registration::query()
                 ->where('session_id', $session->id)
                 ->where('status', 'waitlist')
@@ -608,6 +633,141 @@ class RegistrationService
         ]);
 
         $promoted[] = $next;
+
+        if ($horsQuota) {
+            $this->reevaluateOtherPlace($session, $next, $promoted);
+        }
+    }
+
+    /**
+     * Place de la semaine que l'athlète rendrait s'il obtenait une place HORS QUOTA sur $session
+     * (#103) : sa DERNIÈRE place obtenue sur une autre séance future du même tag, hors override.
+     * Sert au geste (réévaluation) comme à l'avertissement affiché avant — les deux disent la
+     * même séance. Null si l'athlète n'est pas au-dessus du quota, ou si cette place est sur une
+     * séance au quota débloqué : il la garde (§4.10.4 C).
+     */
+    public function placeToRequeue(User $user, Session $session, bool $lock = false): ?Registration
+    {
+        if ($session->quota_tag_id === null
+            || ! $this->quota->isOverQuota($user, $session, excludeSessionId: $session->id)) {
+            return null;
+        }
+
+        [$from, $to] = $this->quota->weekBoundsUtc($session->start_at);
+
+        $last = Registration::query()
+            ->where('user_id', $user->id)
+            ->where('status', 'participating')
+            ->where('session_id', '!=', $session->id)
+            // Override : geste délibéré du coach, jamais défait par le système (§4.10.5).
+            ->whereNull('override_by')
+            ->whereHas('session', fn ($q) => $q
+                ->where('quota_tag_id', $session->quota_tag_id)
+                ->whereNull('cancelled_at')
+                ->whereBetween('start_at', [$from, $to])
+                // Séance commencée : inscription figée (§4.9.1).
+                ->where('start_at', '>', Carbon::now()))
+            ->with('session')
+            ->orderByRaw('COALESCE(promoted_at, registered_at) DESC')
+            ->orderByDesc('id')
+            ->when($lock, fn ($q) => $q->lockForUpdate())
+            ->first();
+
+        return $last !== null && ! $last->session->isQuotaReleased() ? $last : null;
+    }
+
+    /**
+     * Parmi $userIds, ceux qui tiennent une place `participating` sur une autre séance du même tag
+     * dans la semaine de $session (#103). Filtre grossier et groupé ; placeToRequeue() tranche.
+     *
+     * @param  list<int>  $userIds
+     * @return array<int, bool>
+     */
+    private function holdingOtherPlace(Session $session, array $userIds): array
+    {
+        if ($session->quota_tag_id === null || $userIds === []) {
+            return [];
+        }
+
+        [$from, $to] = $this->quota->weekBoundsUtc($session->start_at);
+
+        return Registration::query()
+            ->whereIn('user_id', $userIds)
+            ->where('status', 'participating')
+            ->where('session_id', '!=', $session->id)
+            ->whereHas('session', fn ($q) => $q
+                ->where('quota_tag_id', $session->quota_tag_id)
+                ->whereNull('cancelled_at')
+                ->whereBetween('start_at', [$from, $to]))
+            ->distinct()
+            ->pluck('user_id')
+            ->mapWithKeys(fn ($id) => [(int) $id => true])
+            ->all();
+    }
+
+    /**
+     * Réévaluation de l'autre place (#103, §4.10.4 C). $gained vient d'être obtenue hors quota : si
+     * l'athlète dépasse désormais son quota, sa dernière place obtenue ailleurs dans la semaine est
+     * réévaluée comme s'il s'y inscrivait maintenant — quota débloqué, il la garde ; sinon il repasse
+     * en `waitlist quota_exceeded`, `registered_at` INCHANGÉ (c'était son premier choix : il passe
+     * devant ceux arrivés après lui déjà hors quota), et la place libérée part au 1er de la file
+     * `capacity` (mécanisme A). Pas de boucle : cette séance-là n'étant pas débloquée, A n'y pioche
+     * pas dans `quota_exceeded`, donc aucune nouvelle place hors quota n'en sort.
+     *
+     * La place rendue est attachée au promu (relation `requeued`) : sa notification la nomme.
+     *
+     * @param  list<Registration>  $promoted
+     */
+    private function reevaluateOtherPlace(Session $gainedSession, Registration $gained, array &$promoted): void
+    {
+        $user = $gained->user ?? User::find($gained->user_id);
+        if ($user === null) {
+            return;
+        }
+
+        $other = $this->placeToRequeue($user, $gainedSession, lock: true);
+        if ($other === null) {
+            return;
+        }
+
+        $other->update([
+            'status' => 'waitlist',
+            'waitlist_reason' => 'quota_exceeded',
+            'promoted_at' => null,
+            'promoted_by' => null,
+        ]);
+
+        ActivityLogger::system('quota_requeued', [
+            'user_id' => $user->id,
+            'session_id' => $other->session_id,
+            'registration_id' => $other->id,
+            'resulting_status' => 'waitlist_quota_exceeded',
+        ]);
+
+        $gained->setRelation('requeued', $other);
+
+        $locked = Session::query()->lockForUpdate()->findOrFail($other->session_id);
+        $this->promoteNext($locked, $promoted);
+    }
+
+    /**
+     * Charge utile « place rendue » d'une notification de promotion (#103) : le corps dit quelle
+     * séance repasse en liste d'attente.
+     *
+     * @return array<string, string>
+     */
+    public static function requeuedPayload(Registration $gained): array
+    {
+        $other = $gained->relationLoaded('requeued') ? $gained->getRelation('requeued') : null;
+
+        if (! $other instanceof Registration || $other->session === null) {
+            return [];
+        }
+
+        return [
+            'requeued_session_title' => $other->session->title,
+            'requeued_session_start_at' => $other->session->start_at->toIso8601String(),
+        ];
     }
 
     /**
@@ -735,7 +895,10 @@ class RegistrationService
                 $this->notifier->dispatch(
                     NotificationType::WaitlistPromoted,
                     $reg->user,
-                    $reg->session?->payloadNotification() ?? ['session_id' => $reg->session_id],
+                    [
+                        ...($reg->session?->payloadNotification() ?? ['session_id' => $reg->session_id]),
+                        ...self::requeuedPayload($reg),
+                    ],
                 );
             }
         }

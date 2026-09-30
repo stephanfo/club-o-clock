@@ -2,7 +2,7 @@
 
 namespace App\Notifications\Push;
 
-// Issue d'un envoi push vers UN abonnement. « expired » = endpoint mort (404/410) → l'abonnement
+// Issue d'un envoi push vers UN abonnement. « expired » = endpoint mort (404/410) ou refusé (401/403) → l'abonnement
 // doit être purgé ; « delivered » = accepté par le service push ; sinon échec transitoire (retry).
 final class PushDeliveryResult
 {
@@ -16,7 +16,7 @@ final class PushDeliveryResult
         return new self(true, false);
     }
 
-    /** Endpoint mort : à purger, inutile de retenter. */
+    /** Endpoint mort ou refusé : à purger, inutile de retenter. */
     public static function expired(): self
     {
         return new self(false, true);

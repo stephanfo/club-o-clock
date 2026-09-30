@@ -402,6 +402,25 @@ indépendantes de la coquille serveur) :
 | **Géocodage** | **Photon / OSM** (`photon.komoot.io`) | Service ouvert UE | Gratuit, UE, sans clé, **auto-hébergeable**. Usage principal serveur (`GeocodingService::search()`) : **autocomplétion** adresse/POI, ≤ 5 résultats **structurés** (nom + adresse recomposée depuis les champs `housenumber`/`street`/`postcode`/`city` + type lisible déduit d'`osm_value`), **debounce serveur Livewire 400 ms + ≥ 4 caractères**, cache 6 h, `lang=fr`. **Biais géographique** : le barycentre des `Location` non archivés et géocodés est envoyé en `lat`/`lon` — Photon **classe** par distance, il ne filtre pas, donc une compétition lointaine reste trouvable ; catalogue vide ⇒ pas de biais. Les doublons OSM d'un même lieu (même nom à ~100 m) sont **fusionnés**. La sélection d'une suggestion remplit tous les champs (nom/adresse/type/coords) → **plus de bouton « géocoder » manuel** dans l'UI ; `geocode()` (1 résultat, cache 30 j) emploie **le même moteur** et reste disponible côté service (météo, scripts). **Aucun appel navigateur** (User-Agent identifiable côté serveur). Fallback : **saisie lat/lng manuelle** dans les champs (PRD §4.13.4). ⚠️ Photon rend `geometry.coordinates` en **`[longitude, latitude]`**, l'inverse de l'ordre employé partout ailleurs ici. **Nominatim écarté (#63)** : il apparie l'adresse complète et, sur une saisie approximative, rend soit rien, soit une **commune voisine plausible mais fausse** (code postal et commune ignorés) — une donnée erronée se valide sans y penser, là où un silence se remarque. |
 | **Météo** | **Open-Meteo** (figé PRD) | — | Gratuit, sans clé, UE, CC BY 4.0. Cache serveur 3h + pré-calcul cron J-16. |
 
+**Cycle de vie d'un abonnement push (#96).** Le serveur peut perdre un abonnement que le navigateur croit
+toujours valide : purge après un refus, renouvellement silencieux par le service push, clés VAPID changées.
+Trois règles referment l'écart, sans geste ni nouvelle permission :
+
+- **Refus définitif = purge.** 404/410 (abonnement disparu) **et 401/403** (signature VAPID refusée, donc
+  abonnement créé avec d'anciennes clés) suppriment la ligne. Retenter ne peut pas réussir ; le reste
+  (réseau, 429, 5xx) est transitoire et laissé au drain.
+- **Le navigateur se resynchronise.** À l'ouverture de l'app (et au retour au premier plan), si la
+  permission est accordée et qu'un abonnement existe, il est renvoyé au `POST` idempotent — au plus une
+  fois par jour, sauf si l'endpoint ou le compte connecté ont changé. Un abonnement signé avec une autre
+  clé que la clé publique courante est d'abord recréé. Le service worker traite `pushsubscriptionchange`
+  de la même façon, en demandant un jeton CSRF à `/push/jeton` faute de page où le lire.
+- **L'écran ne ment pas.** « Activées » n'est affiché qu'après confirmation du serveur ; sinon l'état
+  « à réparer » invite à réactiver. Un 419 (session expirée dans une PWA restée ouverte) redemande un
+  jeton puis rejoue l'appel une fois ; tout autre échec s'affiche en clair.
+
+Un endpoint identifie le **navigateur**, pas la personne : envoyé par un autre compte, il passe à ce
+compte, et les alertes suivent qui est connecté sur l'appareil partagé.
+
 ### 6.4 Répartition des responsabilités mutualisé ↔ externe
 
 | Responsabilité | Où |

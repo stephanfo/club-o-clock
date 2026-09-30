@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Concerns\SessionShow;
 
+use App\Models\ClubSettings;
+use App\Models\Registration;
 use App\Models\User;
 use App\Services\QuotaService;
 use App\Services\RegistrationService;
@@ -16,6 +18,12 @@ trait ManagesEnrollment
     public bool $confirmingQuota = false;
 
     /**
+     * Place que le sujet rendrait s'il obtenait plus tard une place ici (#103) — nommée dans le
+     * dialog de quota, pour qu'il sache à quoi il s'engage en rejoignant la file.
+     */
+    public ?string $quotaRequeue = null;
+
+    /**
      * S'inscrire / rejoindre la liste d'attente (§4.9, §4.10).
      * Un dépassement de quota lève QUOTA_NEEDS_CONFIRM → on montre le bandeau de confirmation.
      */
@@ -25,11 +33,17 @@ trait ManagesEnrollment
         $this->authorize('enroll', [$this->session, $target]);
 
         try {
-            $service->register($this->session, $target, auth()->user(), confirmQuota: $confirmQuota);
+            $registration = $service->register($this->session, $target, auth()->user(), confirmQuota: $confirmQuota);
             $this->confirmingQuota = false;
+
+            if (($rendue = self::requeuedLabel($registration)) !== null) {
+                $qui = $target->id === auth()->id() ? 'Ta place' : 'La place de '.$target->first_name;
+                session()->flash('status', "Inscription confirmée. {$qui} à {$rendue} repasse en liste d'attente, pour laisser la place à quelqu'un qui attendait.");
+            }
         } catch (RuntimeException $e) {
             if ($e->getMessage() === RegistrationService::QUOTA_NEEDS_CONFIRM) {
                 $this->confirmingQuota = true; // demande explicite avant waitlist quota_exceeded.
+                $this->quotaRequeue = self::placeLabel($service->placeToRequeue($target, $this->session));
             } else {
                 // Sentinelle possible malgré l'authorize (course : catégorie/ciblage modifié entre-temps).
                 session()->flash('warn', $this->translateRegError($e->getMessage()));
@@ -39,9 +53,45 @@ trait ManagesEnrollment
         $this->refreshSession();
     }
 
+    /**
+     * Avertissement avant de s'inscrire sur une séance au quota débloqué (#103) : l'inscription y
+     * passe sans dialog de quota, mais rend l'autre place de la semaine. Null si rien à rendre.
+     */
+    protected function requeueNotice(): ?string
+    {
+        $subject = $this->subject();
+
+        if (! $this->session->isQuotaReleased() || $this->session->hasStarted()) {
+            return null;
+        }
+
+        $reg = $this->session->registrations->firstWhere('user_id', $subject->id);
+        if ($reg !== null && $reg->status !== 'cancelled') {
+            return null;
+        }
+
+        return self::placeLabel(app(RegistrationService::class)->placeToRequeue($subject, $this->session));
+    }
+
+    /** « « Natation » du ven. 3 oct. » : la séance d'une place, au format dense (heure club). */
+    private static function placeLabel(?Registration $registration): ?string
+    {
+        $session = $registration?->session;
+
+        return $session === null ? null : '« '.$session->title.' » du '
+            .$session->start_at->copy()->setTimezone(ClubSettings::current()->timezone)->locale('fr')->isoFormat('ddd D MMM');
+    }
+
+    /** Place rendue par une inscription qui vient d'aboutir (#103), ou null. */
+    private static function requeuedLabel(Registration $registration): ?string
+    {
+        return $registration->relationLoaded('requeued') ? self::placeLabel($registration->getRelation('requeued')) : null;
+    }
+
     public function cancelQuotaConfirm(): void
     {
         $this->confirmingQuota = false;
+        $this->quotaRequeue = null;
     }
 
     /** Se désinscrire (§4.9) — peut promouvoir le 1er en liste d'attente (mécanismes A/B). */
@@ -95,9 +145,11 @@ trait ManagesEnrollment
         $target = User::findOrFail($userId);
 
         try {
-            $service->register($this->session, $target, auth()->user());
+            $registration = $service->register($this->session, $target, auth()->user());
             $this->pickingAthlete = false;
-            session()->flash('status', $target->fullName().' inscrit·e.');
+            $rendue = self::requeuedLabel($registration);
+            session()->flash('status', $target->fullName().' inscrit·e.'
+                .($rendue !== null ? " Sa place à {$rendue} repasse en liste d'attente." : ''));
         } catch (RuntimeException $e) {
             if ($e->getMessage() === RegistrationService::QUOTA_NEEDS_CONFIRM) {
                 $tag = $this->session->quotaTag;
@@ -107,6 +159,7 @@ trait ManagesEnrollment
                     'count' => $tag ? $quota->weeklyCount($target, $tag->id, $this->session->start_at, $this->session->id) : null,
                     'max' => $tag?->max_per_week,
                     'tag' => $tag?->label,
+                    'requeue' => self::placeLabel($service->placeToRequeue($target, $this->session)),
                     'motif' => '',
                 ];
             } else {

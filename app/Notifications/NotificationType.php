@@ -112,7 +112,7 @@ enum NotificationType: string
         return match ($this) {
             self::SessionCancelled => 'Une séance à laquelle tu es inscrit·e est annulée',
             self::SessionRestored => 'Une séance annulée est réactivée',
-            self::WaitlistPromoted => 'Une place se libère, tu passes inscrit·e (files A, B ou C — un seul réglage pour les trois)',
+            self::WaitlistPromoted => 'Une place se libère, tu passes inscrit·e (files A, B ou C — un seul réglage pour les trois), y compris quand ton autre place de la semaine repasse en liste d\'attente',
             self::EnrolledByCoach => 'Un coach t\'inscrit sur une séance à ta place',
             self::CoachOverride => 'Un coach t\'inscrit d\'office sur une séance (override)',
             self::SessionModified => 'Date, horaire ou lieu modifiés',

@@ -8,6 +8,7 @@ use App\Models\Registration;
 use App\Models\Session;
 use App\Models\User;
 use App\Services\DebriefService;
+use App\Support\Markup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use RuntimeException;
@@ -56,6 +57,46 @@ class DebriefServiceTest extends TestCase
         $this->assertDatabaseHas('activity_logs', [
             'action' => 'debrief_published', 'actor_id' => $u->id, 'session_id' => $s->id,
         ]);
+    }
+
+    // #100 : au-delà de la limite, le débrief est refusé — jamais coupé sans prévenir.
+    public function test_too_long_debrief_is_refused_not_truncated(): void
+    {
+        $s = $this->competition();
+        $u = $this->participant($s);
+
+        try {
+            $this->service()->publish($s, $u, str_repeat('a', Markup::MAX_LENGTH + 1));
+            $this->fail('Un débrief trop long doit être refusé.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('20 000', $e->getMessage());
+        }
+        $this->assertSame(0, Debrief::count());
+    }
+
+    public function test_debrief_at_the_limit_is_stored_intact(): void
+    {
+        $s = $this->competition();
+        $u = $this->participant($s);
+        $text = str_repeat('a', Markup::MAX_LENGTH);
+
+        $debrief = $this->service()->publish($s, $u, $text);
+
+        $this->assertSame($text, $debrief->content_markdown);
+    }
+
+    public function test_too_long_edit_is_refused_and_keeps_previous_text(): void
+    {
+        $s = $this->competition();
+        $u = $this->participant($s);
+        $debrief = $this->service()->publish($s, $u, 'Version courte');
+
+        try {
+            $this->service()->update($debrief, $u, str_repeat('a', Markup::MAX_LENGTH + 1));
+            $this->fail('Une édition trop longue doit être refusée.');
+        } catch (RuntimeException) {
+        }
+        $this->assertSame('Version courte', $debrief->fresh()->content_markdown);
     }
 
     public function test_cannot_publish_before_start(): void

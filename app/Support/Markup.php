@@ -20,6 +20,12 @@ use League\HTMLToMarkdown\HtmlConverter;
 // (TipTap) n'est jamais traité par un sanitizer HTML maison : il transite par le parseur durci.
 class Markup
 {
+    /**
+     * Longueur maximale du markdown STOCKÉ (après normalisation). Au-delà, l'enregistrement est
+     * refusé — jamais tronqué : couper en silence publiait un texte amputé de sa fin (#100).
+     */
+    public const MAX_LENGTH = 20000;
+
     /** Balises conservées telles quelles (hors void / hors <a> traité à part). */
     private const ALLOWED = ['p', 'strong', 'em', 'del', 'ul', 'ol', 'li', 'h2', 'h3', 'blockquote'];
 
@@ -65,7 +71,33 @@ class Markup
 
         $markdown = trim($converter->convert($safeHtml));
 
-        return $markdown === '' ? null : mb_substr($markdown, 0, 20000);
+        return $markdown === '' ? null : $markdown;
+    }
+
+    /**
+     * Message de refus si le contenu, une fois normalisé, dépasse MAX_LENGTH ; null sinon. Mesuré
+     * sur la forme stockée, pas sur la saisie : c'est elle que la limite borne.
+     */
+    public static function lengthError(?string $markdown): ?string
+    {
+        $length = mb_strlen((string) self::clean($markdown));
+        if ($length <= self::MAX_LENGTH) {
+            return null;
+        }
+
+        $fr = fn (int $n) => number_format($n, 0, ',', ' ');
+
+        return 'Le texte fait '.$fr($length).' caractères : '.$fr(self::MAX_LENGTH).' au maximum. Raccourcis-le avant d\'enregistrer.';
+    }
+
+    /** Règle de validation Livewire/Laravel appliquant lengthError(). */
+    public static function lengthRule(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            if (is_string($value) && ($error = self::lengthError($value)) !== null) {
+                $fail($error);
+            }
+        };
     }
 
     /** markdown → HTML sûr : CommonMark durci + reconstruction par allowlist DOM. */

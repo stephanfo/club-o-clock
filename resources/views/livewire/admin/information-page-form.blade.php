@@ -46,6 +46,7 @@
                 <div class="sect-head"><span class="sect-title">Contenu</span></div>
                 <x-wysiwyg model="content_markdown" :markdown="$content_markdown"
                            placeholder="Détails, code, conditions… (mise en forme avec la barre d'outils)" />
+                @error('content_markdown')<div class="field-error">{{ $message }}</div>@enderror
             </div>
 
             {{-- Épinglage bannière d'accueil --}}
