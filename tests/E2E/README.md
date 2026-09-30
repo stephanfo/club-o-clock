@@ -50,6 +50,7 @@ Les captures atterrissent dans `tests/E2E/shots/` (non versionné).
 
 ```bash
 node --test tests/E2E/sw.test.mjs
+node --test tests/E2E/push.test.mjs    # abonnement push de l'appareil (resources/js/push.js, #96)
 node --test tests/E2E/track.test.mjs   # géométrie du survol de tracé (resources/js/track.js)
 ```
 

@@ -12,6 +12,11 @@
 @if (config('club.vapid.public_key'))
     {{-- Clé publique VAPID exposée au front pour la souscription Web Push (J8.6). --}}
     <meta name="vapid-public-key" content="{{ config('club.vapid.public_key') }}">
+    @auth
+        {{-- Compte connecté : la resynchronisation push (#96) repart tout de suite quand un autre
+             compte se connecte sur l'appareil, sans attendre le délai d'un jour. --}}
+        <meta name="club-user" content="{{ auth()->id() }}">
+    @endauth
 @endif
 {{-- Même source que le theme_color du manifest (ManifestController) : une valeur en dur ici
      divergerait de la palette réelle dès que les couleurs de démarrage sont retouchées. --}}

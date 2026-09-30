@@ -256,6 +256,14 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Corrigé
 
+- **Les notifications push pouvaient cesser d'arriver sans que l'écran le montre.** L'interrupteur
+  « Notifications sur cet appareil » restait sur « activées » alors que le serveur avait perdu
+  l'abonnement, et la coupure échouait sans message. L'app renvoie désormais d'elle-même l'abonnement
+  au serveur à l'ouverture (une fois par jour), suit son renouvellement par le navigateur et se
+  réabonne si les clés du serveur ont changé, sans rien demander. L'interrupteur n'affiche
+  « activées » qu'une fois l'abonnement confirmé, propose sinon de réparer, et dit pourquoi une
+  activation ou une coupure a échoué (#96).
+
 - **Les listes de garants de la fiche adhérent étaient triées par prénom.** « Choisir un garant »,
   « Remplacer le garant » et « Rattacher un mineur sans garant » suivent désormais l'ordre de la liste
   des adhérents et de l'écran de création : nom, puis prénom.

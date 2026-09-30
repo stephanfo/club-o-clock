@@ -3,6 +3,7 @@
 namespace App\Notifications\Push;
 
 use App\Models\PushSubscription;
+use Minishlink\WebPush\MessageSentReport;
 use Minishlink\WebPush\Subscription;
 use Minishlink\WebPush\WebPush;
 use RuntimeException;
@@ -26,12 +27,26 @@ class MinishlinkWebPushSender implements WebPushSender
             $payloadJson,
         );
 
+        return self::resultFor($report);
+    }
+
+    /**
+     * Classe la réponse du service push. 404/410 : l'abonnement n'existe plus. 401/403 : le service
+     * refuse notre signature VAPID pour cet abonnement — cas des clés changées, où l'abonnement a
+     * été créé avec l'ancienne clé publique et ne sera plus jamais accepté (#96). Les deux sont
+     * purgés : retenter ne peut pas réussir, et le navigateur se réabonne à la prochaine ouverture
+     * de l'app (resynchronisation de resources/js/push.js). Le reste (réseau, 429, 5xx) est
+     * transitoire et laissé au drain.
+     */
+    public static function resultFor(MessageSentReport $report): PushDeliveryResult
+    {
         if ($report->isSuccess()) {
             return PushDeliveryResult::delivered();
         }
 
-        // 404/410 : l'abonnement n'existe plus côté navigateur → à purger.
-        return $report->isSubscriptionExpired()
+        $status = $report->getResponse()?->getStatusCode();
+
+        return in_array($status, [401, 403, 404, 410], true)
             ? PushDeliveryResult::expired()
             : PushDeliveryResult::failed();
     }
