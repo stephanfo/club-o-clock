@@ -293,12 +293,14 @@
                         <div class="sect-head"><span class="sect-title">Contenu</span></div>
                         <x-wysiwyg model="content_markdown" :markdown="$content_markdown"
                                    placeholder="Échauffement, séries, récup… (mise en forme avec la barre d'outils)" />
+                        @error('content_markdown')<div class="field-error">{{ $message }}</div>@enderror
                     </div>
                 @elseif ($kind === 'club_event')
                     <div>
                         <div class="sect-head"><span class="sect-title">Agenda</span></div>
                         <x-wysiwyg model="agenda" :markdown="$agenda"
                                    placeholder="10:00 · Accueil — 10:30 · …" />
+                        @error('agenda')<div class="field-error">{{ $message }}</div>@enderror
                     </div>
                 @endif
 

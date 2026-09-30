@@ -229,14 +229,14 @@ class SessionForm extends Component
             }],
             'coach_ids.*' => ['exists:users,id'],
             'quota_tag_id' => ['nullable', 'exists:quota_tags,id'],
-            'content_markdown' => ['nullable', 'string'],
+            'content_markdown' => ['nullable', 'string', Markup::lengthRule()],
             // event_type obligatoire pour competition (§4.7).
             'event_type_id' => [$this->kind === 'competition' ? 'required' : 'nullable', 'exists:event_types,id'],
             'distance' => ['nullable', 'string', 'max:255'],
             // Schéma borné à http(s) : la règle `url` nue laisse passer `javascript:` (rendu en href).
             'external_url' => ['nullable', 'url:http,https', 'max:255'],
             'photos_album_url' => ['nullable', 'url:http,https', 'max:255'],
-            'agenda' => ['nullable', 'string'],
+            'agenda' => ['nullable', 'string', Markup::lengthRule()],
             // Parcours OpenRunner : whitelist stricte côté serveur (§4.13.1).
             'route_openrunner_embed_url' => ['nullable', 'string', 'max:500', function ($attr, $value, $fail) {
                 if (filled($value) && ! OpenRunner::validEmbedUrl($value)) {

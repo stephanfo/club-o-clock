@@ -39,6 +39,9 @@ class DebriefService
             throw new RuntimeException('Tu as déjà publié un débrief pour cette compétition.');
         }
 
+        if (($tooLong = Markup::lengthError($markdown)) !== null) {
+            throw new RuntimeException($tooLong);
+        }
         $content = Markup::clean($markdown);
         if ($content === null) {
             throw new RuntimeException('Le débrief est vide.');
@@ -64,6 +67,9 @@ class DebriefService
     /** Édition (auteur ou admin §4.12.5). Pas de renotification (compléments silencieux). */
     public function update(Debrief $debrief, User $actor, string $markdown): Debrief
     {
+        if (($tooLong = Markup::lengthError($markdown)) !== null) {
+            throw new RuntimeException($tooLong);
+        }
         $content = Markup::clean($markdown);
         if ($content === null) {
             throw new RuntimeException('Le débrief est vide.');
