@@ -531,7 +531,8 @@ si C < N :
     sinon                  → status = 'waitlist', reason = 'capacity'
 sinon (C >= N) :
     si le quota de la séance est débloqué (mécanisme C) :
-        si capacité disponible → status = 'participating'      (sans bandeau)
+        si capacité disponible → status = 'participating'      (sans bandeau,
+                                 avec confirmation si une autre place est rendue, §4.10.4 C)
         sinon                  → status = 'waitlist', reason = 'quota_exceeded'
     sinon :
         afficher bandeau d'avertissement à l'athlète
@@ -575,7 +576,12 @@ Action **« Débloquer le quota »** sur la séance. Le déblocage est un **éta
 - Champ « motif » **optionnel** partagé pour le geste et le batch.
 - `AuditLog` : une entrée `action = 'quota_release'` pour le geste (`motif`), puis **N entrées individuelles** `action = 'promote_quota_exceeded'`, une par athlète promu (`actorId` = coach, `targetId` = athlète promu, `sessionId`, `motif` partagé). Les promotions automatiques qui suivent (mécanisme A) gardent leur `ActivityLog` avec acteur système.
 - Notif push + email aux athlètes promus.
-- Le compteur de quota des athlètes promus s'incrémente naturellement (effet recherché).
+- **Réévaluation de l'autre place** (#103). Obtenir une place **hors quota** — promotion au clic, mécanisme A piochant dans `quota_exceeded`, ou inscription directe sur séance débloquée — ne doit pas faire tenir deux places pour un quota d'une, au détriment de quelqu'un qui attend ailleurs. Si l'athlète dépasse alors son quota, sa **dernière place obtenue** sur une autre séance **future** du même tag dans la semaine est réévaluée comme s'il s'y inscrivait maintenant :
+  - quota de cette séance **débloqué** → il la garde ;
+  - sinon → elle repasse en `waitlist quota_exceeded`, **`registeredAt` inchangé** (c'était son premier choix, dans son quota : il passe devant ceux arrivés après lui déjà hors quota), et la place libérée part au mécanisme A.
+  - Jamais pour une place obtenue **par override** (§4.10.5), ni pour une séance **commencée**. Un override ne déclenche pas non plus de réévaluation.
+  - L'ordre des jours n'importe plus : mardi obtenu hors quota rend vendredi, et vendredi débloqué à son tour y repromeut l'athlète normalement. Pas de boucle : la séance rétrogradée n'étant pas débloquée, A n'y pioche pas dans `quota_exceeded`.
+  - **Communication** : le dialog de quota (§4.10.3) nomme la séance qui serait rendue ; sur séance débloquée, l'inscription demande confirmation en la nommant ; la notification de promotion le dit en tête de son corps (« Tu es inscrit·e sur …, mais tu repasses en liste d'attente sur … »). `ActivityLog quota_requeued` (acteur système, `resultingStatus = waitlist_quota_exceeded`).
 - **Refermer le quota** : les athlètes déjà promus **restent inscrits** ; seules les inscriptions suivantes retrouvent la règle normale. `AuditLog action = 'quota_close'`.
 - **Piste hors V1** : déblocage automatique X heures avant le début.
 
@@ -599,6 +605,7 @@ Le coach peut **forcer une inscription `participating`**, en outrepassant quota 
 - **Désistement avant le début** (autorisé librement, cf. §4.9) : libère la place ET libère 1 unité de quota → déclenche le mécanisme B.
 - **Désistement après le début** : bloqué côté UI.
 - **Annulation de la séance par le coach** : libère le quota de tous les `participating`.
+- **Place obtenue hors quota** : réévalue l'autre place de la semaine (§4.10.4 C) ; se désinscrire ensuite de la séance obtenue déclenche le mécanisme B vers celle rendue.
 - **Pas de cron de reset** : le quota se recalcule naturellement sur la semaine courante.
 
 #### 4.10.7 UX et transparence
@@ -1048,7 +1055,7 @@ Trace les **événements d'inscription** au fil de l'eau. Volume élevé, valeur
 |---|---|
 | Inscriptions | `registration_created` (avec `resultingStatus` : `participating` / `waitlist_capacity` / `waitlist_quota_exceeded`), `inscription_by_coach` |
 | Désinscriptions | `registration_cancelled` |
-| Promotions auto | `auto_promoted_capacity` (mécanisme A — `resultingStatus = participating`), `auto_promoted_self_quota` (mécanisme B — `resultingStatus = participating` ou `waitlist_capacity`) |
+| Promotions auto | `auto_promoted_capacity` (mécanisme A — `resultingStatus = participating`), `auto_promoted_self_quota` (mécanisme B — `resultingStatus = participating` ou `waitlist_capacity`), `quota_requeued` (place rendue après une place obtenue hors quota, §4.10.4 C — `resultingStatus = waitlist_quota_exceeded`) |
 | Encadrement coachs | `coach_registered`, `coach_unregistered` |
 | Apéro club | `apero_flagged`, `apero_unflagged` |
 

@@ -191,6 +191,13 @@
             @else
                 En continuant, tu seras placé·e en liste d'attente « quota ». Un coach pourra ensuite te débloquer manuellement s'il décide de t'inscrire.
             @endif
+            {{-- #103 : obtenir cette place plus tard rendra l'autre de la semaine. Dit AVANT de
+                 rejoindre la file, en nommant la séance, pas après coup dans la notification seule. --}}
+            @if ($quotaRequeue)
+                <div style="margin-top:var(--space-2)">
+                    {{ $qSubj ? 'Si une place lui est attribuée ici, sa' : "Si une place t'est attribuée ici, ta" }} place à {{ $quotaRequeue }} repassera en liste d'attente, sauf si le quota y est débloqué.
+                </div>
+            @endif
         </x-banner>
         <x-slot:footer>
             <button type="button" class="btn btn-ghost" wire:click="cancelQuotaConfirm">Annuler</button>
@@ -214,6 +221,12 @@
                     <b>{{ $aqUser?->fullName() }}</b> dépasse le quota de ce créneau cette semaine.
                 @endif
             </div>
+            @if (! empty($athleteQuotaConfirm['requeue']))
+                {{-- #103 : conséquence de la file quota seulement — l'override ne défait rien. --}}
+                <div style="margin-top:var(--space-2)">
+                    En file quota : si une place lui est attribuée ici, sa place à {{ $athleteQuotaConfirm['requeue'] }} repassera en liste d'attente, sauf si le quota y est débloqué.
+                </div>
+            @endif
         </x-banner>
         <div style="margin-top:14px">
             <label class="field-label">Motif (optionnel, pour l'override)</label>

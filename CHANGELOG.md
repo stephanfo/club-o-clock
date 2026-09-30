@@ -256,6 +256,14 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Corrigé
 
+- **Une place obtenue hors quota ne fait plus tenir deux places pour un quota d'une.** Inscrit
+  vendredi puis promu mardi grâce au déblocage du quota, un athlète gardait les deux, au détriment de
+  quelqu'un qui attendait vendredi. Désormais sa place de vendredi repasse en liste d'attente, à son
+  rang d'origine, et la place libérée va au premier qui attendait — sauf si le quota de vendredi est
+  lui aussi débloqué. Le dialog de quota, la confirmation d'inscription sur séance débloquée et la
+  notification de promotion nomment la séance concernée. Les places obtenues par override ne sont
+  jamais touchées (#103).
+
 - **Les notifications push pouvaient cesser d'arriver sans que l'écran le montre.** L'interrupteur
   « Notifications sur cet appareil » restait sur « activées » alors que le serveur avait perdu
   l'abonnement, et la coupure échouait sans message. L'app renvoie désormais d'elle-même l'abonnement

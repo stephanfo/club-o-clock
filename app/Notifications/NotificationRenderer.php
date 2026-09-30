@@ -82,6 +82,10 @@ class NotificationRenderer
         }
 
         if (isset($payload['session_title'])) {
+            if (isset($payload['requeued_session_title'])) {
+                return $this->requeuedBody($payload, $subjectId);
+            }
+
             $quand = $this->formatDate($payload['session_start_at'] ?? null);
 
             return $quand === null ? $payload['session_title'] : $payload['session_title'].' · '.$quand;
@@ -98,6 +102,38 @@ class NotificationRenderer
         }
 
         return $type->description();
+    }
+
+    /**
+     * Place rendue (#103) : obtenir une place hors quota fait repasser en liste d'attente l'autre
+     * séance de la semaine. La notification de promotion le dit — l'athlète l'apprendrait sinon en
+     * ouvrant son planning. La bascule vient EN TÊTE du corps, pas après le nom de séance : l'écran
+     * de notifications de l'OS tronque le corps, et c'est la perte de place qui surprend. Lue par
+     * le garant, la phrase nomme l'enfant au lieu de tutoyer le parent.
+     *
+     * @param  array<string,mixed>  $payload
+     */
+    private function requeuedBody(array $payload, ?int $subjectId): string
+    {
+        $gagnee = $this->seanceEtDate($payload['session_title'], $payload['session_start_at'] ?? null);
+        $rendue = $this->seanceEtDate($payload['requeued_session_title'], $payload['requeued_session_start_at'] ?? null);
+        $prenom = $subjectId !== null ? ($payload['subject_first_name'] ?? null) : null;
+
+        $debut = match (true) {
+            $subjectId === null => 'Tu es inscrit·e sur '.$gagnee.', mais tu repasses',
+            $prenom === null => 'Ton enfant est inscrit·e sur '.$gagnee.', mais repasse',
+            default => $prenom.' est inscrit·e sur '.$gagnee.', mais repasse',
+        };
+
+        return $debut.' en liste d\'attente sur '.$rendue.' pour laisser la place à quelqu\'un qui attendait.';
+    }
+
+    /** « Natation (ven. 3 oct. · 18:30) », ou le titre seul faute de date. */
+    private function seanceEtDate(string $titre, mixed $iso): string
+    {
+        $quand = $this->formatDate($iso);
+
+        return $quand === null ? $titre : $titre.' ('.$quand.')';
     }
 
     /**

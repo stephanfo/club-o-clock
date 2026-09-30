@@ -188,6 +188,7 @@ class SessionShow extends Component
         return view('livewire.session-show', [
             'tz' => $this->tz(),
             'hasConflict' => $this->hasScheduleConflict(),
+            'requeueNotice' => $me ? $this->requeueNotice() : null,
             'nameLabels' => $this->nameLabels(),
             'aperoPayers' => $aperoPayers,
             'iAmAperoPayer' => $me !== null && $aperoPayers->contains('user_id', $me->id),
