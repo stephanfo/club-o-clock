@@ -243,7 +243,7 @@ class NotificationRenderer
             NotificationType::NewDebrief,
             NotificationType::CoachRegistration,
             NotificationType::CoachAssigned => isset($payload['session_id'])
-                ? route('sessions.show', $this->sessionParams($payload['session_id'], $subjectId))
+                ? route('sessions.show', $this->sessionParams($payload['session_id'], $subjectId, $type->sessionTab()))
                 : route('planning'),
 
             // Récap d'une série : pas de séance unique → planning.
@@ -280,9 +280,12 @@ class NotificationRenderer
      *
      * @return array<int|string,mixed>
      */
-    private function sessionParams(mixed $sessionId, ?int $subjectId): array
+    private function sessionParams(mixed $sessionId, ?int $subjectId, ?string $tab = null): array
     {
-        return $subjectId === null ? [$sessionId] : [$sessionId, 'as' => $subjectId];
+        return array_filter(
+            [$sessionId, 'as' => $subjectId, 'tab' => $tab],
+            fn ($v) => $v !== null,
+        );
     }
 
     /**

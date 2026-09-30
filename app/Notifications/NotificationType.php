@@ -92,6 +92,20 @@ enum NotificationType: string
         };
     }
 
+    /**
+     * Onglet de la fiche séance où mène la notification (#99), ou null pour l'onglet Infos. Source
+     * unique des trois sorties — email, push, écran Alertes : ouvrir un débrief sur Infos obligeait
+     * à chercher l'onglet soi-même. La fiche retombe sur Infos si l'onglet n'y existe pas.
+     */
+    public function sessionTab(): ?string
+    {
+        return match ($this) {
+            self::NewDebrief => 'debriefs',
+            self::CoachRegistration, self::CoachAssigned => 'encadrement',
+            default => null,
+        };
+    }
+
     /** Sous-titre explicatif affiché sous le libellé dans la matrice de préférences (§4.15.3). */
     public function description(): string
     {

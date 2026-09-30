@@ -38,6 +38,9 @@ class SessionShow extends Component
 
     public Session $session;
 
+    /** Onglet d'ouverture demandé par l'URL (?tab=), validé par la vue. */
+    public ?string $initialTab = null;
+
     public function mount(Session $session): void
     {
         // §4.2 « Mes enfants » : le lien porte le sujet enfant (?as=). On le pose côté serveur DANS
@@ -51,9 +54,15 @@ class SessionShow extends Component
         // et l'inscription du parent restent sur cet enfant jusqu'au prochain coup de sélecteur.
         // C'est voulu : le sujet courant est affiché en permanence, et enchaîner sur le planning de
         // l'enfant est le geste naturel après une annulation le concernant.
+        // Onglet demandé par le lien (#99, notification d'un débrief…). Lu une fois ici, comme ?as= :
+        // la vue le confronte aux onglets réellement affichés et retombe sur Infos sinon.
+        $tab = request()->query('tab');
+        $this->initialTab = is_string($tab) ? $tab : null;
+
         if (auth()->check() && ($as = request()->integer('as'))) {
             SubjectContext::set(auth()->user(), $as);
-            $this->redirect(route('sessions.show', $session), navigate: true);
+            // L'onglet survit à la redirection canonique : c'est lui que la notification visait.
+            $this->redirect(route('sessions.show', array_filter([$session, 'tab' => $this->initialTab])), navigate: true);
 
             return;
         }

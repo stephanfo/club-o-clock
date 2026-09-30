@@ -2,7 +2,7 @@
      Le × est un <button> frère du lien, jamais dedans : pas de wire:click empilé sur wire:navigate. --}}
 <div class="card card-pad flex ac g12" wire:key="alerte-{{ $shell }}-{{ implode('-', $alert['ids']) }}">
     @if ($alert['sessionId'])
-        <a href="{{ route('sessions.show', $alert['sessionId']) }}" wire:navigate
+        <a href="{{ route('sessions.show', array_filter([$alert['sessionId'], 'tab' => $alert['tab'] ?? null])) }}" wire:navigate
            class="flex ac g12 f1" style="min-width:0;text-decoration:none;color:inherit;border-bottom:0">
             @include('livewire.partials.alert-card', ['alert' => $alert])
         </a>

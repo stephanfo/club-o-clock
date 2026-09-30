@@ -256,6 +256,12 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Corrigé
 
+- **La notification d'un débrief ouvre l'onglet Débriefs.** Elle menait sur l'onglet Infos de la
+  fiche, et il fallait trouver l'onglet soi-même. Le lien (push, email et écran Alertes) porte
+  désormais l'onglet visé : Débriefs pour un nouveau débrief, Encadrement pour les notifications
+  d'encadrement. Au téléphone, la barre d'onglets glisse jusqu'à l'onglet ouvert ; sur ordinateur,
+  la section est amenée à l'écran. Un onglet absent de la fiche retombe sur Infos (#99).
+
 - **Une place obtenue hors quota ne fait plus tenir deux places pour un quota d'une.** Inscrit
   vendredi puis promu mardi grâce au déblocage du quota, un athlète gardait les deux, au détriment de
   quelqu'un qui attendait vendredi. Désormais sa place de vendredi repasse en liste d'attente, à son
