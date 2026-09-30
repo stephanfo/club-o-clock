@@ -7,6 +7,8 @@ import './gpx';
 import './back';
 // Modales : fermeture par Échap, et garde contre la modale rejouée par le retour arrière de wire:navigate.
 import './dialog';
+// Éditeur de débrief : modale calée sur la zone visible quand le clavier logiciel est ouvert (#98).
+import './clavier';
 // Planning Semaine mobile : position de la liste à l'arrivée et au retour arrière (#69).
 import './planning';
 // Web Push : expose window.clubPush (souscription PushManager + sync serveur) — onglet Notifs (J8.6).

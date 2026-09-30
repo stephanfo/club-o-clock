@@ -256,6 +256,20 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Corrigé
 
+- **L'éditeur de débrief était inutilisable sur téléphone et sur iPad.** Sur un texte long, la zone
+  de saisie ne défilait pas : le doigt, le trackpad ou la molette faisaient défiler la page derrière,
+  et on ne pouvait plus remonter au début du texte. Sur certains Android, le clavier ouvert réduisait
+  même la zone à rien. Désormais, c'est la zone de texte qui défile. Au téléphone, l'éditeur s'ouvre
+  en feuille pleine largeur qui reste au-dessus du clavier, et sur un écran bas, ce sont l'en-tête et
+  la barre d'outils qui se resserrent, pas la zone de texte (#98).
+
+- **Un texte trop long était coupé sans prévenir.** Un débrief, un contenu de séance, un agenda ou
+  une page d'information de plus de 20 000 caractères perdait sa fin à l'enregistrement. Il est
+  maintenant refusé, avec un message qui donne sa longueur et le maximum (#100).
+
+- **Un refus émis dans une fenêtre ouverte s'affichait derrière elle.** Le message (par exemple
+  « Le débrief est vide ») passe désormais au-dessus de la fenêtre.
+
 - **Les listes de garants de la fiche adhérent étaient triées par prénom.** « Choisir un garant »,
   « Remplacer le garant » et « Rattacher un mineur sans garant » suivent désormais l'ordre de la liste
   des adhérents et de l'écran de création : nom, puis prénom.

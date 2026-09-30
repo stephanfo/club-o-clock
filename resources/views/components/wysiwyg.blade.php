@@ -9,7 +9,9 @@
        minHeight   — hauteur minimale de la zone d'édition (px).
 
      wire:ignore sur la zone TipTap (et elle seule) : Livewire ne morphe pas le DOM que ProseMirror
-     gère → pas de « mismatched transaction ». La toolbar reste réactive (Alpine). --}}
+     gère → pas de « mismatched transaction ». La toolbar reste réactive (Alpine).
+     TipTap monte la zone .wys-area DANS .wys-host (il ne la remplace pas) : un contexte qui borne la
+     hauteur de l'éditeur (débrief) doit faire de .wys-host un maillon de sa chaîne flex (#98). --}}
 @props(['model', 'markdown' => '', 'placeholder' => '', 'minHeight' => 160])
 <div class="card wysiwyg" style="overflow:hidden"
      x-data="wysiwyg({ model: @js($model), markdown: @js((string) $markdown), placeholder: @js($placeholder), minHeight: {{ (int) $minHeight }} })">
@@ -36,5 +38,5 @@
         <button type="button" class="wys-btn" :class="{ 'is-on': active.link }" title="Lien (Ctrl+K)" aria-label="Lien"
                 x-on:mousedown.prevent x-on:click="setLink()"><x-icon name="link" /></button>
     </div>
-    <div wire:ignore x-ref="editor"></div>
+    <div class="wys-host" wire:ignore x-ref="editor"></div>
 </div>

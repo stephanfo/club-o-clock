@@ -1,9 +1,11 @@
 {{-- Éditeur de débrief (modale) — porté de screen-debriefs.jsx <DebriefEditorModal>.
      Embarque l'îlot WYSIWYG <x-wysiwyg> ; rendu uniquement quand $debriefOpen.
-     Le markdown est synchronisé dans $debriefMarkdown puis sanitisé serveur (§4.12.1). --}}
+     Le markdown est synchronisé dans $debriefMarkdown puis sanitisé serveur (§4.12.1).
+     `x-on:click.stop` seul sur la modale : un `wire:click.stop` sans valeur fait évaluer `$wire.` à
+     Livewire, SyntaxError à chaque clic dans l'éditeur (même piège que <x-dialog>). --}}
 @if ($debriefOpen)
-    <div class="scrim" wire:key="debrief-editor">
-        <div class="dialog debrief-dialog" wire:click.stop x-on:click.stop style="padding:0">
+    <div class="scrim debrief-scrim" wire:key="debrief-editor" x-data="calageClavier">
+        <div class="dialog debrief-dialog" x-on:click.stop style="padding:0">
             <div class="debrief-editor">
                 <div class="debrief-editor-head">
                     <div class="f1">
@@ -14,7 +16,7 @@
                 </div>
 
                 <div class="debrief-editor-body">
-                    <x-wysiwyg model="debriefMarkdown" :markdown="$debriefInitialMarkdown"
+                    <x-wysiwyg model="debriefMarkdown" :markdown="$debriefInitialMarkdown" :min-height="96"
                                placeholder="Raconte ta course : ton ressenti, tes chronos, un mot pour le club…" />
                 </div>
 
