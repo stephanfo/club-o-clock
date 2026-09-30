@@ -18,6 +18,7 @@ enum NotificationType: string
     case SessionContent = 'session_content';
     case EventCreated = 'event_created';
     case NewDebrief = 'new_debrief';
+    case ClubDebrief = 'club_debrief';
     case CoachRegistration = 'coach_registration';
     case CoachAssigned = 'coach_assigned';
     case CoachTemplateRecap = 'coach_template_recap';
@@ -40,6 +41,7 @@ enum NotificationType: string
             self::SessionContent => 'Contenu de séance',
             self::EventCreated => 'Nouvelle compétition ou événement club',
             self::NewDebrief => 'Nouveau débrief',
+            self::ClubDebrief => 'Débrief d\'une autre compétition',
             self::CoachRegistration => 'Inscription ou désinscription d\'un coach',
             self::CoachAssigned => 'Affectation à une séance',
             self::CoachTemplateRecap => 'Récapitulatif d\'affectations (série)',
@@ -118,7 +120,8 @@ enum NotificationType: string
             self::SessionModified => 'Date, horaire ou lieu modifiés',
             self::SessionContent => 'Texte, parcours ou météo ajoutés ou modifiés',
             self::EventCreated => 'Compétition ou événement club créé dans ta catégorie',
-            self::NewDebrief => 'Un participant publie un débrief sur une compétition',
+            self::NewDebrief => 'Un participant publie un débrief sur une compétition à laquelle tu participes',
+            self::ClubDebrief => 'Un membre publie un débrief sur une compétition à laquelle tu ne participes pas',
             self::CoachRegistration => 'Un coach rejoint ou quitte une séance que tu encadres',
             self::CoachAssigned => 'Tu es affecté·e comme encadrant·e d\'une séance',
             self::CoachTemplateRecap => 'Récapitulatif de tes affectations sur une série de séances',
@@ -146,7 +149,7 @@ enum NotificationType: string
                 self::EnrolledByCoach, self::CoachOverride, self::SessionModified, self::SessionContent,
             ]],
             ['label' => 'Le club', 'coachOnly' => false, 'types' => [
-                self::EventCreated, self::NewDebrief,
+                self::EventCreated, self::NewDebrief, self::ClubDebrief,
             ]],
             ['label' => 'Encadrement', 'coachOnly' => true, 'types' => [
                 self::CoachRegistration, self::CoachAssigned, self::CoachTemplateRecap,

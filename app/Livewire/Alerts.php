@@ -246,7 +246,7 @@ class Alerts extends Component
             NotificationType::SessionRestored => 'rotate-ccw',
             NotificationType::EnrolledByCoach, NotificationType::CoachOverride => 'user-check',
             NotificationType::SessionModified, NotificationType::SessionContent => 'pen-line',
-            NotificationType::NewDebrief => 'pen-line',
+            NotificationType::NewDebrief, NotificationType::ClubDebrief => 'pen-line',
             NotificationType::CoachAssigned, NotificationType::CoachRegistration => 'user-check',
             NotificationType::EventCreated => 'calendar',
             default => 'bell',

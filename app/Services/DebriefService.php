@@ -22,7 +22,7 @@ class DebriefService
     /**
      * Publie le débrief de $author sur $session. Gardes (§4.12.5) : compétition commencée, auteur
      * `participating`, pas de débrief existant. ActivityLog debrief_published + notif new_debrief
-     * aux co-participants (l'auteur exclu).
+     * aux co-participants, club_debrief au reste du club (l'auteur exclu).
      */
     public function publish(Session $session, User $author, string $markdown): Debrief
     {
@@ -58,8 +58,10 @@ class DebriefService
             'session_id' => $session->id,
         ]);
 
-        // Les autres participants de la compétition sont prévenus (l'auteur ne se notifie pas).
+        // Les autres participants de la compétition sont prévenus (l'auteur ne se notifie pas),
+        // le reste du club par un type distinct, réglable à part (§4.15.3).
         $this->notifier->notifyParticipants($session, NotificationType::NewDebrief, excludeUserId: $author->id);
+        $this->notifier->notifyClubDebrief($session, $author);
 
         return $debrief;
     }

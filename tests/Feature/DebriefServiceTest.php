@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Debrief;
 use App\Models\NotificationOutbox;
+use App\Models\NotificationPreferences;
 use App\Models\Registration;
 use App\Models\Session;
 use App\Models\User;
@@ -206,5 +207,117 @@ class DebriefServiceTest extends TestCase
         $this->service()->publish($s, $author, 'Seul au monde');
 
         $this->assertSame(0, NotificationOutbox::where('type', 'new_debrief')->count());
+    }
+
+    // ── Débrief annoncé au reste du club (club_debrief, §4.12.5) ──
+
+    public function test_publish_notifies_the_rest_of_the_club_by_default(): void
+    {
+        $s = $this->competition();
+        $author = $this->participant($s);
+        $other = $this->participant($s);
+        $membre = User::factory()->create();
+
+        $this->service()->publish($s, $author, 'Mon retour de course');
+
+        // Un non-participant reçoit club_debrief (push + email), sans réglage préalable.
+        $this->assertSame(2, NotificationOutbox::where('type', 'club_debrief')
+            ->where('user_id', $membre->id)->count());
+        // Le participant ne le reçoit pas en double, l'auteur pas du tout.
+        $this->assertSame(0, NotificationOutbox::where('type', 'club_debrief')
+            ->whereIn('user_id', [$author->id, $other->id])->count());
+        $this->assertSame(2, NotificationOutbox::where('type', 'new_debrief')
+            ->where('user_id', $other->id)->count());
+    }
+
+    public function test_club_debrief_skips_waitlisted_only_when_participating(): void
+    {
+        $s = $this->competition();
+        $author = $this->participant($s);
+        $attente = User::factory()->create();
+        Registration::create([
+            'session_id' => $s->id, 'user_id' => $attente->id,
+            'status' => 'waitlist', 'registered_at' => Carbon::now()->subWeek(),
+        ]);
+
+        $this->service()->publish($s, $author, 'Mon retour de course');
+
+        // En liste d'attente, on n'a pas participé : c'est la ligne « autre compétition » qui joue.
+        $this->assertSame(0, NotificationOutbox::where('type', 'new_debrief')
+            ->where('user_id', $attente->id)->count());
+        $this->assertSame(2, NotificationOutbox::where('type', 'club_debrief')
+            ->where('user_id', $attente->id)->count());
+    }
+
+    public function test_club_debrief_respects_its_own_opt_out(): void
+    {
+        $s = $this->competition();
+        $author = $this->participant($s);
+        $coupe = User::factory()->create();
+        NotificationPreferences::create([
+            'user_id' => $coupe->id,
+            'matrix' => ['club_debrief' => ['push' => false, 'email' => false]],
+            'paused' => false,
+        ]);
+        $temoin = User::factory()->create();
+
+        $this->service()->publish($s, $author, 'Mon retour de course');
+
+        $this->assertSame(0, NotificationOutbox::where('user_id', $coupe->id)->count());
+        $this->assertSame(2, NotificationOutbox::where('type', 'club_debrief')
+            ->where('user_id', $temoin->id)->count());
+    }
+
+    public function test_opting_out_of_club_debrief_keeps_participant_debriefs(): void
+    {
+        $s = $this->competition();
+        $author = $this->participant($s);
+        $other = $this->participant($s);
+        NotificationPreferences::create([
+            'user_id' => $other->id,
+            'matrix' => ['club_debrief' => ['push' => false, 'email' => false]],
+            'paused' => false,
+        ]);
+
+        $this->service()->publish($s, $author, 'Mon retour de course');
+
+        $this->assertSame(2, NotificationOutbox::where('type', 'new_debrief')
+            ->where('user_id', $other->id)->count());
+    }
+
+    public function test_club_debrief_reaches_a_guardian_once_and_never_inactive_accounts(): void
+    {
+        $s = $this->competition();
+        $author = $this->participant($s);
+        $parent = User::factory()->create(['roles' => ['parent']]);
+        User::factory()->minorP1()->count(2)->create(['guardian_id' => $parent->id]);
+        $inactif = User::factory()->create(['is_active' => false]);
+        $anonyme = User::factory()->create(['anonymized_at' => Carbon::now()]);
+
+        $this->service()->publish($s, $author, 'Mon retour de course');
+
+        // Une seule annonce pour le parent, pas une par enfant.
+        $this->assertSame(2, NotificationOutbox::where('type', 'club_debrief')
+            ->where('user_id', $parent->id)->count());
+        $this->assertSame(0, NotificationOutbox::whereIn('user_id', [$inactif->id, $anonyme->id])->count());
+    }
+
+    public function test_guardian_of_a_participant_gets_new_debrief_not_club_debrief(): void
+    {
+        $s = $this->competition();
+        $author = $this->participant($s);
+        $parent = User::factory()->create(['roles' => ['parent']]);
+        $enfant = User::factory()->minorP1()->create(['guardian_id' => $parent->id]);
+        Registration::create([
+            'session_id' => $s->id, 'user_id' => $enfant->id,
+            'status' => 'participating', 'registered_at' => Carbon::now()->subWeek(),
+        ]);
+
+        $this->service()->publish($s, $author, 'Mon retour de course');
+
+        $this->assertSame(2, NotificationOutbox::where('type', 'new_debrief')
+            ->where('user_id', $parent->id)->count());
+        $this->assertSame(0, NotificationOutbox::where('type', 'club_debrief')
+            ->where('user_id', $parent->id)->count());
     }
 }

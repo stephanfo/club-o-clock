@@ -78,4 +78,45 @@ class SessionNotificationService
             $this->dispatcher->dispatch(NotificationType::EventCreated, $user, $payload);
         }
     }
+
+    /**
+     * Annonce un débrief à tout le club hors participants (§4.12.5, type club_debrief) : les
+     * participants — et leurs garants — reçoivent déjà new_debrief, l'auteur ne se notifie pas.
+     *
+     * C'est une nouvelle du club, pas un événement concernant un enfant : on adresse chaque compte
+     * en propre (dispatchTo, sans routage parent/enfant). Le routage ferait recevoir au garant une
+     * copie par enfant P1 ; ici un mineur sans compte n'est pas destinataire, son garant l'est une
+     * fois, en tant que membre.
+     */
+    public function notifyClubDebrief(Session $session, User $author): void
+    {
+        $participants = Registration::query()
+            ->where('session_id', $session->id)
+            ->where('status', 'participating')
+            ->with('user:id,guardian_id')
+            ->get()
+            ->pluck('user')
+            ->filter();
+
+        $exclus = $participants->pluck('id')
+            ->merge($participants->pluck('guardian_id'))
+            ->push($author->id, $author->guardian_id)
+            ->filter()
+            ->unique()
+            ->all();
+
+        $audience = User::query()
+            ->where('is_active', true)
+            ->whereNull('anonymized_at')
+            ->whereNotNull('email')
+            ->whereNotIn('id', $exclus)
+            ->with('notificationPreferences')
+            ->get();
+
+        $payload = $session->payloadNotification();
+
+        foreach ($audience as $user) {
+            $this->dispatcher->dispatchTo(NotificationType::ClubDebrief, $user, $payload);
+        }
+    }
 }
