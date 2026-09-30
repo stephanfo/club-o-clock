@@ -48,7 +48,7 @@ class InformationPageForm extends Component
     {
         return [
             'title' => ['required', 'string', 'max:160'],
-            'content_markdown' => ['nullable', 'string'],
+            'content_markdown' => ['nullable', 'string', Markup::lengthRule()],
             'visibility' => ['required', Rule::in(InformationPage::VISIBILITIES)],
             'pinned' => ['boolean'],
         ];

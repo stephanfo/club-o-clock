@@ -609,15 +609,51 @@ body:has(.scrim) { overflow: hidden; }
 /* max-width explicite : .debrief-dialog porte aussi la classe .dialog, dont le max-width plafonnerait
    sinon la largeur voulue. height (pas juste max-height) : sinon la modale se contracte sur un débrief
    court ; on la fige haute et la zone WYSIWYG (flex:1) absorbe l'espace. */
-.debrief-dialog { width: min(760px, 94vw); max-width: 760px; height: min(760px, 88vh); }
+/* Hauteur en % du scrim et non en vh : le scrim est recalé sur la zone visible quand un clavier
+   logiciel s'ouvre (resources/js/clavier.js), la modale suit. En vh, elle passait sous le clavier (#98).
+   container-type : les réductions « écran bas » ci-dessous se lisent sur la hauteur de la modale,
+   seule mesure qui tient compte du clavier (une media query lit la fenêtre, que le clavier ne réduit
+   pas sur iOS). */
+.debrief-dialog { width: min(760px, 94vw); max-width: 760px; height: min(760px, 100%); container-type: size; }
 
 /* Chaîne flex jusqu'au WYSIWYG : la modale a une hauteur fixe, mais le wrapper du champ et le .card
-   du composant WYSIWYG (partagé) ne sont pas flex → la zone d'édition restait à son min-height. On
-   étire body → .wysiwyg → zone TipTap pour que le champ occupe toute la hauteur disponible. Ciblé sur
-   le contexte débrief : les autres usages de <x-wysiwyg> (séance, agenda) ne sont pas concernés. */
+   du composant WYSIWYG (partagé) ne sont pas flex. On étire body → .wysiwyg → .wys-host → zone TipTap
+   pour que le champ occupe toute la hauteur disponible ET soit le seul à défiler. Ciblé sur le
+   contexte débrief : les autres usages de <x-wysiwyg> (séance, agenda) grandissent avec leur texte
+   dans une page qui défile, ils ne sont pas concernés.
+   .wys-host est le maillon qui manquait (#98) : TipTap monte .wys-area DANS la div wire:ignore, et
+   l'ancien sélecteur `.wysiwyg > .wys-area` ne visait aucun élément. La zone grandissait avec le
+   texte, le surplus était coupé par l'overflow:hidden de la carte, et le doigt, le trackpad ou la
+   molette n'avaient rien à faire défiler : le geste partait vers la page derrière (iPhone, iPad).
+   overscroll-behavior : arrivé en butée, le geste ne se propage pas non plus à la page. */
 .debrief-editor-body { padding: 14px 18px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .debrief-editor-body > .wysiwyg { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.debrief-editor-body > .wysiwyg > .wys-area { flex: 1; }
+.debrief-editor-body .wys-host { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.debrief-editor-body .wys-area { flex: 1; overscroll-behavior: contain; }
+
+/* Écran bas — clavier ouvert, paysage, police système agrandie : c'est la zone de texte qui doit
+   rester utile, les chromes cèdent. Sous-titre et phrase d'aide masqués, marges resserrées, barre
+   d'outils sur une ligne défilante au lieu de deux (#98 : sur un Android, en-tête + barre sur deux
+   lignes + pied prenaient toute la hauteur et la zone de saisie tombait à 0). */
+@container (max-height: 460px) {
+    .debrief-editor-head { padding-top: var(--space-2); padding-bottom: var(--space-2); }
+    .debrief-editor-head .meta, .debrief-editor-foot .wys-hint { display: none; }
+    .debrief-editor-body { padding: var(--space-2) var(--space-3); }
+    .debrief-editor-body .wys-toolbar { flex-wrap: nowrap; overflow-x: auto; padding-top: var(--space-1); padding-bottom: var(--space-1); }
+    .debrief-editor-body .wys-btn { flex: 0 0 auto; }
+    .debrief-editor-foot { padding-top: var(--space-2); padding-bottom: var(--space-2); }
+}
+
+/* Téléphone : l'éditeur devient une feuille pleine largeur montant du bas (intention du design,
+   .debrief-sheet « sheet plein écran mobile / dialog desktop », jamais branchée faute de connaître le
+   format côté serveur — la media query le fait ici). La phrase d'aide passe sur sa propre ligne
+   au-dessus des boutons : en rangée, elle s'écrasait sur sept lignes contre eux. */
+@media (max-width: 768px) {
+    .debrief-scrim { align-items: flex-end; padding: max(var(--space-3), env(safe-area-inset-top)) 0 0; }
+    .debrief-dialog { width: 100%; max-width: none; height: 100%; border-radius: var(--radius-xl) var(--radius-xl) 0 0; }
+    .debrief-editor-foot { flex-wrap: wrap; padding-bottom: max(13px, env(safe-area-inset-bottom)); }
+    .debrief-editor-foot .wys-hint { flex-basis: 100%; }
+}
 
 /* Carte GPX (Leaflet) : conteneur du tracé + bouton plein écran en overlay. */
 .gpx-map { height: 400px; border: 1px solid var(--hair); border-radius: var(--radius-md); overflow: hidden; }

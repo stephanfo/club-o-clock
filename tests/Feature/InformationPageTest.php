@@ -6,6 +6,7 @@ use App\Livewire\Admin\InformationPageForm;
 use App\Livewire\Admin\InformationPageList;
 use App\Models\InformationPage;
 use App\Models\User;
+use App\Support\Markup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -107,6 +108,21 @@ class InformationPageTest extends TestCase
             ->set('title', '')
             ->call('save')
             ->assertHasErrors(['title']);
+    }
+
+    // #100 : un contenu trop long est refusé, jamais tronqué.
+    public function test_too_long_content_is_refused(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)->test(InformationPageForm::class)
+            ->set('title', 'Page longue')
+            ->set('visibility', 'all')
+            ->set('content_markdown', str_repeat('a', Markup::MAX_LENGTH + 1))
+            ->call('save')
+            ->assertHasErrors(['content_markdown']);
+
+        $this->assertSame(0, InformationPage::count());
     }
 
     // ── Autorisation ──

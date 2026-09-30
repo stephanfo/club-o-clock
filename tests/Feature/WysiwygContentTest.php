@@ -69,6 +69,60 @@ class WysiwygContentTest extends TestCase
         $this->assertStringNotContainsString('javascript:', $html);
     }
 
+    // #100 : un contenu trop long est refusé par la validation, jamais tronqué.
+    public function test_too_long_training_content_is_refused(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $disc = $this->discipline();
+
+        Livewire::actingAs($coach)->test(SessionForm::class)
+            ->set('kind', 'training')
+            ->set('title', 'Natation longue')
+            ->set('discipline_id', $disc->id)
+            ->set('start_at', Carbon::now()->addDays(2)->format('Y-m-d\TH:i'))
+            ->set('duration_min', 60)
+            ->set('content_markdown', str_repeat('a', Markup::MAX_LENGTH + 1))
+            ->call('save')
+            ->assertHasErrors(['content_markdown']);
+
+        $this->assertNull(Session::where('title', 'Natation longue')->first());
+    }
+
+    public function test_too_long_agenda_is_refused(): void
+    {
+        $coach = User::factory()->coach()->create();
+
+        Livewire::actingAs($coach)->test(SessionForm::class)
+            ->set('kind', 'club_event')
+            ->set('title', 'AG longue')
+            ->set('start_at', Carbon::now()->addWeek()->format('Y-m-d\TH:i'))
+            ->set('duration_min', 120)
+            ->set('agenda', str_repeat('a', Markup::MAX_LENGTH + 1))
+            ->call('save')
+            ->assertHasErrors(['agenda']);
+
+        $this->assertNull(Session::where('title', 'AG longue')->first());
+    }
+
+    public function test_content_at_the_limit_is_stored_intact(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $disc = $this->discipline();
+        $text = str_repeat('a', Markup::MAX_LENGTH);
+
+        Livewire::actingAs($coach)->test(SessionForm::class)
+            ->set('kind', 'training')
+            ->set('title', 'Natation pile')
+            ->set('discipline_id', $disc->id)
+            ->set('start_at', Carbon::now()->addDays(2)->format('Y-m-d\TH:i'))
+            ->set('duration_min', 60)
+            ->set('content_markdown', $text)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertSame($text, Session::where('title', 'Natation pile')->first()->content_markdown);
+    }
+
     public function test_empty_content_stores_null(): void
     {
         $coach = User::factory()->coach()->create();
