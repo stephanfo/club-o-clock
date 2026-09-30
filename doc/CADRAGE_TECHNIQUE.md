@@ -281,7 +281,7 @@ Lecture : *énoncé PRD → implication → où c'est tranché*. Les exigences s
 
 ### 4.6 Notifications (PRD §4.15)
 - **Push web** (VAPID, PWA installée, limite iOS Safari 16.4+ acceptée) + **email transactionnel UE**.
-- Matrice de préférences type × canal + pause globale. **Temps réel non requis** (souhaitable seul.). Le **type « nouveau débrief »** (PRD §4.12.5) emprunte la même file `outbox` que les autres notifs (publication seule, pas de renotif à l'édition).
+- Matrice de préférences type × canal + pause globale. **Temps réel non requis** (souhaitable seul.). Les **types « nouveau débrief » et « débrief d'une autre compétition »** (PRD §4.12.5) empruntent la même file `outbox` que les autres notifs (publication seule, pas de renotif à l'édition). Le second, diffusé à tout le club, adresse chaque compte en propre (`dispatchTo`, sans routage parent/enfant) : le routage enverrait au garant une copie par enfant P1.
 - → §6.3 (email/push), §8 (outbox/cron, temps réel).
 
 ### 4.7 Traitements planifiés (PRD §4.5, §4.13.5)

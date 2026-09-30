@@ -741,7 +741,7 @@ Sur une séance `kind = competition`, chaque membre **ayant participé** peut pu
 
 **Visibilité** : tous les **membres connectés** du club (athlètes, coachs, admins, parents), inscrits ou non à la compétition. Pas d'accès public anonyme. L'auteur est affiché avec la **même convention que partout dans l'app** (§4.9.4) : un athlète consultant voit **prénom + initiale du nom** (étendue à deux lettres en cas d'homonymie), un coach/admin consultant voit prénom + nom complet. Pas de traitement « signature » particulier.
 
-**Notification** : à la **publication** d'un débrief, push + email aux **autres participants** de la compétition (nouveau type de la matrice §4.15, opt-out cellule par cellule). L'**édition** ultérieure ne renotifie pas (même esprit que les compléments silencieux §4.12.4).
+**Notification** : à la **publication** d'un débrief, push + email à **tout le club**, sous **deux types distincts** de la matrice §4.15.3 (opt-out cellule par cellule, actifs par défaut) : les **autres participants** (`participating`) de la compétition reçoivent « nouveau débrief » ; **tous les autres membres actifs** — non inscrits, en liste d'attente, parents — reçoivent « débrief d'une autre compétition ». Chacun peut ainsi ne suivre que les compétitions auxquelles il participe. L'auteur n'est pas notifié ; un parent reçoit l'annonce club **une seule fois**, pas une par enfant. L'**édition** ultérieure ne renotifie pas (même esprit que les compléments silencieux §4.12.4).
 
 **RGPD** : à l'anonymisation d'un compte (§4.3), `authorId` est anonymisé comme les autres références (`anon:user:<hash>`) ; **le texte du débrief est conservé** (valeur pour le club), aligné sur le traitement des inscriptions anonymisées. Recommandation aux rédacteurs : éviter de citer le nom de tiers ou des informations de santé (recommandation, pas de validation algorithmique — cf. §4.12.1).
 
@@ -903,6 +903,7 @@ ne recevra.
 - Ajout/modification de contenu de séance (sous-types texte, parcours, météo).
 - Création d'une compétition ou d'un événement club ciblant une catégorie de l'utilisateur.
 - **Nouveau débrief sur une compétition à laquelle tu participes** : push + email aux autres participants à la publication d'un débrief (cf. §4.12.5).
+- **Débrief d'une autre compétition** : push + email à tous les membres actifs non participants à la publication d'un débrief (cf. §4.12.5). Type distinct du précédent, pour pouvoir le couper sans perdre les débriefs de ses propres compétitions.
 - **Inscription / désinscription d'un coach** sur une `training` : push + email aux **autres coachs déjà inscrits** + à **l'admin**. Si l'action est déclenchée par un tiers, **également au coach concerné** (distinct de l'`actorId`). Pas de notif aux athlètes inscrits (sauf si une modification de séance est par ailleurs déclenchée).
 - **Affectation d'un coach au formulaire de création d'une `Session`** : notif immédiate push + email à chaque coach autre que le créateur auto-affecté.
 - **Affectation via `defaultCoachIds[]` à la génération en lot d'un `SessionTemplate`** : **notif récapitulative unique par coach** (cf. §4.8 — évite le spam).

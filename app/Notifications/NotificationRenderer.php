@@ -205,6 +205,7 @@ class NotificationRenderer
             NotificationType::CoachOverride,
             NotificationType::EventCreated,
             NotificationType::NewDebrief,
+            NotificationType::ClubDebrief,
             NotificationType::CoachRegistration,
             NotificationType::CoachAssigned => isset($payload['session_id'])
                 ? route('sessions.show', $this->sessionParams($payload['session_id'], $subjectId))
