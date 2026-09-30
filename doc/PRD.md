@@ -912,6 +912,8 @@ ne recevra.
 
 **Pas de rappel temporel automatique avant événement en V1** (J-1, H-2, J-7 etc.), toutes `kind` confondues.
 
+**Destination du lien** (push, email et page Alertes, §4.15.7) : une notification qui concerne une séance ouvre sa fiche **sur l'onglet qui porte l'information** (#99) — **Débriefs** pour un nouveau débrief, **Encadrement** pour l'inscription, la désinscription ou l'affectation d'un coach ; les autres ouvrent l'onglet Infos, où figurent statut et horaires. Sur ordinateur, sans onglets, la section correspondante est amenée à l'écran. Un onglet absent de la fiche ouvre Infos.
+
 #### 4.15.3 Préférences — matrice granulaire
 - Chaque utilisateur a une **matrice type × canal** dans son profil.
 - **Défaut : tout activé.** Opt-out cellule par cellule.
