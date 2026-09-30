@@ -83,8 +83,9 @@ class NotificationRenderer
 
         if (isset($payload['session_title'])) {
             $quand = $this->formatDate($payload['session_start_at'] ?? null);
+            $corps = $quand === null ? $payload['session_title'] : $payload['session_title'].' · '.$quand;
 
-            return $quand === null ? $payload['session_title'] : $payload['session_title'].' · '.$quand;
+            return $corps.$this->requeuedSentence($payload, $subjectId);
         }
 
         // Récap de série (§4.8) : pas de séance unique, mais un volume et une plage déjà en payload.
@@ -98,6 +99,27 @@ class NotificationRenderer
         }
 
         return $type->description();
+    }
+
+    /**
+     * Place rendue (#103) : obtenir une place hors quota fait repasser en liste d'attente l'autre
+     * séance de la semaine. La notification de promotion le dit — l'athlète l'apprendrait sinon en
+     * ouvrant son planning. Lue par le garant, la phrase nomme l'enfant au lieu de tutoyer le parent.
+     *
+     * @param  array<string,mixed>  $payload
+     */
+    private function requeuedSentence(array $payload, ?int $subjectId): string
+    {
+        if (! isset($payload['requeued_session_title'])) {
+            return '';
+        }
+
+        $quand = $this->formatDate($payload['requeued_session_start_at'] ?? null);
+        $seance = $payload['requeued_session_title'].($quand === null ? '' : ' ('.$quand.')');
+        $prenom = $subjectId !== null ? ($payload['subject_first_name'] ?? null) : null;
+        $qui = $subjectId === null ? 'tu repasses' : ($prenom === null ? 'ton enfant repasse' : $prenom.' repasse');
+
+        return '. En échange, '.$qui.' en liste d\'attente sur '.$seance.', pour laisser la place à quelqu\'un qui attendait.';
     }
 
     /**

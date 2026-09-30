@@ -256,6 +256,14 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Corrigé
 
+- **Une place obtenue hors quota ne fait plus tenir deux places pour un quota d'une.** Inscrit
+  vendredi puis promu mardi grâce au déblocage du quota, un athlète gardait les deux, au détriment de
+  quelqu'un qui attendait vendredi. Désormais sa place de vendredi repasse en liste d'attente, à son
+  rang d'origine, et la place libérée va au premier qui attendait — sauf si le quota de vendredi est
+  lui aussi débloqué. Le dialog de quota, la confirmation d'inscription sur séance débloquée et la
+  notification de promotion nomment la séance concernée. Les places obtenues par override ne sont
+  jamais touchées (#103).
+
 - **Les listes de garants de la fiche adhérent étaient triées par prénom.** « Choisir un garant »,
   « Remplacer le garant » et « Rattacher un mineur sans garant » suivent désormais l'ordre de la liste
   des adhérents et de l'écran de création : nom, puis prénom.
