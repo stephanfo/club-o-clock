@@ -581,7 +581,7 @@ Action **« Débloquer le quota »** sur la séance. Le déblocage est un **éta
   - sinon → elle repasse en `waitlist quota_exceeded`, **`registeredAt` inchangé** (c'était son premier choix, dans son quota : il passe devant ceux arrivés après lui déjà hors quota), et la place libérée part au mécanisme A.
   - Jamais pour une place obtenue **par override** (§4.10.5), ni pour une séance **commencée**. Un override ne déclenche pas non plus de réévaluation.
   - L'ordre des jours n'importe plus : mardi obtenu hors quota rend vendredi, et vendredi débloqué à son tour y repromeut l'athlète normalement. Pas de boucle : la séance rétrogradée n'étant pas débloquée, A n'y pioche pas dans `quota_exceeded`.
-  - **Communication** : le dialog de quota (§4.10.3) nomme la séance qui serait rendue ; sur séance débloquée, l'inscription demande confirmation en la nommant ; la notification de promotion le dit (« En échange, tu repasses en liste d'attente sur … »). `ActivityLog quota_requeued` (acteur système, `resultingStatus = waitlist_quota_exceeded`).
+  - **Communication** : le dialog de quota (§4.10.3) nomme la séance qui serait rendue ; sur séance débloquée, l'inscription demande confirmation en la nommant ; la notification de promotion le dit en tête de son corps (« Tu es inscrit·e sur …, mais tu repasses en liste d'attente sur … »). `ActivityLog quota_requeued` (acteur système, `resultingStatus = waitlist_quota_exceeded`).
 - **Refermer le quota** : les athlètes déjà promus **restent inscrits** ; seules les inscriptions suivantes retrouvent la règle normale. `AuditLog action = 'quota_close'`.
 - **Piste hors V1** : déblocage automatique X heures avant le début.
 

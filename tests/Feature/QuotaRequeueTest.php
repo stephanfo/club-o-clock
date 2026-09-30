@@ -170,8 +170,45 @@ class QuotaRequeueTest extends TestCase
         $line = NotificationOutbox::where('type', 'waitlist_promoted')->where('user_id', $x->id)->firstOrFail();
         $this->assertSame('Natation 4', $line->payload['requeued_session_title']);
         $body = app(NotificationRenderer::class)->render($line)['body'];
-        $this->assertStringStartsWith('Natation 1', $body);
-        $this->assertStringContainsString("tu repasses en liste d'attente sur Natation 4", $body);
+        $this->assertMatchesRegularExpression(
+            "/^Tu es inscrit·e sur Natation 1 \\(.+\\), mais tu repasses en liste d'attente sur Natation 4 \\(.+\\) pour laisser la place à quelqu'un qui attendait\\.$/u",
+            $body,
+        );
+    }
+
+    /**
+     * Corps d'une promotion avec place rendue : la bascule vient en tête (« inscrit·e… mais
+     * repasse… »), sans quoi l'écran de notifications de l'OS la tronquait derrière le nom de séance.
+     */
+    private function corpsPromotion(array $payload, ?int $destinataire = null): string
+    {
+        $line = new NotificationOutbox([
+            'type' => 'waitlist_promoted',
+            'channel' => 'push',
+            'payload' => ['session_id' => 1, 'session_title' => 'Natation 1', ...$payload],
+            'user_id' => $destinataire ?? 999,
+            'status' => 'pending',
+        ]);
+
+        return app(NotificationRenderer::class)->render($line)['body'];
+    }
+
+    public function test_guardian_reads_the_child_first_name_in_the_requeue_body(): void
+    {
+        $this->assertSame(
+            "Léa est inscrit·e sur Natation 1, mais repasse en liste d'attente sur Natation 4 pour laisser la place à quelqu'un qui attendait.",
+            $this->corpsPromotion(['requeued_session_title' => 'Natation 4', 'subject_id' => 7, 'subject_first_name' => 'Léa']),
+        );
+        $this->assertSame(
+            "Ton enfant est inscrit·e sur Natation 1, mais repasse en liste d'attente sur Natation 4 pour laisser la place à quelqu'un qui attendait.",
+            $this->corpsPromotion(['requeued_session_title' => 'Natation 4', 'subject_id' => 7]),
+        );
+    }
+
+    /** Contrôle apparié : sans place rendue, le corps reste le format commun « séance · date ». */
+    public function test_promotion_without_requeue_keeps_the_plain_session_body(): void
+    {
+        $this->assertSame('Natation 1', $this->corpsPromotion([]));
     }
 
     public function test_requeued_athlete_keeps_his_rank_ahead_of_later_over_quota_registrants(): void

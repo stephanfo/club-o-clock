@@ -82,10 +82,13 @@ class NotificationRenderer
         }
 
         if (isset($payload['session_title'])) {
-            $quand = $this->formatDate($payload['session_start_at'] ?? null);
-            $corps = $quand === null ? $payload['session_title'] : $payload['session_title'].' · '.$quand;
+            if (isset($payload['requeued_session_title'])) {
+                return $this->requeuedBody($payload, $subjectId);
+            }
 
-            return $corps.$this->requeuedSentence($payload, $subjectId);
+            $quand = $this->formatDate($payload['session_start_at'] ?? null);
+
+            return $quand === null ? $payload['session_title'] : $payload['session_title'].' · '.$quand;
         }
 
         // Récap de série (§4.8) : pas de séance unique, mais un volume et une plage déjà en payload.
@@ -104,22 +107,33 @@ class NotificationRenderer
     /**
      * Place rendue (#103) : obtenir une place hors quota fait repasser en liste d'attente l'autre
      * séance de la semaine. La notification de promotion le dit — l'athlète l'apprendrait sinon en
-     * ouvrant son planning. Lue par le garant, la phrase nomme l'enfant au lieu de tutoyer le parent.
+     * ouvrant son planning. La bascule vient EN TÊTE du corps, pas après le nom de séance : l'écran
+     * de notifications de l'OS tronque le corps, et c'est la perte de place qui surprend. Lue par
+     * le garant, la phrase nomme l'enfant au lieu de tutoyer le parent.
      *
      * @param  array<string,mixed>  $payload
      */
-    private function requeuedSentence(array $payload, ?int $subjectId): string
+    private function requeuedBody(array $payload, ?int $subjectId): string
     {
-        if (! isset($payload['requeued_session_title'])) {
-            return '';
-        }
-
-        $quand = $this->formatDate($payload['requeued_session_start_at'] ?? null);
-        $seance = $payload['requeued_session_title'].($quand === null ? '' : ' ('.$quand.')');
+        $gagnee = $this->seanceEtDate($payload['session_title'], $payload['session_start_at'] ?? null);
+        $rendue = $this->seanceEtDate($payload['requeued_session_title'], $payload['requeued_session_start_at'] ?? null);
         $prenom = $subjectId !== null ? ($payload['subject_first_name'] ?? null) : null;
-        $qui = $subjectId === null ? 'tu repasses' : ($prenom === null ? 'ton enfant repasse' : $prenom.' repasse');
 
-        return '. En échange, '.$qui.' en liste d\'attente sur '.$seance.', pour laisser la place à quelqu\'un qui attendait.';
+        $debut = match (true) {
+            $subjectId === null => 'Tu es inscrit·e sur '.$gagnee.', mais tu repasses',
+            $prenom === null => 'Ton enfant est inscrit·e sur '.$gagnee.', mais repasse',
+            default => $prenom.' est inscrit·e sur '.$gagnee.', mais repasse',
+        };
+
+        return $debut.' en liste d\'attente sur '.$rendue.' pour laisser la place à quelqu\'un qui attendait.';
+    }
+
+    /** « Natation (ven. 3 oct. · 18:30) », ou le titre seul faute de date. */
+    private function seanceEtDate(string $titre, mixed $iso): string
+    {
+        $quand = $this->formatDate($iso);
+
+        return $quand === null ? $titre : $titre.' ('.$quand.')';
     }
 
     /**
