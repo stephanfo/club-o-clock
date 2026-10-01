@@ -1,8 +1,8 @@
-{{-- « Côté courses » (§4.12.5, #104) — débriefs publiés depuis moins de 15 jours, une ligne par
+{{-- « Derniers débriefs » (§4.12.5, #104) — débriefs publiés depuis moins de 15 jours, une ligne par
      compétition, la plus récemment débriefée en tête. Même structure que home-apero. Reçoit $recentDebriefs, $tz. --}}
 @if ($recentDebriefs->isNotEmpty())
     <div>
-        <div class="sect-head"><span class="sect-title">Côté courses</span><x-icon name="trophy" :size="15" style="color:var(--fg-muted)" /></div>
+        <div class="sect-head"><span class="sect-title">Derniers débriefs</span><x-icon name="trophy" :size="15" style="color:var(--fg-muted)" /></div>
         <div class="card" style="overflow:hidden">
             @foreach ($recentDebriefs as $s)
                 @php

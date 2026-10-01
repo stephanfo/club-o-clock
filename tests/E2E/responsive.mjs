@@ -431,9 +431,9 @@ tous.push(s.report());
   tous.push(s31.report());
 }
 
-// ── S32 · #104 · « Côté courses » à l'accueil + badge débriefs sur le planning ──
+// ── S32 · #104 · « Derniers débriefs » à l'accueil + badge débriefs sur le planning ──
 {
-  const s32 = new Scenario('S32 · Côté courses — accueil et badge débriefs du planning');
+  const s32 = new Scenario('S32 · Derniers débriefs — accueil et badge débriefs du planning');
   // Cible dérivée : la compétition au débrief actif le plus récent (le jeu de démo en sème à l'instant du seed).
   const [id, title, j, n] = ligne(`SELECT s.id, s.title, DATE(s.start_at) j, COUNT(*) n FROM sessions s JOIN debriefs d ON d.session_id=s.id
       WHERE d.archived_at IS NULL AND d.created_at >= NOW() - INTERVAL 15 DAY
@@ -444,13 +444,13 @@ tous.push(s.report());
     const { ctx, page } = await session(browser, 'marie@demo.club', vp);
     await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
     const coque = page.locator(nom === 'mobile' ? '.home-mobile' : '.home-desktop');
-    const bloc = coque.locator('.sect-head', { hasText: 'Côté courses' });
-    s32.check(`${nom} : bloc « Côté courses » visible`, await bloc.isVisible());
+    const bloc = coque.locator('.sect-head', { hasText: 'Derniers débriefs' });
+    s32.check(`${nom} : bloc « Derniers débriefs » visible`, await bloc.isVisible());
     const lien = coque.locator(`a[href*="/seances/${c.id}?tab=debriefs"]`);
     s32.check(`${nom} : la ligne nomme la compétition et ses débriefs`,
       (await lien.innerText()).includes(c.title) && (await lien.innerText()).includes(`${c.n} débrief`));
     await bloc.scrollIntoViewIfNeeded();
-    await s32.shot(page, `s32-accueil-courses-${nom}`);
+    await s32.shot(page, `s32-accueil-debriefs-${nom}`);
     await lien.click();
     await page.waitForURL(`**/seances/${c.id}**`);
     await page.waitForLoadState('networkidle');
