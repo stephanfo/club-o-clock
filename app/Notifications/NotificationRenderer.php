@@ -85,6 +85,10 @@ class NotificationRenderer
             return $this->openingBody($payload);
         }
 
+        if ($type === NotificationType::DebriefReaction) {
+            return $this->reactionBody($payload, $subjectId);
+        }
+
         if (isset($payload['session_title'])) {
             if (isset($payload['requeued_session_title'])) {
                 return $this->requeuedBody($payload, $subjectId);
@@ -130,6 +134,38 @@ class NotificationRenderer
         };
 
         return $debut.' en liste d\'attente sur '.$rendue.' pour laisser la place à quelqu\'un qui attendait.';
+    }
+
+    /**
+     * Réactions regroupées (#101) : « Léa, Tom et 3 autres ont aimé ton débrief · Tri de Vertou ».
+     * Les prénoms sont volatils (purgés à l'envoi) : sans eux, le compte seul. Lue par le garant,
+     * la phrase nomme l'enfant au lieu de tutoyer le parent.
+     *
+     * @param  array<string,mixed>  $payload
+     */
+    private function reactionBody(array $payload, ?int $subjectId): string
+    {
+        $noms = array_values($payload['reactor_names'] ?? []);
+        $total = max((int) ($payload['reaction_count'] ?? 0), count($noms), 1);
+
+        $qui = match (true) {
+            $noms === [] => $total === 1 ? 'Une personne' : $total.' personnes',
+            $total === 1 => $noms[0],
+            $total === 2 && count($noms) >= 2 => $noms[0].' et '.$noms[1],
+            default => $noms[0].(count($noms) >= 2 ? ', '.$noms[1] : '')
+                .' et '.($reste = $total - min(count($noms), 2)).' autre'.($reste > 1 ? 's' : ''),
+        };
+
+        $prenom = $subjectId !== null ? ($payload['subject_first_name'] ?? null) : null;
+        $quoi = match (true) {
+            $subjectId === null => 'ton débrief',
+            $prenom === null => 'le débrief de ton enfant',
+            default => 'le débrief de '.$prenom,
+        };
+
+        $phrase = $qui.' '.($total === 1 ? 'a' : 'ont').' aimé '.$quoi;
+
+        return isset($payload['session_title']) ? $phrase.' · '.$payload['session_title'] : $phrase;
     }
 
     /**
@@ -268,6 +304,7 @@ class NotificationRenderer
             NotificationType::EventCreated,
             NotificationType::NewDebrief,
             NotificationType::ClubDebrief,
+            NotificationType::DebriefReaction,
             NotificationType::RegistrationOpening,
             NotificationType::CoachRegistration,
             NotificationType::CoachAssigned => isset($payload['session_id'])

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 // Debrief (PRD §5.1, §4.12.5). kind=competition en V1. Soft-delete admin (archived_at).
 class Debrief extends Model
@@ -43,5 +44,15 @@ class Debrief extends Model
     public function archiver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'archived_by');
+    }
+
+    /**
+     * Réactions « j'aime » (#101). Conservées à l'archivage, masquées avec le débrief.
+     *
+     * @return HasMany<DebriefReaction, $this>
+     */
+    public function reactions(): HasMany
+    {
+        return $this->hasMany(DebriefReaction::class);
     }
 }

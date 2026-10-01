@@ -68,6 +68,7 @@ Remplacer le tableur Google Sheets actuel par une **PWA** qui offre aux adhéren
 - Contenu de séance (texte enrichi WYSIWYG + 1 pièce jointe ≤ 5 Mo).
 - Compétitions (intention déclarée, lien organisateur externe).
 - Débrief de compétition rédigé par les membres participants (texte enrichi), éditable par l'auteur, archivable/réactivable/éditable par l'admin.
+- Réaction « j'aime » sur un débrief, avec notification regroupée à l'auteur (§4.12.5).
 - Lien externe vers un album photos (compétitions et événements club), saisi par coach/admin.
 - Événements club (AG, soirée, sortie loisirs…).
 - Parcours OpenRunner Pro (embed iframe) et/ou GPX (parsing client, ≤ 5 Mo).
@@ -96,7 +97,7 @@ Remplacer le tableur Google Sheets actuel par une **PWA** qui offre aux adhéren
 - Stockage du téléphone et du certificat médical (minimisation RGPD).
 - Compteur / classement public d'apéros offerts.
 - Débrief sur `training` / `club_event` (V1 = compétition uniquement).
-- Réactions / commentaires / fil de discussion sous un débrief.
+- Commentaires / fil de discussion sous un débrief (la réaction « j'aime » est en V1, §4.12.5).
 - Hébergement ou intégration des photos dans l'app (V1 = simple lien externe vers un album tiers ; aucune galerie native).
 
 ---
@@ -761,6 +762,13 @@ Sur une séance `kind = competition`, chaque membre **ayant participé** peut pu
 
 **Notification** : à la **publication** d'un débrief, push + email à **tout le club**, sous **deux types distincts** de la matrice §4.15.3 (opt-out cellule par cellule, actifs par défaut) : les **autres participants** (`participating`) de la compétition reçoivent « nouveau débrief » ; **tous les autres membres actifs** — non inscrits, en liste d'attente, parents — reçoivent « débrief d'une autre compétition ». Chacun peut ainsi ne suivre que les compétitions auxquelles il participe. L'auteur n'est pas notifié ; un parent reçoit l'annonce club **une seule fois**, pas une par enfant. L'**édition** ultérieure ne renotifie pas (même esprit que les compléments silencieux §4.12.4).
 
+**Réaction « j'aime »** : un seul type de réaction, qu'on pose ou qu'on retire.
+- **Qui** : tout lecteur du débrief (membre connecté, **mineur compris** s'il a son compte), sauf son **auteur**. Réagir n'abonne à rien.
+- **Affichage** sous le débrief : le **nombre** de « j'aime » et les noms selon la convention §4.9.4 (« Toi, Léa M. et 3 autres »).
+- **Notification à l'auteur seulement**, **regroupée** : le premier « j'aime » ouvre une fenêtre de 30 min ; ceux qui suivent s'y ajoutent (« Léa, Tom et 3 autres ont aimé ton débrief ») au lieu d'envoyer une notification chacun. Un « j'aime » retiré avant l'envoi en est retiré ; s'il n'en reste aucun, rien ne part. Type dédié de la matrice §4.15.3, actif par défaut, routé au garant comme les autres notifications de l'auteur (§4.15.5).
+- **Archivage** : un débrief archivé n'accepte plus de réaction ; les siennes sont **conservées** et masquées avec lui, et reviennent à sa réactivation.
+- **RGPD** : les réactions d'un compte supprimé sont **effacées** (§4.3) — un geste de la personne, pas un contenu du club, à la différence du texte des débriefs.
+
 **Mise en avant** : l'accueil porte un bloc **« Derniers débriefs »** listant les compétitions ayant reçu un débrief (non archivé) **depuis moins de 15 jours** — au-delà, il a déjà été lu. Une ligne par compétition : nom, date, nombre de débriefs de la période et prénoms des auteurs ; la compétition débriefée le plus récemment en tête ; la ligne ouvre directement l'onglet Débriefs de la fiche. Bloc **masqué s'il est vide**, identique pour tous les membres (y compris en vue parent). Sur le planning, la carte d'une séance porte le **nombre de débriefs** actifs.
 
 **RGPD** : à l'anonymisation d'un compte (§4.3), `authorId` est anonymisé comme les autres références (`anon:user:<hash>`) ; **le texte du débrief est conservé** (valeur pour le club), aligné sur le traitement des inscriptions anonymisées. Recommandation aux rédacteurs : éviter de citer le nom de tiers ou des informations de santé (recommandation, pas de validation algorithmique — cf. §4.12.1).
@@ -925,6 +933,7 @@ ne recevra.
 - **Ouverture des inscriptions** à une compétition ciblant une catégorie de l'utilisateur : push + email 15 min avant l'heure d'ouverture, ou à 9 h heure club le jour même sans heure connue (cf. §4.7). Le message donne l'heure exacte.
 - **Nouveau débrief sur une compétition à laquelle tu participes** : push + email aux autres participants à la publication d'un débrief (cf. §4.12.5).
 - **Débrief d'une autre compétition** : push + email à tous les membres actifs non participants à la publication d'un débrief (cf. §4.12.5). Type distinct du précédent, pour pouvoir le couper sans perdre les débriefs de ses propres compétitions.
+- **Réactions à mon débrief** : push + email à l'auteur quand des membres aiment son débrief, **regroupés** en une notification par fenêtre de 30 min (cf. §4.12.5).
 - **Inscription / désinscription d'un coach** sur une `training` : push + email aux **autres coachs déjà inscrits** + à **l'admin**. Si l'action est déclenchée par un tiers, **également au coach concerné** (distinct de l'`actorId`). Pas de notif aux athlètes inscrits (sauf si une modification de séance est par ailleurs déclenchée).
 - **Affectation d'un coach au formulaire de création d'une `Session`** : notif immédiate push + email à chaque coach autre que le créateur auto-affecté.
 - **Affectation via `defaultCoachIds[]` à la génération en lot d'un `SessionTemplate`** : **notif récapitulative unique par coach** (cf. §4.8 — évite le spam).
@@ -934,7 +943,7 @@ ne recevra.
 
 **Pas de rappel temporel automatique avant événement en V1** (J-1, H-2, J-7 etc.), toutes `kind` confondues. La notification d'ouverture des inscriptions n'en est pas un : elle signale une échéance chez l'organisateur, une seule fois, sans rappel la veille.
 
-**Destination du lien** (push, email et page Alertes, §4.15.7) : une notification qui concerne une séance ouvre sa fiche **sur l'onglet qui porte l'information** (#99) — **Débriefs** pour un nouveau débrief, **Encadrement** pour l'inscription, la désinscription ou l'affectation d'un coach ; les autres ouvrent l'onglet Infos, où figurent statut et horaires. Sur ordinateur, sans onglets, la section correspondante est amenée à l'écran. Un onglet absent de la fiche ouvre Infos.
+**Destination du lien** (push, email et page Alertes, §4.15.7) : une notification qui concerne une séance ouvre sa fiche **sur l'onglet qui porte l'information** (#99) — **Débriefs** pour un nouveau débrief ou une réaction, **Encadrement** pour l'inscription, la désinscription ou l'affectation d'un coach ; les autres ouvrent l'onglet Infos, où figurent statut et horaires. Sur ordinateur, sans onglets, la section correspondante est amenée à l'écran. Un onglet absent de la fiche ouvre Infos.
 
 #### 4.15.3 Préférences — matrice granulaire
 - Chaque utilisateur a une **matrice type × canal** dans son profil.
@@ -1200,6 +1209,7 @@ Vue logique des entités. **Volontairement agnostique** à la techno de stockage
 - **`ActivityLog`** : `id`, `actorId` (anonymisable, peut valoir `system`), `action`, `userId` (anonymisable — concerné par l'action, peut différer de `actorId`), `sessionId`, `registrationId?`, `resultingStatus?`, `timestamp`.
 - **`AperoFlag`** : `id`, `sessionId`, `userId` (payeur), `registrationId` (index pour la cascade), `motif?` (max 140 caractères), `flaggedAt`, `flaggedBy`. **Unicité `(sessionId, userId)`**. Cardinalité par séance : `0..N`. Hard delete au retrait (traçabilité dans `ActivityLog`).
 - **`Debrief`** : `id`, `sessionId` (FK, `kind = competition` en V1), `authorId` (FK User, immuable, anonymisable), `contentMarkdown` (texte enrichi WYSIWYG §4.12.1), `createdAt`, `updatedAt`, `archivedAt?` / `archivedBy?` (soft-delete admin). **Unicité `(sessionId, authorId)`** — au plus 1 débrief par membre et par compétition. Cardinalité par séance : `0..N`. Nom d'entité volontairement **générique** (pas spécifique à la compétition) pour rester réutilisable, même si le périmètre V1 se limite à `kind = competition` (cf. §4.12.5).
+- **`DebriefReaction`** : `id`, `debriefId` (FK), `userId` (FK User, effacée avec le compte), `createdAt`. **Unicité `(debriefId, userId)`** — un « j'aime » par membre et par débrief (cf. §4.12.5).
 - **`InformationPage`** (note club, §4.19) : `id`, `title`, `contentMarkdown?` (texte enrichi WYSIWYG §4.12.1), `visibility` (`all` / `coach` / `admin` — niveau minimum cumulatif), `pinned` (épinglée en bannière d'accueil), `createdBy` (FK User, anonymisable), `createdAt`, `updatedAt`, `archivedAt?` / `archivedBy?` (soft-delete admin). Édition admin uniquement. Ajout de périmètre post-cadrage.
 - **`ClubSettings`** (singleton) : `name`, `logo`, `primaryColor`, `timezone`, `invitationLinkDays`, etc.
 - **`NotificationPreferences`** (rattachée à un `User`) : matrice `type × canal` + flag pause globale.
@@ -1223,7 +1233,7 @@ Vue logique des entités. **Volontairement agnostique** à la techno de stockage
 | **Hébergement** | **UE obligatoire** pour le stockage de toutes les données utilisateurs et leurs sauvegardes (RGPD). Région privilégiée : Paris (sinon Francfort ou équivalent UE). |
 | **Distribution** | **AGPL-3.0 self-hosting un-instance-par-club.** Pas de multi-tenant. |
 | **Sécurité** | Contrôle d'accès appliqué côté backend (pas seulement client). Toute donnée a ses règles d'accès définies dès sa première migration en production. |
-| **RGPD** | Données UE. Suppression de compte = anonymisation des inscriptions et des débriefs (auteur anonymisé, texte conservé — cf. §4.12.5). Pas de stockage santé (certif médical exclu) ni de téléphone (minimisation). Mentions légales / CGU accessibles depuis le footer (rédaction différée pré-prod). |
+| **RGPD** | Données UE. Suppression de compte = anonymisation des inscriptions et des débriefs (auteur anonymisé, texte conservé — cf. §4.12.5) ; les réactions « j'aime » sont effacées. Pas de stockage santé (certif médical exclu) ni de téléphone (minimisation). Mentions légales / CGU accessibles depuis le footer (rédaction différée pré-prod). |
 | **Conservation** | Pas de purge auto, conservation indéfinie. Monitoring du volume de stockage. |
 | **Performance** | Chargement initial < 2s sur 4G. Planning quasi-instantané après mise en cache. **Évaluation du quota en temps quasi-constant** à l'inscription (cf. §4.10). |
 | **Sérialisation des inscriptions** | Sur la dernière place, deux inscriptions concurrentes sérialisées atomiquement sur timestamp serveur. Premier = `participating`, second = `waitlist capacity`. **Pas de double-acceptation, jamais.** Implémentation libre. À garantir par tests E2E. |

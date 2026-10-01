@@ -9,6 +9,11 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Ajouté
 
+- **On peut aimer un débrief.** Sous chaque débrief, « J'aime » se pose ou se retire ; le compteur et
+  les noms (« Toi, Léa M. et 3 autres ») s'affichent pour tous. L'auteur reçoit une seule notification
+  pour plusieurs « j'aime » posés en 30 min (« Léa, Tom et 3 autres ont aimé ton débrief »), qu'il
+  peut couper dans ses préférences. Les réactions d'un compte supprimé sont effacées (#101).
+
 - **On peut ajouter une séance à son agenda perso.** Sur la fiche d'une séance à venir, « Ajouter à
   mon agenda » télécharge un fichier `.ics` que Google Agenda, Apple Calendrier ou Outlook importent :
   titre, horaire, lieu et lien vers la fiche, sans le nom d'aucun inscrit. C'est une copie : un

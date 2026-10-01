@@ -6,6 +6,7 @@ use App\Models\AperoFlag;
 use App\Models\Category;
 use App\Models\ClubSettings;
 use App\Models\Debrief;
+use App\Models\DebriefReaction;
 use App\Models\Discipline;
 use App\Models\EventType;
 use App\Models\InformationPage;
@@ -863,6 +864,15 @@ class DemoSeeder extends Seeder
                 ['session_id' => $competition->id, 'author_id' => $reg->user_id],
                 ['content_markdown' => $debriefTexts[$i]],
             );
+        }
+
+        // Réactions « j'aime » (#101) : posées en direct, sans notification (jeu de démo figé).
+        foreach (Debrief::where('session_id', $competition->id)->get() as $i => $debrief) {
+            $fans = User::where('is_active', true)->whereNotNull('email')
+                ->where('id', '!=', $debrief->author_id)->orderBy('id')->skip($i * 2)->take(4 - $i * 3)->pluck('id');
+            DebriefReaction::insertOrIgnore($fans->map(fn ($id) => [
+                'debrief_id' => $debrief->id, 'user_id' => $id, 'created_at' => $now,
+            ])->all());
         }
 
         // --- Séance CLUB_EVENT future (PRD §4.7) : Assemblée Générale + apéro ---

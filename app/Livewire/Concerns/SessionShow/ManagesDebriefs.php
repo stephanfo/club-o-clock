@@ -3,6 +3,7 @@
 namespace App\Livewire\Concerns\SessionShow;
 
 use App\Models\Debrief;
+use App\Services\DebriefReactionService;
 use App\Services\DebriefService;
 use RuntimeException;
 
@@ -96,6 +97,20 @@ trait ManagesDebriefs
         $debrief = Debrief::findOrFail($id);
         $this->authorize('archive', $debrief);
         $service->restore($debrief, auth()->user());
+        $this->refreshSession();
+    }
+
+    /** « J'aime » / retrait (#101) : tout lecteur du débrief, sauf son auteur. */
+    public function toggleReaction(DebriefReactionService $service, int $id): void
+    {
+        $debrief = Debrief::where('session_id', $this->session->id)->findOrFail($id);
+
+        try {
+            $service->toggle($debrief, auth()->user());
+        } catch (RuntimeException $e) {
+            session()->flash('warn', $e->getMessage());
+        }
+
         $this->refreshSession();
     }
 
