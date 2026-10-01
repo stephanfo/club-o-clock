@@ -243,6 +243,33 @@ const clubPush = {
         }
     },
 
+    // Endpoint de l'abonnement de CET appareil, ou null (#97 : notification de test, repérage dans
+    // « Mes appareils »). Ne crée rien et ne demande aucune permission.
+    async currentEndpoint() {
+        if (!this.isSupported()) return null;
+        try {
+            const reg = await swReady();
+            const sub = await reg.pushManager.getSubscription();
+            return sub ? sub.endpoint : null;
+        } catch (e) {
+            return null;
+        }
+    },
+
+    // Empreinte SHA-256 de l'endpoint, même calcul que PushSubscription::hashFor : la liste des
+    // appareils repère la ligne de cet appareil sans que l'endpoint transite. Null hors contexte
+    // sécurisé (crypto.subtle absent) : la liste s'affiche alors sans repère, rien ne casse.
+    async currentEndpointHash() {
+        const endpoint = await this.currentEndpoint();
+        if (!endpoint || !window.crypto || !window.crypto.subtle) return null;
+        try {
+            const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(endpoint));
+            return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+        } catch (e) {
+            return null;
+        }
+    },
+
     messageFor(e) {
         switch (e && e.kind) {
             case 'network':

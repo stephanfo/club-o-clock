@@ -921,6 +921,12 @@ celle de l'adhérent créé par le bureau (§4.1.3) comme celle du mineur autono
 jeton d'activation sur un compte injoignable écrirait une trace d'envoi pour un message que personne
 ne recevra.
 
+**Push sur mes appareils** (onglet Notifs du profil) : l'adhérent doit pouvoir savoir si ses push fonctionnent, sans passer par le bureau.
+- **Notification de test** : quand le push est activé sur l'appareil, un bouton envoie une notification **à cet appareil seul**. Fréquence limitée (3 envois par 10 min et par compte). Le message dit si le service de notifications l'a acceptée, ne reconnaît plus l'appareil (à réactiver) ou est injoignable.
+- **Mes appareils** : chaque appareil abonné (système et navigateur), la date de son dernier envoi réussi, un repère sur l'appareil courant et un signal si les derniers envois ont échoué. Un **autre** appareil se retire d'un geste (confirmation simple) ; l'appareil courant se coupe par l'interrupteur de l'onglet.
+- **Avertissement** quand aucun appareil n'est abonné alors que l'adhérent veut des push (pas en pause, au moins un type activé en push) : ses push ne sont alors lisibles que sur la page Alertes (§4.15.7). Le message dit quoi faire selon l'appareil (activer, autoriser dans le navigateur, installer l'application sur iPhone). Rien n'est affiché quand le club a fermé le push.
+- **Pas de repli par email** quand un push n'aboutit pas : l'adhérent règle ses canaux dans la matrice §4.15.3.
+
 **Mode d'envoi** : par défaut, les notifications partent en **envoi différé par lots** (la latence de livraison reste bornée par la période de traitement). Une option **envoi immédiat** est proposée aux points de déclenchement (ex. modification de séance §4.7) et depuis l'écran de gestion des envois (§4.15.6), pour pousser sans attendre le lot suivant. L'évaluation des préférences (§4.15.3), de la pause (§4.15.4) et du routage parent/enfant (§4.15.5) est identique dans les deux modes.
 
 #### 4.15.2 Types

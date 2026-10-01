@@ -6,6 +6,7 @@ use App\Models\ClubSettings;
 use App\Models\NotificationOutbox;
 use App\Models\PushSubscription;
 use App\Notifications\NotificationRenderer;
+use App\Notifications\Push\PushDeliveryResult;
 use App\Notifications\Push\WebPushSender;
 use Illuminate\Support\Carbon;
 
@@ -45,23 +46,17 @@ class PushChannel implements NotificationChannel
         // pas lire ClubSettings (cadrage §7.16), donc le serveur lui transmet l'URL déjà résolue,
         // le service worker gardant un repli en dur si la clé manque (payload d'une version
         // antérieure encore en vol dans l'outbox).
-        $payload = json_encode([
-            ...$this->renderer->render($line),
-            'icon' => ClubSettings::current()->pwaIconUrl('icon_192'),
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $payload = $this->payload($this->renderer->render($line));
 
         $delivered = 0;
         $transientFailures = 0;
 
         foreach ($user->pushSubscriptions as $subscription) {
-            $result = $this->sender->send($subscription, $payload);
+            $result = $this->deliver($subscription, $payload);
 
-            if ($result->expired) {
-                $subscription->delete(); // endpoint mort : on purge, pas de retry possible.
-            } elseif ($result->delivered) {
-                $subscription->forceFill(['last_success_at' => Carbon::now(), 'failure_count' => 0])->save();
+            if ($result->delivered) {
                 $delivered++;
-            } elseif ($this->recordFailure($subscription)) {
+            } elseif (! $result->expired && $subscription->exists) {
                 $transientFailures++;
             }
         }
@@ -80,10 +75,48 @@ class PushChannel implements NotificationChannel
     }
 
     /**
-     * Compte un échec transitoire ; purge l'appareil s'il a épuisé son crédit. Renvoie true si
-     * l'appareil reste abonné (donc vaut un nouvel essai).
+     * Notification de test vers UN appareil (#97) : même chemin que les vraies — payload, envoi et
+     * suivi de santé —, pour que le test prouve ce qu'il prétend prouver.
+     *
+     * @param  array{title:string,body:string,url:string}  $content
      */
-    private function recordFailure(PushSubscription $subscription): bool
+    public function sendTo(PushSubscription $subscription, array $content): PushDeliveryResult
+    {
+        return $this->deliver($subscription, $this->payload($content));
+    }
+
+    /** @param  array{title:string,body:string,url:string}  $content */
+    private function payload(array $content): string
+    {
+        return json_encode([
+            ...$content,
+            'icon' => ClubSettings::current()->pwaIconUrl('icon_192'),
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * Envoie à un appareil et tient sa santé à jour. Endpoint mort → purgé ; échec transitoire →
+     * compté, et purgé s'il a épuisé son crédit (l'abonnement n'existe alors plus : `exists` faux).
+     */
+    private function deliver(PushSubscription $subscription, string $payload): PushDeliveryResult
+    {
+        $result = $this->sender->send($subscription, $payload);
+
+        if ($result->expired) {
+            $subscription->delete(); // endpoint mort : on purge, pas de retry possible.
+        } elseif ($result->delivered) {
+            $subscription->forceFill(['last_success_at' => Carbon::now(), 'failure_count' => 0])->save();
+        } else {
+            $this->recordFailure($subscription);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Compte un échec transitoire ; purge l'appareil s'il a épuisé son crédit.
+     */
+    private function recordFailure(PushSubscription $subscription): void
     {
         $failures = $subscription->failure_count + 1;
         $lastProof = $subscription->last_success_at ?? $subscription->created_at;
@@ -92,11 +125,9 @@ class PushChannel implements NotificationChannel
             && ($lastProof === null || $lastProof->lt(Carbon::now()->subDays(self::PURGE_AFTER_DAYS)))) {
             $subscription->delete();
 
-            return false;
+            return;
         }
 
         $subscription->forceFill(['last_failure_at' => Carbon::now(), 'failure_count' => $failures])->save();
-
-        return true;
     }
 }

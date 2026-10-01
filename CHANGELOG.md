@@ -9,6 +9,12 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Ajouté
 
+- **Chacun peut vérifier ses notifications push.** Profil → Notifs : « M'envoyer une notification de
+  test » envoie un push à l'appareil en main, et à lui seul (3 essais par 10 min). La liste « Mes
+  appareils » montre chaque appareil abonné, son dernier envoi réussi et l'appareil courant, et
+  permet de retirer un ancien téléphone. Un avertissement apparaît quand aucun appareil ne reçoit les
+  push alors que l'adhérent en veut, avec la marche à suivre selon l'appareil (#97).
+
 - **Le bureau voit la santé du push.** L'écran des envois indique le nombre d'appareils abonnés et le
   bilan des push des dernières 24 h (livrés, en échec, sans destinataire). Un bandeau prévient quand
   la moitié des essais échouent (clés VAPID, service push). La fiche d'un adhérent signale qu'il n'a
