@@ -25,11 +25,12 @@ class DrainNotificationsCommand extends Command
         $heartbeat->beat();
 
         $this->info(sprintf(
-            'Outbox drainée : %d envoyée(s), %d reprogrammée(s), %d en échec, %d annulée(s).',
+            'Outbox drainée : %d envoyée(s), %d reprogrammée(s), %d en échec, %d annulée(s), %d sans destinataire.',
             $stats['sent'],
             $stats['retried'],
             $stats['failed'],
             $stats['cancelled'],
+            $stats['no_target'],
         ));
 
         return self::SUCCESS;

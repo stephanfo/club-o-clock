@@ -11,7 +11,7 @@ class NotificationOutbox extends Model
 {
     protected $table = 'notification_outbox';
 
-    public const STATUSES = ['pending', 'sent', 'failed', 'cancelled'];
+    public const STATUSES = ['pending', 'sent', 'failed', 'cancelled', 'no_target'];
 
     /** Libellés FR des statuts pour l'écran de gestion (§4.15.6). */
     public const STATUS_LABELS = [
@@ -19,6 +19,8 @@ class NotificationOutbox extends Model
         'sent' => 'Envoyée',
         'failed' => 'En échec',
         'cancelled' => 'Annulée',
+        // #97 : aucun appareil abonné au push, ou pas d'adresse email. Rien n'est parti.
+        'no_target' => 'Sans destinataire',
     ];
 
     /**
@@ -106,7 +108,9 @@ class NotificationOutbox extends Model
 
         return self::query()
             ->where('user_id', $userId)
-            ->where('status', 'sent')
+            // `no_target` aussi (#97) : sans appareil abonné, la page Alertes est le SEUL endroit où
+            // l'adhérent peut encore la lire.
+            ->whereIn('status', ['sent', 'no_target'])
             ->where('channel', 'push')
             ->whereNull('dismissed_at')
             // Visibilité (#79) : une alerte de séance vit jusqu'à 7 jours après la FIN de la séance,

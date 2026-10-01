@@ -90,7 +90,8 @@ class OutboxAdminService
 
         $count = NotificationOutbox::query()
             ->whereIn('id', $ids)
-            ->where('status', 'failed')
+            // `no_target` aussi (#97) : rejouable une fois que l'adhérent a abonné un appareil.
+            ->whereIn('status', ['failed', 'no_target'])
             ->update(['status' => 'pending', 'attempts' => 0, 'available_at' => Carbon::now()]);
 
         if ($count > 0) {
@@ -105,12 +106,12 @@ class OutboxAdminService
      * attendre le lot cron — même chemin que l'envoi prioritaire (§7.14). Renvoie le compte d'envois.
      *
      * @param  list<int>  $ids
-     * @return array{sent:int,retried:int,failed:int,cancelled:int}
+     * @return array{sent:int,retried:int,failed:int,cancelled:int,no_target:int}
      */
     public function pushNow(array $ids, User $admin): array
     {
         if ($ids === []) {
-            return ['sent' => 0, 'retried' => 0, 'failed' => 0, 'cancelled' => 0];
+            return ['sent' => 0, 'retried' => 0, 'failed' => 0, 'cancelled' => 0, 'no_target' => 0];
         }
 
         $lines = NotificationOutbox::query()

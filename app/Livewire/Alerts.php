@@ -117,7 +117,8 @@ class Alerts extends Component
                 'ids' => $rows->pluck('id')->all(),
                 'title' => self::titre($rows, $label, $subjects),
                 'sub' => self::sousTitre($session, $row->payload ?? [], $tz),
-                'when' => $row->sent_at?->diffForHumans() ?? '',
+                // Une ligne `no_target` (#97) n'a pas de sent_at : sa dernière mise à jour est le passage du drain.
+                'when' => ($row->sent_at ?? $row->updated_at)?->diffForHumans() ?? '',
                 'icon' => self::iconFor($type),
                 'tintBg' => self::tintBgFor($type),
                 'tintFg' => self::tintFgFor($type),

@@ -104,7 +104,7 @@ class SessionDeletionService
     {
         return [
             'cloches' => (clone self::requeteAlertes($session))
-                ->where('status', 'sent')->where('channel', 'push')
+                ->whereIn('status', ['sent', 'no_target'])->where('channel', 'push')
                 ->where('created_at', '>=', Carbon::now()->subDays(60))->count(),
             'enAttente' => (clone self::requeteAlertes($session))
                 ->whereIn('status', ['pending', 'failed'])->count(),

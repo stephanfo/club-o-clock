@@ -9,8 +9,9 @@ use App\Models\NotificationOutbox;
 interface NotificationChannel
 {
     /**
-     * Tente l'envoi d'une ligne d'outbox. Retourne true si délivré, false sinon (le drain
-     * programmera un retry). Peut aussi lever : le drain traite l'exception comme un échec.
+     * Tente l'envoi d'une ligne d'outbox. Retry : le drain programmera un nouvel essai ; NoTarget :
+     * personne à qui l'envoyer, terminal. Peut aussi lever : le drain traite l'exception comme un
+     * échec transitoire.
      */
-    public function send(NotificationOutbox $line): bool;
+    public function send(NotificationOutbox $line): DeliveryOutcome;
 }

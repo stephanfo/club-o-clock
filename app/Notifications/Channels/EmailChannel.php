@@ -15,14 +15,14 @@ class EmailChannel implements NotificationChannel
 {
     public function __construct(private NotificationRenderer $renderer) {}
 
-    public function send(NotificationOutbox $line): bool
+    public function send(NotificationOutbox $line): DeliveryOutcome
     {
         $user = $line->user;
 
         // Pas d'adresse (mineur P1, compte anonymisé) : rien à envoyer, inutile de retenter.
         // Le dispatcher filtre déjà à l'émission ; garde-fou si l'email a disparu depuis.
         if ($user === null || $user->email === null) {
-            return true;
+            return DeliveryOutcome::NoTarget;
         }
 
         $content = $this->renderer->render($line);
@@ -35,6 +35,6 @@ class EmailChannel implements NotificationChannel
             new OutboxNotificationMail($content['title'], $content['body'], $content['url'], $transactional),
         );
 
-        return true;
+        return DeliveryOutcome::Delivered;
     }
 }

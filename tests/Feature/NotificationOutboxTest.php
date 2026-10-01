@@ -245,7 +245,7 @@ class NotificationOutboxTest extends TestCase
 
         $stats = app(OutboxDrainer::class)->drainNow([$line]);
 
-        $this->assertSame(['sent' => 0, 'retried' => 0, 'failed' => 0, 'cancelled' => 0], $stats);
+        $this->assertSame(['sent' => 0, 'retried' => 0, 'failed' => 0, 'cancelled' => 0, 'no_target' => 0], $stats);
     }
 
     // ── Commande cron ──

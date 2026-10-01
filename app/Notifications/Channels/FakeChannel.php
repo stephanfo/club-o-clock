@@ -13,14 +13,20 @@ class FakeChannel implements NotificationChannel
 
     public bool $shouldFail = false;
 
-    public function send(NotificationOutbox $line): bool
+    /** Simule un destinataire sans appareil ni adresse (#97). */
+    public bool $noTarget = false;
+
+    public function send(NotificationOutbox $line): DeliveryOutcome
     {
         if ($this->shouldFail) {
-            return false;
+            return DeliveryOutcome::Retry;
+        }
+        if ($this->noTarget) {
+            return DeliveryOutcome::NoTarget;
         }
 
         $this->sent[] = $line->id;
 
-        return true;
+        return DeliveryOutcome::Delivered;
     }
 }

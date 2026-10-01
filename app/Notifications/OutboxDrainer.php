@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\ClubSettings;
 use App\Models\NotificationOutbox;
 use App\Notifications\Channels\ChannelManager;
+use App\Notifications\Channels\DeliveryOutcome;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -27,7 +28,7 @@ class OutboxDrainer
     /**
      * Drain par lots : lignes pending dont available_at est échu (ou nul). Utilisé par le cron.
      *
-     * @return array{sent:int,retried:int,failed:int,cancelled:int}
+     * @return array{sent:int,retried:int,failed:int,cancelled:int,no_target:int}
      */
     public function drainDue(int $limit = 100): array
     {
@@ -46,7 +47,7 @@ class OutboxDrainer
      * sans attendre l'échéance. Ne traite que les lignes encore pending.
      *
      * @param  iterable<NotificationOutbox>  $lines
-     * @return array{sent:int,retried:int,failed:int,cancelled:int}
+     * @return array{sent:int,retried:int,failed:int,cancelled:int,no_target:int}
      */
     public function drainNow(iterable $lines): array
     {
@@ -57,11 +58,11 @@ class OutboxDrainer
 
     /**
      * @param  Collection<int,NotificationOutbox>  $lines
-     * @return array{sent:int,retried:int,failed:int,cancelled:int}
+     * @return array{sent:int,retried:int,failed:int,cancelled:int,no_target:int}
      */
     private function process(Collection $lines): array
     {
-        $stats = ['sent' => 0, 'retried' => 0, 'failed' => 0, 'cancelled' => 0];
+        $stats = ['sent' => 0, 'retried' => 0, 'failed' => 0, 'cancelled' => 0, 'no_target' => 0];
         // Singleton mémoïsé : une lecture pour toute la passe.
         $settings = ClubSettings::current();
 
@@ -86,7 +87,7 @@ class OutboxDrainer
             }
 
             try {
-                $delivered = $this->channels->driver($line->channel)->send($line);
+                $outcome = $this->channels->driver($line->channel)->send($line);
             } catch (Throwable $e) {
                 // Échec de transport : on programme un retry/backoff plus bas, mais on trace l'erreur
                 // (sinon les échecs de livraison sont silencieux, seul `attempts` bouge).
@@ -97,10 +98,20 @@ class OutboxDrainer
                     'attempts' => $line->attempts,
                     'exception' => $e->getMessage(),
                 ]);
-                $delivered = false;
+                $outcome = DeliveryOutcome::Retry;
             }
 
-            if ($delivered) {
+            if ($outcome === DeliveryOutcome::NoTarget) {
+                // Personne à qui l'envoyer (#97) : terminal, sans retry ni sent_at. Le payload est
+                // gardé intact — la ligne reste lisible sur la page Alertes et rejouable depuis
+                // l'écran des envois une fois un appareil abonné.
+                $line->update(['status' => 'no_target']);
+                $stats['no_target']++;
+
+                continue;
+            }
+
+            if ($outcome === DeliveryOutcome::Delivered) {
                 // Le secret a servi : il n'a plus rien à faire en base. Même sort pour le contexte
                 // volatil (prénom du sujet), qui n'a servi qu'au rendu. On ne purge QUE sur `sent` —
                 // une ligne `failed` reste rejouable depuis l'écran d'envois, la vider produirait un

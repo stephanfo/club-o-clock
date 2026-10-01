@@ -5,7 +5,7 @@
     use App\Models\NotificationOutbox;
     use App\Notifications\NotificationType;
 
-    $statusChip = ['pending' => 'chip-warn', 'sent' => 'chip-green', 'failed' => 'chip-danger', 'cancelled' => 'chip-cancel'];
+    $statusChip = ['pending' => 'chip-warn', 'sent' => 'chip-green', 'failed' => 'chip-danger', 'cancelled' => 'chip-cancel', 'no_target' => 'chip-line'];
     $typeLabel = fn (string $v) => NotificationType::tryFrom($v)?->label() ?? $v;
     $selectedCount = count($selected);
 @endphp
@@ -26,6 +26,10 @@
                     · traitement automatique actif
                     ({{ $scheduler['age'] }})
                 @endif
+            </div>
+            <div class="meta" data-push-sante>
+                push : {{ $pushHealth['devices'] }} appareil(s) abonné(s){{ $pushHealth['devicesFailing'] > 0 ? ', dont '.$pushHealth['devicesFailing'].' en échec' : '' }}
+                · {{ $pushWindow }} h : {{ $pushHealth['delivered'] }} livré(s), {{ $pushHealth['failing'] }} en échec, {{ $pushHealth['noTarget'] }} sans destinataire
             </div>
         </div>
         <div class="flex g8 ac">
@@ -73,9 +77,26 @@
             </div>
         @endif
 
+        {{-- ═══ Santé du push (#97) ═══ — panne de clés VAPID ou du service push : les essais
+             échouent en masse alors que l'outbox, elle, avance normalement. --}}
+        @if ($pushHealth['alert'])
+            <div class="banner banner-danger" style="margin-bottom:14px" data-push-alerte>
+                <x-icon name="alert-triangle" class="ic" :size="18" />
+                <div>
+                    <strong>Échecs massifs du push.</strong>
+                    {{ $pushHealth['failing'] }} essai(s) sur {{ $pushHealth['failing'] + $pushHealth['delivered'] }}
+                    n'ont pas abouti ces {{ $pushWindow }} dernières heures.
+                    <div style="margin-top:4px">
+                        Vérifier les clés VAPID et l'accès sortant au service push — voir <em>INSTALL §3.3</em>.
+                        Les emails ne sont pas concernés.
+                    </div>
+                </div>
+            </div>
+        @endif
+
         {{-- ═══ Filtres (§4.15.6) ═══ --}}
         <div class="flex g8 ac wrap" style="margin-bottom:14px">
-            <x-segmented :items="[['v'=>'','l'=>'Tous'],['v'=>'pending','l'=>'En attente'],['v'=>'sent','l'=>'Envoyées'],['v'=>'failed','l'=>'En échec'],['v'=>'cancelled','l'=>'Annulées']]"
+            <x-segmented :items="[['v'=>'','l'=>'Tous'],['v'=>'pending','l'=>'En attente'],['v'=>'sent','l'=>'Envoyées'],['v'=>'failed','l'=>'En échec'],['v'=>'cancelled','l'=>'Annulées'],['v'=>'no_target','l'=>'Sans destinataire']]"
                          :value="$status" wire-set="status" />
 
             <x-segmented :items="[['v'=>'','l'=>'Tous canaux'],['v'=>'push','l'=>'Push'],['v'=>'email','l'=>'Email']]"
@@ -228,7 +249,7 @@
                 @if ($detail->status === 'pending')
                     <button type="button" wire:click="pushDetail" wire:loading.attr="disabled" wire:target="pushDetail" class="btn btn-primary btn-sm f1"><x-icon name="send" :size="14" /> Pousser</button>
                     <button type="button" wire:click="askCancel('detail')" class="btn btn-ghost btn-sm f1"><x-icon name="x" :size="14" /> Annuler</button>
-                @elseif ($detail->status === 'failed')
+                @elseif (in_array($detail->status, ['failed', 'no_target'], true))
                     <button type="button" wire:click="retryDetail" wire:loading.attr="disabled" wire:target="retryDetail" class="btn btn-primary btn-sm f1"><x-icon name="refresh-cw" :size="14" /> Rejouer</button>
                 @endif
                 <button type="button" wire:click="closeDetail" class="btn btn-ghost btn-sm">Fermer</button>

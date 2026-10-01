@@ -410,6 +410,15 @@ Trois règles referment l'écart, sans geste ni nouvelle permission :
 - **Refus définitif = purge.** 404/410 (abonnement disparu) **et 401/403** (signature VAPID refusée, donc
   abonnement créé avec d'anciennes clés) suppriment la ligne. Retenter ne peut pas réussir ; le reste
   (réseau, 429, 5xx) est transitoire et laissé au drain.
+- **Échecs transitoires sans fin = purge aussi (#97).** Chaque essai tient `last_success_at`,
+  `last_failure_at` et `failure_count` (échecs **consécutifs**, remis à zéro par une livraison). À
+  5 échecs consécutifs sans succès depuis 30 jours (référence : dernier succès, sinon date
+  d'abonnement), la ligne est supprimée. Sans cela, un appareil abandonné ferait retenter chaque
+  notification de son propriétaire jusqu'à `failed`, y compris celles qu'un autre appareil reçoit.
+- **« Personne à qui envoyer » n'est pas « envoyée » (#97).** Le canal rend une issue à trois valeurs
+  (`DeliveryOutcome` : livré / à retenter / sans destinataire) au lieu d'un booléen. Sans appareil
+  abonné, ou une fois tous purgés, la ligne passe en `no_target` : terminal, sans `sent_at`, payload
+  intact (rejouable), toujours visible sur la page Alertes. Même issue pour l'email sans adresse.
 - **Le navigateur se resynchronise.** À l'ouverture de l'app (et au retour au premier plan), si la
   permission est accordée et qu'un abonnement existe, il est renvoyé au `POST` idempotent — au plus une
   fois par jour, sauf si l'endpoint ou le compte connecté ont changé. Un abonnement signé avec une autre

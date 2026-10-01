@@ -7,6 +7,7 @@ use App\Models\NotificationOutbox;
 use App\Models\PushSubscription;
 use App\Models\User;
 use App\Notifications\Channels\ChannelManager;
+use App\Notifications\Channels\DeliveryOutcome;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\LogChannel;
 use App\Notifications\Channels\PushChannel;
@@ -159,7 +160,7 @@ class NotificationDeliveryTest extends TestCase
         $this->sub($user, 'https://push/a');
         $this->sub($user, 'https://push/b');
 
-        $this->assertTrue(app(PushChannel::class)->send($this->line(NotificationType::SessionCancelled, $user, ['session_id' => 1])));
+        $this->assertSame(DeliveryOutcome::Delivered, app(PushChannel::class)->send($this->line(NotificationType::SessionCancelled, $user, ['session_id' => 1])));
         $this->assertEqualsCanonicalizing(['https://push/a', 'https://push/b'], $fake->sent);
     }
 
@@ -170,8 +171,8 @@ class NotificationDeliveryTest extends TestCase
         $user = User::factory()->create();
         $this->sub($user, 'https://push/dead');
 
-        // Tous les endpoints sont morts → rien à retenter : terminal (true), abonnement purgé.
-        $this->assertTrue(app(PushChannel::class)->send($this->line(NotificationType::SessionCancelled, $user, ['session_id' => 1])));
+        // Tous les endpoints sont morts → rien à retenter : terminal (sans destinataire, #97), abonnement purgé.
+        $this->assertSame(DeliveryOutcome::NoTarget, app(PushChannel::class)->send($this->line(NotificationType::SessionCancelled, $user, ['session_id' => 1])));
         $this->assertDatabaseMissing('push_subscriptions', ['endpoint_hash' => PushSubscription::hashFor('https://push/dead')]);
     }
 
@@ -183,7 +184,7 @@ class NotificationDeliveryTest extends TestCase
         $this->sub($user, 'https://push/dead');
         $this->sub($user, 'https://push/live');
 
-        $this->assertTrue(app(PushChannel::class)->send($this->line(NotificationType::SessionCancelled, $user, ['session_id' => 1])));
+        $this->assertSame(DeliveryOutcome::Delivered, app(PushChannel::class)->send($this->line(NotificationType::SessionCancelled, $user, ['session_id' => 1])));
         $this->assertDatabaseMissing('push_subscriptions', ['endpoint_hash' => PushSubscription::hashFor('https://push/dead')]);
         $this->assertDatabaseHas('push_subscriptions', ['endpoint_hash' => PushSubscription::hashFor('https://push/live')]);
     }
@@ -195,8 +196,8 @@ class NotificationDeliveryTest extends TestCase
         $user = User::factory()->create();
         $this->sub($user, 'https://push/flaky');
 
-        // Endpoint vivant mais échec transitoire → false : le drain retentera, l'abonnement reste.
-        $this->assertFalse(app(PushChannel::class)->send($this->line(NotificationType::SessionCancelled, $user, ['session_id' => 1])));
+        // Endpoint vivant mais échec transitoire → Retry : le drain retentera, l'abonnement reste.
+        $this->assertSame(DeliveryOutcome::Retry, app(PushChannel::class)->send($this->line(NotificationType::SessionCancelled, $user, ['session_id' => 1])));
         $this->assertDatabaseHas('push_subscriptions', ['endpoint_hash' => PushSubscription::hashFor('https://push/flaky')]);
     }
 
@@ -205,8 +206,8 @@ class NotificationDeliveryTest extends TestCase
         $this->fakeSender();
         $user = User::factory()->create();
 
-        // Aucun appareil abonné : rien à pousser, inutile de retenter → terminal.
-        $this->assertTrue(app(PushChannel::class)->send($this->line(NotificationType::SessionCancelled, $user, ['session_id' => 1])));
+        // Aucun appareil abonné : rien à pousser, inutile de retenter → terminal, et dit comme tel (#97).
+        $this->assertSame(DeliveryOutcome::NoTarget, app(PushChannel::class)->send($this->line(NotificationType::SessionCancelled, $user, ['session_id' => 1])));
     }
 
     // ── Canal email (EmailChannel + Mailable) ──
@@ -216,7 +217,7 @@ class NotificationDeliveryTest extends TestCase
         Mail::fake();
         $user = User::factory()->create(['email' => 'athlete@club.test']);
 
-        $this->assertTrue(app(EmailChannel::class)->send(
+        $this->assertSame(DeliveryOutcome::Delivered, app(EmailChannel::class)->send(
             $this->line(NotificationType::SessionCancelled, $user, ['session_id' => 1], 'email')
         ));
 
@@ -229,7 +230,7 @@ class NotificationDeliveryTest extends TestCase
         Mail::fake();
         $user = User::factory()->minorP1()->create(); // pas d'email propre
 
-        $this->assertTrue(app(EmailChannel::class)->send(
+        $this->assertSame(DeliveryOutcome::NoTarget, app(EmailChannel::class)->send(
             $this->line(NotificationType::SessionCancelled, $user, ['session_id' => 1], 'email')
         ));
 
