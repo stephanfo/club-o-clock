@@ -515,6 +515,9 @@ class MemberService
             // et une ligne outbox encore pending enverrait une notification APRÈS la suppression.
             $member->pushSubscriptions()->delete();
             NotificationOutbox::where('user_id', $member->id)->where('status', 'pending')->delete();
+            // Les « j'aime » sont un geste de la personne, pas une donnée du club (#101) : ils
+            // partent avec elle, à la différence du texte des débriefs qu'elle a signés.
+            app(DebriefReactionService::class)->forgetUser($member);
             if ($email !== null) {
                 MagicLinkToken::where('email', $email)->delete();
                 DB::table('password_reset_tokens')->where('email', $email)->delete();

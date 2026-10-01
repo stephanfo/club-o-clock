@@ -72,7 +72,7 @@ class SessionShow extends Component
     }
 
     /** Relations de la fiche — même jeu au mount, au refresh et à la ré-hydratation. */
-    private const EAGER = ['discipline', 'eventType', 'quotaTag', 'location', 'creator', 'coaches.qualifications', 'categories', 'registrations.user', 'activeAperoFlags.user', 'debriefs.author', 'debriefs.archiver', 'gpxRoute.discipline'];
+    private const EAGER = ['discipline', 'eventType', 'quotaTag', 'location', 'creator', 'coaches.qualifications', 'categories', 'registrations.user', 'activeAperoFlags.user', 'debriefs.author', 'debriefs.archiver', 'debriefs.reactions.user', 'gpxRoute.discipline'];
 
     private function tz(): string
     {
@@ -187,6 +187,11 @@ class SessionShow extends Component
             $this->session->debriefs->map(fn (Debrief $d) => $d->author)->filter(),
             $fullNames
         );
+        // Réactions (#101) : même convention, homonymies levées sur l'ensemble des réacteurs.
+        $reactionLabels = RegistrantDisplay::labels(
+            $this->session->debriefs->flatMap(fn (Debrief $d) => $d->reactions->pluck('user'))->filter(),
+            $fullNames
+        );
 
         $weather = $this->weatherData();
 
@@ -229,6 +234,7 @@ class SessionShow extends Component
                 : ['cloches' => 0, 'enAttente' => 0],
             // Débriefs (§4.12.5).
             'debriefLabels' => $debriefLabels,
+            'reactionLabels' => $reactionLabels,
             'canWriteDebrief' => $this->canWriteDebrief(),
             'debriefInitialMarkdown' => $this->debriefOpen ? $this->debriefMarkdown : '',
             // Météo (§4.13.5).

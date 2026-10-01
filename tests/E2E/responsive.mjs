@@ -589,6 +589,56 @@ tous.push(s.report());
   tous.push(s34.report());
 }
 
+// ── S35 · #101 · Réaction « j'aime » sur un débrief : poser, voir, retirer ; l'auteur voit le compte ──
+// Restaure l'état : le « j'aime » posé est retiré, et sa notification en attente avec lui.
+{
+  const s35 = new Scenario('S35 · Réaction « j\'aime » — lecteur et auteur, mobile et desktop (#101)');
+  const [debriefId, sessionId, auteur] = ligne(`SELECT d.id, d.session_id, u.email FROM debriefs d
+      JOIN users u ON u.id = d.author_id WHERE d.archived_at IS NULL ORDER BY d.id LIMIT 1`, 'un débrief actif');
+  const [lecteur] = ligne(`SELECT u.email FROM users u WHERE u.is_active = 1 AND u.email LIKE '%@demo.club'
+      AND u.id <> (SELECT author_id FROM debriefs WHERE id=${debriefId})
+      AND NOT EXISTS (SELECT 1 FROM debrief_reactions r WHERE r.debrief_id=${debriefId} AND r.user_id=u.id)
+      ORDER BY u.id LIMIT 1`, 'un lecteur qui n\'a pas encore aimé ce débrief');
+  const nb = () => Number(sql(`SELECT COUNT(*) FROM debrief_reactions WHERE debrief_id=${debriefId}`));
+  const avant = nb();
+  s35.check('contrôle positif : le débrief a déjà des « j\'aime »', avant > 0);
+
+  for (const [nom, vp] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
+    const { ctx, page } = await session(browser, lecteur, vp);
+    await fiche(page, sessionId);
+    page.__erreursJs.length = 0; // embed OpenRunner : erreur tierce au chargement de la fiche
+    const onglet = page.locator('button.tab:visible', { hasText: 'Débriefs' });
+    if (await onglet.count()) await onglet.first().click();
+    const bouton = page.locator(`button.react-btn:visible[wire\\:click="toggleReaction(${debriefId})"]`).first();
+    s35.check(`${nom} : bouton « J'aime · ${avant} »`, (await bouton.innerText()).includes(`J'aime · ${avant}`));
+
+    await bouton.click();
+    await page.waitForFunction((id) => document.querySelector(`button.react-btn.on[wire\\:click="toggleReaction(${id})"]`), debriefId);
+    s35.check(`${nom} : « j'aime » posé en base`, nb() === avant + 1);
+    s35.check(`${nom} : « Toi » en tête des noms`, (await page.locator('.react-who:visible').first().innerText()).startsWith('Toi'));
+    await s35.shot(page, `s35-reaction-${nom}`);
+
+    await bouton.click();
+    await page.waitForFunction((id) => !document.querySelector(`button.react-btn.on[wire\\:click="toggleReaction(${id})"]`), debriefId);
+    s35.check(`${nom} : « j'aime » retiré (état restauré)`, nb() === avant);
+    s35.checkJs(page);
+    await ctx.close();
+  }
+  s35.check('aucune notification de réaction laissée en attente',
+    sql(`SELECT COUNT(*) FROM notification_outbox WHERE type='debrief_reaction' AND status='pending'`) === '0');
+
+  // L'auteur : le compteur et les noms, sans bouton.
+  const { ctx, page } = await session(browser, auteur, MOBILE);
+  await fiche(page, sessionId);
+  await page.locator('button.tab:visible', { hasText: 'Débriefs' }).first().click();
+  s35.check('auteur : compteur affiché', await page.locator('.react-count:visible').first().waitFor({ timeout: 5000 }).then(() => true, () => false));
+  s35.check('auteur : pas de bouton « J\'aime » sur son débrief',
+    await page.locator(`button.react-btn[wire\\:click="toggleReaction(${debriefId})"]`).count() === 0);
+  await s35.shot(page, 's35-reaction-auteur-mobile');
+  await ctx.close();
+  tous.push(s35.report());
+}
+
 await browser.close();
 const ok = tous.every(Boolean);
 console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES SCÉNARIOS RESPONSIVE PASSENT' : '❌ AU MOINS UN SCÉNARIO RESPONSIVE ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);

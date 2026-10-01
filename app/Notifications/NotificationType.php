@@ -19,6 +19,7 @@ enum NotificationType: string
     case EventCreated = 'event_created';
     case NewDebrief = 'new_debrief';
     case ClubDebrief = 'club_debrief';
+    case DebriefReaction = 'debrief_reaction';
     case RegistrationOpening = 'registration_opening';
     case CoachRegistration = 'coach_registration';
     case CoachAssigned = 'coach_assigned';
@@ -43,6 +44,7 @@ enum NotificationType: string
             self::EventCreated => 'Nouvelle compétition ou événement club',
             self::NewDebrief => 'Nouveau débrief',
             self::ClubDebrief => 'Débrief d\'une autre compétition',
+            self::DebriefReaction => 'Réactions à mon débrief',
             self::RegistrationOpening => 'Ouverture des inscriptions',
             self::CoachRegistration => 'Inscription ou désinscription d\'un coach',
             self::CoachAssigned => 'Affectation à une séance',
@@ -104,7 +106,7 @@ enum NotificationType: string
     public function sessionTab(): ?string
     {
         return match ($this) {
-            self::NewDebrief => 'debriefs',
+            self::NewDebrief, self::DebriefReaction => 'debriefs',
             self::CoachRegistration, self::CoachAssigned => 'encadrement',
             default => null,
         };
@@ -124,6 +126,7 @@ enum NotificationType: string
             self::EventCreated => 'Compétition ou événement club créé dans ta catégorie',
             self::NewDebrief => 'Un participant publie un débrief sur une compétition à laquelle tu participes',
             self::ClubDebrief => 'Un membre publie un débrief sur une compétition à laquelle tu ne participes pas',
+            self::DebriefReaction => 'Des membres aiment ton débrief (une seule notification pour plusieurs « j\'aime »)',
             self::RegistrationOpening => 'Les inscriptions chez l\'organisateur d\'une compétition de ta catégorie ouvrent',
             self::CoachRegistration => 'Un coach rejoint ou quitte une séance que tu encadres',
             self::CoachAssigned => 'Tu es affecté·e comme encadrant·e d\'une séance',
@@ -152,7 +155,7 @@ enum NotificationType: string
                 self::EnrolledByCoach, self::CoachOverride, self::SessionModified, self::SessionContent,
             ]],
             ['label' => 'Le club', 'coachOnly' => false, 'types' => [
-                self::EventCreated, self::RegistrationOpening, self::NewDebrief, self::ClubDebrief,
+                self::EventCreated, self::RegistrationOpening, self::NewDebrief, self::ClubDebrief, self::DebriefReaction,
             ]],
             ['label' => 'Encadrement', 'coachOnly' => true, 'types' => [
                 self::CoachRegistration, self::CoachAssigned, self::CoachTemplateRecap,

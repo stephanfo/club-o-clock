@@ -41,8 +41,11 @@ class NotificationOutbox extends Model
      *
      * Même raison pour `guardian_name` (nom complet du garant, §4.2.1) : il ne sert qu'au corps de
      * l'alerte de rattachement, dont le rendu retombe sur la description du type sans lui.
+     *
+     * Et `reactor_names` (#101) : les prénoms des membres qui ont aimé un débrief. Un « j'aime »
+     * s'efface avec le compte (§4.3) ; son prénom ne doit pas lui survivre dans la file.
      */
-    public const VOLATILE_PAYLOAD_KEYS = ['subject_first_name', 'guardian_name'];
+    public const VOLATILE_PAYLOAD_KEYS = ['subject_first_name', 'guardian_name', 'reactor_names'];
 
     /** Visibilité d'une alerte sur la page Alertes (#79) : après la fin de sa séance, ou après l'envoi. */
     public const DAYS_AFTER_SESSION = 7;

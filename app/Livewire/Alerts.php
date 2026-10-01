@@ -247,6 +247,7 @@ class Alerts extends Component
             NotificationType::EnrolledByCoach, NotificationType::CoachOverride => 'user-check',
             NotificationType::SessionModified, NotificationType::SessionContent => 'pen-line',
             NotificationType::NewDebrief, NotificationType::ClubDebrief => 'pen-line',
+            NotificationType::DebriefReaction => 'heart',
             NotificationType::CoachAssigned, NotificationType::CoachRegistration => 'user-check',
             NotificationType::EventCreated, NotificationType::RegistrationOpening => 'calendar',
             default => 'bell',

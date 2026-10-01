@@ -184,6 +184,21 @@ CREATE TABLE `club_settings` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `debrief_reactions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `debrief_reactions` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `debrief_id` bigint(20) unsigned NOT NULL,
+  `user_id` bigint(20) unsigned NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `debrief_reactions_debrief_id_user_id_unique` (`debrief_id`,`user_id`),
+  KEY `debrief_reactions_user_id_index` (`user_id`),
+  CONSTRAINT `debrief_reactions_debrief_id_foreign` FOREIGN KEY (`debrief_id`) REFERENCES `debriefs` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `debrief_reactions_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `debriefs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -843,5 +858,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (45,'2026_09_15_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (46,'2026_09_16_000000_add_dismissed_at_to_notification_outbox',9);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (47,'2026_09_17_000000_create_calendar_feeds_table',10);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (48,'2026_10_01_000000_add_registration_opening_to_sessions',11);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (49,'2026_10_02_000000_create_debrief_reactions_table',12);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
