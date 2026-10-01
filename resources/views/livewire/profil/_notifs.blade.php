@@ -13,24 +13,49 @@
          Masqué si le club a coupé le push (§4.17) : s'abonner n'aurait aucun effet, et proposer le
          geste laisserait croire que l'appareil recevra des alertes. --}}
     @if ($clubChannels['push'] ?? true)
-    <div class="card card-pad card-soft flex ac g10"
+    @php
+        // Avertissement (#97) : l'adhérent veut des push (pas en pause, au moins un type coché en
+        // push) mais aucun appareil n'est abonné — ils finissent « sans destinataire », lisibles sur
+        // la seule page Alertes. On ne prévient que parce que la correction passe par lui.
+        $wantsPush = ! $paused && collect($matrix)->contains(fn ($c) => (bool) ($c['push'] ?? false));
+    @endphp
+    <div style="display:flex;flex-direction:column;gap:16px"
         x-data="{
             state: 'loading',
             busy: false,
+            testing: false,
             error: null,
-            async init() { this.state = await window.clubPush.getState(); },
+            current: null,
+            async init() {
+                this.state = await window.clubPush.getState();
+                this.current = await window.clubPush.currentEndpointHash();
+            },
             async toggle() {
                 if (this.busy || this.state === 'denied' || this.state === 'unsupported') return;
                 this.busy = true;
                 this.error = null;
                 try {
                     this.state = this.state === 'on' ? await window.clubPush.disable() : await window.clubPush.enable();
+                    this.current = await window.clubPush.currentEndpointHash();
+                    $wire.$refresh(); // liste des appareils et avertissement suivent
                 } catch (e) {
                     this.error = window.clubPush.messageFor(e);
                 }
                 this.busy = false;
+            },
+            async test() {
+                if (this.testing) return;
+                this.testing = true;
+                const endpoint = await window.clubPush.currentEndpoint();
+                if (endpoint) {
+                    await $wire.sendTestPush(endpoint);
+                } else {
+                    this.state = 'repair';
+                }
+                this.testing = false;
             }
         }">
+    <div class="card card-pad card-soft flex ac g10">
         <button type="button" class="toggle" :class="{ 'on': state === 'on' }"
             :aria-pressed="state === 'on' ? 'true' : 'false'"
             :disabled="busy || state === 'denied' || state === 'unsupported'"
@@ -46,7 +71,53 @@
                 <span x-show="state === 'loading'">Vérification…</span>
             </div>
             <div class="field-error" role="alert" x-show="error" x-text="error" x-cloak></div>
+            {{-- Preuve de bout en bout (#97) : un push à cet appareil seul, fréquence bornée serveur. --}}
+            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:10px" data-push-test
+                x-show="state === 'on'" x-cloak :disabled="testing" x-on:click="test()">
+                <x-icon name="send" :size="14" /> M'envoyer une notification de test
+            </button>
         </div>
+    </div>
+
+    @if ($pushDevices === [] && $wantsPush)
+        <x-banner kind="warn" data-push-aucun>
+            <div><b>Aucun appareil ne reçoit tes notifications push.</b> Tu ne les vois que sur la page Alertes.</div>
+            <div style="margin-top:4px" x-show="state === 'off' || state === 'repair'">Active « Notifications sur cet appareil » ci-dessus.</div>
+            <div style="margin-top:4px" x-show="state === 'denied'" x-cloak>Autorise d'abord les notifications dans les réglages du navigateur.</div>
+            <div style="margin-top:4px" x-show="state === 'unsupported'" x-cloak>Cet appareil ne les gère pas : active-les depuis un autre. Sur iPhone, ajoute d'abord l'application à l'écran d'accueil.</div>
+        </x-banner>
+    @endif
+
+    {{-- Mes appareils (#97) : chaque abonnement, son dernier envoi réussi, et le retrait des
+         autres appareils (anodin et réversible : wire:confirm). Le courant se coupe par
+         l'interrupteur ci-dessus, qui désabonne aussi le navigateur. --}}
+    @if ($pushDevices !== [])
+        <div>
+            <div class="sect-head"><span class="sect-title">Mes appareils</span><span class="meta mlauto">{{ count($pushDevices) }}</span></div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+                @foreach ($pushDevices as $d)
+                    <div class="card card-pad flex ac jb g10" wire:key="push-device-{{ $d['id'] }}" data-push-appareil>
+                        <div style="min-width:0">
+                            <div class="flex ac g6 wrap" style="font-weight:700;font-size:14px">
+                                {{ $d['device'] }}
+                                <span class="chip chip-sm chip-green" x-show="current === '{{ $d['hash'] }}'" x-cloak>cet appareil</span>
+                            </div>
+                            <div class="meta" style="font-size:12px">
+                                {{ $d['lastSuccess'] ? 'Dernier envoi réussi '.$d['lastSuccess'] : 'Aucun envoi réussi pour l\'instant' }}
+                                · abonné le {{ $d['since'] }}
+                            </div>
+                            @if ($d['failing'])
+                                <div class="meta" style="font-size:12px;color:var(--accent-700)">Les derniers envois vers cet appareil ont échoué.</div>
+                            @endif
+                        </div>
+                        <button type="button" class="btn btn-ghost btn-sm" x-show="current !== '{{ $d['hash'] }}'"
+                            wire:click="removePushDevice({{ $d['id'] }})" wire:loading.attr="disabled" wire:target="removePushDevice({{ $d['id'] }})"
+                            wire:confirm="Retirer cet appareil ? Il ne recevra plus de notifications push.">Retirer</button>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
     </div>
     @endif
 

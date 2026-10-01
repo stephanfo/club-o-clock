@@ -602,6 +602,10 @@ tous.push(s.report());
   const nb = () => Number(sql(`SELECT COUNT(*) FROM debrief_reactions WHERE debrief_id=${debriefId}`));
   const avant = nb();
   s35.check('contrôle positif : le débrief a déjà des « j\'aime »', avant > 0);
+  // Des notifications en attente peuvent préexister (« j'aime » posés à la main sur la démo) :
+  // on compare avant / après plutôt que d'exiger zéro.
+  const enAttente = () => sql(`SELECT COUNT(*) FROM notification_outbox WHERE type='debrief_reaction' AND status='pending'`);
+  const attenteAvant = enAttente();
 
   for (const [nom, vp] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
     const { ctx, page } = await session(browser, lecteur, vp);
@@ -624,8 +628,7 @@ tous.push(s.report());
     s35.checkJs(page);
     await ctx.close();
   }
-  s35.check('aucune notification de réaction laissée en attente',
-    sql(`SELECT COUNT(*) FROM notification_outbox WHERE type='debrief_reaction' AND status='pending'`) === '0');
+  s35.check('aucune notification de réaction laissée en attente par le scénario', enAttente() === attenteAvant);
 
   // L'auteur : le compteur et les noms, sans bouton.
   const { ctx, page } = await session(browser, auteur, MOBILE);
@@ -637,6 +640,64 @@ tous.push(s.report());
   await s35.shot(page, 's35-reaction-auteur-mobile');
   await ctx.close();
   tous.push(s35.report());
+}
+
+// ── S36 · #97 · Onglet Notifs : avertissement sans appareil, « Mes appareils », retrait ──
+// Les appareils sont insérés en base (aucun vrai abonnement push en navigateur headless), puis
+// supprimés en fin de scénario : l'état est restauré.
+{
+  const s36 = new Scenario('S36 · Push sur mes appareils — avertissement, liste, retrait (#97)');
+  const email = 'marie@demo.club';
+  const [uid] = ligne(`SELECT id FROM users WHERE email='${email}'`, 'le compte de démo');
+  const nb = () => Number(sql(`SELECT COUNT(*) FROM push_subscriptions WHERE user_id=${uid}`));
+  s36.check('contrôle : aucun appareil abonné au départ', nb() === 0);
+  const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1';
+  const ANDROID = 'Mozilla/5.0 (Linux; Android 14; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36';
+  const ajoute = (ep, ua, extra) => sql(`INSERT INTO push_subscriptions (user_id, endpoint, endpoint_hash, p256dh, auth, content_encoding, user_agent, last_success_at, failure_count, created_at, updated_at)
+      VALUES (${uid}, '${ep}', SHA2('${ep}', 256), 'k', 'a', 'aes128gcm', '${ua}', ${extra}, NOW() - INTERVAL 20 DAY, NOW())`);
+
+  try {
+    for (const [nom, vp] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
+      const { ctx, page } = await session(browser, email, vp);
+      await page.goto(`${BASE}/profil?tab=notifs`, { waitUntil: 'networkidle' });
+      s36.check(`${nom} : avertissement « aucun appareil »`, await page.locator('[data-push-aucun]:visible').count() === 1);
+      s36.check(`${nom} : pas de liste sans appareil`, await page.locator('[data-push-appareil]').count() === 0);
+      await s36.shot(page, `s36-notifs-sans-appareil-${nom}`);
+      s36.checkJs(page);
+      await ctx.close();
+    }
+
+    ajoute('https://e2e.invalid/s36-iphone', IPHONE, 'NOW() - INTERVAL 2 HOUR, 0');
+    ajoute('https://e2e.invalid/s36-android', ANDROID, 'NULL, 2');
+
+    for (const [nom, vp] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
+      const { ctx, page } = await session(browser, email, vp);
+      await page.goto(`${BASE}/profil?tab=notifs`, { waitUntil: 'networkidle' });
+      const lignes = page.locator('[data-push-appareil]:visible');
+      s36.check(`${nom} : deux appareils listés`, await lignes.count() === 2);
+      s36.check(`${nom} : plus d'avertissement`, await page.locator('[data-push-aucun]').count() === 0);
+      const texte = await page.locator('[data-push-appareil]:visible').allInnerTexts();
+      s36.check(`${nom} : libellés et dernier envoi`, texte.join(' ').includes('iPhone · Safari') && texte.join(' ').includes('Dernier envoi réussi'));
+      await s36.shot(page, `s36-mes-appareils-${nom}`);
+      s36.checkJs(page);
+      await ctx.close();
+    }
+
+    // Retrait d'un autre appareil (wire:confirm natif, accepté).
+    const { ctx, page } = await session(browser, email, MOBILE);
+    await page.goto(`${BASE}/profil?tab=notifs`, { waitUntil: 'networkidle' });
+    page.once('dialog', (d) => d.accept());
+    await page.locator('[data-push-appareil]:visible', { hasText: 'Android' }).locator('button', { hasText: 'Retirer' }).click();
+    await page.locator('[data-push-appareil]:visible').nth(1).waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+    s36.check('retrait : un appareil en moins en base', nb() === 1);
+    s36.check('retrait : un appareil listé', await page.locator('[data-push-appareil]:visible').count() === 1);
+    s36.checkJs(page);
+    await ctx.close();
+  } finally {
+    sql(`DELETE FROM push_subscriptions WHERE user_id=${uid} AND endpoint LIKE 'https://e2e.invalid/s36-%'`);
+    s36.check('état restauré : aucun appareil', nb() === 0);
+  }
+  tous.push(s36.report());
 }
 
 await browser.close();

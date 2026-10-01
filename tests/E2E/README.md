@@ -40,7 +40,7 @@ node tests/E2E/scenarios.mjs    # S1–S5   gardes d'inscription et bascule de r
 node tests/E2E/parcours.mjs     # S7–S17, S21, S23, S28–S30, S32  parcours métier, cloisonnement, alertes parent, survol du tracé, agenda, lien vers un onglet
 node tests/E2E/retour.mjs       # R1–R3   navigation « retour » : pile d'historique et fraîcheur
 node tests/E2E/comptes.mjs      # S18–S20 messages d'auth, correction d'email, suspension d'accès
-node tests/E2E/responsive.mjs   # S6, S24–S27, S31–S35  bascule mobile/desktop, rendu des cartes, morphing, ouverture de semaine, éditeur de débrief, vue Courses, ouvertures, « j'aime »
+node tests/E2E/responsive.mjs   # S6, S24–S27, S31–S36  bascule mobile/desktop, rendu des cartes, morphing, ouverture de semaine, éditeur de débrief, vue Courses, ouvertures, « j'aime », mes appareils
 ```
 
 Sortie : une ligne par assertion (✅/❌), code de sortie non nul si un scénario échoue.

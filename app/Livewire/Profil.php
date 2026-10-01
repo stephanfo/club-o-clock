@@ -4,6 +4,8 @@ namespace App\Livewire;
 
 use App\Actions\Fortify\PasswordValidationRules;
 use App\Models\CalendarFeed;
+use App\Models\PushSubscription;
+use App\Notifications\Channels\PushChannel;
 use App\Services\AuthMethodService;
 use App\Services\CalendarFeedService;
 use App\Services\MemberService;
@@ -11,10 +13,12 @@ use App\Services\NotificationPreferenceService;
 use App\Services\PasswordService;
 use App\Services\QuotaService;
 use App\Support\DemoMode;
+use App\Support\DeviceLabel;
 use App\Support\Logging\AuditLogger;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -269,6 +273,66 @@ class Profil extends Component
         session()->flash('status', ucfirst($provider).' délié de ton compte.');
     }
 
+    // ── Notifs : appareils abonnés au push (#97) ──
+
+    /** Notifications de test autorisées par fenêtre, par compte. */
+    public const TEST_PUSH_MAX = 3;
+
+    public const TEST_PUSH_WINDOW_MIN = 10;
+
+    /**
+     * Envoie une notification de test à CET appareil, et à lui seul. L'endpoint vient du navigateur
+     * (seul à le connaître) ; il n'est honoré que s'il appartient au compte connecté. Fréquence
+     * bornée : le test sollicite le service push d'un tiers à chaque clic.
+     */
+    public function sendTestPush(string $endpoint, PushChannel $push): void
+    {
+        $subscription = auth()->user()->pushSubscriptions()
+            ->where('endpoint_hash', PushSubscription::hashFor($endpoint))
+            ->first();
+
+        if ($subscription === null) {
+            session()->flash('warn', 'Cet appareil n\'est pas abonné : réactive les notifications ci-dessus.');
+
+            return;
+        }
+
+        $cle = 'push-test:'.auth()->id();
+        if (RateLimiter::tooManyAttempts($cle, self::TEST_PUSH_MAX)) {
+            $min = (int) ceil(RateLimiter::availableIn($cle) / 60);
+            session()->flash('warn', "Trop d'essais : réessaie dans {$min} min.");
+
+            return;
+        }
+        RateLimiter::hit($cle, self::TEST_PUSH_WINDOW_MIN * 60);
+
+        $result = $push->sendTo($subscription, [
+            'title' => 'Notification de test',
+            'body' => 'Si tu lis ceci, les notifications fonctionnent sur cet appareil.',
+            'url' => route('profil', ['tab' => 'notifs']),
+        ]);
+
+        match (true) {
+            $result->delivered => session()->flash('status', 'Notification envoyée : elle doit s\'afficher dans quelques secondes. Rien reçu ? Vérifie les réglages de notifications de l\'appareil.'),
+            $result->expired => session()->flash('warn', 'Le service de notifications ne reconnaît plus cet appareil : réactive les notifications ci-dessus.'),
+            default => session()->flash('warn', 'Le service de notifications est injoignable pour l\'instant. Réessaie plus tard.'),
+        };
+    }
+
+    /**
+     * Retire un AUTRE appareil (ancien téléphone, navigateur abandonné). L'appareil courant se coupe
+     * par l'interrupteur, qui désabonne aussi le navigateur : retiré d'ici seulement, il se
+     * réabonnerait à la prochaine ouverture (resynchronisation #96).
+     */
+    public function removePushDevice(int $id): void
+    {
+        $n = auth()->user()->pushSubscriptions()->whereKey($id)->delete();
+
+        $n > 0
+            ? session()->flash('status', 'Appareil retiré : il ne recevra plus de notifications push.')
+            : session()->flash('warn', 'Cet appareil n\'est déjà plus abonné.');
+    }
+
     // ── Connexion : sessions actives (driver base de données) ──
 
     /** Révoque une session précise (déconnecte cet appareil). Jamais la session courante. */
@@ -377,6 +441,7 @@ class Profil extends Component
                 && $authMethods->keepsAnotherWayIn(auth()->user(), 'password'),
             'demo' => DemoMode::enabled(),
             'feed' => $this->tab === 'notifs' ? $feeds->active(auth()->user()) : null,
+            'pushDevices' => $this->tab === 'notifs' ? $this->pushDevices() : [],
             'feedHasWards' => $this->tab === 'notifs' && $feeds->hasWards(auth()->user()),
             'quotas' => $quota->weeklyUsage(auth()->user(), Carbon::now()),
             'lastAdmin' => $members->isLastActiveAdmin(auth()->user()),
@@ -441,36 +506,32 @@ class Profil extends Component
             ->map(fn ($s) => [
                 'id' => $s->id,
                 'current' => $s->id === $current,
-                'device' => $this->deviceLabel($s->user_agent),
+                'device' => DeviceLabel::from($s->user_agent),
                 'last' => Carbon::createFromTimestamp($s->last_activity)->diffForHumans(),
             ])
             ->all();
     }
 
-    /** Étiquette appareil heuristique à partir du User-Agent (présentation, best-effort). */
-    private function deviceLabel(?string $ua): string
+    /**
+     * Appareils abonnés au push (#97), le plus récemment confirmé en tête. `hash` permet au
+     * navigateur de repérer sa propre ligne sans que l'endpoint transite.
+     *
+     * @return list<array{id:int,hash:string,device:string,since:string,lastSuccess:?string,failing:bool}>
+     */
+    private function pushDevices(): array
     {
-        if ($ua === null || $ua === '') {
-            return 'Appareil inconnu';
-        }
-
-        $os = match (true) {
-            str_contains($ua, 'iPhone') => 'iPhone',
-            str_contains($ua, 'iPad') => 'iPad',
-            str_contains($ua, 'Android') => 'Android',
-            str_contains($ua, 'Macintosh') => 'Mac',
-            str_contains($ua, 'Windows') => 'Windows',
-            str_contains($ua, 'Linux') => 'Linux',
-            default => 'Appareil',
-        };
-        $browser = match (true) {
-            str_contains($ua, 'Edg') => 'Edge',
-            str_contains($ua, 'Chrome') => 'Chrome',
-            str_contains($ua, 'Firefox') => 'Firefox',
-            str_contains($ua, 'Safari') => 'Safari',
-            default => 'Navigateur',
-        };
-
-        return "{$os} · {$browser}";
+        return auth()->user()->pushSubscriptions()
+            ->orderByDesc('updated_at')
+            ->get()
+            ->map(fn (PushSubscription $s) => [
+                'id' => $s->id,
+                'hash' => $s->endpoint_hash,
+                'device' => DeviceLabel::from($s->user_agent),
+                'since' => $s->created_at?->locale('fr')->isoFormat('D MMM YYYY') ?? '',
+                'lastSuccess' => $s->last_success_at?->locale('fr')->diffForHumans(),
+                'failing' => $s->failure_count > 0,
+            ])
+            ->values()
+            ->all();
     }
 }
