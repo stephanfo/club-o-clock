@@ -546,6 +546,59 @@ tous.push(s.report());
   tous.push(s33.report());
 }
 
+// ── S34 · #105 · Ouverture des inscriptions : accueil, vue Courses, fiche, formulaire ──
+{
+  const s34 = new Scenario('S34 · Ouverture des inscriptions — accueil, Courses, fiche, formulaire');
+  // Attendus dérivés : compétitions à venir non annulées dont l'ouverture tombe entre J-3 et J+14.
+  const fenetre = `kind='competition' AND cancelled_at IS NULL AND start_at > NOW()
+      AND registration_opens_at BETWEEN CURDATE() - INTERVAL 3 DAY AND NOW() + INTERVAL 14 DAY`;
+  const n = Number(sql(`SELECT COUNT(*) FROM sessions WHERE ${fenetre}`));
+  const [id, titre] = ligne(`SELECT id, title FROM sessions WHERE ${fenetre} AND registration_opens_at > NOW() ORDER BY registration_opens_at LIMIT 1`,
+    'une compétition dont les inscriptions ouvrent bientôt');
+  s34.check('jeu de démo : des ouvertures dans la fenêtre d\'accueil', n > 0);
+
+  for (const [nom, vp] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
+    const { ctx, page } = await session(browser, 'marie@demo.club', vp);
+    await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+    const coque = page.locator(nom === 'mobile' ? '.home-mobile' : '.home-desktop');
+    const lignes = coque.locator('[data-ouverture]');
+    s34.check(`${nom} : accueil — une ligne par ouverture`, await lignes.count() === n, `${await lignes.count()} / ${n}`);
+    const cible = coque.locator(`[data-ouverture="${id}"]`);
+    s34.check(`${nom} : accueil — la ligne dit quand ouvrent les inscriptions`,
+      (await cible.innerText()).includes(titre) && /Inscriptions (le|aujourd)/.test(await cible.innerText()));
+    await cible.scrollIntoViewIfNeeded();
+    await s34.shot(page, `s34-accueil-ouvertures-${nom}`);
+
+    await page.goto(`${BASE}/planning?view=courses`, { waitUntil: 'networkidle' });
+    const pc = page.locator(nom === 'mobile' ? '.planning-mobile' : '.planning-desktop');
+    s34.check(`${nom} : vue Courses — état des inscriptions sur la course`,
+      await pc.locator(`[data-courses="up"] a[href$="/seances/${id}"] [data-inscriptions]`).isVisible());
+    s34.check(`${nom} : vue Courses — aucun état sur les courses passées`,
+      await pc.locator('[data-courses="past"] [data-inscriptions]').count() === 0);
+    await s34.shot(page, `s34-courses-ouvertures-${nom}`);
+
+    s34.checkJs(page);
+    // Contrôle JS AVANT la fiche : l'embed OpenRunner des compétitions de démo lève sa propre erreur
+    // (openrunner-embed.es.js, « reading 'code' »), étrangère à l'app.
+    await page.goto(`${BASE}/seances/${id}`, { waitUntil: 'networkidle' });
+    s34.check(`${nom} : fiche — rubrique Inscriptions`, await page.locator('dt:visible', { hasText: 'Inscriptions' }).count() > 0);
+    await ctx.close();
+  }
+
+  // Formulaire coach : les deux champs, pré-remplis, au format mobile (le plus étroit).
+  const { ctx, page } = await session(browser, 'vincent@demo.club', MOBILE);
+  await page.goto(`${BASE}/seances/${id}/modifier`, { waitUntil: 'networkidle' });
+  const date = page.locator('input[type="date"][wire\\:model\\.blur="registration_opens_date"]');
+  const heure = page.locator('input[type="time"][wire\\:model\\.blur="registration_opens_time"]');
+  s34.check('formulaire : date et heure d\'ouverture pré-remplies',
+    await date.inputValue() !== '' && await heure.inputValue() !== '');
+  await date.scrollIntoViewIfNeeded();
+  await s34.shot(page, 's34-formulaire-ouverture-mobile');
+  s34.checkJs(page);
+  await ctx.close();
+  tous.push(s34.report());
+}
+
 await browser.close();
 const ok = tous.every(Boolean);
 console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES SCÉNARIOS RESPONSIVE PASSENT' : '❌ AU MOINS UN SCÉNARIO RESPONSIVE ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);

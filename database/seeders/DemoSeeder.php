@@ -833,9 +833,21 @@ class DemoSeeder extends Seeder
         $pastCompStart = $now->copy()->subDays(10)->startOfWeek(Carbon::MONDAY)->next(Carbon::SUNDAY)->setTime(9, 0);
         $futureCompStart = $now->copy()->addWeeks(2)->startOfWeek(Carbon::MONDAY)->next(Carbon::SUNDAY)->setTime(9, 0);
         $competition = $makeCompetition($pastCompStart, 'Triathlon M de printemps');
-        $makeCompetition($futureCompStart, 'Triathlon M du lac');
+        $lac = $makeCompetition($futureCompStart, 'Triathlon M du lac');
         // Une course lointaine (~7 mois) : la vue « Courses » du planning n'a pas de borne haute (#106).
-        $makeCompetition($now->copy()->addMonths(7)->startOfWeek(Carbon::MONDAY)->next(Carbon::SUNDAY)->setTime(9, 0), 'Triathlon M de la côte');
+        $cote = $makeCompetition($now->copy()->addMonths(7)->startOfWeek(Carbon::MONDAY)->next(Carbon::SUNDAY)->setTime(9, 0), 'Triathlon M de la côte');
+        // Ouverture des inscriptions (#105) : deux états visibles à l'accueil et dans la vue Courses —
+        // ouvertes depuis 2 jours (date seule, déjà passée : marquée notifiée), ouvrent dans 5 jours à 10 h.
+        $clubNow = $now->copy()->setTimezone(ClubSettings::current()->timezone);
+        $lac->forceFill([
+            'registration_opens_at' => $clubNow->copy()->subDays(2)->startOfDay(),
+            'registration_opens_has_time' => false,
+            'registration_opening_notified_at' => $now,
+        ])->save();
+        $cote->forceFill([
+            'registration_opens_at' => $clubNow->copy()->addDays(5)->setTime(10, 0),
+            'registration_opens_has_time' => true,
+        ])->save();
 
         // --- Débriefs sur la compétition PASSÉE (PRD §4.12) : 2 participants partagent leur ressenti ---
         $debriefTexts = [

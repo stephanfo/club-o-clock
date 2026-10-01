@@ -81,6 +81,10 @@ class NotificationRenderer
             return $this->linkedBody($payload, $subjectId);
         }
 
+        if ($type === NotificationType::RegistrationOpening && isset($payload['session_title'])) {
+            return $this->openingBody($payload);
+        }
+
         if (isset($payload['session_title'])) {
             if (isset($payload['requeued_session_title'])) {
                 return $this->requeuedBody($payload, $subjectId);
@@ -126,6 +130,28 @@ class NotificationRenderer
         };
 
         return $debut.' en liste d\'attente sur '.$rendue.' pour laisser la place à quelqu\'un qui attendait.';
+    }
+
+    /**
+     * Ouverture des inscriptions (#105) : « Tri de Saint-Nazaire : les inscriptions ouvrent
+     * aujourd'hui à 10:00 » — le titre en tête, sans article à accorder. L'heure exacte est le cœur du message — la notification part 15 min
+     * avant ; sans heure connue, « aujourd'hui » seul (elle part à 9 h).
+     *
+     * @param  array<string,mixed>  $payload
+     */
+    private function openingBody(array $payload): string
+    {
+        $ouverture = $this->parse($payload['registration_opens_at'] ?? null);
+        $heure = ($payload['registration_opens_has_time'] ?? false) && $ouverture !== null
+            ? ' à '.$ouverture->format('H:i')
+            : '';
+        // Une ouverture à 00:10 se notifie la veille au soir : « aujourd'hui » y serait faux.
+        $tz = ClubSettings::current()->timezone;
+        $jour = $ouverture === null || $ouverture->isSameDay(Carbon::now($tz))
+            ? 'aujourd\'hui'
+            : 'le '.$ouverture->isoFormat('ddd D MMM');
+
+        return $payload['session_title'].' : les inscriptions ouvrent '.$jour.$heure.', sur le site de l\'organisateur.';
     }
 
     /** « Natation (ven. 3 oct. · 18:30) », ou le titre seul faute de date. */
@@ -242,6 +268,7 @@ class NotificationRenderer
             NotificationType::EventCreated,
             NotificationType::NewDebrief,
             NotificationType::ClubDebrief,
+            NotificationType::RegistrationOpening,
             NotificationType::CoachRegistration,
             NotificationType::CoachAssigned => isset($payload['session_id'])
                 ? route('sessions.show', $this->sessionParams($payload['session_id'], $subjectId, $type->sessionTab()))

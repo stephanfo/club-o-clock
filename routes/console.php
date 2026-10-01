@@ -36,6 +36,10 @@ Artisan::command('inspire', function () {
 // d'échéance : elle est idempotente par nature (les lignes traitées changent de statut) et son
 // travail est de vider une file, pas d'honorer une échéance. `*/5` est vu une dizaine de fois par
 // fenêtre quelle que soit la minute imposée.
+// Ouvertures d'inscriptions (#105) AVANT le drain : le planificateur exécute les tâches d'une même
+// minute dans l'ordre de déclaration, l'envoi part donc dans la même passe.
+Schedule::command('notifications:ouvertures')->everyFiveMinutes()->withoutOverlapping(10);
+
 Schedule::command('notifications:drain')->everyFiveMinutes()->withoutOverlapping(10);
 
 // Pré-calcul météo J-16 (§4.13.5) — échéance horaire, cadence < TTL 3 h.

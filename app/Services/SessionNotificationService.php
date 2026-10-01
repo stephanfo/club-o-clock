@@ -80,6 +80,36 @@ class SessionNotificationService
     }
 
     /**
+     * Annonce l'ouverture des inscriptions officielles d'une compétition (#105, type
+     * registration_opening) à sa catégorie cible — même audience que event_created, créateur
+     * compris : un coach qui court veut aussi être prévenu. Routage parent/enfant, matrice et pause
+     * appliqués par le dispatcher. Appelée par `notifications:ouvertures`, qui garde l'unicité.
+     */
+    public function notifyRegistrationOpening(Session $session): void
+    {
+        $categoryIds = $session->categories()->pluck('categories.id')->all();
+
+        $audience = User::query()
+            ->where('is_active', true)
+            ->whereNull('anonymized_at')
+            ->when($categoryIds !== [], fn ($q) => $q->whereHas(
+                'categories', fn ($c) => $c->whereIn('categories.id', $categoryIds)
+            ))
+            ->with(['guardian.notificationPreferences', 'notificationPreferences'])
+            ->get();
+
+        $payload = [
+            ...$session->payloadNotification(),
+            'registration_opens_at' => $session->registration_opens_at?->toIso8601String(),
+            'registration_opens_has_time' => (bool) $session->registration_opens_has_time,
+        ];
+
+        foreach ($audience as $user) {
+            $this->dispatcher->dispatch(NotificationType::RegistrationOpening, $user, $payload);
+        }
+    }
+
+    /**
      * Annonce un débrief à tout le club hors participants (§4.12.5, type club_debrief) : les
      * participants — et leurs garants — reçoivent déjà new_debrief, l'auteur ne se notifie pas.
      *
