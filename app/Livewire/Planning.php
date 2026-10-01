@@ -165,6 +165,8 @@ class Planning extends Component
 
         $query = Session::query()
             ->with(['discipline', 'location', 'coaches', 'registrations', 'activeAperoFlags', 'quotaTag', 'categories'])
+            // Badge débriefs des cartes (#104) : compté en SQL, pas de requête par carte.
+            ->withCount(['debriefs' => fn ($q) => $q->active()])
             // Bornes converties en UTC (start_at stocké en UTC ; Laravel sérialise les Carbon dans
             // LEUR fuseau, sans conversion — la fenêtre en fuseau club serait décalée de 1-2 h).
             ->whereBetween('start_at', [$from->copy()->utc(), $to->copy()->utc()])

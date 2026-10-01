@@ -9,6 +9,7 @@ use App\Models\Session;
 use App\Models\User;
 use App\Services\QuotaService;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -24,6 +25,23 @@ class Home extends Component
     private function tz(): string
     {
         return ClubSettings::current()->timezone;
+    }
+
+    /** Fenêtre du bloc « Côté courses » : au-delà, le débrief a déjà été lu (retour terrain). */
+    public const DEBRIEFS_RECENTS_JOURS = 15;
+
+    /** @return Collection<int, Session> */
+    private function recentDebriefs(Carbon $depuisUtc)
+    {
+        $recent = fn ($q) => $q->active()->where('created_at', '>=', $depuisUtc);
+
+        return Session::query()
+            ->whereHas('debriefs', $recent)
+            ->with(['debriefs' => fn ($q) => $recent($q)->with('author:id,first_name')->latest()])
+            ->get()
+            ->sortByDesc(fn (Session $s) => $s->debriefs->max('created_at'))
+            ->take(5)
+            ->values();
     }
 
     public function render()
@@ -84,6 +102,9 @@ class Home extends Component
                 ->orderBy('start_at')
                 ->limit(5)
                 ->get(),
+            // « Côté courses » (§4.12.5, #104) : compétitions débriefées depuis moins de 15 jours.
+            // Lu par tout le club, sans filtre de catégorie (cohérent avec l'annonce #111).
+            'recentDebriefs' => $this->recentDebriefs($nowUtc->copy()->subDays(self::DEBRIEFS_RECENTS_JOURS)),
             'weekCount' => Session::whereNull('cancelled_at')
                 ->whereBetween('start_at', [$now->copy()->startOfWeek(Carbon::MONDAY)->utc(), $now->copy()->endOfWeek(Carbon::SUNDAY)->utc()])
                 ->count(),

@@ -44,6 +44,9 @@
     // « Tu encadres » reste rattaché au compte connecté (le sujet enfant n'encadre jamais).
     $mineCoach = ! $subjectName && auth()->id() && $s->relationLoaded('coaches') && $s->coaches->contains('id', auth()->id());
     $participeLabel = $subjectName ? $subjectName.' participe' : 'Tu participes';
+    // Badge débriefs (#104) : renseigné seulement là où la requête fait un withCount (planning),
+    // jamais calculé ici — la carte ne doit pas déclencher de requête par séance.
+    $debriefs = (int) ($s->debriefs_count ?? 0);
 @endphp
 
 @if ($variant === 'pill')
@@ -91,6 +94,9 @@
         @elseif ($effectiveStatus === 'waitlist')
             <span class="chip chip-sm chip-warn" style="margin-top:6px"><x-icon name="clock" :size="11" /> Liste d'attente</span>
         @endif
+        @if ($debriefs)
+            <span class="chip chip-sm" style="margin-top:6px" title="Débriefs"><x-icon name="file-text" :size="11" /> {{ $debriefs }} débrief{{ $debriefs > 1 ? 's' : '' }}</span>
+        @endif
         @if ($apero)<x-chope :size="14" style="position:absolute;top:8px;right:8px;color:var(--apero)" />@endif
     </a>
 
@@ -134,6 +140,9 @@
                         <span class="chip chip-sm chip-warn"><x-icon name="clock" :size="12" /> Liste d'attente</span>
                     @elseif ($full)
                         <span class="chip chip-sm chip-pink">Complet</span>
+                    @endif
+                    @if ($debriefs)
+                        <span class="chip chip-sm"><x-icon name="file-text" :size="12" /> {{ $debriefs }} débrief{{ $debriefs > 1 ? 's' : '' }}</span>
                     @endif
                 </div>
             @endif
