@@ -431,9 +431,9 @@ tous.push(s.report());
   tous.push(s31.report());
 }
 
-// ── S32 · #104 · « Côté courses » à l'accueil + badge débriefs sur le planning ──
+// ── S32 · #104 · « Derniers débriefs » à l'accueil + badge débriefs sur le planning ──
 {
-  const s32 = new Scenario('S32 · Côté courses — accueil et badge débriefs du planning');
+  const s32 = new Scenario('S32 · Derniers débriefs — accueil et badge débriefs du planning');
   // Cible dérivée : la compétition au débrief actif le plus récent (le jeu de démo en sème à l'instant du seed).
   const [id, title, j, n] = ligne(`SELECT s.id, s.title, DATE(s.start_at) j, COUNT(*) n FROM sessions s JOIN debriefs d ON d.session_id=s.id
       WHERE d.archived_at IS NULL AND d.created_at >= NOW() - INTERVAL 15 DAY
@@ -444,13 +444,13 @@ tous.push(s.report());
     const { ctx, page } = await session(browser, 'marie@demo.club', vp);
     await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
     const coque = page.locator(nom === 'mobile' ? '.home-mobile' : '.home-desktop');
-    const bloc = coque.locator('.sect-head', { hasText: 'Côté courses' });
-    s32.check(`${nom} : bloc « Côté courses » visible`, await bloc.isVisible());
+    const bloc = coque.locator('.sect-head', { hasText: 'Derniers débriefs' });
+    s32.check(`${nom} : bloc « Derniers débriefs » visible`, await bloc.isVisible());
     const lien = coque.locator(`a[href*="/seances/${c.id}?tab=debriefs"]`);
     s32.check(`${nom} : la ligne nomme la compétition et ses débriefs`,
       (await lien.innerText()).includes(c.title) && (await lien.innerText()).includes(`${c.n} débrief`));
     await bloc.scrollIntoViewIfNeeded();
-    await s32.shot(page, `s32-accueil-courses-${nom}`);
+    await s32.shot(page, `s32-accueil-debriefs-${nom}`);
     await lien.click();
     await page.waitForURL(`**/seances/${c.id}**`);
     await page.waitForLoadState('networkidle');
@@ -544,6 +544,49 @@ tous.push(s.report());
     await ctx.close();
   }
   tous.push(s33.report());
+}
+
+// ── S34 · #105 · Ouverture des inscriptions : vue Courses, fiche, formulaire (pas l'accueil) ──
+{
+  const s34 = new Scenario('S34 · Ouverture des inscriptions — Courses, fiche, formulaire, absente de l\'accueil');
+  const [id] = ligne(`SELECT id FROM sessions WHERE kind='competition' AND cancelled_at IS NULL AND start_at > NOW()
+      AND registration_opens_at > NOW() ORDER BY registration_opens_at LIMIT 1`, 'une compétition dont les inscriptions ouvrent bientôt');
+
+  for (const [nom, vp] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
+    const { ctx, page } = await session(browser, 'marie@demo.club', vp);
+    // Accueil : réservé aux débriefs (choix du 01/10), aucune ouverture n'y figure.
+    await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+    s34.check(`${nom} : accueil — aucune ouverture d'inscriptions`,
+      await page.locator('[data-inscriptions], [data-ouverture]').count() === 0);
+
+    await page.goto(`${BASE}/planning?view=courses`, { waitUntil: 'networkidle' });
+    const pc = page.locator(nom === 'mobile' ? '.planning-mobile' : '.planning-desktop');
+    s34.check(`${nom} : vue Courses — état des inscriptions sur la course`,
+      await pc.locator(`[data-courses="up"] a[href$="/seances/${id}"] [data-inscriptions]`).isVisible());
+    s34.check(`${nom} : vue Courses — aucun état sur les courses passées`,
+      await pc.locator('[data-courses="past"] [data-inscriptions]').count() === 0);
+    await s34.shot(page, `s34-courses-ouvertures-${nom}`);
+
+    s34.checkJs(page);
+    // Contrôle JS AVANT la fiche : l'embed OpenRunner des compétitions de démo lève sa propre erreur
+    // (openrunner-embed.es.js, « reading 'code' »), étrangère à l'app.
+    await page.goto(`${BASE}/seances/${id}`, { waitUntil: 'networkidle' });
+    s34.check(`${nom} : fiche — rubrique Inscriptions`, await page.locator('dt:visible', { hasText: 'Inscriptions' }).count() > 0);
+    await ctx.close();
+  }
+
+  // Formulaire coach : les deux champs, pré-remplis, au format mobile (le plus étroit).
+  const { ctx, page } = await session(browser, 'vincent@demo.club', MOBILE);
+  await page.goto(`${BASE}/seances/${id}/modifier`, { waitUntil: 'networkidle' });
+  const date = page.locator('input[type="date"][wire\\:model\\.blur="registration_opens_date"]');
+  const heure = page.locator('input[type="time"][wire\\:model\\.blur="registration_opens_time"]');
+  s34.check('formulaire : date et heure d\'ouverture pré-remplies',
+    await date.inputValue() !== '' && await heure.inputValue() !== '');
+  await date.scrollIntoViewIfNeeded();
+  await s34.shot(page, 's34-formulaire-ouverture-mobile');
+  s34.checkJs(page);
+  await ctx.close();
+  tous.push(s34.report());
 }
 
 await browser.close();

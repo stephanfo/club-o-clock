@@ -248,7 +248,7 @@ class Alerts extends Component
             NotificationType::SessionModified, NotificationType::SessionContent => 'pen-line',
             NotificationType::NewDebrief, NotificationType::ClubDebrief => 'pen-line',
             NotificationType::CoachAssigned, NotificationType::CoachRegistration => 'user-check',
-            NotificationType::EventCreated => 'calendar',
+            NotificationType::EventCreated, NotificationType::RegistrationOpening => 'calendar',
             default => 'bell',
         };
     }

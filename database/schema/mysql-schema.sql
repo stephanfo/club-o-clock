@@ -654,6 +654,9 @@ CREATE TABLE `sessions` (
   `distance` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `external_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `photos_album_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `registration_opens_at` datetime DEFAULT NULL,
+  `registration_opens_has_time` tinyint(1) NOT NULL DEFAULT '0',
+  `registration_opening_notified_at` timestamp NULL DEFAULT NULL,
   `agenda` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `route_openrunner_embed_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `route_openrunner_public_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -672,6 +675,7 @@ CREATE TABLE `sessions` (
   KEY `sessions_route_id_foreign` (`route_id`),
   KEY `sessions_source_template_id_foreign` (`source_template_id`),
   KEY `sessions_quota_released_by_foreign` (`quota_released_by`),
+  KEY `sessions_registration_opens_at_index` (`registration_opens_at`),
   CONSTRAINT `sessions_cancelled_by_foreign` FOREIGN KEY (`cancelled_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `sessions_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `sessions_discipline_id_foreign` FOREIGN KEY (`discipline_id`) REFERENCES `disciplines` (`id`) ON DELETE SET NULL,
@@ -838,3 +842,4 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (44,'2026_09_13_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (45,'2026_09_15_000000_add_quota_release_to_sessions',8);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (46,'2026_09_16_000000_add_dismissed_at_to_notification_outbox',9);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (47,'2026_09_17_000000_create_calendar_feeds_table',10);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (48,'2026_10_01_000000_add_registration_opening_to_sessions',11);

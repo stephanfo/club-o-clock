@@ -105,6 +105,11 @@ class SessionForm extends Component
     // competition + club_event : album photos externe (§4.12.6)
     public string $photos_album_url = '';
 
+    // competition : ouverture des inscriptions officielles (#105) — date, heure facultative.
+    public string $registration_opens_date = '';
+
+    public string $registration_opens_time = '';
+
     // club_event
     public string $agenda = '';
 
@@ -177,6 +182,9 @@ class SessionForm extends Component
         $this->distance = $s->distance ?? '';
         $this->external_url = $s->external_url ?? '';
         $this->photos_album_url = $s->photos_album_url ?? '';
+        $opens = $s->registrationOpensLocal();
+        $this->registration_opens_date = $opens?->format('Y-m-d') ?? '';
+        $this->registration_opens_time = $opens && $s->registration_opens_has_time ? $opens->format('H:i') : '';
         $this->agenda = $s->agenda ?? '';
         $this->route_openrunner_embed_url = $s->route_openrunner_embed_url ?? '';
         $this->route_openrunner_public_url = $s->route_openrunner_public_url ?? '';
@@ -236,6 +244,13 @@ class SessionForm extends Component
             // Schéma borné à http(s) : la règle `url` nue laisse passer `javascript:` (rendu en href).
             'external_url' => ['nullable', 'url:http,https', 'max:255'],
             'photos_album_url' => ['nullable', 'url:http,https', 'max:255'],
+            // Ouverture des inscriptions (#105) : une heure sans date n'a pas de sens.
+            'registration_opens_date' => ['nullable', 'date_format:Y-m-d', 'required_with:registration_opens_time', function ($attr, $value, $fail) {
+                if (filled($value) && filled($this->start_at) && $value > substr($this->start_at, 0, 10)) {
+                    $fail('Les inscriptions doivent ouvrir au plus tard le jour de la course.');
+                }
+            }],
+            'registration_opens_time' => ['nullable', 'date_format:H:i'],
             'agenda' => ['nullable', 'string', Markup::lengthRule()],
             // Parcours OpenRunner : whitelist stricte côté serveur (§4.13.1).
             'route_openrunner_embed_url' => ['nullable', 'string', 'max:500', function ($attr, $value, $fail) {
@@ -678,6 +693,39 @@ class SessionForm extends Component
         return $id !== null ? (QuotaTag::find($id)?->label ?? 'aucun') : 'aucun';
     }
 
+    /**
+     * Ouverture des inscriptions (#105) : instant UTC + drapeau « heure connue ». Sans heure, minuit
+     * heure club. L'état d'envoi de la notification se recalcule quand l'ouverture change : remis à
+     * null si l'échéance est à venir (replanification), posé si elle est déjà passée (une date
+     * saisie après coup ne déclenche pas d'envoi). Inchangée, l'ouverture garde son état.
+     *
+     * @param  array<string,mixed>  $data
+     * @return array<string,mixed>
+     */
+    private function registrationOpeningPayload(array $data, string $tz): array
+    {
+        $date = $data['kind'] === 'competition' ? ($data['registration_opens_date'] ?: null) : null;
+        $time = $date !== null ? ($data['registration_opens_time'] ?: null) : null;
+        $opens = $date === null ? null : Carbon::parse($date.' '.($time ?? '00:00'), $tz)->utc();
+
+        $s = $this->session && $this->session->exists ? $this->session : null;
+        $unchanged = $s !== null
+            && $s->registration_opens_at?->equalTo($opens ?? Carbon::create(1970)) === true
+            && (bool) $s->registration_opens_has_time === ($time !== null);
+        if ($unchanged || ($s !== null && $opens === null && $s->registration_opens_at === null)) {
+            return ['registration_opens_at' => $opens, 'registration_opens_has_time' => $time !== null];
+        }
+
+        $probe = new Session(['registration_opens_at' => $opens, 'registration_opens_has_time' => $time !== null]);
+        $due = $probe->registrationOpeningNotifyAt();
+
+        return [
+            'registration_opens_at' => $opens,
+            'registration_opens_has_time' => $time !== null,
+            'registration_opening_notified_at' => $due !== null && $due->lte(Carbon::now()) ? Carbon::now() : null,
+        ];
+    }
+
     private function toShow()
     {
         // Refermer AVANT le redirect : `wire:navigate` mémorise la page quittée pour la rejouer au
@@ -768,6 +816,7 @@ class SessionForm extends Component
             'distance' => $data['kind'] === 'competition' ? ($data['distance'] ?: null) : null,
             'external_url' => in_array($data['kind'], ['competition', 'club_event'], true) ? ($data['external_url'] ?: null) : null,
             'photos_album_url' => in_array($data['kind'], ['competition', 'club_event'], true) ? ($data['photos_album_url'] ?: null) : null,
+            ...$this->registrationOpeningPayload($data, $tz),
             'agenda' => $data['kind'] === 'club_event' ? Markup::clean($data['agenda']) : null,
             // Parcours : optionnel sur toutes les séances (§4.13).
             'route_openrunner_embed_url' => $data['route_openrunner_embed_url'] ?: null,

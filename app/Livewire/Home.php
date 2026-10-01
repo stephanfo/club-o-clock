@@ -27,7 +27,7 @@ class Home extends Component
         return ClubSettings::current()->timezone;
     }
 
-    /** Fenêtre du bloc « Côté courses » : au-delà, le débrief a déjà été lu (retour terrain). */
+    /** Fenêtre du bloc « Derniers débriefs » : au-delà, le débrief a déjà été lu (retour terrain). */
     public const DEBRIEFS_RECENTS_JOURS = 15;
 
     /** @return Collection<int, Session> */
@@ -102,7 +102,7 @@ class Home extends Component
                 ->orderBy('start_at')
                 ->limit(5)
                 ->get(),
-            // « Côté courses » (§4.12.5, #104) : compétitions débriefées depuis moins de 15 jours.
+            // « Derniers débriefs » (§4.12.5, #104) : compétitions débriefées depuis moins de 15 jours.
             // Lu par tout le club, sans filtre de catégorie (cohérent avec l'annonce #111).
             'recentDebriefs' => $this->recentDebriefs($nowUtc->copy()->subDays(self::DEBRIEFS_RECENTS_JOURS)),
             'weekCount' => Session::whereNull('cancelled_at')

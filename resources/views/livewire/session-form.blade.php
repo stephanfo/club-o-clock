@@ -268,6 +268,24 @@
                         <div class="ifield @error('external_url') is-error @enderror"><x-icon name="link" :size="15" style="color:var(--info)" /><input class="ifield-input" type="url" wire:model.blur="external_url" placeholder="https://…"></div>
                         @error('external_url')<div class="field-error">{{ $message }}</div>@enderror
                     </div>
+                    {{-- Ouverture des inscriptions chez l'organisateur (#105) : date souvent connue tard,
+                         heure plus rarement — les deux restent facultatives. La catégorie ciblée est
+                         prévenue 15 min avant l'heure, à 9 h le jour même sans heure. --}}
+                    @if ($kind === 'competition')
+                        <div class="form-row2">
+                            <div>
+                                <label class="field-label">Ouverture des inscriptions <span class="meta" style="text-transform:none;letter-spacing:0;font-weight:400">· optionnel</span></label>
+                                <div class="ifield @error('registration_opens_date') is-error @enderror"><input class="ifield-input" type="date" wire:model.blur="registration_opens_date"></div>
+                                @error('registration_opens_date')<div class="field-error">{{ $message }}</div>@enderror
+                            </div>
+                            <div>
+                                <label class="field-label">Heure <span class="meta" style="text-transform:none;letter-spacing:0;font-weight:400">· si connue</span></label>
+                                <div class="ifield @error('registration_opens_time') is-error @enderror"><input class="ifield-input" type="time" wire:model.blur="registration_opens_time"></div>
+                                @error('registration_opens_time')<div class="field-error">{{ $message }}</div>@enderror
+                            </div>
+                        </div>
+                        <div class="meta">La catégorie ciblée est prévenue 15 min avant l'heure, ou à 9 h le jour même si l'heure n'est pas connue.</div>
+                    @endif
                     {{-- Album photos externe (§4.12.6) — simple lien, aucune intégration --}}
                     <div>
                         <label class="field-label">Album photos <span class="meta" style="text-transform:none;letter-spacing:0;font-weight:400">· optionnel</span></label>

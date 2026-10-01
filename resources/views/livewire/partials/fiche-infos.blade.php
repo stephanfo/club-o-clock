@@ -14,6 +14,7 @@
             <dl class="fiche-infos">
                 @if ($session->eventType)<dt>Type</dt><dd>{{ $session->eventType->label }}</dd>@endif
                 @if ($session->distance)<dt>Distance</dt><dd>{{ $session->distance }}</dd>@endif
+                @if ($session->registrationState())<dt>Inscriptions</dt><dd><x-registration-opening :session="$session" variant="text" /></dd>@endif
                 @if ($session->external_url)<dt>Lien</dt><dd><a href="{{ $session->external_url }}" target="_blank" rel="noopener noreferrer" class="auth-link">Infos officielles</a></dd>@endif
             </dl>
         </div>

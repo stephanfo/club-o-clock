@@ -372,6 +372,9 @@ Modèle unique avec un **discriminator `kind`**.
 - `distance` (texte libre).
 - `externalUrl`.
 - `photosAlbumUrl?` (optionnel — lien externe vers un album photos partagé, voir §4.12.5).
+- `registrationOpensAt?` (optionnel) : **ouverture des inscriptions chez l'organisateur**, date avec **heure facultative** (souvent inconnue). Sur les courses prisées, l'inscription ouvre des mois avant la course et se remplit en quelques jours : la date de la course ne suffit pas. Modifiable à tout moment, au plus tard le jour de la course. Ce n'est qu'une **information** : l'inscription reste faite par chacun sur le site de l'organisateur (§3.2).
+  - **État affiché** (fiche, à côté du lien organisateur ; vue Courses du planning — pas sur l'accueil, réservé aux débriefs §4.12.5) : « ouvrent le … », « aujourd'hui », « ouvertes » pendant 3 jours, puis « peut-être complet ». Sans heure, l'ouverture vaut toute la journée. Rien sur une course annulée ou passée.
+  - **Notification** à la catégorie ciblée (§4.15.2), **15 min avant l'heure** quand elle est connue, sinon **à 9 h heure club** le jour même. Une seule fois ; **replanifiée** si la date change, **jamais envoyée** sur une compétition annulée, ni en retard (une date saisie déjà passée, ou une échéance manquée, ne déclenche rien).
 
 > La granularité de distance (S/M/L, Ironman 70.3, semi, sprint…) vit dans `distance`, pas dans le type d'épreuve. Le type décrit la *nature* de la compétition ; `distance` en précise le format quantitatif, librement saisi.
 
@@ -437,7 +440,7 @@ Pendant de l'annulation, pour le cas qu'elle ne couvre pas : la séance qui **n'
 Une compétition se prépare sur plusieurs mois, là où le planning se lit à la semaine. Le sélecteur de vues du planning porte donc un quatrième segment, **Courses** (Jour / Semaine / Mois / Courses), sur mobile comme sur desktop. C'est **une liste, pas une grille** : ni flèches précédent / suivant ni titre de période, et les filtres par type et par discipline n'y ont pas cours.
 - **À venir** : toutes les `competition` à partir d'aujourd'hui (une course du jour y reste jusqu'à minuit, heure club), **sans borne haute** — en juin, on prépare les courses de septembre. Tri par date croissante.
 - **Passées** : celles de la **saison en cours** seulement (§4.4), de la plus récente à la plus ancienne. Chaque ligne indique le **nombre de débriefs** actifs et la présence d'un **album photos** ; elle ouvre directement l'onglet Débriefs quand il y en a. C'est l'archive des débriefs ; la nouveauté reste mise en avant sur l'accueil (§4.12.5).
-- **Chaque ligne** : nom, date, type d'épreuve, distance et lieu ; le **nombre de membres du club** qui y participent et leurs noms selon la convention §4.9.4 ; l'intention du sujet consulté (« Tu participes » / « Tu y étais », liste d'attente).
+- **Chaque ligne** : nom, date, type d'épreuve, distance et lieu ; pour une course à venir, l'**état des inscriptions** chez l'organisateur quand la date d'ouverture est connue ; le **nombre de membres du club** qui y participent et leurs noms selon la convention §4.9.4 ; l'intention du sujet consulté (« Tu participes » / « Tu y étais », liste d'attente).
 - Les compétitions **annulées** restent visibles et marquées comme telles.
 - Mêmes règles que le reste du planning pour le **filtrage par catégorie** (§4.5), la **vue parent** (§4.2) et « Mes inscriptions ».
 
@@ -758,7 +761,7 @@ Sur une séance `kind = competition`, chaque membre **ayant participé** peut pu
 
 **Notification** : à la **publication** d'un débrief, push + email à **tout le club**, sous **deux types distincts** de la matrice §4.15.3 (opt-out cellule par cellule, actifs par défaut) : les **autres participants** (`participating`) de la compétition reçoivent « nouveau débrief » ; **tous les autres membres actifs** — non inscrits, en liste d'attente, parents — reçoivent « débrief d'une autre compétition ». Chacun peut ainsi ne suivre que les compétitions auxquelles il participe. L'auteur n'est pas notifié ; un parent reçoit l'annonce club **une seule fois**, pas une par enfant. L'**édition** ultérieure ne renotifie pas (même esprit que les compléments silencieux §4.12.4).
 
-**Mise en avant** : l'accueil porte un bloc **« Côté courses »** listant les compétitions ayant reçu un débrief (non archivé) **depuis moins de 15 jours** — au-delà, il a déjà été lu. Une ligne par compétition : nom, date, nombre de débriefs de la période et prénoms des auteurs ; la compétition débriefée le plus récemment en tête ; la ligne ouvre directement l'onglet Débriefs de la fiche. Bloc **masqué s'il est vide**, identique pour tous les membres (y compris en vue parent). Sur le planning, la carte d'une séance porte le **nombre de débriefs** actifs.
+**Mise en avant** : l'accueil porte un bloc **« Derniers débriefs »** listant les compétitions ayant reçu un débrief (non archivé) **depuis moins de 15 jours** — au-delà, il a déjà été lu. Une ligne par compétition : nom, date, nombre de débriefs de la période et prénoms des auteurs ; la compétition débriefée le plus récemment en tête ; la ligne ouvre directement l'onglet Débriefs de la fiche. Bloc **masqué s'il est vide**, identique pour tous les membres (y compris en vue parent). Sur le planning, la carte d'une séance porte le **nombre de débriefs** actifs.
 
 **RGPD** : à l'anonymisation d'un compte (§4.3), `authorId` est anonymisé comme les autres références (`anon:user:<hash>`) ; **le texte du débrief est conservé** (valeur pour le club), aligné sur le traitement des inscriptions anonymisées. Recommandation aux rédacteurs : éviter de citer le nom de tiers ou des informations de santé (recommandation, pas de validation algorithmique — cf. §4.12.1).
 
@@ -919,6 +922,7 @@ ne recevra.
 - Modification de séance (date, heure, lieu).
 - Ajout/modification de contenu de séance (sous-types texte, parcours, météo).
 - Création d'une compétition ou d'un événement club ciblant une catégorie de l'utilisateur.
+- **Ouverture des inscriptions** à une compétition ciblant une catégorie de l'utilisateur : push + email 15 min avant l'heure d'ouverture, ou à 9 h heure club le jour même sans heure connue (cf. §4.7). Le message donne l'heure exacte.
 - **Nouveau débrief sur une compétition à laquelle tu participes** : push + email aux autres participants à la publication d'un débrief (cf. §4.12.5).
 - **Débrief d'une autre compétition** : push + email à tous les membres actifs non participants à la publication d'un débrief (cf. §4.12.5). Type distinct du précédent, pour pouvoir le couper sans perdre les débriefs de ses propres compétitions.
 - **Inscription / désinscription d'un coach** sur une `training` : push + email aux **autres coachs déjà inscrits** + à **l'admin**. Si l'action est déclenchée par un tiers, **également au coach concerné** (distinct de l'`actorId`). Pas de notif aux athlètes inscrits (sauf si une modification de séance est par ailleurs déclenchée).
@@ -928,7 +932,7 @@ ne recevra.
 - **Accès athlète réactivé** : **email** à l'utilisateur réactivé individuellement.
 - **Nouveau parent garant** : push + email au **garant entrant** quand un admin rattache un mineur à un garant ou change son garant, et au **pupille** s'il a un compte propre (P2). Le garant sortant reçoit la rupture (§4.2.2), pas cette notification. Informative, hors matrice §4.15.3.
 
-**Pas de rappel temporel automatique avant événement en V1** (J-1, H-2, J-7 etc.), toutes `kind` confondues.
+**Pas de rappel temporel automatique avant événement en V1** (J-1, H-2, J-7 etc.), toutes `kind` confondues. La notification d'ouverture des inscriptions n'en est pas un : elle signale une échéance chez l'organisateur, une seule fois, sans rappel la veille.
 
 **Destination du lien** (push, email et page Alertes, §4.15.7) : une notification qui concerne une séance ouvre sa fiche **sur l'onglet qui porte l'information** (#99) — **Débriefs** pour un nouveau débrief, **Encadrement** pour l'inscription, la désinscription ou l'affectation d'un coach ; les autres ouvrent l'onglet Infos, où figurent statut et horaires. Sur ordinateur, sans onglets, la section correspondante est amenée à l'écran. Un onglet absent de la fiche ouvre Infos.
 
@@ -1179,7 +1183,7 @@ Vue logique des entités. **Volontairement agnostique** à la techno de stockage
 - **`Session`** :
   - Communs : `kind` (`training` | `competition` | `club_event`), `title`, `disciplineId?`, `startAt`, `durationMin`, `locationId?` + `locationText?`, `capacity?`, `categoryIds[]`, `createdBy` (immuable), `coaches[]` (M:N), `sourceTemplateId?` (informatif uniquement), `cancelledAt?` / `cancelledBy?`, `visibility`.
   - `training` : `quotaTagId?`, `contentMarkdown`, `contentAttachment`, `externalStaffLabel?` (libellé libre ≤ 120 car. d'un intervenant extérieur — **non nominatif**, cf. §4.11.2 ; forcé à `null` sur les autres `kind`).
-  - `competition` : `eventTypeId` (FK Types d'épreuve), `distance`, `externalUrl`, `photosAlbumUrl?`.
+  - `competition` : `eventTypeId` (FK Types d'épreuve), `distance`, `externalUrl`, `photosAlbumUrl?`, `registrationOpensAt?` (heure facultative).
   - `club_event` : `agenda` (markdown), `externalUrl?`, `photosAlbumUrl?`.
   - Parcours : `routeOpenrunnerEmbedUrl?`, `routeOpenrunnerPublicUrl?`, `routeOpenrunnerId?` (dérivé du `code` opaque, non exposé), `route?` (référence `0..1` vers un **`GpxRoute`** — cf. §4.20 ; remplace les anciens `routeGpxFile?` / `routeStats?` portés par la séance).
 - **`Registration`** (rattachée à une `Session`) : `userId`, `status` (`participating` | `waitlist` | `cancelled`), `waitlistReason?` (`capacity` | `quota_exceeded`), `waitlistPosition?`, `registeredAt`, `promotedAt?`, `promotedBy?`, `overrideBy?`, `overrideReason?`.

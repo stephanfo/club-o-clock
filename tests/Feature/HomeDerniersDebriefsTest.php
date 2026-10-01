@@ -13,11 +13,11 @@ use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
- * « Côté courses » (§4.12.5, #104) : l'accueil liste les compétitions débriefées depuis moins de
+ * « Derniers débriefs » (§4.12.5, #104) : l'accueil liste les compétitions débriefées depuis moins de
  * 15 jours, la plus récemment débriefée en tête ; les cartes du planning portent le nombre de
  * débriefs actifs.
  */
-class HomeCoteCoursesTest extends TestCase
+class HomeDerniersDebriefsTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -53,7 +53,7 @@ class HomeCoteCoursesTest extends TestCase
 
         $this->actingAs(User::factory()->create());
         Livewire::test(Home::class)
-            ->assertSee('Côté courses')
+            ->assertSee('Derniers débriefs')
             // Dijon a le débrief le plus récent (hier) : il passe devant Beaune.
             ->assertSeeInOrder(['Tri de Dijon', '1 débrief', 'Julie', 'Duathlon de Beaune', '2 débriefs'])
             ->assertSee('Marc, Léa')
@@ -89,7 +89,7 @@ class HomeCoteCoursesTest extends TestCase
         $this->actingAs(User::factory()->create());
         Livewire::test(Home::class)
             ->assertSee('Bonjour')
-            ->assertDontSee('Côté courses');
+            ->assertDontSee('Derniers débriefs');
     }
 
     public function test_planning_cards_show_active_debrief_count(): void

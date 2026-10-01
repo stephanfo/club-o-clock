@@ -14,6 +14,14 @@ class Session extends Model
 {
     public const KINDS = ['training', 'competition', 'club_event'];
 
+    /** Notification d'ouverture des inscriptions (#105) : avance sur l'heure connue, heure par défaut sinon. */
+    public const OPENING_NOTIFY_LEAD_MIN = 15;
+
+    public const OPENING_NOTIFY_HOUR = 9;
+
+    /** Jours pendant lesquels des inscriptions ouvertes se disent « ouvertes » (puis « peut-être complet »). */
+    public const OPENING_RECENT_DAYS = 3;
+
     protected $fillable = [
         'kind', 'title', 'discipline_id', 'start_at', 'duration_min',
         'location_id', 'location_text', 'capacity', 'visibility',
@@ -26,6 +34,10 @@ class Session extends Model
         'quota_tag_id', 'content_markdown', 'content_attachment_path',
         // competition
         'event_type_id', 'distance', 'external_url', 'photos_album_url',
+        // ouverture des inscriptions officielles (#105)
+        'registration_opens_at', 'registration_opens_has_time',
+        // état d'envoi de sa notification, recalculé par le formulaire quand l'ouverture change
+        'registration_opening_notified_at',
         // club_event
         'agenda',
         // parcours : les URLs OpenRunner restent par-séance, le GPX vit dans GpxRoute (§4.20).
@@ -38,6 +50,8 @@ class Session extends Model
         'capacity' => 'integer',
         'cancelled_at' => 'datetime',
         'quota_released_at' => 'datetime',
+        'registration_opens_has_time' => 'boolean',
+        'registration_opening_notified_at' => 'datetime',
         'ad_hoc_latitude' => 'decimal:7',
         'ad_hoc_longitude' => 'decimal:7',
     ];
@@ -57,6 +71,68 @@ class Session extends Model
             get: fn ($value) => $value === null ? null : Carbon::parse($value, 'UTC'),
             set: fn ($value) => $value === null ? null : Carbon::parse($value)->utc(),
         );
+    }
+
+    /**
+     * Même piège et même parade que `start_at` : l'ouverture des inscriptions (#105) est un instant,
+     * stocké en UTC quel que soit le fuseau du Carbon reçu.
+     *
+     * @return Attribute<Carbon|null, Carbon|string|null>
+     */
+    protected function registrationOpensAt(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => $value === null ? null : Carbon::parse($value, 'UTC'),
+            set: fn ($value) => $value === null ? null : Carbon::parse($value)->utc(),
+        );
+    }
+
+    /** Ouverture des inscriptions en heure club (null si non renseignée). */
+    public function registrationOpensLocal(): ?Carbon
+    {
+        return $this->registration_opens_at?->copy()->setTimezone(ClubSettings::current()->timezone);
+    }
+
+    /**
+     * Instant d'envoi de la notification d'ouverture (#105, §4.15.2) : 15 min avant l'heure quand
+     * elle est connue (le temps d'ouvrir le site de l'organisateur), sinon 9 h heure club le jour même.
+     */
+    public function registrationOpeningNotifyAt(): ?Carbon
+    {
+        $local = $this->registrationOpensLocal();
+        if ($local === null) {
+            return null;
+        }
+
+        return ($this->registration_opens_has_time
+            ? $local->copy()->subMinutes(self::OPENING_NOTIFY_LEAD_MIN)
+            : $local->copy()->startOfDay()->setTime(self::OPENING_NOTIFY_HOUR, 0))->utc();
+    }
+
+    /**
+     * État des inscriptions officielles (#105) : 'today' (ouvrent aujourd'hui), 'upcoming' (plus
+     * tard), 'open' (ouvertes depuis au plus 3 jours), 'maybe_full' (au-delà : la course a pu se
+     * remplir). Null sans date, sur une course annulée ou déjà partie. Sans heure, l'ouverture vaut
+     * toute la journée : « aujourd'hui » jusqu'à minuit, « ouvertes » le lendemain.
+     */
+    public function registrationState(?Carbon $now = null): ?string
+    {
+        $opens = $this->registrationOpensLocal();
+        if ($opens === null || $this->isCancelled() || $this->hasStarted()) {
+            return null;
+        }
+
+        $now = ($now ?? Carbon::now())->copy()->setTimezone($opens->getTimezone());
+        $today = $now->isSameDay($opens);
+
+        if ($today && (! $this->registration_opens_has_time || $now->lt($opens))) {
+            return 'today';
+        }
+        if ($now->lt($opens)) {
+            return 'upcoming';
+        }
+
+        return $now->lt($opens->copy()->startOfDay()->addDays(self::OPENING_RECENT_DAYS + 1)) ? 'open' : 'maybe_full';
     }
 
     /**

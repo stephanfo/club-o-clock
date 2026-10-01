@@ -61,6 +61,7 @@
                                     @elseif ($status === 'waitlist')
                                         <span class="chip chip-sm chip-warn"><x-icon name="clock" :size="12" /> Liste d'attente</span>
                                     @endif
+                                    @unless ($sec['past'])<x-registration-opening :session="$s" />@endunless
                                     @if ($sec['past'])
                                         @if ($debriefs)
                                             <span class="chip chip-sm"><x-icon name="file-text" :size="12" /> {{ $debriefs }} débrief{{ $debriefs > 1 ? 's' : '' }}</span>
