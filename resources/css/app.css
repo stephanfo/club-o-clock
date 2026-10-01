@@ -312,6 +312,11 @@ body { touch-action: manipulation; }
     padding: 10px var(--space-4) 6px; position: sticky; top: 0; z-index: 2; background: var(--bg-alt);
 }
 .plan-daylist-m { padding: 0 var(--space-4); display: flex; flex-direction: column; gap: 8px; }
+/* Vue Courses (#106) : liste de compétitions. Colonne bornée en desktop (une carte pleine largeur
+   sur 1440px se lirait mal), marges latérales de la liste mobile sinon. */
+.plan-courses { display: flex; flex-direction: column; gap: var(--space-6); max-width: 760px; margin: 0 auto; }
+.plan-courses-list { display: flex; flex-direction: column; gap: 8px; }
+.plan-scroll-m .plan-courses { padding: var(--space-4) var(--space-4) 0; }
 /* Barre de vue : posée AU-DESSUS de la botnav globale fixe (proto).
    Son bas s'arrête pile au sommet de la botnav (bottom = hauteur botnav + safe-area) : elle ne la
    chevauche pas, leur ordre z-index est donc sans effet visuel. Le planning n'a pas de carte
@@ -325,6 +330,10 @@ body { touch-action: manipulation; }
    segment à droite (space-between). */
 .plan-viewbar-row { display: flex; align-items: center; justify-content: center; }
 .plan-viewbar-m.has-subj .plan-viewbar-row { justify-content: space-between; gap: 10px; }
+/* Garant : les pastilles partagent la rangée avec les 4 vues (#106, segment Courses). Segment
+   resserré pour tenir à 390px avec deux enfants, sans chevaucher la dernière pastille. */
+.plan-viewbar-m.has-subj .seg { flex: 0 0 auto; }
+.plan-viewbar-m.has-subj .seg-item { padding: 7px 8px; font-size: 12px; }
 /* Bandeau « Tu agis pour X » posé DANS la barre du bas, au-dessus de la rangée : compact,
    sans la marge haute du is-inline générique (le gap du conteneur suffit). */
 .plan-viewbar-m .subj-banner.is-inline { margin: 0; }
