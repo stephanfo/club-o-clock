@@ -799,6 +799,8 @@ class MemberShow extends Component
             : collect();
 
         return view('livewire.admin.member-show', [
+            // Appareils abonnés au push (#97) : sans aucun, ses push finissent « sans destinataire ».
+            'pushDevices' => $this->user->pushSubscriptions()->count(),
             'primary' => $primary,
             'surclassements' => $surclassements,
             'availableCats' => $availableCats,

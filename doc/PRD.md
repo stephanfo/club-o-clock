@@ -975,10 +975,14 @@ La matrice §4.15.3 est **propre à chaque utilisateur**. Le parent gère ses op
 #### 4.15.6 Gestion des envois sortants (bureau)
 Écran **bureau / admin** donnant la main sur la **file des notifications sortantes** (`NotificationOutbox`, §5.1), pour superviser et rattraper les envois sans attendre le traitement automatique.
 
-- **Consultation filtrée** : par statut (en attente / envoyée / en échec), canal (push / email), type (§4.15.2) et destinataire ; **détail** d'un envoi (canal, contenu, nombre de tentatives, horodatages).
+- **Consultation filtrée** : par statut (en attente / envoyée / en échec / annulée / **sans destinataire**), canal (push / email), type (§4.15.2) et destinataire ; **détail** d'un envoi (canal, contenu, nombre de tentatives, horodatages).
 - **Rattrapage** : **annulation** d'un (ou de plusieurs) envoi(s) **encore en attente** — utile quand une notification a été générée par erreur, avant qu'elle ne parte.
 - **Envoi manuel immédiat** : pousser tout de suite un envoi (ou tous les envois en attente) sans attendre le lot différé suivant (même effet que l'option « envoi prioritaire » §4.7).
-- **Rejeu des échecs** : relancer les envois en échec.
+- **Rejeu des échecs** : relancer les envois en échec, ou sans destinataire une fois l'adhérent équipé.
+- **Sans destinataire** : statut distinct d'« envoyée » quand **rien n'est parti** — aucun appareil abonné au push, ou pas d'adresse email. Pas de nouvel essai. Un push sans destinataire reste lisible sur la page Alertes (§4.15.7), seul endroit où l'adhérent peut alors le voir. Pas de repli par email.
+- **Santé du push** : l'écran donne le nombre d'appareils abonnés et le bilan des push des dernières 24 h (livrés, en échec, sans destinataire). Un **bandeau d'alerte** s'affiche quand au moins la moitié des essais échouent (5 essais au minimum) : signe d'une panne de configuration ou du service push, à repérer avant les adhérents. Les envois sans destinataire n'entrent pas dans ce taux : ce n'est pas une panne.
+- **Fiche adhérent** : indique le nombre d'appareils abonnés au push, ou « aucun appareil abonné ».
+- **Appareils abandonnés** : un appareil qui échoue **5 fois de suite** sans aucune livraison réussie depuis **30 jours** (ou depuis son abonnement) est désabonné, comme un appareil refusé par le service push.
 - **Accès** : **admin uniquement** (acte de gouvernance, cohérent avec l'accès aux journaux §4.18). La consultation ne ré-émet jamais ; seules les actions explicites (annuler / pousser / rejouer) agissent sur la file.
 
 #### 4.15.7 Page Alertes (adhérent)

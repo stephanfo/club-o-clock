@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 // Permet d'exercer tout le chemin outbox + drain sans dépendance externe (clés VAPID / email UE).
 class LogChannel implements NotificationChannel
 {
-    public function send(NotificationOutbox $line): bool
+    public function send(NotificationOutbox $line): DeliveryOutcome
     {
         Log::info('notification.send', [
             'id' => $line->id,
@@ -18,6 +18,6 @@ class LogChannel implements NotificationChannel
             'user_id' => $line->user_id,
         ]);
 
-        return true;
+        return DeliveryOutcome::Delivered;
     }
 }

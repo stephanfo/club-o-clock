@@ -8,6 +8,7 @@ use App\Models\NotificationOutbox;
 use App\Models\User;
 use App\Notifications\NotificationType;
 use App\Services\OutboxAdminService;
+use App\Services\PushHealthService;
 use App\Services\SchedulerHeartbeatService;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -204,7 +205,7 @@ class Outbox extends Component
      * Message d'un envoi manuel. Les lignes annulées faute de canal ouvert (§4.17) sont signalées :
      * sans ça, l'admin lit « 0 envoi(s) poussé(s) » sans comprendre que c'est lui qui a coupé le canal.
      *
-     * @param  array{sent:int,retried:int,failed:int,cancelled:int}  $stats
+     * @param  array{sent:int,retried:int,failed:int,cancelled:int,no_target:int}  $stats
      */
     private function pushMessage(array $stats): string
     {
@@ -212,6 +213,10 @@ class Outbox extends Component
 
         if ($stats['cancelled'] > 0) {
             $message .= " {$stats['cancelled']} annulé(s) : le canal est désactivé dans les paramètres du club.";
+        }
+
+        if ($stats['no_target'] > 0) {
+            $message .= " {$stats['no_target']} sans destinataire : aucun appareil abonné ou pas d'adresse email.";
         }
 
         return $message;
@@ -257,7 +262,7 @@ class Outbox extends Component
         $this->detailId = null;
     }
 
-    public function render(OutboxAdminService $service, SchedulerHeartbeatService $heartbeat)
+    public function render(OutboxAdminService $service, SchedulerHeartbeatService $heartbeat, PushHealthService $pushHealth)
     {
         $page = $service->page($this->filters(), $this->perPage);
 
@@ -267,6 +272,8 @@ class Outbox extends Component
             // envoi — c'est donc là que l'information doit se trouver.
             'scheduler' => $heartbeat->status(),
             'staleAfter' => SchedulerHeartbeatService::STALE_AFTER_MINUTES,
+            'pushHealth' => $pushHealth->summary(),
+            'pushWindow' => PushHealthService::WINDOW_HOURS,
             'tz' => ClubSettings::current()->timezone,
             'rows' => $page['rows'],
             'total' => $page['total'],

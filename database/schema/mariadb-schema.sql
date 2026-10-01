@@ -465,7 +465,7 @@ CREATE TABLE `notification_outbox` (
   `channel` varchar(255) NOT NULL,
   `payload` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`payload`)),
   `user_id` bigint(20) unsigned DEFAULT NULL,
-  `status` enum('pending','sent','failed','cancelled') NOT NULL DEFAULT 'pending',
+  `status` enum('pending','sent','failed','cancelled','no_target') NOT NULL DEFAULT 'pending',
   `attempts` smallint(5) unsigned NOT NULL DEFAULT 0,
   `available_at` timestamp NULL DEFAULT NULL,
   `sent_at` timestamp NULL DEFAULT NULL,
@@ -516,6 +516,9 @@ CREATE TABLE `push_subscriptions` (
   `auth` varchar(255) NOT NULL,
   `content_encoding` varchar(255) NOT NULL DEFAULT 'aesgcm',
   `user_agent` varchar(255) DEFAULT NULL,
+  `last_success_at` timestamp NULL DEFAULT NULL,
+  `last_failure_at` timestamp NULL DEFAULT NULL,
+  `failure_count` smallint(5) unsigned NOT NULL DEFAULT 0,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -859,5 +862,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (46,'2026_09_16_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (47,'2026_09_17_000000_create_calendar_feeds_table',10);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (48,'2026_10_01_000000_add_registration_opening_to_sessions',11);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (49,'2026_10_02_000000_create_debrief_reactions_table',12);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (50,'2026_10_03_000000_add_push_health',13);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

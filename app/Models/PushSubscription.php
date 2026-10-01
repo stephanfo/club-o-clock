@@ -12,6 +12,13 @@ class PushSubscription extends Model
         'user_id', 'endpoint', 'endpoint_hash', 'p256dh', 'auth', 'content_encoding', 'user_agent',
     ];
 
+    /** @var array<string, string> */
+    protected $casts = [
+        'last_success_at' => 'datetime',
+        'last_failure_at' => 'datetime',
+        'failure_count' => 'integer',
+    ];
+
     /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {

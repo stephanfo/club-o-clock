@@ -9,6 +9,12 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Ajouté
 
+- **Le bureau voit la santé du push.** L'écran des envois indique le nombre d'appareils abonnés et le
+  bilan des push des dernières 24 h (livrés, en échec, sans destinataire). Un bandeau prévient quand
+  la moitié des essais échouent (clés VAPID, service push). La fiche d'un adhérent signale qu'il n'a
+  aucun appareil abonné. Un appareil qui échoue 5 fois de suite sans livraison depuis 30 jours est
+  désabonné (#97).
+
 - **On peut aimer un débrief.** Sous chaque débrief, « J'aime » se pose ou se retire ; le compteur et
   les noms (« Toi, Léa M. et 3 autres ») s'affichent pour tous. L'auteur reçoit une seule notification
   pour plusieurs « j'aime » posés en 30 min (« Léa, Tom et 3 autres ont aimé ton débrief »), qu'il
@@ -260,6 +266,10 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   garde est **serveur** : un bouton grisé contourné ne déclenche rien.
 
 ### Corrigé
+
+- **Un push parti vers aucun appareil ne se dit plus « envoyé ».** Sans appareil abonné (ou une fois
+  tous désabonnés), l'envoi passe « sans destinataire » : filtrable et rejouable sur l'écran des
+  envois, et toujours lisible sur la page Alertes. Idem pour un email sans adresse (#97).
 
 - **La notification d'un débrief ouvre l'onglet Débriefs.** Elle menait sur l'onglet Infos de la
   fiche, et il fallait trouver l'onglet soi-même. Le lien (push, email et écran Alertes) porte

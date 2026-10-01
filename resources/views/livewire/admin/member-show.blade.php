@@ -63,6 +63,15 @@
                         </div>
                         <div class="flex ac g14 wrap" style="margin-top:10px">
                             <span class="meta flex ac g4" style="white-space:nowrap"><x-icon name="calendar" :size="13" /> Créé le {{ $u->created_at?->translatedFormat('j M Y') }}</span>
+                            {{-- Push (#97) : un compte sans appareil abonné ne reçoit ses alertes que sur la
+                                 page Alertes. Rien pour un mineur sans compte propre (P1) : il ne se connecte pas. --}}
+                            @if ($u->email !== null && $u->anonymized_at === null)
+                                @if ($pushDevices === 0)
+                                    <span class="chip chip-sm chip-warn flex ac g4" style="white-space:nowrap" data-push-appareils="0"><x-icon name="bell" :size="12" /> Aucun appareil abonné au push</span>
+                                @else
+                                    <span class="meta flex ac g4" style="white-space:nowrap" data-push-appareils="{{ $pushDevices }}"><x-icon name="bell" :size="13" /> Push : {{ $pushDevices }} appareil{{ $pushDevices > 1 ? 's' : '' }}</span>
+                                @endif
+                            @endif
                             @if ($u->guardian)
                                 <span class="meta flex ac g4" style="white-space:nowrap"><x-icon name="shield" :size="13" style="color:var(--info)" /> Parent garant · {{ $u->guardian->fullName() }} <span class="chip chip-sm chip-blue">{{ $u->email ? 'P2' : 'P1' }}</span></span>
                             @endif
