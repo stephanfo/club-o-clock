@@ -106,7 +106,7 @@ enum NotificationType: string
     public function sessionTab(): ?string
     {
         return match ($this) {
-            self::NewDebrief, self::DebriefReaction => 'debriefs',
+            self::NewDebrief, self::ClubDebrief, self::DebriefReaction => 'debriefs',
             self::CoachRegistration, self::CoachAssigned => 'encadrement',
             default => null,
         };

@@ -56,6 +56,14 @@ class NotificationOngletTest extends TestCase
         $this->assertStringEndsWith('/seances/42?tab=debriefs', $this->url(NotificationType::NewDebrief, ['session_id' => 42]));
     }
 
+    // Revue du 01/10 : le débrief d'une autre compétition ouvrait Infos, alors que le bloc
+    // « Derniers débriefs » de l'accueil ouvre bien l'onglet Débriefs.
+    public function test_club_debrief_and_reaction_links_open_the_debriefs_tab(): void
+    {
+        $this->assertStringEndsWith('/seances/42?tab=debriefs', $this->url(NotificationType::ClubDebrief, ['session_id' => 42]));
+        $this->assertStringEndsWith('/seances/42?tab=debriefs', $this->url(NotificationType::DebriefReaction, ['session_id' => 42]));
+    }
+
     public function test_coach_notifications_open_the_coaching_tab(): void
     {
         $this->assertStringEndsWith('?tab=encadrement', $this->url(NotificationType::CoachRegistration, ['session_id' => 42]));

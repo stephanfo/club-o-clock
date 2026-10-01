@@ -9,15 +9,17 @@ use Minishlink\WebPush\MessageSentReport;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-// #96 — classement de la réponse du service push : ce qui purge l'abonnement, ce qui se retente.
+// #96 — classement de la réponse du service push : ce qui purge l'abonnement (404/410), ce qui se retente.
 class WebPushResultTest extends TestCase
 {
     /** @return array<string, array{int, bool}> */
     public static function refus(): array
     {
         return [
-            '401 clé VAPID refusée' => [401, true],
-            '403 clé VAPID refusée' => [403, true],
+            // Revue du 01/10 : une erreur de configuration VAPID répond aussi 401/403, pour TOUS
+            // les appareils — purger vidait les abonnements du club en un passage de drain.
+            '401 clé VAPID refusée' => [401, false],
+            '403 clé VAPID refusée' => [403, false],
             '404 abonnement inconnu' => [404, true],
             '410 abonnement expiré' => [410, true],
             '429 limite de débit' => [429, false],

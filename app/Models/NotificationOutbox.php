@@ -34,7 +34,8 @@ class NotificationOutbox extends Model
     public const SENSITIVE_PAYLOAD_KEYS = ['token'];
 
     /**
-     * Clés de payload qui ont fini leur office une fois la ligne envoyée. Distinctes des secrets :
+     * Clés de payload qui ont fini leur office une fois la ligne envoyée — ou terminée sans
+     * destinataire (`no_target`, revue du 01/10). Distinctes des secrets :
      * elles ne sont PAS masquées dans le tiroir admin — un prénom n'est pas un jeton, le masquer
      * rendrait l'écran des envois illisible pour la seule ligne où il aide (celle qui n'est pas
      * partie). Elles sont simplement retirées au passage à `sent` (minimisation RGPD §4.19) : le
