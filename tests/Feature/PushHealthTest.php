@@ -95,7 +95,10 @@ class PushHealthTest extends TestCase
         $this->assertSame('no_target', $line->status, 'Rien n\'est parti : la ligne ne doit pas se dire envoyée.');
         $this->assertNull($line->sent_at);
         $this->assertSame(0, $line->attempts, 'Pas de retry : personne à qui l\'envoyer.');
-        $this->assertSame('Léa', $line->payload['subject_first_name'], 'Payload intact : la ligne reste rejouable.');
+        // Terminale comme `sent` : le prénom (volatil) part, le rattachement reste pour le rejeu.
+        $this->assertArrayNotHasKey('subject_first_name', $line->payload);
+        $this->assertSame(99, $line->payload['subject_id']);
+        $this->assertSame(1, $line->payload['session_id']);
         $this->assertSame(1, $stats['no_target']);
     }
 
@@ -319,5 +322,39 @@ class PushHealthTest extends TestCase
         Livewire::actingAs(User::factory()->admin()->create())->test(MemberShow::class, ['user' => $p1])
             ->assertDontSee('appareil abonné au push')
             ->assertDontSee('Push :');
+    }
+
+    // Revue du 01/10 : le prénom d'un membre qui a aimé un débrief ne survit pas dans une ligne
+    // terminée sans destinataire (il survivait même à l'effacement de son compte).
+    public function test_no_target_line_drops_reactor_names(): void
+    {
+        $auteur = User::factory()->create();
+        $line = NotificationOutbox::create([
+            'type' => NotificationType::DebriefReaction->value, 'channel' => 'push', 'user_id' => $auteur->id,
+            'payload' => ['session_id' => 1, 'debrief_id' => 3, 'reactor_names' => ['Léa'], 'reaction_count' => 1],
+            'status' => 'pending', 'attempts' => 0, 'available_at' => now(),
+        ]);
+
+        $this->drain();
+
+        $line->refresh();
+        $this->assertSame('no_target', $line->status);
+        $this->assertArrayNotHasKey('reactor_names', $line->payload);
+        $this->assertSame(1, $line->payload['reaction_count'], 'Le compte reste : la page Alertes s\'en sert.');
+    }
+
+    // Revue du 01/10 : une signature VAPID refusée (clé mal configurée côté serveur) ne vide plus
+    // les abonnements du club ; l'appareil reste, l'échec est compté, la ligne sera retentée.
+    public function test_vapid_refusal_keeps_the_device_and_retries(): void
+    {
+        $user = User::factory()->create();
+        $sub = $this->sub($user, 'https://push/a');
+        $this->sender->fail = ['https://push/a']; // 401/403 → failed (cf. WebPushResultTest)
+        $line = $this->line($user);
+
+        $this->drain();
+
+        $this->assertSame(1, $sub->fresh()->failure_count);
+        $this->assertSame('pending', $line->fresh()->status);
     }
 }

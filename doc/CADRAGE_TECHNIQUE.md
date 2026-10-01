@@ -407,9 +407,15 @@ indépendantes de la coquille serveur) :
 toujours valide : purge après un refus, renouvellement silencieux par le service push, clés VAPID changées.
 Trois règles referment l'écart, sans geste ni nouvelle permission :
 
-- **Refus définitif = purge.** 404/410 (abonnement disparu) **et 401/403** (signature VAPID refusée, donc
-  abonnement créé avec d'anciennes clés) suppriment la ligne. Retenter ne peut pas réussir ; le reste
-  (réseau, 429, 5xx) est transitoire et laissé au drain.
+- **Refus définitif = purge.** 404/410 (abonnement disparu) suppriment la ligne. Retenter ne peut pas
+  réussir ; le reste (réseau, 429, 5xx) est transitoire et laissé au drain.
+- **401/403 ne purgent pas** (revue du 01/10). La signature VAPID refusée vient aussi bien d'un
+  abonnement créé avec d'anciennes clés que d'une **erreur de configuration du serveur** (clé ou
+  subject mal saisis, horloge décalée) — et dans ce cas pour tous les appareils : purger vidait les
+  abonnements du club en un seul passage de drain. Traités en transitoire, ils font lever l'alerte
+  d'échecs massifs de l'écran des envois ; une configuration corrigée reprend les envois sans geste ;
+  un abonnement vraiment périmé tombe sous la purge des échecs sans fin ci-dessous, et le navigateur
+  se réabonne avec la bonne clé dès la prochaine ouverture.
 - **Échecs transitoires sans fin = purge aussi (#97).** Chaque essai tient `last_success_at`,
   `last_failure_at` et `failure_count` (échecs **consécutifs**, remis à zéro par une livraison). À
   5 échecs consécutifs sans succès depuis 30 jours (référence : dernier succès, sinon date
@@ -417,8 +423,9 @@ Trois règles referment l'écart, sans geste ni nouvelle permission :
   notification de son propriétaire jusqu'à `failed`, y compris celles qu'un autre appareil reçoit.
 - **« Personne à qui envoyer » n'est pas « envoyée » (#97).** Le canal rend une issue à trois valeurs
   (`DeliveryOutcome` : livré / à retenter / sans destinataire) au lieu d'un booléen. Sans appareil
-  abonné, ou une fois tous purgés, la ligne passe en `no_target` : terminal, sans `sent_at`, payload
-  intact (rejouable), toujours visible sur la page Alertes. Même issue pour l'email sans adresse.
+  abonné, ou une fois tous purgés, la ligne passe en `no_target` : terminal, sans `sent_at`, rejouable,
+  toujours visible sur la page Alertes. Comme pour `sent`, secrets et prénoms volatils sont retirés
+  du payload : une ligne terminale ne garde pas le prénom d'un tiers. Même issue pour l'email sans adresse.
 - **Le navigateur se resynchronise.** À l'ouverture de l'app (et au retour au premier plan), si la
   permission est accordée et qu'un abonnement existe, il est renvoyé au `POST` idempotent — au plus une
   fois par jour, sauf si l'endpoint ou le compte connecté ont changé. Un abonnement signé avec une autre

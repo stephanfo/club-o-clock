@@ -31,12 +31,17 @@ class MinishlinkWebPushSender implements WebPushSender
     }
 
     /**
-     * Classe la réponse du service push. 404/410 : l'abonnement n'existe plus. 401/403 : le service
-     * refuse notre signature VAPID pour cet abonnement — cas des clés changées, où l'abonnement a
-     * été créé avec l'ancienne clé publique et ne sera plus jamais accepté (#96). Les deux sont
-     * purgés : retenter ne peut pas réussir, et le navigateur se réabonne à la prochaine ouverture
-     * de l'app (resynchronisation de resources/js/push.js). Le reste (réseau, 429, 5xx) est
-     * transitoire et laissé au drain.
+     * Classe la réponse du service push. 404/410 : l'abonnement n'existe plus → purgé.
+     *
+     * 401/403 (signature VAPID refusée) ne purgent PAS : la même réponse vient d'une clé changée
+     * (abonnement créé avec l'ancienne clé, cas #96) ET d'une erreur de configuration du serveur
+     * (clé ou subject mal saisis, horloge décalée). Dans le second cas, purger supprimait en un
+     * passage de drain les abonnements de tout le club, pour une faute qui n'était pas la leur.
+     * Traités en échec transitoire, ils comptent dans la santé de l'appareil : l'écran des envois
+     * lève l'alerte d'échecs massifs, une configuration corrigée reprend les envois sans geste
+     * des adhérents, et un abonnement vraiment périmé tombe sous la purge des 5 échecs sans succès
+     * depuis 30 jours (PushChannel) — le navigateur, lui, se réabonne avec la bonne clé dès la
+     * prochaine ouverture (resources/js/push.js). Le reste (réseau, 429, 5xx) est transitoire.
      */
     public static function resultFor(MessageSentReport $report): PushDeliveryResult
     {
@@ -46,7 +51,7 @@ class MinishlinkWebPushSender implements WebPushSender
 
         $status = $report->getResponse()?->getStatusCode();
 
-        return in_array($status, [401, 403, 404, 410], true)
+        return in_array($status, [404, 410], true)
             ? PushDeliveryResult::expired()
             : PushDeliveryResult::failed();
     }

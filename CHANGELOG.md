@@ -273,6 +273,14 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Corrigé
 
+- **Une erreur de configuration du push ne désabonne plus tout le club.** Un refus de signature
+  (401/403) du service push, qui peut venir d'une clé mal saisie côté serveur, supprimait les
+  abonnements de tous les appareils en un passage. Il est désormais compté comme un échec : l'écran
+  des envois lève l'alerte, et tout repart une fois la configuration corrigée.
+
+- **Une notification « débrief d'une autre compétition » ouvre l'onglet Débriefs**, comme le bloc
+  « Derniers débriefs » de l'accueil, et non plus l'onglet Infos (#99).
+
 - **Un push parti vers aucun appareil ne se dit plus « envoyé ».** Sans appareil abonné (ou une fois
   tous désabonnés), l'envoi passe « sans destinataire » : filtrable et rejouable sur l'écran des
   envois, et toujours lisible sur la page Alertes. Idem pour un email sans adresse (#97).

@@ -102,10 +102,19 @@ class OutboxDrainer
             }
 
             if ($outcome === DeliveryOutcome::NoTarget) {
-                // Personne à qui l'envoyer (#97) : terminal, sans retry ni sent_at. Le payload est
-                // gardé intact — la ligne reste lisible sur la page Alertes et rejouable depuis
-                // l'écran des envois une fois un appareil abonné.
-                $line->update(['status' => 'no_target']);
+                // Personne à qui l'envoyer (#97) : terminal, sans retry ni sent_at. La ligne reste
+                // lisible sur la page Alertes et rejouable depuis l'écran des envois. Mais elle est
+                // terminale au même titre que `sent` : secrets et prénoms partent aussi, sinon le
+                // prénom d'un membre (« Léa a aimé ton débrief ») survivait indéfiniment, même à
+                // l'effacement de son compte. Le rendu retombe sans eux (sujet re-résolu par
+                // subject_id, compte de « j'aime » à la place des prénoms).
+                $line->update([
+                    'status' => 'no_target',
+                    'payload' => Arr::except($line->payload ?? [], [
+                        ...NotificationOutbox::SENSITIVE_PAYLOAD_KEYS,
+                        ...NotificationOutbox::VOLATILE_PAYLOAD_KEYS,
+                    ]),
+                ]);
                 $stats['no_target']++;
 
                 continue;
