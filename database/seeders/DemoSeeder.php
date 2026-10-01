@@ -786,9 +786,10 @@ class DemoSeeder extends Seeder
         }
 
         // --- Séances COMPÉTITION (PRD §4.7, §4.12) — toutes datées en RELATIF par rapport au seed ---
-        // On crée DEUX compétitions, le dimanche (les compétitions tombent le week-end) :
+        // On crée TROIS compétitions, le dimanche (les compétitions tombent le week-end) :
         //   • une PASSÉE (~10 j avant) → permet les débriefs (DebriefService exige hasStarted()) ;
-        //   • une FUTURE (~2 sem après) → visible directement au planning.
+        //   • une FUTURE (~2 sem après) → visible directement au planning ;
+        //   • une LOINTAINE (~7 mois après) → vue « Courses » sans borne haute.
         $triathlonM = EventType::where('label', 'Triathlon')->first();
 
         // Builder : crée une compétition + inscrit 5 athlètes adultes (insertion directe du statut
@@ -833,6 +834,8 @@ class DemoSeeder extends Seeder
         $futureCompStart = $now->copy()->addWeeks(2)->startOfWeek(Carbon::MONDAY)->next(Carbon::SUNDAY)->setTime(9, 0);
         $competition = $makeCompetition($pastCompStart, 'Triathlon M de printemps');
         $makeCompetition($futureCompStart, 'Triathlon M du lac');
+        // Une course lointaine (~7 mois) : la vue « Courses » du planning n'a pas de borne haute (#106).
+        $makeCompetition($now->copy()->addMonths(7)->startOfWeek(Carbon::MONDAY)->next(Carbon::SUNDAY)->setTime(9, 0), 'Triathlon M de la côte');
 
         // --- Débriefs sur la compétition PASSÉE (PRD §4.12) : 2 participants partagent leur ressenti ---
         $debriefTexts = [

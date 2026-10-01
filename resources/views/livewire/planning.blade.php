@@ -1,11 +1,13 @@
 {{-- Planning — porté de screen-planning.jsx (Desktop : grille 7 col ; Mobile : filtres + weeknav + liste/jour).
-     3 vues : semaine / jour / mois. Mois = calendrier à dots, Jour = timeline horaire. --}}
+     4 vues : jour / semaine / mois / courses. Mois = calendrier à dots, Jour = timeline horaire,
+     Courses = liste des compétitions sans navigation de période (#106). --}}
 @php
     // Granularité croissante (Jour → Mois). La vue par défaut reste Semaine (Planning::$view).
     $viewItems = [
         ['v' => 'day', 'l' => 'Jour'],
         ['v' => 'week', 'l' => 'Semaine'],
         ['v' => 'month', 'l' => 'Mois'],
+        ['v' => 'courses', 'l' => 'Courses'],
     ];
     $rangeLabel = $from->locale('fr')->isoFormat('D MMM') . ' — ' . $to->locale('fr')->isoFormat('D MMM');
     $weekIsCurrent = ($view === 'week') && ($from->isoWeek === now($tz)->isoWeek && $from->year === now($tz)->year);
@@ -30,21 +32,29 @@
                             </div>
                         @elseif ($view === 'month')
                             <div class="dsp" style="font-size:26px;text-transform:capitalize">{{ $from->locale('fr')->isoFormat('MMMM YYYY') }}</div>
+                        @elseif ($view === 'courses')
+                            <div class="dsp" style="font-size:26px">Courses</div>
+                            <div class="meta">Les compétitions du club</div>
                         @else
                             <div class="dsp" style="font-size:26px;text-transform:capitalize">{{ $from->locale('fr')->isoFormat('dddd D MMMM') }}</div>
                         @endif
                     </div>
+                    @unless ($view === 'courses')
                     <div class="weeknav">
                         <button wire:click="previous" class="iconbtn" aria-label="Précédent"><x-icon name="chevron-left" :size="18" /></button>
                         <button wire:click="today" class="weeknav-today">Aujourd'hui</button>
                         <button wire:click="next" class="iconbtn" aria-label="Suivant"><x-icon name="chevron-right" :size="18" /></button>
                     </div>
+                    @endunless
                 </div>
                 <x-segmented wire-method="setView" :value="$view" :items="$viewItems" />
             </div>
             {{-- Ligne 2 : filtres par activité + « Mes inscriptions ». --}}
             <div class="dk-plan-row2 flex ac g12">
-                <div class="dk-plan-filters flex g6">@include('livewire.partials.plan-filters')</div>
+                {{-- Filtres type/discipline sans objet en vue Courses (que des compétitions). --}}
+                @unless ($view === 'courses')
+                    <div class="dk-plan-filters flex g6">@include('livewire.partials.plan-filters')</div>
+                @endunless
                 <label class="planning-mine"><input type="checkbox" wire:model.live="mine"> Mes inscriptions</label>
             </div>
             {{-- Sélecteur de sujet parent (§4.2) — desktop : inline sous les filtres. --}}
@@ -94,7 +104,9 @@
 
         {{-- Filtres — TEMPORAIREMENT masqués sur mobile (classe is-hidden-temp, cf. app.css).
              Pour réafficher : retirer is-hidden-temp ici + la règle CSS associée. --}}
-        <div class="plan-filterrow flex g6 wrap is-hidden-temp">@include('livewire.partials.plan-filters')</div>
+        @unless ($view === 'courses')
+            <div class="plan-filterrow flex g6 wrap is-hidden-temp">@include('livewire.partials.plan-filters')</div>
+        @endunless
 
         {{-- WeekNav / MonthNav (semaine ou mois) --}}
         @if ($view === 'week')

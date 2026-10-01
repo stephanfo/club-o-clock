@@ -480,6 +480,72 @@ tous.push(s.report());
   tous.push(s32.report());
 }
 
+// ── S33 · #106 · Vue « Courses » du planning ──
+{
+  const s33 = new Scenario('S33 · Planning — vue Courses (à venir sans borne, passées de la saison)');
+  // Attendus dérivés de la base, avec le filtre de catégories de Marie (fallback ouvert sans catégorie).
+  const visible = `(NOT EXISTS (SELECT 1 FROM session_category sc WHERE sc.session_id=s.id)
+      OR EXISTS (SELECT 1 FROM session_category sc JOIN user_category uc ON uc.category_id=sc.category_id
+                 JOIN users u ON u.id=uc.user_id WHERE sc.session_id=s.id AND u.email='marie@demo.club')
+      OR NOT EXISTS (SELECT 1 FROM user_category uc JOIN users u ON u.id=uc.user_id WHERE u.email='marie@demo.club'))`;
+  const mois = Number(sql('SELECT season_start_month FROM club_settings')) || 9;
+  const t = new Date();
+  const saison = `${t.getMonth() + 1 >= mois ? t.getFullYear() : t.getFullYear() - 1}-${String(mois).padStart(2, '0')}-01`;
+  const titres = (q) => { const r = sql(q); return r ? r.split('\n') : []; };
+  const aVenir = titres(`SELECT title FROM sessions s WHERE kind='competition' AND start_at >= CURDATE() AND ${visible} ORDER BY start_at`);
+  const passees = titres(`SELECT title FROM sessions s WHERE kind='competition' AND start_at < CURDATE() AND start_at >= '${saison}' AND ${visible} ORDER BY start_at DESC`);
+  s33.check('jeu de démo : au moins une course à venir, dont une à plus de 6 mois', aVenir.length > 0
+    && Number(sql(`SELECT COUNT(*) FROM sessions s WHERE kind='competition' AND start_at > NOW() + INTERVAL 6 MONTH AND ${visible}`)) > 0);
+
+  for (const [nom, vp] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
+    const { ctx, page } = await session(browser, 'marie@demo.club', vp);
+    await page.goto(`${BASE}/planning`, { waitUntil: 'networkidle' });
+    const coque = page.locator(nom === 'mobile' ? '.planning-mobile' : '.planning-desktop');
+    await coque.locator('.seg-item', { hasText: 'Courses' }).click();
+    await page.waitForURL('**view=courses**');
+    await page.waitForLoadState('networkidle');
+    s33.check(`${nom} : segment « Courses » actif`, await coque.locator('.seg-item.on', { hasText: 'Courses' }).isVisible());
+    s33.check(`${nom} : pas de navigation de période`,
+      await page.locator('.weeknav:visible, .plan-weeknav:visible').count() === 0);
+
+    const lus = async (cle) => coque.locator(`[data-courses="${cle}"] .scard-row-title`).allInnerTexts();
+    const up = await lus('up');
+    s33.check(`${nom} : « À venir » = toutes les courses futures, date croissante`,
+      JSON.stringify(up) === JSON.stringify(aVenir), `${up.length} affichée(s) / ${aVenir.length}`);
+    const past = await lus('past');
+    s33.check(`${nom} : « Passées » = saison en cours, la plus récente en tête`,
+      JSON.stringify(past) === JSON.stringify(passees), `${past.length} affichée(s) / ${passees.length}`);
+
+    // Une course passée débriefée porte ses chips et ouvre l'onglet Débriefs.
+    const debriefee = coque.locator('[data-courses="past"] a[href*="tab=debriefs"]').first();
+    if (await debriefee.count()) {
+      const txt = await debriefee.innerText();
+      s33.check(`${nom} : la course débriefée affiche débriefs et participants`, /\d+ débrief/.test(txt) && /\d+ du club/.test(txt));
+    } else {
+      s33.check(`${nom} : aucune course passée débriefée cette saison (rien à contrôler)`, passees.length === 0 ||
+        Number(sql(`SELECT COUNT(*) FROM debriefs d JOIN sessions s ON s.id=d.session_id WHERE s.kind='competition' AND s.start_at >= '${saison}' AND d.archived_at IS NULL`)) === 0);
+    }
+    await s33.shot(page, `s33-planning-courses-${nom}`);
+    s33.checkJs(page);
+    await ctx.close();
+  }
+  // Garant de deux enfants (390px) : 3 pastilles + 4 vues sur la même rangée, sans chevauchement.
+  {
+    const garant = sql(`SELECT g.email FROM users c JOIN users g ON g.id=c.guardian_id GROUP BY g.email ORDER BY COUNT(*) DESC LIMIT 1`);
+    const { ctx, page } = await session(browser, garant, MOBILE);
+    await page.goto(`${BASE}/planning?view=courses`, { waitUntil: 'networkidle' });
+    const pastilles = page.locator('.plan-viewbar-m .plan-subj-pill');
+    const n = await pastilles.count();
+    const derniere = await pastilles.last().boundingBox();
+    const seg = await page.locator('.plan-viewbar-m .seg').boundingBox();
+    s33.check(`garant (${n} pastilles) : le segment ne chevauche pas la dernière pastille`,
+      n >= 2 && derniere && seg && derniere.x + derniere.width <= seg.x && seg.x + seg.width <= MOBILE.width);
+    await s33.shot(page, 's33-planning-courses-garant-mobile');
+    await ctx.close();
+  }
+  tous.push(s33.report());
+}
+
 await browser.close();
 const ok = tous.every(Boolean);
 console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES SCÉNARIOS RESPONSIVE PASSENT' : '❌ AU MOINS UN SCÉNARIO RESPONSIVE ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);

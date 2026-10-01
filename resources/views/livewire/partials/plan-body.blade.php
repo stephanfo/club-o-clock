@@ -1,4 +1,4 @@
-{{-- Corps planning partagé desktop/mobile pour les vues Mois / Jour.
+{{-- Corps planning partagé desktop/mobile pour les vues Mois / Jour / Courses.
      Semaine est rendue par les coquilles (grille desktop / liste-jour mobile). --}}
 
 @if ($view === 'month')
@@ -175,4 +175,6 @@
         </div>
     </div>
 
+@elseif ($view === 'courses')
+    @include('livewire.partials.plan-courses')
 @endif

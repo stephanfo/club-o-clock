@@ -6,6 +6,7 @@ use App\Livewire\Concerns\WithSubject;
 use App\Models\ClubSettings;
 use App\Models\Discipline;
 use App\Models\Session;
+use App\Support\RegistrantDisplay;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
@@ -13,7 +14,7 @@ use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-// Planning adhérent — 3 vues (semaine / jour / mois), mobile + desktop (PRD §4.7, ROADMAP_DEV J1).
+// Planning adhérent — 4 vues (jour / semaine / mois / courses), mobile + desktop (PRD §4.7, ROADMAP_DEV J1).
 // Fuseau club appliqué (invariant ROADMAP_DEV §30). Un parent garant peut consulter/inscrire un
 // enfant via le sélecteur de sujet (§4.2, shell.jsx SubjectSwitcher) — jamais d'impersonation.
 #[Layout('layouts.app')]
@@ -22,7 +23,7 @@ class Planning extends Component
 {
     use WithSubject;
 
-    public const VIEWS = ['week', 'day', 'month'];
+    public const VIEWS = ['week', 'day', 'month', 'courses'];
 
     #[Url]
     public string $view = 'week';
@@ -161,6 +162,11 @@ class Planning extends Component
     /** @return Collection<int, Session> */
     private function sessions(): Collection
     {
+        // La vue Courses a ses propres requêtes (courses()) : pas de fenêtre de dates.
+        if ($this->view === 'courses') {
+            return collect();
+        }
+
         [$from, $to] = $this->queryWindow();
 
         $query = Session::query()
@@ -190,6 +196,74 @@ class Planning extends Component
         $query->visibleToCategories($this->subject());
 
         return $query->get();
+    }
+
+    /**
+     * Vue « Courses » (#106) : liste des compétitions, sans grille ni fenêtre de dates. À venir =
+     * toutes les compétitions à partir d'aujourd'hui (pas de borne haute : en juin, on prépare
+     * septembre) ; passées = celles de la saison en cours, la plus récente en tête. Le jour même,
+     * une course reste « à venir » jusqu'à minuit, heure club.
+     *
+     * Filtres conservés : catégories et « Mes inscriptions » (sujet consulté) ; les filtres
+     * type/discipline n'ont pas de sens ici.
+     *
+     * @return array{0: Collection<int, Session>, 1: Collection<int, Session>}
+     */
+    private function courses(): array
+    {
+        $today = $this->now()->startOfDay();
+        $seasonStart = ClubSettings::current()->seasonStart($today);
+
+        $base = function () {
+            $query = Session::query()
+                ->where('kind', 'competition')
+                ->with(['discipline', 'eventType', 'location', 'coaches', 'registrations.user:id,first_name,last_name'])
+                ->visibleToCategories($this->subject());
+
+            if ($this->mine && auth()->check()) {
+                $userId = $this->subject()->id;
+                $query->whereHas('registrations', function ($q) use ($userId) {
+                    $q->where('user_id', $userId)->whereIn('status', ['participating', 'waitlist']);
+                });
+            }
+
+            return $query;
+        };
+
+        $upcoming = $base()
+            ->where('start_at', '>=', $today->copy()->utc())
+            ->orderBy('start_at')
+            ->get();
+
+        $past = $base()
+            ->withCount(['debriefs' => fn ($q) => $q->active()])
+            ->where('start_at', '>=', $seasonStart->copy()->utc())
+            ->where('start_at', '<', $today->copy()->utc())
+            ->orderByDesc('start_at')
+            ->get();
+
+        return [$upcoming, $past];
+    }
+
+    /**
+     * Prénoms des membres du club qui participent, par course (§4.9.4) : prénom + initiale entre
+     * athlètes, nom complet pour un coach/admin — même règle que la fiche séance.
+     *
+     * @param  Collection<int, Session>  $courses
+     * @return array<int, list<string>>
+     */
+    private function participantNames(Collection $courses): array
+    {
+        $viewer = auth()->user();
+        $staff = $viewer !== null && ($viewer->hasRole('coach') || $viewer->hasRole('admin'));
+
+        return $courses->mapWithKeys(function (Session $s) use ($staff, $viewer) {
+            $users = $s->registrations->where('status', 'participating')->map(fn ($r) => $r->user);
+            $full = $staff || ($viewer !== null && $s->coaches->contains('id', $viewer->id));
+            $labels = RegistrantDisplay::labels($users, $full);
+
+            return [$s->id => array_values($labels)];
+        })->all();
     }
 
     /**
@@ -242,7 +316,13 @@ class Planning extends Component
 
         $todayStr = $this->now()->toDateString();
 
+        [$coursesUpcoming, $coursesPast] = $this->view === 'courses' ? $this->courses() : [collect(), collect()];
+
         return view('livewire.planning', [
+            'coursesUpcoming' => $coursesUpcoming,
+            'coursesPast' => $coursesPast,
+            'courseNames' => $this->participantNames($coursesUpcoming->concat($coursesPast)),
+            'seasonStart' => ClubSettings::current()->seasonStart($this->now()),
             'sessions' => $sessions,
             'grouped' => $grouped,
             'weekDays' => $weekDays,

@@ -433,6 +433,14 @@ Pendant de l'annulation, pour le cas qu'elle ne couvre pas : la séance qui **n'
 #### Inscription anticipée
 **Pas de limite haute** : un athlète peut s'inscrire à n'importe quelle distance dans le futur. L'horizon est borné de fait par la plage de génération des `SessionTemplate`.
 
+#### Vue « Courses » du planning
+Une compétition se prépare sur plusieurs mois, là où le planning se lit à la semaine. Le sélecteur de vues du planning porte donc un quatrième segment, **Courses** (Jour / Semaine / Mois / Courses), sur mobile comme sur desktop. C'est **une liste, pas une grille** : ni flèches précédent / suivant ni titre de période, et les filtres par type et par discipline n'y ont pas cours.
+- **À venir** : toutes les `competition` à partir d'aujourd'hui (une course du jour y reste jusqu'à minuit, heure club), **sans borne haute** — en juin, on prépare les courses de septembre. Tri par date croissante.
+- **Passées** : celles de la **saison en cours** seulement (§4.4), de la plus récente à la plus ancienne. Chaque ligne indique le **nombre de débriefs** actifs et la présence d'un **album photos** ; elle ouvre directement l'onglet Débriefs quand il y en a. C'est l'archive des débriefs ; la nouveauté reste mise en avant sur l'accueil (§4.12.5).
+- **Chaque ligne** : nom, date, type d'épreuve, distance et lieu ; le **nombre de membres du club** qui y participent et leurs noms selon la convention §4.9.4 ; l'intention du sujet consulté (« Tu participes » / « Tu y étais », liste d'attente).
+- Les compétitions **annulées** restent visibles et marquées comme telles.
+- Mêmes règles que le reste du planning pour le **filtrage par catégorie** (§4.5), la **vue parent** (§4.2) et « Mes inscriptions ».
+
 ### 4.8 Générateur de séances récurrentes (`SessionTemplate`)
 
 **Pas de récurrence iCal (RRULE/EXDATE) en V1.** Modèle alternatif : générateur persisté qui produit des `Session` **indépendantes** en base.
