@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Club'O'Clock — le planning d'entraînement de ton club</title>
-<meta name="description" content="Application web libre de gestion du planning d'entraînement pour club sportif associatif : inscriptions, liste d'attente, quotas, tutelle parentale et notifications. Une instance par club, tes données restent chez toi.">
+<title>Club'O'Clock — logiciel libre et gratuit de planning d'entraînement pour club sportif</title>
+<meta name="description" content="Application web libre et gratuite de gestion du planning d'entraînement pour club sportif associatif (triathlon, course à pied, natation…) : inscriptions, liste d'attente, quotas, tutelle parentale et notifications. Une instance par club, tes données restent chez toi.">
+<link rel="canonical" href="https://cluboclock.ratelet.fr/">
 
 <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <meta name="theme-color" content="#4338CA">
@@ -20,6 +21,44 @@
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="fr_FR">
 <meta name="twitter:card" content="summary_large_image">
+
+<!-- Données structurées : décrivent le logiciel aux moteurs de recherche (catégorie, gratuité,
+     licence). La FAQ en bas de page a son pendant ici — les deux doivent rester identiques. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "Club'O'Clock",
+      "url": "https://cluboclock.ratelet.fr/",
+      "description": "Application web libre de gestion du planning d'entraînement pour club sportif associatif : inscriptions, liste d'attente, quotas, tutelle parentale et notifications.",
+      "applicationCategory": "BusinessApplication",
+      "applicationSubCategory": "Gestion de club sportif",
+      "operatingSystem": "Web, Android, iOS (PWA)",
+      "inLanguage": "fr",
+      "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+      "image": "https://cluboclock.ratelet.fr/assets/og.png",
+      "screenshot": "https://cluboclock.ratelet.fr/img/planning-semaine.png",
+      "codeRepository": "https://github.com/stephanfo/club-o-clock",
+      "sameAs": ["https://github.com/stephanfo/club-o-clock"]
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {"@type": "Question", "name": "Combien ça coûte ?", "acceptedAnswer": {"@type": "Answer", "text": "Rien pour le logiciel : il est libre, sous licence AGPL, sans abonnement ni coût par adhérent. Le club ne paie que son hébergement — un mutualisé PHP et MySQL ordinaire suffit — et, s'il en utilise un, son service d'envoi d'email."}},
+        {"@type": "Question", "name": "Pour quels sports ?", "acceptedAnswer": {"@type": "Answer", "text": "Il est né dans un club de triathlon (natation, vélo, course à pied), mais les disciplines, catégories d'âge et types d'épreuve sont des catalogues que le club paramètre. Tout club qui propose des séances d'entraînement avec inscription peut s'en servir."}},
+        {"@type": "Question", "name": "Faut-il un informaticien ?", "acceptedAnswer": {"@type": "Answer", "text": "Pour l'installation, quelqu'un d'à l'aise avec un hébergement web : déposer le code, remplir un fichier de configuration, programmer une tâche planifiée. Ensuite, tout se gère depuis l'interface : séances, adhérents, rôles, paramètres du club."}},
+        {"@type": "Question", "name": "Les adhérents doivent-ils installer une application ?", "acceptedAnswer": {"@type": "Answer", "text": "Non : elle s'ouvre dans le navigateur du téléphone, sans passer par un store. Chacun peut l'ajouter à son écran d'accueil pour l'utiliser comme une application, notifications comprises."}},
+        {"@type": "Question", "name": "Pour quelle taille de club ?", "acceptedAnswer": {"@type": "Answer", "text": "Elle est pensée pour un club associatif de 50 à 150 adhérents, administré par des bénévoles. Les mineurs sont gérés par leurs parents, puis prennent leur compte en main en grandissant."}},
+        {"@type": "Question", "name": "Et les données des adhérents ?", "acceptedAnswer": {"@type": "Answer", "text": "Elles restent chez le club, sur son hébergement : aucun tiers n'y a accès. L'application ne stocke ni numéro de téléphone ni certificat médical, et un adhérent peut demander la suppression de son compte."}}
+      ]
+    }
+  ]
+}
+</script>
 
 <link rel="preload" as="font" type="font/woff2" crossorigin href="/assets/manrope-latin-variable.woff2">
 <link rel="stylesheet" href="/style.css">
@@ -347,6 +386,49 @@
       <p style="margin-top: var(--space-8);">
         <a class="btn btn-outline" href="/doc/INSTALL">Guide d'installation complet</a>
       </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Questions fréquentes</span>
+        <h2>Ce que demandent les clubs avant de se lancer</h2>
+      </div>
+
+      <!-- Le texte de ces questions est repris tel quel dans le JSON-LD « FAQPage » de l'en-tête :
+           modifier l'un sans l'autre fait diverger ce que voient les moteurs et les visiteurs. -->
+      <div class="feats">
+        <article class="feat">
+          <h3>Combien ça coûte&nbsp;?</h3>
+          <p>Rien pour le logiciel : il est libre, sous licence AGPL, sans abonnement ni coût par adhérent. Le club ne paie que son hébergement — un mutualisé PHP et MySQL ordinaire suffit — et, s'il en utilise un, son service d'envoi d'email.</p>
+        </article>
+
+        <article class="feat">
+          <h3>Pour quels sports&nbsp;?</h3>
+          <p>Il est né dans un club de triathlon (natation, vélo, course à pied), mais les disciplines, catégories d'âge et types d'épreuve sont des catalogues que le club paramètre. Tout club qui propose des séances d'entraînement avec inscription peut s'en servir.</p>
+        </article>
+
+        <article class="feat">
+          <h3>Faut-il un informaticien&nbsp;?</h3>
+          <p>Pour l'installation, quelqu'un d'à l'aise avec un hébergement web : déposer le code, remplir un fichier de configuration, programmer une tâche planifiée. Ensuite, tout se gère depuis l'interface : séances, adhérents, rôles, paramètres du club.</p>
+        </article>
+
+        <article class="feat">
+          <h3>Les adhérents doivent-ils installer une application&nbsp;?</h3>
+          <p>Non : elle s'ouvre dans le navigateur du téléphone, sans passer par un store. Chacun peut l'ajouter à son écran d'accueil pour l'utiliser comme une application, notifications comprises.</p>
+        </article>
+
+        <article class="feat">
+          <h3>Pour quelle taille de club&nbsp;?</h3>
+          <p>Elle est pensée pour un club associatif de 50 à 150 adhérents, administré par des bénévoles. Les mineurs sont gérés par leurs parents, puis prennent leur compte en main en grandissant.</p>
+        </article>
+
+        <article class="feat">
+          <h3>Et les données des adhérents&nbsp;?</h3>
+          <p>Elles restent chez le club, sur son hébergement : aucun tiers n'y a accès. L'application ne stocke ni numéro de téléphone ni certificat médical, et un adhérent peut demander la suppression de son compte.</p>
+        </article>
+      </div>
     </div>
   </section>
 
