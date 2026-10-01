@@ -546,28 +546,18 @@ tous.push(s.report());
   tous.push(s33.report());
 }
 
-// ── S34 · #105 · Ouverture des inscriptions : accueil, vue Courses, fiche, formulaire ──
+// ── S34 · #105 · Ouverture des inscriptions : vue Courses, fiche, formulaire (pas l'accueil) ──
 {
-  const s34 = new Scenario('S34 · Ouverture des inscriptions — accueil, Courses, fiche, formulaire');
-  // Attendus dérivés : compétitions à venir non annulées dont l'ouverture tombe entre J-3 et J+14.
-  const fenetre = `kind='competition' AND cancelled_at IS NULL AND start_at > NOW()
-      AND registration_opens_at BETWEEN CURDATE() - INTERVAL 3 DAY AND NOW() + INTERVAL 14 DAY`;
-  const n = Number(sql(`SELECT COUNT(*) FROM sessions WHERE ${fenetre}`));
-  const [id, titre] = ligne(`SELECT id, title FROM sessions WHERE ${fenetre} AND registration_opens_at > NOW() ORDER BY registration_opens_at LIMIT 1`,
-    'une compétition dont les inscriptions ouvrent bientôt');
-  s34.check('jeu de démo : des ouvertures dans la fenêtre d\'accueil', n > 0);
+  const s34 = new Scenario('S34 · Ouverture des inscriptions — Courses, fiche, formulaire, absente de l\'accueil');
+  const [id] = ligne(`SELECT id FROM sessions WHERE kind='competition' AND cancelled_at IS NULL AND start_at > NOW()
+      AND registration_opens_at > NOW() ORDER BY registration_opens_at LIMIT 1`, 'une compétition dont les inscriptions ouvrent bientôt');
 
   for (const [nom, vp] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
     const { ctx, page } = await session(browser, 'marie@demo.club', vp);
+    // Accueil : réservé aux débriefs (choix du 01/10), aucune ouverture n'y figure.
     await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
-    const coque = page.locator(nom === 'mobile' ? '.home-mobile' : '.home-desktop');
-    const lignes = coque.locator('[data-ouverture]');
-    s34.check(`${nom} : accueil — une ligne par ouverture`, await lignes.count() === n, `${await lignes.count()} / ${n}`);
-    const cible = coque.locator(`[data-ouverture="${id}"]`);
-    s34.check(`${nom} : accueil — la ligne dit quand ouvrent les inscriptions`,
-      (await cible.innerText()).includes(titre) && /Inscriptions (le|aujourd)/.test(await cible.innerText()));
-    await cible.scrollIntoViewIfNeeded();
-    await s34.shot(page, `s34-accueil-ouvertures-${nom}`);
+    s34.check(`${nom} : accueil — aucune ouverture d'inscriptions`,
+      await page.locator('[data-inscriptions], [data-ouverture]').count() === 0);
 
     await page.goto(`${BASE}/planning?view=courses`, { waitUntil: 'networkidle' });
     const pc = page.locator(nom === 'mobile' ? '.planning-mobile' : '.planning-desktop');

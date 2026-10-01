@@ -1,6 +1,6 @@
 {{-- État des inscriptions officielles d'une compétition (#105, PRD §4.7). Rien sans date d'ouverture,
      sur une course annulée ou déjà partie (Session::registrationState).
-     variant : chip (listes : vue Courses, accueil) | text (fiche, à côté du lien organisateur). --}}
+     variant : chip (vue Courses du planning) | text (fiche, à côté du lien organisateur). --}}
 @props(['session', 'variant' => 'chip'])
 @php
     $state = $session->registrationState();

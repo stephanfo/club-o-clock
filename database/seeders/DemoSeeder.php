@@ -836,7 +836,7 @@ class DemoSeeder extends Seeder
         $lac = $makeCompetition($futureCompStart, 'Triathlon M du lac');
         // Une course lointaine (~7 mois) : la vue « Courses » du planning n'a pas de borne haute (#106).
         $cote = $makeCompetition($now->copy()->addMonths(7)->startOfWeek(Carbon::MONDAY)->next(Carbon::SUNDAY)->setTime(9, 0), 'Triathlon M de la côte');
-        // Ouverture des inscriptions (#105) : deux états visibles à l'accueil et dans la vue Courses —
+        // Ouverture des inscriptions (#105) : deux états visibles dans la vue Courses et sur la fiche —
         // ouvertes depuis 2 jours (date seule, déjà passée : marquée notifiée), ouvrent dans 5 jours à 10 h.
         $clubNow = $now->copy()->setTimezone(ClubSettings::current()->timezone);
         $lac->forceFill([

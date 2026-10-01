@@ -44,31 +44,6 @@ class Home extends Component
             ->values();
     }
 
-    /**
-     * Inscriptions qui ouvrent (#105) : compétitions à venir, non annulées, dont l'ouverture tombe
-     * entre J-3 et J+14 — au-delà de 3 jours, une course prisée a pu se remplir, la fiche le dit.
-     * Filtrées par catégorie du sujet (§4.5), comme la notification : on n'annonce que ce qui le concerne.
-     *
-     * @return Collection<int, Session>
-     */
-    private function openings(Carbon $now, ?User $subject)
-    {
-        return Session::query()
-            ->where('kind', 'competition')
-            ->whereNull('cancelled_at')
-            ->where('start_at', '>', $now->copy()->utc())
-            ->whereBetween('registration_opens_at', [
-                $now->copy()->startOfDay()->subDays(Session::OPENING_RECENT_DAYS)->utc(),
-                $now->copy()->addDays(Session::OPENING_HOME_BEFORE_DAYS)->utc(),
-            ])
-            ->visibleToCategories($subject)
-            ->orderBy('registration_opens_at')
-            ->get()
-            ->filter(fn (Session $s) => in_array($s->registrationState(), ['today', 'upcoming', 'open'], true))
-            ->take(5)
-            ->values();
-    }
-
     public function render()
     {
         $tz = $this->tz();
@@ -129,7 +104,6 @@ class Home extends Component
                 ->get(),
             // « Côté courses » (§4.12.5, #104) : compétitions débriefées depuis moins de 15 jours.
             // Lu par tout le club, sans filtre de catégorie (cohérent avec l'annonce #111).
-            'openings' => $this->openings($now, $subject),
             'recentDebriefs' => $this->recentDebriefs($nowUtc->copy()->subDays(self::DEBRIEFS_RECENTS_JOURS)),
             'weekCount' => Session::whereNull('cancelled_at')
                 ->whereBetween('start_at', [$now->copy()->startOfWeek(Carbon::MONDAY)->utc(), $now->copy()->endOfWeek(Carbon::SUNDAY)->utc()])

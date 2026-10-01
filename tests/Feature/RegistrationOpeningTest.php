@@ -21,7 +21,7 @@ use Tests\TestCase;
 
 /**
  * Ouverture des inscriptions aux compétitions (#105, PRD §4.7 et §4.15.2) : date et heure
- * facultative sur la compétition, état affiché (fiche, vue Courses, accueil de J-14 à J+3),
+ * facultative sur la compétition, état affiché (fiche, vue Courses — pas l'accueil),
  * notification à la catégorie ciblée 15 min avant l'heure — 9 h heure club sans heure —, jamais
  * en double, jamais sur une course annulée ni en retard, replanifiée quand la date change.
  */
@@ -264,24 +264,22 @@ class RegistrationOpeningTest extends TestCase
             ->assertSee('Inscriptions le jeu. 15 oct. à 10:00');
     }
 
-    public function test_home_lists_openings_from_fourteen_days_before_to_three_days_after(): void
+    public function test_home_does_not_show_openings(): void
     {
-        $seniors = $this->category('Sénior', 2);
-        $masters = $this->category('Master', 4);
+        // Choix de Stéphane (01/10) : l'accueil reste aux débriefs ; les courses à venir ont la vue Courses.
+        $this->course('2026-10-13 10:00', title: 'Ouvre demain');
+
         $u = User::factory()->create();
-        $u->categories()->attach($seniors->id);
 
-        $this->course('2026-10-20 10:00', title: 'Ouvre dans 8 jours');
-        $this->course('2026-10-10 10:00', title: 'Ouverte avant-hier');
-        $this->course('2026-11-05 10:00', title: 'Ouvre dans 24 jours');
-        $this->course('2026-10-05 10:00', title: 'Ouverte il y a 7 jours');
-        $this->course('2026-10-20 10:00', categoryIds: [$masters->id], title: 'Course des masters');
+        // Contrôle positif : la course et son état existent bien, dans la vue Courses.
+        Livewire::withQueryParams(['view' => 'courses'])->actingAs($u)->test(Planning::class)
+            ->assertSee('Ouvre demain')
+            ->assertSee('Inscriptions le');
 
+        // Sur l'accueil, la course peut figurer comme « Prochaine » séance (héros) : seul son état
+        // d'inscriptions, et le bloc des ouvertures, en sont absents.
         Livewire::actingAs($u)->test(Home::class)
-            ->assertSee('Côté courses')
-            ->assertSeeInOrder(['Ouverte avant-hier', 'Inscriptions ouvertes', 'Ouvre dans 8 jours', 'Inscriptions le mar. 20 oct.'])
-            ->assertDontSee('Ouvre dans 24 jours')
-            ->assertDontSee('Ouverte il y a 7 jours')
-            ->assertDontSee('Course des masters');
+            ->assertDontSee('Inscriptions le')
+            ->assertDontSee('data-inscriptions', false);
     }
 }

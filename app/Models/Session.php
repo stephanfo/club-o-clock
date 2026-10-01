@@ -22,9 +22,6 @@ class Session extends Model
     /** Jours pendant lesquels des inscriptions ouvertes se disent « ouvertes » (puis « peut-être complet »). */
     public const OPENING_RECENT_DAYS = 3;
 
-    /** Fenêtre d'affichage à l'accueil : de J-14 avant l'ouverture à J+3 après (#105). */
-    public const OPENING_HOME_BEFORE_DAYS = 14;
-
     protected $fillable = [
         'kind', 'title', 'discipline_id', 'start_at', 'duration_min',
         'location_id', 'location_text', 'capacity', 'visibility',
