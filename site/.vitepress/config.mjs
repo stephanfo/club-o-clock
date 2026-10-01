@@ -1,6 +1,20 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitepress'
 
+const SITE = 'https://cluboclock.ratelet.fr'
+
+// Pages utiles au dépôt mais sans intérêt pour un club qui cherche un outil : plans de test,
+// identifiants de démo, notes d'exploitation, poste de développement. Indexées, elles
+// concurrenceraient la vitrine et la documentation d'installation dans les résultats de
+// recherche. Elles restent publiées et liées — seulement exclues des moteurs et du sitemap.
+const NON_INDEXEES = [
+  'doc/PLAN_TESTS.md',
+  'doc/PLAN_TESTS_MEMBRES.md',
+  'doc/COMPTES_DEMO.md',
+  'doc/RETOURS_TERRAIN.md',
+  'doc/DOCKER_LOCAL.md',
+]
+
 // Configuration du site de documentation.
 //
 // Le parti pris central : les fichiers Markdown ne bougent pas. Ils restent dans `doc/` et à la
@@ -60,6 +74,31 @@ export default defineConfig({
   appearance: false,
 
   lastUpdated: true,
+
+  // Le robots.txt (écrit par build-local.sh) annonce ce sitemap : sans cette option, l'URL
+  // annoncée répondait 404.
+  sitemap: {
+    hostname: SITE,
+    transformItems: (items) => [
+      // La vitrine n'est pas une page VitePress (elle écrase l'index au montage) : il faut
+      // l'ajouter à la main, et en tête — c'est la page qu'on veut voir sortir.
+      { url: '', changefreq: 'monthly', priority: 1.0 },
+      ...items.filter((i) => !NON_INDEXEES.some((p) => i.url === p.replace(/\.md$/, '.html'))),
+    ],
+  },
+
+  // URL canonique de chaque page, et `noindex` sur les pages listées plus haut. `follow` reste
+  // permis : les liens qu'elles contiennent vers l'installation ou le PRD comptent toujours.
+  transformHead: ({ pageData }) => {
+    const chemin = pageData.relativePath
+      .replace(/(^|\/)index\.md$/, '$1')
+      .replace(/\.md$/, '.html')
+    const tetes = [['link', { rel: 'canonical', href: `${SITE}/${chemin}` }]]
+    if (NON_INDEXEES.includes(pageData.relativePath)) {
+      tetes.push(['meta', { name: 'robots', content: 'noindex, follow' }])
+    }
+    return tetes
+  },
 
   // Volontairement laissé à `false` (le défaut) : un lien mort fait échouer le build. C'est le
   // filet qui remplace la relecture manuelle des quarante liens croisés.
