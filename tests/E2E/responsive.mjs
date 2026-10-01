@@ -431,6 +431,55 @@ tous.push(s.report());
   tous.push(s31.report());
 }
 
+// ── S32 · #104 · « Côté courses » à l'accueil + badge débriefs sur le planning ──
+{
+  const s32 = new Scenario('S32 · Côté courses — accueil et badge débriefs du planning');
+  // Cible dérivée : la compétition au débrief actif le plus récent (le jeu de démo en sème à l'instant du seed).
+  const [id, title, j, n] = ligne(`SELECT s.id, s.title, DATE(s.start_at) j, COUNT(*) n FROM sessions s JOIN debriefs d ON d.session_id=s.id
+      WHERE d.archived_at IS NULL AND d.created_at >= NOW() - INTERVAL 15 DAY
+      GROUP BY s.id, s.title, j ORDER BY MAX(d.created_at) DESC LIMIT 1`, 'une compétition débriefée récemment');
+  const c = { id, title, j, n };
+
+  for (const [nom, vp] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
+    const { ctx, page } = await session(browser, 'marie@demo.club', vp);
+    await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+    const coque = page.locator(nom === 'mobile' ? '.home-mobile' : '.home-desktop');
+    const bloc = coque.locator('.sect-head', { hasText: 'Côté courses' });
+    s32.check(`${nom} : bloc « Côté courses » visible`, await bloc.isVisible());
+    const lien = coque.locator(`a[href*="/seances/${c.id}?tab=debriefs"]`);
+    s32.check(`${nom} : la ligne nomme la compétition et ses débriefs`,
+      (await lien.innerText()).includes(c.title) && (await lien.innerText()).includes(`${c.n} débrief`));
+    await bloc.scrollIntoViewIfNeeded();
+    await s32.shot(page, `s32-accueil-courses-${nom}`);
+    await lien.click();
+    await page.waitForURL(`**/seances/${c.id}**`);
+    await page.waitForLoadState('networkidle');
+    // Mobile : onglet Débriefs ouvert. Desktop : pas d'onglets, ?tab= fait défiler jusqu'à la section.
+    const ouvert = nom === 'mobile'
+      ? await page.locator('[x-show="tab === \'debriefs\'"]').first().isVisible()
+      : await page.locator('.fiche-desktop [data-section="debriefs"]').evaluate(el => {
+          const r = el.getBoundingClientRect();
+          return r.top >= -1 && r.top < window.innerHeight;
+        });
+    s32.check(`${nom} : la ligne ouvre les débriefs de la fiche`, ouvert);
+    s32.checkJs(page);
+    await ctx.close();
+  }
+
+  // Badge du planning (vue semaine sur le jour de la compétition) — contrôle positif + négatif.
+  const { ctx, page } = await session(browser, 'marie@demo.club', DESKTOP);
+  await page.goto(`${BASE}/planning?view=week&anchor=${c.j}`, { waitUntil: 'networkidle' });
+  const carte = page.locator(`a.scard[href$="/seances/${c.id}"]`).first();
+  s32.check('planning : la carte porte le nombre de débriefs', (await carte.innerText()).includes(`${c.n} débrief`));
+  const sans = sql(`SELECT COUNT(*) FROM sessions WHERE DATE(start_at)='${c.j}' AND id<>${c.id}
+      AND NOT EXISTS (SELECT 1 FROM debriefs d WHERE d.session_id=sessions.id AND d.archived_at IS NULL)`);
+  s32.check('planning : seule la carte débriefée porte un badge',
+    await page.locator('a.scard:visible', { hasText: 'débrief' }).count() === 1, `${sans} autre(s) séance(s) ce jour`);
+  await s32.shot(page, 's32-planning-badge-desktop');
+  await ctx.close();
+  tous.push(s32.report());
+}
+
 await browser.close();
 const ok = tous.every(Boolean);
 console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES SCÉNARIOS RESPONSIVE PASSENT' : '❌ AU MOINS UN SCÉNARIO RESPONSIVE ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);

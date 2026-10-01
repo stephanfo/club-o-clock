@@ -95,6 +95,7 @@
             </div>
             @include('livewire.partials.home-quotas')
             @include('livewire.partials.home-apero')
+            @include('livewire.partials.home-courses')
         </div>
     </div>
 
@@ -191,6 +192,7 @@
                     </div>
                     @include('livewire.partials.home-quotas')
                     @include('livewire.partials.home-apero')
+                    @include('livewire.partials.home-courses')
                 </div>
             </div>
         </div>
