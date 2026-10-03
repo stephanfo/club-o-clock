@@ -32,6 +32,44 @@ class PlanningWeekViewTest extends TestCase
         ]);
     }
 
+    /**
+     * #123 — la carte desktop de la vue Semaine (variant week) n'affichait que « Tu participes » /
+     * « Liste d'attente » : un coach encadrant n'y voyait pas « Tu encadres », présent partout ailleurs.
+     */
+    public function test_week_desktop_card_shows_coach_badge_before_participation(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $session = $this->sessionOn(Carbon::now()->addDay()->setTime(18, 0), 'Fractionné');
+        $session->coaches()->attach($coach->id);
+        Registration::create([
+            'session_id' => $session->id, 'user_id' => $coach->id,
+            'status' => 'participating', 'registered_at' => Carbon::now(),
+        ]);
+        $tz = ClubSettings::current()->timezone;
+
+        $this->actingAs($coach);
+        $html = (string) $this->blade('<x-session-card :session="$s" :tz="$tz" variant="week" />',
+            ['s' => $session->load('coaches', 'registrations'), 'tz' => $tz]);
+
+        $this->assertStringContainsString('Fractionné', $html);
+        $this->assertStringContainsString('Tu encadres', $html);
+        // Le badge coach prime : pas de second chip « Tu participes » sur la même carte.
+        $this->assertStringNotContainsString('Tu participes', $html);
+
+        // Refus : un autre compte inscrit ne voit pas « Tu encadres ».
+        $athlete = User::factory()->create();
+        Registration::create([
+            'session_id' => $session->id, 'user_id' => $athlete->id,
+            'status' => 'participating', 'registered_at' => Carbon::now(),
+        ]);
+        $this->actingAs($athlete);
+        $html = (string) $this->blade('<x-session-card :session="$s" :tz="$tz" variant="week" />',
+            ['s' => $session->fresh()->load('coaches', 'registrations'), 'tz' => $tz]);
+
+        $this->assertStringContainsString('Tu participes', $html);
+        $this->assertStringNotContainsString('Tu encadres', $html);
+    }
+
     public function test_each_mobile_day_group_is_keyed_on_its_date(): void
     {
         $monday = Carbon::now()->startOfWeek();

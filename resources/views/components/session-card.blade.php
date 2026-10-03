@@ -89,6 +89,8 @@
         <div class="meta" style="font-size:11px;margin-top:3px">{{ $full ? 'complet' : $insLabel }}</div>
         @if ($cancelled)
             <span class="chip chip-sm chip-pink" style="margin-top:6px">Annulée</span>
+        @elseif ($mineCoach)
+            <span class="chip chip-sm" style="margin-top:6px;background:var(--ink);color:var(--paper)"><x-icon name="whistle" :size="11" /> Tu encadres</span>
         @elseif ($effectiveStatus === 'participating')
             <span class="chip chip-sm chip-green" style="margin-top:6px"><x-icon name="check" :size="11" /> {{ $participeLabel }}</span>
         @elseif ($effectiveStatus === 'waitlist')
