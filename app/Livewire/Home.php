@@ -71,12 +71,16 @@ class Home extends Component
         // « Mes prochaines séances » : celles où le SUJET est inscrit, place ferme (participating)
         // OU liste d'attente (waitlist). La carte de séance affiche le chip de statut distinct.
         // Le héros ($next) reste la prochaine séance du club ; cette liste est personnelle.
+        // S'y ajoutent les séances que le sujet ENCADRE (session_coach, sans Registration) : la carte
+        // les marque « Tu encadres » (retour terrain — elles manquaient à l'accueil d'un coach).
         $myUpcoming = $uid
             ? Session::query()
                 ->with(['discipline', 'location', 'registrations', 'activeAperoFlags', 'quotaTag', 'coaches'])
                 ->whereNull('cancelled_at')
                 ->where('start_at', '>=', $nowUtc)
-                ->whereHas('registrations', fn ($q) => $q->where('user_id', $uid)->whereIn('status', ['participating', 'waitlist']))
+                ->where(fn ($q) => $q
+                    ->whereHas('registrations', fn ($r) => $r->where('user_id', $uid)->whereIn('status', ['participating', 'waitlist']))
+                    ->orWhereHas('coaches', fn ($c) => $c->whereKey($uid)))
                 ->orderBy('start_at')
                 ->limit(6)
                 ->get()
