@@ -81,6 +81,21 @@ class HomeUpcomingTest extends TestCase
             ->assertViewHas('myUpcoming', fn ($my) => $my->pluck('title')->all() === ['Liste attente']);
     }
 
+    public function test_coached_session_is_listed_in_my_upcoming(): void
+    {
+        // Retour terrain : un coach inscrit comme encadrant (session_coach, pas de Registration)
+        // voyait « Tu encadres » au planning mais pas la séance sur l'accueil.
+        $coach = User::factory()->coach()->create();
+        $this->makeSession('Héros club', Carbon::now()->addDays(1));
+        $encadree = $this->makeSession('Encadrée', Carbon::now()->addDays(2));
+        $this->makeSession('Autre', Carbon::now()->addDays(3));
+        $encadree->coaches()->attach($coach->id);
+
+        Livewire::actingAs($coach)->test(Home::class)
+            ->assertViewHas('myUpcoming', fn ($my) => $my->pluck('title')->all() === ['Encadrée'])
+            ->assertSee('Tu encadres');
+    }
+
     public function test_cancelled_registration_is_excluded_from_my_upcoming(): void
     {
         $athlete = User::factory()->create();

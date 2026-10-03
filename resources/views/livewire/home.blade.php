@@ -83,7 +83,7 @@
             <div>
                 <div class="sect-head"><span class="sect-title">Mes prochaines séances</span><span class="meta mlauto">{{ $myUpcoming->count() }}</span></div>
                 @if ($myUpcoming->isEmpty())
-                    <div class="card card-pad meta" style="text-align:center">{{ $subjectFirstName ? "Aucune séance à venir où {$subjectFirstName} est inscrit·e." : 'Aucune séance à venir où tu es inscrit·e.' }}</div>
+                    <div class="card card-pad meta" style="text-align:center">{{ $subjectFirstName ? "Aucune séance à venir où {$subjectFirstName} est inscrit·e." : 'Aucune séance à venir où tu es inscrit·e ou encadrant·e.' }}</div>
                 @else
                     <div style="display:flex;flex-direction:column;gap:10px">
                         @foreach ($myUpcoming as $s)
@@ -169,7 +169,7 @@
                     {{-- Prochaines séances --}}
                     <div class="sect-head" style="margin-top:var(--space-5)"><span class="sect-title">Mes prochaines séances</span></div>
                     @if ($myUpcoming->isEmpty())
-                        <div class="card card-pad"><div class="meta">{{ $subjectFirstName ? "Aucune séance à venir où {$subjectFirstName} est inscrit·e." : 'Aucune séance à venir où tu es inscrit·e.' }}</div></div>
+                        <div class="card card-pad"><div class="meta">{{ $subjectFirstName ? "Aucune séance à venir où {$subjectFirstName} est inscrit·e." : 'Aucune séance à venir où tu es inscrit·e ou encadrant·e.' }}</div></div>
                     @else
                         <div class="home-cards">
                             @foreach ($myUpcoming as $s)
