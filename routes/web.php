@@ -25,7 +25,6 @@ use App\Livewire\Admin\Outbox;
 use App\Livewire\Admin\TemplateForm;
 use App\Livewire\Admin\TemplateList;
 use App\Livewire\Alerts;
-use App\Livewire\Allures;
 use App\Livewire\GpxRouteForm;
 use App\Livewire\GpxRouteLibrary;
 use App\Livewire\GpxRouteShow;
@@ -93,8 +92,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Profil utilisateur — compte courant (J8.4, PRD §4.15.3/.4, §4.10, §4.1.1). Self only.
     Route::get('/profil', Profil::class)->name('profil');
-    // Allures course (#114) : VMA du profil, allures par zone, estimation, projection.
-    Route::get('/allures', Allures::class)->name('allures');
+    // Allures course (#114) : onglet du profil ; l'ancienne adresse y mène (liens des consignes).
+    Route::get('/allures', fn () => redirect()->route('profil', ['tab' => 'allures']))->name('allures');
 
     // Abonnements Web Push de l'appareil courant (J8.6, PRD §4.15). Activés depuis l'onglet Notifs.
     Route::post('/push/subscriptions', [PushSubscriptionController::class, 'store'])->name('push.subscribe');

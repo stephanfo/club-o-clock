@@ -141,6 +141,14 @@ class AllureLevels extends Component
 
     public function save(): void
     {
+        // Virgule décimale acceptée (« 85,5 ») : le contrôle numérique porte sur le point.
+        foreach ($this->rows as $i => $row) {
+            foreach ($row['targets'] ?? [] as $key => $t) {
+                foreach (['min', 'max'] as $b) {
+                    $this->rows[$i]['targets'][$key][$b] = str_replace(',', '.', trim((string) ($t[$b] ?? '')));
+                }
+            }
+        }
         $this->validate();
         // Gardé côté serveur : l'état des lignes vient du client.
         if (! collect($this->rows)->contains(fn ($r) => ($r['model'] ?? null) === AllureLevel::MODEL_RIEGEL)) {

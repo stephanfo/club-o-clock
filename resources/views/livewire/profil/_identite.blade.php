@@ -11,25 +11,6 @@
         </div>
     </div>
 
-    {{-- Allures course (#114) : accès à l'écran dédié, VMA visible du seul membre. --}}
-    @php $vmaRef = $user->referenceValue(\App\Support\Allures\Referentiel::Course); @endphp
-    <a href="{{ route('allures') }}" wire:navigate class="card card-pad flex ac jb row-press" style="text-decoration:none;color:inherit">
-        <div class="flex ac g10">
-            <x-icon name="footprints" :size="20" style="color:var(--brand)" />
-            <div>
-                <div style="font-weight:700;font-size:14px">Mes allures course</div>
-                <div class="meta" style="font-size:12px">
-                    @if ($vmaRef)
-                        VMA {{ \App\Support\Allures\Calculateur::formatVma($vmaRef->value) }} km/h · {{ $vmaRef->originLabel() }}
-                    @else
-                        Renseigne ta VMA pour connaître tes allures par zone
-                    @endif
-                </div>
-            </div>
-        </div>
-        <x-icon name="chevron-right" class="muted" />
-    </a>
-
     {{-- Modifiable par l'athlète --}}
     <div>
         <div class="sect-head"><span class="sect-title">Modifiable</span></div>

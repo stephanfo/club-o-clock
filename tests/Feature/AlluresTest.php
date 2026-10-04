@@ -163,6 +163,9 @@ class AlluresTest extends TestCase
         Livewire::actingAs($user)->test(Allures::class)
             ->assertSee('Z9')
             ->assertSee('4:27 – 5:00')
+            // Grille de la piste au marathon : 400 m à 90–80 % = 1:47 – 2:00.
+            ->assertSee('1:47 – 2:00')
+            ->assertSee('Marathon')
             ->assertSee('Projection de temps de course');
     }
 
@@ -173,13 +176,13 @@ class AlluresTest extends TestCase
         $marie = User::factory()->create();
         app(AlluresService::class)->setReference($marie, Referentiel::Course, 13.7, ReferenceValue::SOURCE_SAISIE);
 
-        // Contrôle positif : Marie voit sa VMA, à l'écran et sur son profil.
-        $this->actingAs($marie)->get(route('allures'))->assertOk()->assertSee('13,7');
-        $this->actingAs($marie)->get(route('profil'))->assertOk()->assertSee('VMA 13,7');
+        // Contrôle positif : Marie voit sa VMA dans l'onglet Allures de son profil.
+        $onglet = route('profil', ['tab' => 'allures']);
+        $this->actingAs($marie)->get($onglet)->assertOk()->assertSee('13,7');
 
-        // Un autre membre, un coach, un admin : l'écran ne montre que LEUR propre valeur (vide).
+        // Un autre membre, un coach, un admin : l'onglet ne montre que LEUR propre valeur (vide).
         foreach ([User::factory()->create(), User::factory()->coach()->create(), User::factory()->admin()->create()] as $other) {
-            $this->actingAs($other)->get(route('allures'))->assertOk()->assertDontSee('13,7');
+            $this->actingAs($other)->get($onglet)->assertOk()->assertSee('Ma VMA')->assertDontSee('13,7');
         }
         // Ni la fiche adhérent côté admin.
         $this->actingAs(User::factory()->admin()->create())
@@ -189,6 +192,22 @@ class AlluresTest extends TestCase
     public function test_ecran_reserve_aux_membres_connectes(): void
     {
         $this->get(route('allures'))->assertRedirect(route('login'));
+    }
+
+    public function test_l_ancienne_adresse_mene_a_l_onglet_du_profil(): void
+    {
+        $this->actingAs(User::factory()->create())->get(route('allures'))
+            ->assertRedirect(route('profil', ['tab' => 'allures']));
+    }
+
+    public function test_couleurs_d_intensite_reparties_par_rang(): void
+    {
+        $zones = collect([$this->zone('A', 60, 70), $this->zone('B', 70, 80), $this->zone('C', 80, 90)]);
+
+        $this->assertSame(
+            [$zones[0]->id => 'var(--intensite-1)', $zones[1]->id => 'var(--intensite-5)', $zones[2]->id => 'var(--intensite-8)'],
+            AllureZone::intensites(AllureZone::activeFor(Referentiel::Course)),
+        );
     }
 
     public function test_la_vma_part_avec_le_compte_anonymise(): void
@@ -346,6 +365,21 @@ class AlluresTest extends TestCase
             ->call('save');
 
         $this->assertSame(0, AllureLevel::count());
+    }
+
+    public function test_table_club_accepte_la_virgule_decimale(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $t = ['min' => '85,5', 'max' => '90'];
+
+        Livewire::actingAs($admin)->test(AllureLevels::class)
+            ->call('addRow')
+            ->set('rows.1.label', 'Club')
+            ->set('rows.1.targets', ['5k' => $t, '10k' => $t, 'semi' => $t, 'marathon' => $t])
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertSame([85.5, 90.0], AllureLevel::where('label', 'Club')->first()?->target('5k'));
     }
 
     public function test_table_club_refuse_un_max_inferieur_au_min(): void

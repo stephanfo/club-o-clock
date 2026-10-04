@@ -64,6 +64,23 @@ enum Referentiel: string
     }
 
     /**
+     * Distances du tableau « Mes allures par zone », de la piste au marathon : libellé => mètres.
+     *
+     * @return array<string, float>
+     */
+    public function gridDistances(): array
+    {
+        return match ($this) {
+            self::Course => [
+                '100 m' => 100.0, '200 m' => 200.0, '300 m' => 300.0, '400 m' => 400.0,
+                '500 m' => 500.0, '600 m' => 600.0, '800 m' => 800.0, '1 km' => 1000.0,
+                '1,5 km' => 1500.0, '2 km' => 2000.0, '3 km' => 3000.0, '5 km' => 5000.0,
+                '10 km' => 10000.0, 'Semi' => 21097.5, 'Marathon' => 42195.0,
+            ],
+        };
+    }
+
+    /**
      * Grille de zones générique posée au déploiement. Volontairement neutre (littérature, pas la
      * grille d'un coach) : chaque club saisit la sienne dans l'admin, sur son instance.
      *

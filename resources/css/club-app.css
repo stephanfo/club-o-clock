@@ -270,6 +270,8 @@ button.chip { font-family: var(--font-sans); }
 .tab.on { color: var(--ink); border-bottom-color: var(--brand); font-weight: 700; }
 .tab .badge { font-size: 11px; color: var(--fg-muted); margin-left: 5px; font-weight: 600; }
 .tab.on .badge { color: var(--brand-700); }
+/* Onglets qui se partagent la largeur (profil, 5 onglets) : le défilement reste le repli. */
+.tabstrip-fit .tab { flex: 1 0 auto; padding-inline: 8px; }
 
 .seg { display: inline-flex; background: var(--slate-100); border-radius: var(--radius-md); padding: 3px; gap: 2px; }
 .seg-item {
@@ -804,3 +806,30 @@ textarea.input { resize: vertical; min-height: 70px; line-height: 1.5; }
 /* fallback « carte indisponible » */
 .or-fallback { display: flex; align-items: center; gap: 13px; padding: 16px; border: 1px solid var(--hair); border-radius: var(--radius-md); background: var(--bg-alt); }
 .or-fallback .of-ic { width: 40px; height: 40px; border-radius: var(--radius-md); background: var(--slate-100); color: var(--fg-soft); display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+
+/* =========================================================================
+   ALLURES COURSE (#114) — curseur d'intensité sur bande de zones, tableau à colonne figée
+   ========================================================================= */
+.zone-strip-wrap { position: relative; margin: 6px 10px 0; }
+.zone-strip { display: flex; height: 14px; border-radius: var(--radius-pill); overflow: hidden; background: var(--slate-100); }
+.zone-strip > span { display: block; height: 100%; }
+.zone-marker { position: absolute; top: -4px; width: 3px; height: 22px; margin-left: -1px; border-radius: 2px; background: var(--ink); pointer-events: none; }
+.zone-range { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 28px; margin: 2px 0 0; background: transparent; cursor: pointer; }
+.zone-range::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--slate-200); }
+.zone-range::-moz-range-track { height: 6px; border-radius: 3px; background: var(--slate-200); }
+.zone-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%; background: var(--brand); border: 3px solid var(--paper); box-shadow: 0 0 0 1px var(--brand); }
+.zone-range::-moz-range-thumb { width: 22px; height: 22px; box-sizing: border-box; border-radius: 50%; background: var(--brand); border: 3px solid var(--paper); box-shadow: 0 0 0 1px var(--brand); }
+.zone-range:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.zone-badge { color: var(--paper); }
+.zone-readout { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; margin-top: 12px; }
+.zone-readout > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.zone-readout .num { font-size: 26px; }
+.zone-readout .unite { font-size: 12px; color: var(--fg-muted); margin-left: 3px; }
+@media (min-width: 760px) { .zone-readout { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.zone-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.tbl-figee th:first-child, .tbl-figee td:first-child { position: sticky; left: 0; z-index: 1; background: var(--paper); box-shadow: 1px 0 0 var(--divider); }
+.tbl-figee th, .tbl-figee td { white-space: nowrap; }
+.tbl-figee td:first-child { white-space: normal; min-width: 96px; max-width: 132px; }
+.tbl-figee td.r, .tbl-figee th.r { text-align: right; font-variant-numeric: tabular-nums; }
+.niveau-grille { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 16px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--divider); }
+@media (max-width: 900px) { .niveau-grille { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
