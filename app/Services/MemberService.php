@@ -518,6 +518,8 @@ class MemberService
             // Les « j'aime » sont un geste de la personne, pas une donnée du club (#101) : ils
             // partent avec elle, à la différence du texte des débriefs qu'elle a signés.
             app(DebriefReactionService::class)->forgetUser($member);
+            // Valeur de référence d'allure (#114) : donnée personnelle sans intérêt pour le club.
+            $member->referenceValues()->delete();
             if ($email !== null) {
                 MagicLinkToken::where('email', $email)->delete();
                 DB::table('password_reset_tokens')->where('email', $email)->delete();

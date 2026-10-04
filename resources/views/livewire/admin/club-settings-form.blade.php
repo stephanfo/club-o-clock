@@ -9,6 +9,7 @@
         ['type' => 'discipline', 'label' => 'Disciplines', 'sub' => 'Natation, Vélo, Course, Enchaînement…'],
         ['type' => 'event_type', 'label' => 'Types d’épreuve', 'sub' => 'Triathlon, Duathlon, Trail…'],
         ['type' => 'location', 'label' => 'Lieux', 'sub' => 'Piscine Olympique, Stade Léo…'],
+        ['type' => 'allure_zone', 'label' => 'Zones d’allure course', 'sub' => 'Codes reconnus dans les consignes, en % de VMA'],
     ];
 @endphp
 <div class="form-screen">
@@ -291,6 +292,15 @@
                             <x-icon name="chevron-right" class="muted" />
                         </a>
                     @endforeach
+                    {{-- Table club des allures cibles (#114) : pas un catalogue à lignes, écran dédié. --}}
+                    <a href="{{ route('admin.allure-levels') }}" wire:navigate
+                       class="flex ac jb row-press" style="padding:11px 4px;border-top:1px solid var(--divider);text-decoration:none;color:inherit">
+                        <div>
+                            <div style="font-weight:700;font-size:14px">Allures cibles <span class="meta" style="font-size:12px">· {{ $allureLevelCount ?: 'Riegel' }}</span></div>
+                            <div class="meta" style="font-size:12px">% de VMA tenable par niveau et par distance</div>
+                        </div>
+                        <x-icon name="chevron-right" class="muted" />
+                    </a>
                 </div>
             </div>
 

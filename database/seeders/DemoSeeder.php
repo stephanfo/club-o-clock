@@ -14,6 +14,7 @@ use App\Models\Location;
 use App\Models\NotificationOutbox;
 use App\Models\Qualification;
 use App\Models\QuotaTag;
+use App\Models\ReferenceValue;
 use App\Models\Registration;
 use App\Models\Session;
 use App\Models\SessionTemplate;
@@ -24,6 +25,7 @@ use App\Services\RegistrationService;
 use App\Services\SessionNotificationService;
 use App\Services\TemplateGenerationService;
 use App\Support\AgeCategory;
+use App\Support\Allures\Referentiel;
 use App\Support\Markup;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Arr;
@@ -462,6 +464,13 @@ class DemoSeeder extends Seeder
         // Kévin : accès athlète suspendu (athlete_access_suspended) — ne peut plus s'inscrire,
         // mais compte toujours actif (distinct de is_active). Démontre l'état dans l'admin.
         User::where('email', 'kevin@demo.club')->update(['athlete_access_suspended' => true]);
+
+        // --- Allures course (#114) : Marie a renseigné sa VMA, Lucas non (écran vide démontré). ---
+        $marie = User::where('email', 'marie@demo.club')->firstOrFail();
+        ReferenceValue::updateOrCreate(
+            ['user_id' => $marie->id, 'referentiel' => Referentiel::Course->value],
+            ['value' => 13.5, 'source' => ReferenceValue::SOURCE_ESTIMATION, 'source_distance' => '10k', 'measured_on' => Carbon::now()->subWeeks(3)->toDateString()],
+        );
 
         // --- Couples parent garant / enfant mineur (PRD §4.2, §4.15.5) ---
         // Deux phases démontrées :

@@ -6,6 +6,9 @@
     @error('form.label')<span class="meta" style="color:var(--danger-border)">{{ $message }}</span>@enderror
     @error('form.name')<span class="meta" style="color:var(--danger-border)">{{ $message }}</span>@enderror
     @error('form.age_max')<span class="meta" style="color:var(--danger-border)">{{ $message }}</span>@enderror
+    @error('form.code')<span class="meta" style="color:var(--danger-border)">{{ $message }}</span>@enderror
+    @error('form.pct_min')<span class="meta" style="color:var(--danger-border)">{{ $message }}</span>@enderror
+    @error('form.pct_max')<span class="meta" style="color:var(--danger-border)">{{ $message }}</span>@enderror
 
     <div class="flex g8 wrap" style="align-items:flex-end">
         @if ($type === 'location')
@@ -64,6 +67,10 @@
                 @endif
             </div>
         @else
+            @if ($type === 'allure_zone')
+                {{-- Code cité tel quel dans les consignes (#113) : « Z4 », « EF », « AS10 »… --}}
+                <div style="width:100px"><label class="field-label">Code</label><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="form.code" placeholder="Z4" autofocus></div></div>
+            @endif
             <div class="f1" style="min-width:140px"><label class="field-label">Libellé</label><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="form.label" autofocus></div></div>
             @if ($type === 'category')
                 <div style="width:90px"><label class="field-label">Âge min</label><div class="ifield"><input class="ifield-input" type="number" min="0" wire:model.blur="form.age_min"></div></div>
@@ -72,6 +79,21 @@
             @if ($type === 'quota_tag')
                 <div style="width:120px"><label class="field-label">Code</label><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="form.code" placeholder="piscine"></div></div>
                 <div style="width:100px"><label class="field-label">Max / sem.</label><div class="ifield"><input class="ifield-input" type="number" min="1" max="14" wire:model.blur="form.max_per_week"></div></div>
+            @endif
+            @if ($type === 'allure_zone')
+                <div style="width:90px"><label class="field-label">% min</label><div class="ifield"><input class="ifield-input" type="number" min="30" max="150" wire:model.blur="form.pct_min"></div></div>
+                <div style="width:90px"><label class="field-label">% max</label><div class="ifield"><input class="ifield-input" type="number" min="30" max="150" wire:model.blur="form.pct_max"></div></div>
+            @endif
+            @if ($type === 'discipline')
+                {{-- Référentiel d'allures (#114) : quelle grille s'applique aux séances de la discipline. --}}
+                <div style="width:200px"><label class="field-label">Allures</label><div class="ifield">
+                    <select class="ifield-input" wire:model="form.referentiel">
+                        <option value="">Aucune</option>
+                        @foreach (\App\Support\Allures\Referentiel::options() as $value => $label)
+                            <option value="{{ $value }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div></div>
             @endif
             @if ($type === 'qualification')
                 <div style="width:120px"><label class="field-label">Code court</label><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="form.code" placeholder="BNSSA"></div></div>

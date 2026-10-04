@@ -3,6 +3,8 @@
 namespace App\Livewire\Admin;
 
 use App\Livewire\Concerns\AuthorizesAdminGate;
+use App\Models\AllureLevel;
+use App\Models\AllureZone;
 use App\Models\Category;
 use App\Models\ClubSettings;
 use App\Models\Discipline;
@@ -427,6 +429,7 @@ class ClubSettingsForm extends Component
             'discipline' => Discipline::whereNull('archived_at')->count(),
             'event_type' => EventType::whereNull('archived_at')->count(),
             'location' => Location::where('is_archived', false)->count(),
+            'allure_zone' => AllureZone::whereNull('archived_at')->count(),
         ];
     }
 
@@ -434,6 +437,7 @@ class ClubSettingsForm extends Component
     {
         return view('livewire.admin.club-settings-form', [
             'counts' => $this->catalogueCounts(),
+            'allureLevelCount' => AllureLevel::count(),
             'logoPath' => ClubSettings::current()->logo_path,
             // Le bouton « rétablir » ne s'affiche que s'il y a quelque chose à rétablir : proposer
             // de revenir au défaut quand on y est déjà n'a pas de sens et inquiète inutilement.
