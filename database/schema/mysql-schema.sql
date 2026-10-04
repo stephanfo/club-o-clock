@@ -37,7 +37,9 @@ CREATE TABLE `allure_levels` (
   `referentiel` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
   `label` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
   `sort_order` smallint unsigned NOT NULL DEFAULT '0',
-  `targets` json NOT NULL,
+  `model` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `active` tinyint(1) NOT NULL DEFAULT '1',
+  `targets` json DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`)
@@ -914,3 +916,4 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (48,'2026_10_01_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (49,'2026_10_02_000000_create_debrief_reactions_table',12);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (50,'2026_10_03_000000_add_push_health',13);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (51,'2026_10_04_000000_create_allures_tables',14);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (52,'2026_10_05_000000_add_model_and_active_to_allure_levels',15);

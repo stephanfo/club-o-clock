@@ -50,7 +50,7 @@ class Allures extends Component
     {
         $ref = $this->user()->referenceValue($this->referentiel());
         $this->vma = $ref !== null ? Calculateur::formatVma($ref->value) : '';
-        $this->levelId = AllureLevel::forReferentiel($this->referentiel())->first()?->id;
+        $this->levelId = AllureLevel::activeFor($this->referentiel())->first()?->id;
     }
 
     /** « 13,6 » → 13.6 ; null si vide ou illisible. */
@@ -61,10 +61,10 @@ class Allures extends Component
         return is_numeric($v) ? (float) $v : null;
     }
 
-    /** Niveau choisi ; le premier de la table si le choix n'existe plus ; null sans table (Riegel). */
+    /** Niveau choisi parmi les actifs ; le premier si le choix n'existe plus ; null sans niveau actif (Riegel). */
     private function level(): ?AllureLevel
     {
-        $levels = AllureLevel::forReferentiel($this->referentiel());
+        $levels = AllureLevel::activeFor($this->referentiel());
 
         return $levels->firstWhere('id', $this->levelId) ?? $levels->first();
     }
@@ -119,7 +119,7 @@ class Allures extends Component
         [$min, $max] = $referentiel->bounds();
         $vma = $this->parsedVma();
         $vmaOk = $vma !== null && $vma >= $min && $vma <= $max;
-        $levels = AllureLevel::forReferentiel($referentiel);
+        $levels = AllureLevel::activeFor($referentiel);
         $level = $levels->firstWhere('id', $this->levelId) ?? $levels->first();
 
         $seconds = Calculateur::parseTemps($this->estTime);
