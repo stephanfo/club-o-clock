@@ -81,10 +81,11 @@ Remplacer le tableur Google Sheets actuel par une **PWA** qui offre aux adhéren
 - Deux journaux séparés : `AuditLog` (gouvernance) et `ActivityLog` (opérationnel), accès admin uniquement.
 - Pages d'information (notes club) éditables par l'admin, avec visibilité par niveau de rôle et épinglage en bannière d'accueil (ajout post-cadrage, cf. §4.19).
 - Export des séances vers l'agenda personnel : ajout ponctuel d'une séance et abonnement tenu à jour (ajout post-cadrage, cf. §4.21).
+- Allures course : VMA courante du membre, allures par zone, estimation depuis un résultat de course et projection de temps (ajout post-cadrage, cf. §4.22).
 
 ### 3.2 Hors V1 (V2+)
 - Cotisations / paiements en ligne.
-- Suivi de performance individuel (Strava, courbes de progression).
+- Suivi de performance individuel (Strava, courbes de progression, historique des chronos ou des VMA). Une **valeur de référence courante** sans historique (VMA, §4.22) n'en relève pas : c'est un paramètre d'affichage des allures.
 - Inscription collective gérée par le club (dossard, tarif groupé, covoiturage).
 - Section invités / séance d'essai.
 - App mobile native.
@@ -326,6 +327,7 @@ Pattern commun : seed au déploiement, **renommage rétroactif** (référence pa
 | **Types d'épreuve** (§4.6.2) | Admin uniquement | `Triathlon`, `Duathlon`, `Aquathlon`, `Course à pied`, `Trail`, `Autre` | 1 (`competition` uniquement), 0 sinon |
 | **Tags de quota** (§4.10) | Admin uniquement | aucun | 0 ou 1 (`training` uniquement) |
 | **Qualifications** (§4.11.3) | Admin uniquement | `BF1-5`, `BNSSA`, `MNS`, `PSC1`, `PSE1`, `AFPS` | N (M:N via `UserQualification`) |
+| **Zones d'allure** (§4.22) | Admin uniquement | grille générique (`Z1`…`Z5`) | 0 (citées en texte libre dans les consignes) |
 | **Lieux** (§4.13.4) | Coachs au fil de l'eau, admin gère/archive | aucun | 0 ou 1 par Session, **ou** une adresse ponctuelle géocodée propre à la séance (exclusifs) + précision libre `locationText` |
 
 #### 4.6.1 Disciplines
@@ -1078,7 +1080,7 @@ Trace les **actions humaines à enjeu** (administration, gouvernance, sécurité
 | Quota / inscriptions | `override_quota`, `promote_quota_exceeded` (mécanisme C, N entrées par batch), `cancel_session` |
 | Tutelle / mineurs | `guardianship_severed`, `child_account_activated` |
 | Cycle de vie compte | `account_deletion_requested`, `account_deletion_cancelled`, `account_deleted` (`actorId = admin` qui confirme, jamais `system`), `account_activated`, `role_changed`, `auth_method_linked`, `auth_method_unlinked`, `password_reset`, `bulk_athlete_deactivation` (1 entrée globale par clic admin) |
-| Configuration club | `quota_tag_modified`, `category_archived`, `discipline_modified`, `event_type_modified`, `season_rollover` (1 entrée globale par démarrage de nouvelle année sportive, cf. §4.5) |
+| Configuration club | `quota_tag_modified`, `category_archived`, `discipline_modified`, `event_type_modified`, `allure_zone_modified`, `allure_levels_modified`, `season_rollover` (1 entrée globale par démarrage de nouvelle année sportive, cf. §4.5) |
 
 Enum **extensible** au cadrage technique si une action sensible non identifiée émerge.
 
@@ -1188,6 +1190,19 @@ Deux gestes distincts, livrés séparément.
 - **Exigences non-fonctionnelles** : le flux est borné dans le temps et se sert sans recalcul quand rien n'a changé ; l'adresse est un secret non devinable.
 - **Hors périmètre** : synchronisation bidirectionnelle, invitations par email, ajout automatique à l'inscription, un calendrier distinct par enfant, rappel envoyé par l'app.
 
+### 4.22 Allures course
+
+*Ajout de périmètre post-cadrage.* Les coachs prescrivent la course en **zones exprimées en % de VMA** ; l'application traduit ces zones en allures personnelles.
+
+- **Référentiel par discipline** : l'admin rattache une discipline à un référentiel d'allures (V1 : course à pied, valeur de référence = VMA). Une discipline sans référentiel n'affiche aucune allure. Le modèle prévoit d'autres référentiels (vélo, natation) sans valeurs en V1.
+- **VMA du membre** : une **seule valeur courante** par membre et par référentiel, écrasée à chaque mise à jour, **sans historique**, avec sa date et son origine (saisie libre, ou estimation depuis une distance de course). Saisie et visible **par le membre seul** : ni coach, ni admin. Bornes de vraisemblance 8–25 km/h, refus côté serveur. Effacée avec le compte (§4.3).
+- **Aucun chrono n'est enregistré** : le temps saisi pour une estimation est une entrée de calcul.
+- **Zones d'allure** (catalogue admin, §4.6) : code court unique (celui que les consignes citent), libellé, **alias** facultatifs (« SV2 », « SubT » : affichés à côté du code et reconnus comme lui ; aucun alias ne peut reprendre le code ou l'alias d'une autre zone), plage en % de VMA. Plages discontinues acceptées, chevauchement refusé. Seed **générique** : les coefficients d'un coach se saisissent sur l'instance du club, jamais dans le dépôt public.
+- **Estimation et projection** : par défaut, **modèle de Riegel** (exposant 1,06, VMA tenue 6 min), sans niveau. L'admin peut compléter la **table club** (% de VMA tenable par niveau × distance — 5 km, 10 km, semi, marathon — en fourchettes, borne haute ouverte possible). Riegel y figure comme un niveau calculé (ses % dépendant de la VMA, ils sont montrés en exemple sur une plage de VMA) : non modifiable ni supprimable, mais ordonnable et désactivable comme les autres. Chaque niveau peut être retiré de ce qui est proposé aux membres sans être supprimé ; au moins un reste proposé. Le premier niveau proposé est le choix par défaut ; le niveau est choisi à chaque usage et jamais stocké. Estimation hors bornes : « temps improbable ».
+- **Onglet « Allures » du profil** : allures par zone (fourchette /km et temps de passage de 100 m au marathon), curseur d'intensité sur la bande des zones, estimation de la VMA depuis une course, projection de temps de course.
+- **Consignes de séance** (disciplines rattachées au référentiel) : chaque code de zone cité est complété, à l'affichage web, par la fourchette d'allure du lecteur ; une plage (« Z1-Z2 ») reçoit une seule fourchette couvrant les deux zones. Sans VMA renseignée : texte inchangé et invitation à la renseigner.
+- **Hors périmètre** : tests de VMA guidés, outillage coach (saisie collective, groupes de niveau), vélo et natation.
+
 ---
 
 ## 5. Modèle conceptuel (entités et relations)
@@ -1208,12 +1223,15 @@ Vue logique des entités. **Volontairement agnostique** à la techno de stockage
 - **`Registration`** (rattachée à une `Session`) : `userId`, `status` (`participating` | `waitlist` | `cancelled`), `waitlistReason?` (`capacity` | `quota_exceeded`), `waitlistPosition?`, `registeredAt`, `promotedAt?`, `promotedBy?`, `overrideBy?`, `overrideReason?`.
 - **`SessionTemplate`** : `id`, `label`, `kind`, `disciplineId?`, `dayOfWeek` (1..7), `startTimeOfDay`, `durationMin`, `locationId?` / `locationText?`, `externalStaffLabel?` (recopié sur chaque séance générée, `training` uniquement), `capacity?`, `quotaTagId?`, `categoryIds[]`, `defaultCoachIds[]`, `generationStartDate`, `generationEndDate` (**obligatoires**), `createdBy` (= admin), `status` (`active` / `archived`). Aucun lien retour comportemental vers les `Session` générées.
 - **`QuotaTag`** : `code`, `label`, `maxPerWeek`, `archivedAt?`. Universel — aucune restriction de discipline.
-- **`Discipline`** : `id`, `label`, `archivedAt?`. Référencée par `Session.disciplineId` et `SessionTemplate.disciplineId`, sur les `training` uniquement (§4.7). Garde-fou : la dernière discipline active ne peut être ni archivée ni supprimée.
+- **`Discipline`** : `id`, `label`, `referentiel?` (référentiel d'allures, §4.22), `archivedAt?`. Référencée par `Session.disciplineId` et `SessionTemplate.disciplineId`, sur les `training` uniquement (§4.7). Garde-fou : la dernière discipline active ne peut être ni archivée ni supprimée.
 - **`EventType`** : `id`, `label`, `archivedAt?`. Référencé par `Session.eventTypeId` (uniquement pour `kind = competition`). Garde-fou : le dernier type actif ne peut être ni archivé ni supprimé (cf. §4.6.2 — note ouverte sur ce point).
 - **`Qualification`** : `id`, `label`, `code?`, `archivedAt?`.
 - **`UserQualification`** (M:N) : `userId`, `qualificationId`, `expiresAt?`, `attributedAt`, `attributedBy`. Unicité `(userId, qualificationId)` — les renouvellements mettent à jour `expiresAt` plutôt que créer une nouvelle ligne.
 - **`Location`** : `name`, `address`, `latitude`, `longitude`, `kind`, `notes`, `createdBy`, `isArchived`.
 - **`GpxRoute`** (§4.20) : `name`, `description?`, `disciplineId?`, `gpxFile` (référence stockage objets), `fingerprint` (empreinte du fichier, pour la détection de doublon), métriques dérivées du tracé (`distanceKm?`, `dPlusM?`, `dMinusM?`, `altMin?`, `altMax?`), qualification automatique (`sector?` — rose des vents 8 directions, `shape?` — arrondi/étiré, `grade?` — roulant/vallonné/exigeant), données géographiques dérivées (emprise du tracé et **tracé simplifié** servant l'affichage cartographique), `createdBy`, `archivedAt?`. Référencé par `Session.route` (`0..n` séances par parcours). **Toutes les métriques et données dérivées sont produites côté client** (§4.13.2) : le serveur ne lit jamais le fichier, il borne et refuse les valeurs aberrantes.
+- **`AllureZone`** (§4.22) : `referentiel`, `code` (unique par référentiel), `label`, `pctMin`, `pctMax`, `archivedAt?`.
+- **`AllureLevel`** (§4.22, table club) : `referentiel`, `label`, `sortOrder`, `targets` (bornes de % par distance, borne haute optionnelle).
+- **`ReferenceValue`** (§4.22) : `userId`, `referentiel`, `value`, `source` (`saisie` / `estimation`), `sourceDistance?`, `measuredOn`. **Unicité `(userId, referentiel)`** — valeur courante sans historique, visible du seul membre, effacée avec le compte.
 - **`WeatherCacheEntry`** : indexée par `(location, créneau horaire)`, `forecast`, `fetchedAt`.
 - **`AuditLog`** : `id`, `actorId` (anonymisable), `actorRole` (snapshot), `action` (enum extensible), `targetType`, `targetId` (anonymisable), `sessionId?`, `motif?`, `timestamp`.
 - **`ActivityLog`** : `id`, `actorId` (anonymisable, peut valoir `system`), `action`, `userId` (anonymisable — concerné par l'action, peut différer de `actorId`), `sessionId`, `registrationId?`, `resultingStatus?`, `timestamp`.

@@ -270,6 +270,8 @@ button.chip { font-family: var(--font-sans); }
 .tab.on { color: var(--ink); border-bottom-color: var(--brand); font-weight: 700; }
 .tab .badge { font-size: 11px; color: var(--fg-muted); margin-left: 5px; font-weight: 600; }
 .tab.on .badge { color: var(--brand-700); }
+/* Onglets qui se partagent la largeur (profil, 5 onglets) : le défilement reste le repli. */
+.tabstrip-fit .tab { flex: 1 0 auto; padding-inline: 8px; }
 
 .seg { display: inline-flex; background: var(--slate-100); border-radius: var(--radius-md); padding: 3px; gap: 2px; }
 .seg-item {
@@ -323,6 +325,8 @@ textarea.input { resize: vertical; min-height: 70px; line-height: 1.5; }
 .stepper button { width: 40px; height: 42px; border: none; background: var(--paper); font-size: 20px; cursor: pointer; color: var(--fg-soft); }
 .stepper button:hover { background: var(--slate-100); color: var(--ink); }
 .stepper .val { min-width: 48px; text-align: center; font-family: var(--font-display); font-weight: 800; font-size: 18px; border-left: 1px solid var(--hair); border-right: 1px solid var(--hair); height: 42px; display: flex; align-items: center; justify-content: center; }
+.stepper input.val { width: 72px; min-width: 0; padding: 0; border-top: none; border-bottom: none; border-radius: 0; background: var(--paper); color: var(--ink); }
+.stepper input.val:focus { outline: none; background: var(--slate-100); }
 
 /* =========================================================================
    BANNERS
@@ -653,6 +657,8 @@ textarea.input { resize: vertical; min-height: 70px; line-height: 1.5; }
 .db-prose > :first-child { margin-top: 0; }
 .db-prose > :last-child { margin-bottom: 0; }
 .db-prose p { margin: 0 0 10px; }
+/* Allure du lecteur ajoutée après un code de zone reconnu dans une consigne (#113). */
+.db-prose .zone-allure { color: var(--brand-700); font-weight: 600; white-space: nowrap; }
 .db-prose h2 { font-family: var(--font-display); font-weight: 800; text-transform: uppercase; letter-spacing: -0.01em; font-size: 20px; line-height: 1.15; margin: 16px 0 8px; }
 .db-prose h3 { font-family: var(--font-display); font-weight: 700; font-size: 16px; line-height: 1.2; margin: 14px 0 7px; }
 .db-prose ul, .db-prose ol { margin: 8px 0 12px; padding-left: 22px; }
@@ -804,3 +810,35 @@ textarea.input { resize: vertical; min-height: 70px; line-height: 1.5; }
 /* fallback « carte indisponible » */
 .or-fallback { display: flex; align-items: center; gap: 13px; padding: 16px; border: 1px solid var(--hair); border-radius: var(--radius-md); background: var(--bg-alt); }
 .or-fallback .of-ic { width: 40px; height: 40px; border-radius: var(--radius-md); background: var(--slate-100); color: var(--fg-soft); display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+
+/* =========================================================================
+   ALLURES COURSE (#114) — curseur d'intensité sur bande de zones, tableau à colonne figée
+   ========================================================================= */
+.zone-strip-wrap { position: relative; margin: 6px 10px 0; }
+.zone-strip { display: flex; height: 14px; border-radius: var(--radius-pill); overflow: hidden; background: var(--slate-100); }
+.zone-strip > span { display: block; height: 100%; }
+.zone-marker { position: absolute; top: -4px; width: 3px; height: 22px; margin-left: -1px; border-radius: 2px; background: var(--ink); pointer-events: none; }
+.zone-range { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 28px; margin: 2px 0 0; background: transparent; cursor: pointer; }
+.zone-range::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--slate-200); }
+.zone-range::-moz-range-track { height: 6px; border-radius: 3px; background: var(--slate-200); }
+.zone-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%; background: var(--brand); border: 3px solid var(--paper); box-shadow: 0 0 0 1px var(--brand); }
+.zone-range::-moz-range-thumb { width: 22px; height: 22px; box-sizing: border-box; border-radius: 50%; background: var(--brand); border: 3px solid var(--paper); box-shadow: 0 0 0 1px var(--brand); }
+.zone-range:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.zone-badge { display: flex; justify-content: center; width: 100%; margin-top: 16px; padding: 6px 12px; font-size: 14px; color: var(--paper); overflow: hidden; text-overflow: ellipsis; }
+.zone-badge-hors { color: var(--fg-soft); }
+.zone-readout { container-type: inline-size; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 10px; margin-top: 12px; }
+.zone-readout > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.zone-readout .num { font-size: clamp(20px, 8.5cqi, 32px); }
+.zone-readout > div > span:last-child { white-space: nowrap; }
+.zone-readout .eyebrow { font-size: 12px; }
+.zone-readout .unite { font-size: clamp(11px, 3.6cqi, 14px); color: var(--fg-muted); margin-left: 3px; }
+.zone-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.tbl-figee th:first-child, .tbl-figee td:first-child { position: sticky; left: 0; z-index: 1; background: var(--paper); box-shadow: 1px 0 0 var(--divider); }
+.tbl-figee th, .tbl-figee td { white-space: nowrap; }
+.tbl-figee td:first-child { white-space: normal; min-width: 96px; max-width: 132px; }
+.tbl-figee td.r, .tbl-figee th.r { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl-figee .col-officielle { background: var(--slate-50); font-weight: 700; }
+.tbl-figee th.col-officielle { color: var(--ink); }
+.fourchette { display: inline-flex; flex-direction: column; align-items: flex-end; line-height: 1.3; }
+.niveau-grille { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 16px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--divider); }
+@media (max-width: 900px) { .niveau-grille { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

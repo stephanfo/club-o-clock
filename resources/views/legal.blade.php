@@ -52,6 +52,12 @@
         légaux. Aucun numéro de téléphone ni certificat médical n'est stocké par l'application.
     </p>
     <p>
+        Un adhérent peut, s'il le souhaite, renseigner sa VMA pour afficher ses allures
+        d'entraînement. Seule la valeur courante est conservée, avec sa date et son origine (saisie
+        ou estimée depuis une distance de course, sans le temps réalisé) ; elle n'est visible que de
+        lui, ni des encadrants ni du bureau, et elle est effacée avec le compte.
+    </p>
+    <p>
         Les comptes des mineurs sont créés et gérés par un représentant légal jusqu'à leur
         autonomisation (invitation dédiée). Les données sont conservées le temps de l'adhésion
         au club, avec un délai de grâce de 7 jours après une demande de suppression de compte

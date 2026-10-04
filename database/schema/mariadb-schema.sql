@@ -30,6 +30,40 @@ CREATE TABLE `activity_logs` (
   CONSTRAINT `activity_logs_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `allure_levels`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `allure_levels` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `referentiel` varchar(20) NOT NULL,
+  `label` varchar(60) NOT NULL,
+  `sort_order` smallint(5) unsigned NOT NULL DEFAULT 0,
+  `model` varchar(20) DEFAULT NULL,
+  `active` tinyint(1) NOT NULL DEFAULT 1,
+  `targets` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`targets`)),
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `allure_zones`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `allure_zones` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `referentiel` varchar(20) NOT NULL,
+  `code` varchar(12) NOT NULL,
+  `label` varchar(120) NOT NULL,
+  `aliases` varchar(60) DEFAULT NULL,
+  `pct_min` smallint(5) unsigned NOT NULL,
+  `pct_max` smallint(5) unsigned NOT NULL,
+  `archived_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `allure_zones_referentiel_code_unique` (`referentiel`,`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `apero_flags`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -226,6 +260,7 @@ DROP TABLE IF EXISTS `disciplines`;
 CREATE TABLE `disciplines` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `label` varchar(255) NOT NULL,
+  `referentiel` varchar(20) DEFAULT NULL,
   `sort_order` int(10) unsigned NOT NULL DEFAULT 0,
   `archived_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
@@ -556,6 +591,24 @@ CREATE TABLE `quota_tags` (
   UNIQUE KEY `quota_tags_code_unique` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `reference_values`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `reference_values` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) unsigned NOT NULL,
+  `referentiel` varchar(20) NOT NULL,
+  `value` decimal(5,1) NOT NULL,
+  `source` varchar(20) NOT NULL,
+  `source_distance` varchar(20) DEFAULT NULL,
+  `measured_on` date NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `reference_values_user_id_referentiel_unique` (`user_id`,`referentiel`),
+  CONSTRAINT `reference_values_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `registrations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -863,5 +916,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (47,'2026_09_17_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (48,'2026_10_01_000000_add_registration_opening_to_sessions',11);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (49,'2026_10_02_000000_create_debrief_reactions_table',12);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (50,'2026_10_03_000000_add_push_health',13);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (51,'2026_10_04_000000_create_allures_tables',14);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

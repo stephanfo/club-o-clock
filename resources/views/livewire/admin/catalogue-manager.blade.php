@@ -66,6 +66,7 @@
                         <div class="row">
                             @if ($type === 'discipline')<span class="dot dot-{{ $it->colorClass() }}" style="width:12px;height:12px"></span>@endif
                             @if ($type === 'quota_tag')<span class="chip chip-sm chip-tag">{{ $it->code ?: $it->label }}</span>@endif
+                            @if ($type === 'allure_zone')<span class="chip chip-sm chip-line">{{ $it->code }}</span>@endif
                             <div class="f1" style="min-width:0">
                                 <div class="flex ac g8">
                                     <span style="font-weight:700;font-size:14px">{{ $it->{$nameField} }}</span>

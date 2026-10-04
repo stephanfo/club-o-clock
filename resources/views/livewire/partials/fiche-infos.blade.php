@@ -3,9 +3,18 @@
 
 {{-- Bloc spécifique kind --}}
 @if ($session->kind === 'training' && $session->content_markdown)
+    {{-- Zones d'allure reconnues dans la consigne (#113) : allure du lecteur ajoutée à côté. --}}
+    @php $consigne = \App\Support\Allures\Annotateur::pourSeance($session, auth()->user()); @endphp
     <div>
         <div class="sect-head"><span class="sect-title">Programme</span></div>
-        <div class="card card-pad"><div class="db-prose">{!! \App\Support\Markup::render($session->content_markdown) !!}</div></div>
+        <div class="card card-pad">
+            <div class="db-prose">{!! $consigne['html'] !!}</div>
+            @if ($consigne['invite'])
+                <a href="{{ route('profil', ['tab' => 'allures']) }}" wire:navigate class="meta ac g6" style="display:inline-flex;margin-top:10px;font-size:12.5px;color:var(--brand-700)">
+                    <x-icon name="footprints" :size="14" /> Renseigne ta VMA pour voir tes allures
+                </a>
+            @endif
+        </div>
     </div>
 @elseif ($session->kind === 'competition')
     <div>

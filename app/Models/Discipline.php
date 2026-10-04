@@ -2,15 +2,25 @@
 
 namespace App\Models;
 
+use App\Support\Allures\Referentiel;
 use Illuminate\Database\Eloquent\Model;
 
 // Catalogue Discipline (PRD §5.1, §4.6.1).
 class Discipline extends Model
 {
-    protected $fillable = ['label', 'sort_order', 'archived_at'];
+    protected $fillable = ['label', 'referentiel', 'sort_order', 'archived_at'];
 
     /** @var array<string, string> */
     protected $casts = ['archived_at' => 'datetime'];
+
+    /**
+     * Référentiel d'allures (#114) : quelle grille s'applique aux séances de cette discipline.
+     * Colonne laissée en chaîne (et non castée) pour que le formulaire de catalogue la lie telle quelle.
+     */
+    public function referentielEnum(): ?Referentiel
+    {
+        return Referentiel::tryFrom((string) $this->referentiel);
+    }
 
     /**
      * Classe couleur du design (liseré scard, dot) dérivée du label.

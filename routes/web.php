@@ -11,6 +11,7 @@ use App\Http\Controllers\ManifestController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\SessionIcsController;
 use App\Livewire\Activation;
+use App\Livewire\Admin\AllureLevels;
 use App\Livewire\Admin\CatalogueManager;
 use App\Livewire\Admin\ClubSettingsForm;
 use App\Livewire\Admin\Dashboard;
@@ -91,6 +92,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Profil utilisateur — compte courant (J8.4, PRD §4.15.3/.4, §4.10, §4.1.1). Self only.
     Route::get('/profil', Profil::class)->name('profil');
+    // Allures course (#114) : onglet du profil ; l'ancienne adresse y mène (liens des consignes).
+    Route::get('/allures', fn () => redirect()->route('profil', ['tab' => 'allures']))->name('allures');
 
     // Abonnements Web Push de l'appareil courant (J8.6, PRD §4.15). Activés depuis l'onglet Notifs.
     Route::post('/push/subscriptions', [PushSubscriptionController::class, 'store'])->name('push.subscribe');
@@ -146,6 +149,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Paramètres club + catalogues — admin uniquement (J6.1, PRD §4.17, §4.6). Garde Gate.
     Route::get('/admin/parametres', ClubSettingsForm::class)->name('admin.settings');
     Route::get('/admin/catalogues/{type}', CatalogueManager::class)->name('admin.catalogues');
+    Route::get('/admin/allures-cibles', AllureLevels::class)->name('admin.allure-levels');
 
     // Pages d'information — édition admin uniquement (Gate manage-information-pages).
     // « creer » avant « {page} » : route littérale prioritaire sur le param.

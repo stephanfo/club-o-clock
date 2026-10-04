@@ -3,6 +3,10 @@
     @case('notifs')
         @include('livewire.profil._notifs')
         @break
+    @case('allures')
+        {{-- Composant imbriqué (#114), une instance par coquille : clé distincte. --}}
+        <livewire:allures :key="'allures-'.$coquille" />
+        @break
     @case('quotas')
         @include('livewire.profil._quotas')
         @break
