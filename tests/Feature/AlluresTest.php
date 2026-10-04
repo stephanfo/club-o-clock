@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Livewire\Admin\AllureLevels;
 use App\Livewire\Admin\CatalogueManager;
+use App\Livewire\Admin\ClubSettingsForm;
 use App\Livewire\Allures;
 use App\Models\AllureLevel;
 use App\Models\AllureZone;
@@ -182,6 +183,19 @@ class AlluresTest extends TestCase
 
     // ── Confidentialité ──
 
+    public function test_les_identifiants_de_l_onglet_sont_uniques_dans_la_page(): void
+    {
+        // L'onglet est rendu deux fois (coquilles mobile et desktop) : un libellé ne doit pas
+        // viser le champ caché de l'autre coquille.
+        $user = User::factory()->create();
+        app(AlluresService::class)->setReference($user, Referentiel::Course, 13.5, ReferenceValue::SOURCE_SAISIE);
+        $html = $this->actingAs($user)->get(route('profil', ['tab' => 'allures']))->assertOk()->getContent();
+
+        preg_match_all('/\bid="(al-[^"]+)"/', $html, $m);
+        $this->assertGreaterThanOrEqual(6, count($m[1]));
+        $this->assertSame(count($m[1]), count(array_unique($m[1])));
+    }
+
     public function test_la_vma_n_est_visible_que_de_son_titulaire(): void
     {
         $marie = User::factory()->create();
@@ -336,6 +350,55 @@ class AlluresTest extends TestCase
         Livewire::actingAs($admin)->test(CatalogueManager::class, ['type' => 'allure_zone'])->call('restore', $old->id);
 
         $this->assertNotNull($old->refresh()->archived_at);
+    }
+
+    public function test_alias_trop_longs_une_fois_reformates_refuses(): void
+    {
+        $admin = User::factory()->admin()->create();
+        AllureZone::query()->delete();
+        // 12 alias de 4 lettres séparés d'espaces : 59 caractères saisis, 70 une fois en « A, B ».
+        $saisie = implode(' ', array_map(fn ($i) => 'AL'.str_pad((string) $i, 2, '0', STR_PAD_LEFT), range(1, 12)));
+        $this->assertSame(59, mb_strlen($saisie));
+
+        Livewire::actingAs($admin)->test(CatalogueManager::class, ['type' => 'allure_zone'])
+            ->call('startAdd')
+            ->set('form', ['code' => 'Z3', 'label' => 'Seuil', 'aliases' => $saisie, 'pct_min' => 85, 'pct_max' => 90])
+            ->call('saveRow')
+            ->assertHasErrors('form.aliases');
+        $this->assertSame(0, AllureZone::count());
+    }
+
+    public function test_restaurer_une_zone_dont_un_alias_a_ete_repris_est_refuse(): void
+    {
+        $admin = User::factory()->admin()->create();
+        AllureZone::query()->delete();
+        $old = $this->zone('Z3', 85, 90);
+        $old->update(['aliases' => 'SV2', 'archived_at' => now()]);
+        $autre = $this->zone('ZX', 70, 80);
+        $autre->update(['aliases' => 'sv2']);
+
+        Livewire::actingAs($admin)->test(CatalogueManager::class, ['type' => 'allure_zone'])->call('restore', $old->id);
+        $this->assertNotNull($old->refresh()->archived_at);
+
+        // Contrôle positif : l'alias libéré, la restauration passe.
+        $autre->update(['aliases' => null]);
+        Livewire::actingAs($admin)->test(CatalogueManager::class, ['type' => 'allure_zone'])->call('restore', $old->id);
+        $this->assertNull($old->refresh()->archived_at);
+    }
+
+    public function test_compteur_des_allures_cibles_dans_les_parametres(): void
+    {
+        $admin = User::factory()->admin()->create();
+        AllureLevel::query()->delete();
+        $this->riegel();
+
+        // Seul Riegel : le libellé de repli, pas « 1 ».
+        Livewire::actingAs($admin)->test(ClubSettingsForm::class)->assertViewHas('allureLevelCount', 0);
+
+        // Un niveau proposé compte, un niveau retiré non.
+        $this->level('Confirmé');
+        $this->level('Débutant', 2)->update(['active' => false]);
+        Livewire::actingAs($admin)->test(ClubSettingsForm::class)->assertViewHas('allureLevelCount', 1);
     }
 
     public function test_admin_enregistre_la_table_club(): void

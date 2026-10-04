@@ -77,6 +77,14 @@ class AlluresConsignesTest extends TestCase
         $this->assertSame(3, substr_count($html, 'zone-allure'));
     }
 
+    public function test_plage_abregee(): void
+    {
+        // « Z3-4 » vaut « Z3-Z4 » ; « Z4-7 » (pas de Z7) reste Z4 suivi du texte.
+        [$html] = $this->annoter('Z3-4 puis Z4-7');
+        $this->assertStringContainsString('Z3-4<span class="zone-allure"> [4:13–4:42 /km]</span>', $html);
+        $this->assertStringContainsString('Z4<span class="zone-allure"> [4:13–4:27 /km]</span>-7', $html);
+    }
+
     public function test_un_alias_vaut_sa_zone(): void
     {
         AllureZone::where('code', 'Z3')->update(['aliases' => 'SV2, SubT']);

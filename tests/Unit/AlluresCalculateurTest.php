@@ -62,6 +62,10 @@ class AlluresCalculateurTest extends TestCase
         $this->assertSame(6540.0, C::parseTemps('1:49:00'));
         $this->assertSame(6540.0, C::parseTemps('1h49'));
         $this->assertSame(6540.0, C::parseTemps('1h49:00'));
+        // Heures pleines : « 2h » sur un semi, pas deux minutes.
+        $this->assertSame(7200.0, C::parseTemps('2h'));
+        $this->assertSame(3600.0, C::parseTemps('1 h'));
+        $this->assertSame(2700.0, C::parseTemps('45'));
         $this->assertNull(C::parseTemps('vite'));
         $this->assertNull(C::parseTemps(''));
         $this->assertNull(C::parseTemps('0:00'));

@@ -40,7 +40,7 @@
         {{-- Bandeau pleine largeur, toujours présent : hauteur fixe, aucun saut de ligne en glissant. --}}
         <div class="chip zone-badge" :class="zone ? '' : 'zone-badge-hors'" :style="zone ? 'background:' + zone[4] : ''"
              x-text="zone ? zone[0] : 'Hors zone'" aria-live="polite"></div>
-        <label class="field-label" for="al-pct" style="margin:12px 0 0">
+        <label class="field-label" for="al-pct-{{ $this->getId() }}" style="margin:12px 0 0">
             Intensité : <b x-text="pct + ' %'"></b> de VMA
         </label>
         <div class="zone-strip-wrap">
@@ -51,7 +51,7 @@
             </div>
             <div class="zone-marker" :style="'left:' + ((pct - {{ $lo }}) / {{ $hi - $lo }} * 100) + '%'"></div>
         </div>
-        <input id="al-pct" type="range" class="zone-range" min="{{ $lo }}" max="{{ $hi }}" step="1" x-model.number="pct">
+        <input id="al-pct-{{ $this->getId() }}" type="range" class="zone-range" min="{{ $lo }}" max="{{ $hi }}" step="1" x-model.number="pct">
     </div>
 
     {{-- ── Mes allures par zone ── --}}

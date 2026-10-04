@@ -62,6 +62,21 @@ class AllureZone extends Model
     }
 
     /**
+     * Codes et alias des zones actives (hors `exceptId`), en minuscules, vers le code de leur zone :
+     * ce qu'une autre zone ne peut plus prendre sans rendre une consigne ambiguë.
+     *
+     * @return \Illuminate\Support\Collection<string, string>
+     */
+    public static function motsPris(Referentiel $referentiel, ?int $exceptId = null): \Illuminate\Support\Collection
+    {
+        return self::query()->active()
+            ->where('referentiel', $referentiel->value)
+            ->when($exceptId !== null, fn ($q) => $q->whereKeyNot($exceptId))
+            ->get()
+            ->flatMap(fn (self $z) => collect([$z->code, ...$z->aliasList()])->mapWithKeys(fn ($c) => [mb_strtolower($c) => $z->code]));
+    }
+
+    /**
      * Alias saisis « SV2, SubT » (virgules ou espaces), sans doublon.
      *
      * @return list<string>

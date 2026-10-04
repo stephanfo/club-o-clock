@@ -116,7 +116,7 @@ class CatalogueManager extends Component
                     $this->codeLibreRule()],
                 'form.label' => ['required', 'string', 'max:120'],
                 // Alias reconnus comme le code : mêmes contraintes, et aucun déjà pris par une zone.
-                'form.aliases' => ['nullable', 'string', 'max:60', $this->aliasesRule()],
+                'form.aliases' => ['nullable', 'string', 'max:255', $this->aliasesRule()],
                 'form.pct_min' => ['required', 'integer', 'min:30', 'max:150'],
                 'form.pct_max' => ['required', 'integer', 'min:30', 'max:150', 'gt:form.pct_min'],
             ],
@@ -126,18 +126,20 @@ class CatalogueManager extends Component
 
     /**
      * Alias d'une zone : chacun court (12 caractères), distinct du code de la zone, et ni code ni
-     * alias d'une autre zone active — sinon une consigne « SV2 » serait ambiguë.
+     * alias d'une autre zone active — sinon une consigne « SV2 » serait ambiguë. La longueur se
+     * contrôle sur la forme enregistrée (« A, B »), plus longue qu'une saisie séparée d'espaces.
      */
     private function aliasesRule(): \Closure
     {
         return function (string $attribute, mixed $value, \Closure $fail): void {
             $aliases = AllureZone::parseAliases((string) $value);
+            if (mb_strlen(implode(', ', $aliases)) > 60) {
+                $fail('Trop d’alias : 60 caractères au plus, séparateurs compris.');
+
+                return;
+            }
             $code = mb_strtolower(trim((string) ($this->form['code'] ?? '')));
-            $pris = AllureZone::query()->active()
-                ->where('referentiel', Referentiel::Course->value)
-                ->when(is_int($this->editingId), fn ($q) => $q->whereKeyNot($this->editingId))
-                ->get()
-                ->flatMap(fn (AllureZone $z) => collect([$z->code, ...$z->aliasList()])->mapWithKeys(fn ($c) => [mb_strtolower($c) => $z->code]));
+            $pris = AllureZone::motsPris(Referentiel::Course, is_int($this->editingId) ? $this->editingId : null);
             foreach ($aliases as $alias) {
                 if (mb_strlen($alias) > 12) {
                     $fail("Alias « {$alias} » trop long (12 caractères au plus).");
@@ -154,13 +156,11 @@ class CatalogueManager extends Component
     private function codeLibreRule(): \Closure
     {
         return function (string $attribute, mixed $value, \Closure $fail): void {
-            $zone = AllureZone::query()->active()
-                ->where('referentiel', Referentiel::Course->value)
-                ->when(is_int($this->editingId), fn ($q) => $q->whereKeyNot($this->editingId))
-                ->get()
-                ->first(fn (AllureZone $z) => in_array(mb_strtolower((string) $value), array_map('mb_strtolower', $z->aliasList()), true));
-            if ($zone !== null) {
-                $fail("« {$value} » est déjà un alias de la zone {$zone->code}.");
+            $pris = AllureZone::motsPris(Referentiel::Course, is_int($this->editingId) ? $this->editingId : null);
+            $zone = $pris->get(mb_strtolower((string) $value));
+            // Code contre code : déjà couvert par la règle d'unicité (zones archivées comprises).
+            if ($zone !== null && mb_strtolower($zone) !== mb_strtolower((string) $value)) {
+                $fail("« {$value} » est déjà un alias de la zone {$zone}.");
             }
         };
     }
@@ -302,6 +302,16 @@ class CatalogueManager extends Component
             session()->flash('warn', "Impossible : la zone chevaucherait {$clash->code} ({$clash->range()}).");
 
             return;
+        }
+        // Ses code et alias ont pu être repris par une autre zone pendant l'archivage.
+        if ($entity instanceof AllureZone) {
+            $pris = AllureZone::motsPris(Referentiel::Course, $entity->id);
+            $doublon = collect([$entity->code, ...$entity->aliasList()])->first(fn ($c) => $pris->has(mb_strtolower($c)));
+            if ($doublon !== null) {
+                session()->flash('warn', "Impossible : « {$doublon} » est déjà utilisé par la zone {$pris->get(mb_strtolower($doublon))}.");
+
+                return;
+            }
         }
         $this->runGuarded(fn () => $service->restore($this->type, $this->find($id), auth()->user()), 'Restauré·e.');
     }

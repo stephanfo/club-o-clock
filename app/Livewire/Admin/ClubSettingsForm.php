@@ -437,7 +437,8 @@ class ClubSettingsForm extends Component
     {
         return view('livewire.admin.club-settings-form', [
             'counts' => $this->catalogueCounts(),
-            'allureLevelCount' => AllureLevel::count(),
+            // Niveaux saisis par le club et proposés : à zéro, seul Riegel sert (libellé de repli).
+            'allureLevelCount' => AllureLevel::where('active', true)->whereNull('model')->count(),
             'logoPath' => ClubSettings::current()->logo_path,
             // Le bouton « rétablir » ne s'affiche que s'il y a quelque chose à rétablir : proposer
             // de revenir au défaut quand on y est déjà n'a pas de sens et inquiète inutilement.

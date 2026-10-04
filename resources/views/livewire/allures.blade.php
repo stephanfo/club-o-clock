@@ -44,10 +44,10 @@
                     i.value = v.toFixed(1).replace('.', ',');
                     i.dispatchEvent(new Event('input'));
                 } }">
-                <label class="field-label" for="al-vma">VMA (km/h)</label>
+                <label class="field-label" for="al-vma-{{ $this->getId() }}">VMA (km/h)</label>
                 <div class="stepper">
                     <button type="button" x-on:click="pas(-0.1)" aria-label="Baisser de 0,1 km/h">−</button>
-                    <input id="al-vma" x-ref="vma" class="val" type="text" inputmode="decimal" wire:model.live.debounce.400ms="vma" placeholder="13,5">
+                    <input id="al-vma-{{ $this->getId() }}" x-ref="vma" class="val" type="text" inputmode="decimal" wire:model.live.debounce.400ms="vma" placeholder="13,5">
                     <button type="button" x-on:click="pas(0.1)" aria-label="Monter de 0,1 km/h">+</button>
                 </div>
             </div>

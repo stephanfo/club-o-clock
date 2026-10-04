@@ -15,17 +15,17 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   // Onglet « Allures » du profil (une instance du composant par coquille : filtrer :visible).
   await page.goto(BASE + '/profil', { waitUntil: 'networkidle' });
   await page.locator('button:visible', { hasText: /^\s*Allures\s*$/ }).first().click();
-  await page.locator('#al-vma:visible').waitFor();
+  await page.locator('[id^="al-vma-"]:visible').waitFor();
   await attendre(page);
-  s.check('onglet Allures du profil, avec la VMA', (await page.locator('#al-vma:visible').inputValue()) === '13,5');
+  s.check('onglet Allures du profil, avec la VMA', (await page.locator('[id^="al-vma-"]:visible').inputValue()) === '13,5');
   // Boutons − / + : au dixième, sans rien enregistrer.
   await page.getByRole('button', { name: 'Monter de 0,1 km/h' }).locator('visible=true').click();
   await page.getByRole('button', { name: 'Monter de 0,1 km/h' }).locator('visible=true').click();
-  s.check('le + monte la VMA au dixième', (await page.locator('#al-vma:visible').inputValue()) === '13,7');
+  s.check('le + monte la VMA au dixième', (await page.locator('[id^="al-vma-"]:visible').inputValue()) === '13,7');
   await page.getByRole('button', { name: 'Baisser de 0,1 km/h' }).locator('visible=true').click();
   await page.getByRole('button', { name: 'Baisser de 0,1 km/h' }).locator('visible=true').click();
   await attendre(page);
-  s.check('le − la redescend', (await page.locator('#al-vma:visible').inputValue()) === '13,5');
+  s.check('le − la redescend', (await page.locator('[id^="al-vma-"]:visible').inputValue()) === '13,5');
 
   const corps = (await page.locator('body').innerText()).toLowerCase();
   s.check('VMA affichée avec son origine', corps.includes('estimée depuis un 10 km'));
@@ -35,12 +35,12 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   s.check('projection affichée, modèle de Riegel annoncé', corps.includes('projection de temps') && corps.includes('riegel'));
 
   // Le curseur de % recalcule côté navigateur.
-  const avant = await page.locator('#al-pct:visible').locator('..').innerText();
-  await page.locator('#al-pct:visible').fill('100');
-  const apres = await page.locator('#al-pct:visible').locator('..').innerText();
+  const avant = await page.locator('[id^="al-pct-"]:visible').locator('..').innerText();
+  await page.locator('[id^="al-pct-"]:visible').fill('100');
+  const apres = await page.locator('[id^="al-pct-"]:visible').locator('..').innerText();
   s.check('curseur : 100 % de 13,5 km/h = 4:27 /km', apres.includes('4:27') && apres !== avant);
 
-  await page.locator('#al-time:visible').fill('47:45');
+  await page.locator('[id^="al-time-"]:visible').fill('47:45');
   await page.waitForFunction(() => document.body.innerText.toLowerCase().includes('utiliser'));
   s.check('estimation affichée depuis un 10 km en 47:45', (await page.locator('body').innerText()).includes('14,1'));
   s.check('rien d’enregistré tant qu’on ne clique pas', sql("SELECT value FROM reference_values rv JOIN users u ON u.id=rv.user_id WHERE u.email='marie@demo.club'") === '13.5');
@@ -63,11 +63,11 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   const premier = titres.find(t => !/mon niveau/i.test(t)) ?? '';
   s.check('sans VMA, l’estimation passe en premier', /estimer/i.test(premier), premier);
   s.check('pas de tableau des zones sans VMA', await page.locator('table.tbl').count() === 0);
-  s.check('contrôle positif : l’écran est bien rendu', await page.locator('#al-vma:visible').count() === 1);
+  s.check('contrôle positif : l’écran est bien rendu', await page.locator('[id^="al-vma-"]:visible').count() === 1);
 
   await page.getByRole('button', { name: 'Semi' }).click();
   await attendre(page);
-  await page.locator('#al-time:visible').fill('1:49:00');
+  await page.locator('[id^="al-time-"]:visible').fill('1:49:00');
   const btn = page.getByRole('button', { name: /^Utiliser/ });
   await btn.waitFor();
   await btn.click();

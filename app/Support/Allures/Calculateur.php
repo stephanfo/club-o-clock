@@ -108,7 +108,7 @@ final class Calculateur
         return number_format($vma, 1, ',', '');
     }
 
-    /** Lit « 47:45 », « 1:49:00 » ou « 1h49 » ; null si illisible. */
+    /** Lit « 47:45 », « 1:49:00 », « 1h49 » ou « 2h » ; null si illisible. */
     public static function parseTemps(string $saisie): ?float
     {
         $t = trim(str_replace(['h', "'", '’', '"'], [':', ':', ':', ''], mb_strtolower($saisie)), ': ');
@@ -116,9 +116,10 @@ final class Calculateur
             return null;
         }
         $parts = array_map('intval', explode(':', $t));
-        // « 1h49 » donne [1, 49] : heures-minutes si la saisie contenait un h, minutes-secondes sinon.
-        if (count($parts) === 2 && str_contains(mb_strtolower($saisie), 'h')) {
-            $parts[] = 0;
+        // « 1h49 » donne [1, 49] et « 2h » [2] : avec un h, la saisie commence par les heures ;
+        // sans, « 47:45 » est en minutes-secondes et « 45 » en minutes.
+        if (str_contains(mb_strtolower($saisie), 'h')) {
+            $parts = array_pad($parts, 3, 0);
         }
         $secondes = match (count($parts)) {
             3 => $parts[0] * 3600 + $parts[1] * 60 + $parts[2],

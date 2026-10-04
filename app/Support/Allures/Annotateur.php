@@ -24,7 +24,7 @@ use Illuminate\Support\HtmlString;
  * - Le motif vient du catalogue (pas de `Z\d` en dur) : un club peut coder I1–I5, EF, AS10…
  * - Travail sur le HTML DÉJÀ sanitisé, dans les nœuds texte seulement, jamais dans un lien.
  * - « − » et « - » valent l'un pour l'autre ; un tiret suivi d'un code est une plage, annotée
- *   d'une seule fourchette qui couvre les deux zones : « Z3-Z4 [4:41–5:14 /km] ».
+ *   d'une seule fourchette qui couvre les deux zones : « Z3-Z4 [4:41–5:14 /km] », abrégé « Z3-4 ».
  * - Repli naturel sur le texte brut : pas de VMA, discipline sans référentiel, code inconnu.
  * - Web uniquement : email et push gardent le texte brut.
  */
@@ -97,6 +97,15 @@ final class Annotateur
                 if ($fin !== null) {
                     $morceau .= $morceaux[$i + 1].$morceaux[$i + 2];
                     $i += 2;
+                } elseif ($zone !== null && $i + 1 < $n
+                    && preg_match('/^[−-](\d+)(?![\p{L}\p{N}_+])/u', $morceaux[$i + 1], $m)
+                    && preg_match('/\d+$/', $morceau)) {
+                    // Plage abrégée « Z4-5 » : le nombre remplace celui qui termine le code.
+                    $fin = $parCode->get(self::normaliser(preg_replace('/\d+$/', $m[1], $morceau)));
+                    if ($fin !== null) {
+                        $morceau .= $m[0];
+                        $morceaux[$i + 1] = substr($morceaux[$i + 1], strlen($m[0]));
+                    }
                 }
                 if ($morceau !== '') {
                     $fragment->appendChild($doc->createTextNode($morceau));

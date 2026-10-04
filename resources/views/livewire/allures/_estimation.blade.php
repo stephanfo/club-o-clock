@@ -10,8 +10,8 @@
     </div>
     <div class="flex g8 wrap" style="align-items:flex-end">
         <div style="width:140px">
-            <label class="field-label" for="al-time">Temps</label>
-            <div class="ifield"><input id="al-time" class="ifield-input" type="text" wire:model.live.debounce.400ms="estTime" placeholder="47:45"></div>
+            <label class="field-label" for="al-time-{{ $this->getId() }}">Temps</label>
+            <div class="ifield"><input id="al-time-{{ $this->getId() }}" class="ifield-input" type="text" wire:model.live.debounce.400ms="estTime" placeholder="47:45"></div>
         </div>
     </div>
     @if ($estTimeInvalid)
