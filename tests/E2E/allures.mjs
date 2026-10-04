@@ -79,10 +79,11 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   await s.shot(page, 'allures-admin-zones');
 
   await page.goto(BASE + '/admin/allures-cibles', { waitUntil: 'networkidle' });
-  s.check('table vide : Riegel annoncé', (await page.locator('body').innerText()).includes('le modèle de Riegel s'));
+  s.check('Riegel affiché d’office comme niveau calculé', await page.locator('table.tbl tbody tr').count() === 1
+    && (await page.locator('table.tbl tbody tr').first().innerText()).includes('Modèle de Riegel'));
   await page.getByRole('button', { name: /Ajouter un niveau/ }).click();
-  await page.locator('table.tbl tbody tr').first().waitFor({ timeout: 5000 }).catch(() => {});
-  s.check('une ligne de niveau ajoutée (non enregistrée)', await page.locator('table.tbl tbody tr').count() === 1);
+  await page.locator('table.tbl tbody tr').nth(1).waitFor({ timeout: 5000 }).catch(() => {});
+  s.check('une ligne de niveau ajoutée sous Riegel (non enregistrée)', await page.locator('table.tbl tbody tr').count() === 2);
   await s.shot(page, 'allures-admin-cibles');
   s.check('rien d’enregistré', sql('SELECT COUNT(*) FROM allure_levels') === '0');
 

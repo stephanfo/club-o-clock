@@ -4,6 +4,7 @@ namespace App\Livewire\Admin;
 
 use App\Livewire\Concerns\AuthorizesAdminGate;
 use App\Models\AllureLevel;
+use App\Support\Allures\Calculateur;
 use App\Support\Allures\Referentiel;
 use App\Support\Logging\AuditLogger;
 use Illuminate\Support\Facades\DB;
@@ -12,9 +13,11 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 
 // Table club des allures cibles (#114) : % de VMA tenable par niveau × distance, saisi par le
-// coach sur l'instance de son club (ses coefficients ne vont jamais dans le dépôt). Vide, l'écran
-// Allures applique le modèle de Riegel. Édition en bloc : la table entière est réécrite à
-// l'enregistrement, l'ordre des lignes fait l'ordre des niveaux. Admin uniquement.
+// coach sur l'instance de son club (ses coefficients ne vont jamais dans le dépôt). Le modèle de
+// Riegel y figure d'office comme un niveau calculé, en lecture seule, montré par l'exemple (ses %
+// dépendent de la VMA) : déplaçable et désactivable, jamais supprimable. Au moins un niveau reste
+// proposé aux membres. Édition en bloc : la table entière est réécrite à l'enregistrement, l'ordre
+// des lignes fait l'ordre des niveaux (le premier actif est le choix par défaut). Admin uniquement.
 #[Layout('layouts.app')]
 #[Title('Allures cibles')]
 class AllureLevels extends Component
@@ -26,9 +29,13 @@ class AllureLevels extends Component
         return 'manage-catalogues';
     }
 
+    /** VMA (km/h) entre lesquelles la ligne Riegel affiche ses % en exemple. */
+    public const RIEGEL_VMA_EXEMPLE = [10.0, 18.0];
+
     /**
-     * Lignes éditées : [['label' => …, 'targets' => [distance => ['min' => …, 'max' => …]]]].
-     * Bornes en chaîne pour la saisie ; max vide = borne ouverte (« 95+ »).
+     * Lignes éditées : [['label' => …, 'model' => 'riegel'|null, 'active' => bool,
+     * 'targets' => [distance => ['min' => …, 'max' => …]]]].
+     * Bornes en chaîne pour la saisie ; max vide = borne ouverte (« 95+ »). Riegel : bornes vides.
      */
     public array $rows = [];
 
@@ -39,14 +46,38 @@ class AllureLevels extends Component
 
     public function mount(): void
     {
-        $this->rows = AllureLevel::forReferentiel($this->referentiel())->map(fn (AllureLevel $l) => [
-            'label' => $l->label,
+        $levels = AllureLevel::forReferentiel($this->referentiel());
+        $this->rows = $levels->map(fn (AllureLevel $l) => [
+            'label' => $l->isRiegel() ? AllureLevel::LABEL_RIEGEL : $l->label,
+            'model' => $l->isRiegel() ? AllureLevel::MODEL_RIEGEL : null,
+            'active' => $l->active,
             'targets' => collect($this->referentiel()->distances())->mapWithKeys(function ($d, $key) use ($l) {
-                $t = $l->target($key);
+                $t = $l->isRiegel() ? null : $l->target($key);
 
                 return [$key => ['min' => $t ? $this->fmt($t[0]) : '', 'max' => $t && $t[1] !== null ? $this->fmt($t[1]) : '']];
             })->all(),
         ])->values()->all();
+
+        // Base neuve : la ligne Riegel n'existe pas encore, elle arrive en tête et active.
+        if (! $levels->contains(fn (AllureLevel $l) => $l->isRiegel())) {
+            array_unshift($this->rows, $this->blankRow(AllureLevel::LABEL_RIEGEL, AllureLevel::MODEL_RIEGEL));
+        }
+    }
+
+    /** @return array{label: string, model: ?string, active: bool, targets: array<string, array{min: string, max: string}>} */
+    private function blankRow(string $label = '', ?string $model = null): array
+    {
+        return [
+            'label' => $label,
+            'model' => $model,
+            'active' => true,
+            'targets' => collect($this->referentiel()->distances())->mapWithKeys(fn ($d, $key) => [$key => ['min' => '', 'max' => '']])->all(),
+        ];
+    }
+
+    private function isRiegelRow(int $i): bool
+    {
+        return ($this->rows[$i]['model'] ?? null) === AllureLevel::MODEL_RIEGEL;
     }
 
     private function fmt(float $v): string
@@ -56,14 +87,21 @@ class AllureLevels extends Component
 
     public function addRow(): void
     {
-        $this->rows[] = [
-            'label' => '',
-            'targets' => collect($this->referentiel()->distances())->mapWithKeys(fn ($d, $key) => [$key => ['min' => '', 'max' => '']])->all(),
-        ];
+        $this->rows[] = $this->blankRow();
+    }
+
+    public function toggleActive(int $i): void
+    {
+        if (isset($this->rows[$i])) {
+            $this->rows[$i]['active'] = ! ($this->rows[$i]['active'] ?? true);
+        }
     }
 
     public function removeRow(int $i): void
     {
+        if ($this->isRiegelRow($i)) {
+            return;
+        }
         unset($this->rows[$i]);
         $this->rows = array_values($this->rows);
     }
@@ -77,10 +115,16 @@ class AllureLevels extends Component
 
     protected function rules(): array
     {
-        $rules = ['rows' => ['array', 'max:10'], 'rows.*.label' => ['required', 'string', 'max:60']];
-        foreach (array_keys($this->referentiel()->distances()) as $key) {
-            $rules["rows.*.targets.{$key}.min"] = ['required', 'numeric', 'min:30', 'max:120'];
-            $rules["rows.*.targets.{$key}.max"] = ['nullable', 'numeric', 'min:30', 'max:120', "gte:rows.*.targets.{$key}.min"];
+        $rules = ['rows' => ['array', 'max:11'], 'rows.*.label' => ['required', 'string', 'max:60']];
+        // Riegel n'a pas de bornes : seules les lignes saisies par le club sont contrôlées.
+        foreach (array_keys($this->rows) as $i) {
+            if ($this->isRiegelRow($i)) {
+                continue;
+            }
+            foreach (array_keys($this->referentiel()->distances()) as $key) {
+                $rules["rows.{$i}.targets.{$key}.min"] = ['required', 'numeric', 'min:30', 'max:120'];
+                $rules["rows.{$i}.targets.{$key}.max"] = ['nullable', 'numeric', 'min:30', 'max:120', "gte:rows.{$i}.targets.{$key}.min"];
+            }
         }
 
         return $rules;
@@ -98,16 +142,28 @@ class AllureLevels extends Component
     public function save(): void
     {
         $this->validate();
+        // Gardé côté serveur : l'état des lignes vient du client.
+        if (! collect($this->rows)->contains(fn ($r) => ($r['model'] ?? null) === AllureLevel::MODEL_RIEGEL)) {
+            $this->rows = [$this->blankRow(AllureLevel::LABEL_RIEGEL, AllureLevel::MODEL_RIEGEL), ...$this->rows];
+        }
+        if (! collect($this->rows)->contains(fn ($r) => (bool) ($r['active'] ?? true))) {
+            session()->flash('warn', 'Au moins un niveau doit rester proposé aux membres.');
+
+            return;
+        }
         $referentiel = $this->referentiel();
 
         DB::transaction(function () use ($referentiel) {
             AllureLevel::where('referentiel', $referentiel->value)->delete();
             foreach (array_values($this->rows) as $i => $row) {
+                $riegel = ($row['model'] ?? null) === AllureLevel::MODEL_RIEGEL;
                 AllureLevel::create([
                     'referentiel' => $referentiel->value,
-                    'label' => trim($row['label']),
+                    'label' => $riegel ? AllureLevel::LABEL_RIEGEL : trim($row['label']),
                     'sort_order' => $i,
-                    'targets' => collect($row['targets'])->map(fn ($t) => [
+                    'model' => $riegel ? AllureLevel::MODEL_RIEGEL : null,
+                    'active' => (bool) ($row['active'] ?? true),
+                    'targets' => $riegel ? null : collect($row['targets'])->map(fn ($t) => [
                         (float) $t['min'],
                         ($t['max'] ?? '') === '' ? null : (float) $t['max'],
                     ])->all(),
@@ -119,15 +175,29 @@ class AllureLevels extends Component
             ]);
         });
 
-        session()->flash('status', $this->rows === []
-            ? 'Table vidée : le modèle de Riegel s’applique.'
-            : 'Table des allures cibles enregistrée.');
+        session()->flash('status', 'Table des allures cibles enregistrée.');
     }
 
     public function render()
     {
         return view('livewire.admin.allure-levels', [
             'distances' => $this->referentiel()->distances(),
+            'riegel' => $this->riegelExample(),
         ]);
+    }
+
+    /**
+     * % de VMA tenus selon Riegel, par distance, pour les VMA d'exemple : [clé => [bas, haut]].
+     *
+     * @return array<string, array{float, float}>
+     */
+    private function riegelExample(): array
+    {
+        [$slow, $fast] = self::RIEGEL_VMA_EXEMPLE;
+
+        return collect($this->referentiel()->distances())->map(fn ($d) => [
+            Calculateur::pctRiegel(Calculateur::tempsRiegel($d[1], $slow)),
+            Calculateur::pctRiegel(Calculateur::tempsRiegel($d[1], $fast)),
+        ])->all();
     }
 }

@@ -3,7 +3,7 @@
 @php
     use App\Support\Allures\Calculateur as C;
     $distances = $referentiel->distances();
-    $model = $level ? 'Table du club — '.$level->label : 'Modèle de Riegel (exposant '.str_replace('.', ',', (string) C::RIEGEL_EXPOSANT).')';
+    $model = $level && ! $level->isRiegel() ? 'Table du club — '.$level->label : 'Modèle de Riegel (exposant '.str_replace('.', ',', (string) C::RIEGEL_EXPOSANT).')';
     $range = fn (array $t) => abs($t[0] - $t[1]) < 1 ? C::formatTemps($t[0]) : C::formatTemps($t[0]).' – '.C::formatTemps($t[1]);
 @endphp
 <div class="form-screen">

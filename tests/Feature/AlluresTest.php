@@ -259,19 +259,92 @@ class AlluresTest extends TestCase
         $admin = User::factory()->admin()->create();
         $targets = fn ($a, $b) => ['5k' => ['min' => $a, 'max' => $b], '10k' => ['min' => $a, 'max' => $b], 'semi' => ['min' => $a, 'max' => $b], 'marathon' => ['min' => $a, 'max' => '']];
 
+        // Lignes envoyées sans Riegel (état client) : le serveur le remet en tête.
         Livewire::actingAs($admin)->test(AllureLevels::class)
-            ->set('rows', [['label' => 'Loisir', 'targets' => $targets('80', '85')], ['label' => 'Compétition', 'targets' => $targets('88', '92')]])
+            ->set('rows', [['label' => 'Loisir', 'active' => true, 'targets' => $targets('80', '85')], ['label' => 'Compétition', 'active' => true, 'targets' => $targets('88', '92')]])
             ->call('save')
             ->assertHasNoErrors();
 
         $levels = AllureLevel::forReferentiel(Referentiel::Course);
-        $this->assertSame(['Loisir', 'Compétition'], $levels->pluck('label')->all());
-        $this->assertSame([80.0, 85.0], $levels[0]->target('5k'));
-        $this->assertSame([80.0, null], $levels[0]->target('marathon'));
+        $this->assertSame([AllureLevel::LABEL_RIEGEL, 'Loisir', 'Compétition'], $levels->pluck('label')->all());
+        $this->assertTrue($levels[0]->isRiegel());
+        $this->assertNull($levels[0]->targets);
+        $this->assertSame([80.0, 85.0], $levels[1]->target('5k'));
+        $this->assertSame([80.0, null], $levels[1]->target('marathon'));
         $this->assertTrue(AuditLog::where('action', 'allure_levels_modified')->exists());
+    }
 
-        // Vider la table : retour à Riegel.
-        Livewire::actingAs($admin)->test(AllureLevels::class)->set('rows', [])->call('save');
+    public function test_riegel_figure_d_office_comme_niveau_calcule_non_supprimable(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $c = Livewire::actingAs($admin)->test(AllureLevels::class)
+            ->assertSee(AllureLevel::LABEL_RIEGEL)
+            // % tenus sur 10 km pour une VMA de 10 à 18 km/h.
+            ->assertSee('87 – 90 %')
+            ->call('removeRow', 0);
+        $this->assertSame(AllureLevel::MODEL_RIEGEL, $c->get('rows')[0]['model']);
+
+        // Ajout d'un niveau sous Riegel, puis déplacement en tête : Riegel garde sa ligne.
+        $t = ['min' => '85', 'max' => '90'];
+        $c->call('addRow')
+            ->set('rows.1.label', 'Club')
+            ->set('rows.1.targets', ['5k' => $t, '10k' => $t, 'semi' => $t, 'marathon' => $t])
+            ->call('moveUp', 1)
+            ->call('save')
+            ->assertHasNoErrors();
+        $this->assertSame(['Club', AllureLevel::LABEL_RIEGEL], AllureLevel::forReferentiel(Referentiel::Course)->pluck('label')->all());
+    }
+
+    public function test_un_niveau_desactive_n_est_plus_propose_aux_membres(): void
+    {
+        $riegel = AllureLevel::create(['referentiel' => 'course', 'label' => AllureLevel::LABEL_RIEGEL, 'model' => AllureLevel::MODEL_RIEGEL, 'sort_order' => 0, 'active' => false]);
+        $club = $this->level('Confirmé', 1);
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)->test(Allures::class)
+            ->assertSet('levelId', $club->id)
+            ->set('estTime', '40:00')
+            ->assertSee('Table du club — Confirmé')
+            ->assertDontSee('Modèle de Riegel')
+            // Choix forcé sur le niveau désactivé : repli sur le premier actif.
+            ->set('levelId', $riegel->id)
+            ->assertSee('Table du club — Confirmé');
+    }
+
+    public function test_riegel_et_table_club_au_choix_du_membre(): void
+    {
+        $riegel = AllureLevel::create(['referentiel' => 'course', 'label' => AllureLevel::LABEL_RIEGEL, 'model' => AllureLevel::MODEL_RIEGEL, 'sort_order' => 0]);
+        $this->level('Confirmé', 1);
+        $user = User::factory()->create();
+
+        Livewire::actingAs($user)->test(Allures::class)
+            ->assertSet('levelId', $riegel->id)
+            ->assertSee('<select id="al-level"', false)
+            ->set('estTime', '40:00')
+            ->assertSee('Modèle de Riegel (exposant')
+            // Riegel seul n'a pas de fourchette : 10 km en 40:00 → 16,7.
+            ->assertSee('16,7');
+    }
+
+    public function test_riegel_seul_ne_propose_pas_de_choix_de_niveau(): void
+    {
+        AllureLevel::create(['referentiel' => 'course', 'label' => AllureLevel::LABEL_RIEGEL, 'model' => AllureLevel::MODEL_RIEGEL, 'sort_order' => 0]);
+        $this->level('Réserve', 1)->update(['active' => false]);
+
+        Livewire::actingAs(User::factory()->create())->test(Allures::class)
+            ->assertDontSee('<select id="al-level"', false)
+            ->assertSee('Modèle de Riegel (exposant');
+    }
+
+    public function test_au_moins_un_niveau_reste_propose(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        Livewire::actingAs($admin)->test(AllureLevels::class)
+            ->call('toggleActive', 0)
+            ->call('save');
+
         $this->assertSame(0, AllureLevel::count());
     }
 

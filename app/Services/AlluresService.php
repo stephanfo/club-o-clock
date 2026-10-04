@@ -54,8 +54,8 @@ class AlluresService
     }
 
     /**
-     * Estimation de la valeur de référence depuis une course : Riegel, ou la table club si elle
-     * existe (avec le niveau choisi). Résultat en fourchette [basse, haute] (égales sous Riegel),
+     * Estimation de la valeur de référence depuis une course : Riegel, ou le niveau choisi de la
+     * table club (le niveau Riegel compris). Résultat en fourchette [basse, haute] (égales sous Riegel),
      * plus le drapeau `improbable` quand la fourchette sort des bornes de vraisemblance.
      *
      * @return array{low: float, high: float, mid: float, improbable: bool, speed: float}|null
@@ -67,7 +67,7 @@ class AlluresService
             return null;
         }
 
-        if ($level !== null && ($target = $level->target($distance)) !== null) {
+        if ($level !== null && ! $level->isRiegel() && ($target = $level->target($distance)) !== null) {
             [$low, $high] = Calculateur::vmaTable($meters, $seconds, $target[0], $target[1]);
         } else {
             $low = $high = Calculateur::vmaRiegel($meters, $seconds);
@@ -92,6 +92,7 @@ class AlluresService
     public function project(Referentiel $referentiel, float $value, ?AllureLevel $level): array
     {
         $out = [];
+        $level = $level?->isRiegel() ? null : $level;
         foreach ($referentiel->distances() as $key => [, $meters]) {
             if ($level !== null) {
                 $target = $level->target($key);

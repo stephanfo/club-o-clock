@@ -13,7 +13,7 @@
             <label class="field-label" for="al-time">Temps</label>
             <div class="ifield"><input id="al-time" class="ifield-input" type="text" wire:model.live.debounce.400ms="estTime" placeholder="47:45"></div>
         </div>
-        @if ($levels->isNotEmpty())
+        @if ($levels->count() > 1)
             <div style="min-width:180px">
                 <label class="field-label" for="al-level">Niveau</label>
                 <div class="ifield">
