@@ -10,7 +10,7 @@
         <div class="card card-pad">
             <div class="db-prose">{!! $consigne['html'] !!}</div>
             @if ($consigne['invite'])
-                <a href="{{ route('allures') }}" wire:navigate class="meta ac g6" style="display:inline-flex;margin-top:10px;font-size:12.5px;color:var(--brand-700)">
+                <a href="{{ route('profil', ['tab' => 'allures']) }}" wire:navigate class="meta ac g6" style="display:inline-flex;margin-top:10px;font-size:12.5px;color:var(--brand-700)">
                     <x-icon name="footprints" :size="14" /> Renseigne ta VMA pour voir tes allures
                 </a>
             @endif

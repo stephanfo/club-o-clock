@@ -68,10 +68,13 @@ class AlluresConsignesTest extends TestCase
 
     public function test_signe_moins_et_plage(): void
     {
-        // « Z3- » (tiret ASCII) = la zone Z3− ; « Z3-Z4 » = une plage, Z3 puis Z4.
-        [$html] = $this->annoter('Z3- puis Z3-Z4');
+        // « Z3- » (tiret ASCII) = la zone Z3− ; « Z3-Z4 » = une plage, une seule fourchette de
+        // l'allure la plus rapide de Z4 à la plus lente de Z3, quel que soit l'ordre d'écriture.
+        [$html] = $this->annoter('Z3- puis Z3-Z4 puis Z4−Z3');
         $this->assertStringContainsString('Z3-<span class="zone-allure"> (4:46–5:00 /km)</span>', $html);
-        $this->assertStringContainsString('Z3<span class="zone-allure"> (4:27–4:42 /km)</span>-Z4<span class="zone-allure"> (4:13–4:27 /km)</span>', $html);
+        $this->assertStringContainsString('Z3-Z4<span class="zone-allure"> (4:13–4:42 /km)</span>', $html);
+        $this->assertStringContainsString('Z4−Z3<span class="zone-allure"> (4:13–4:42 /km)</span>', $html);
+        $this->assertSame(3, substr_count($html, 'zone-allure'));
     }
 
     public function test_ni_dans_un_lien_ni_colle_a_un_mot(): void

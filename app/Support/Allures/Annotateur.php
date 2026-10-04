@@ -22,8 +22,8 @@ use Illuminate\Support\HtmlString;
  *
  * - Le motif vient du catalogue (pas de `Z\d` en dur) : un club peut coder I1–I5, EF, AS10…
  * - Travail sur le HTML DÉJÀ sanitisé, dans les nœuds texte seulement, jamais dans un lien.
- * - « − » et « - » valent l'un pour l'autre ; un tiret suivi d'un code est une plage
- *   (« Z3-Z4 » = Z3 puis Z4), pas un signe moins.
+ * - « − » et « - » valent l'un pour l'autre ; un tiret suivi d'un code est une plage, annotée
+ *   d'une seule fourchette qui couvre les deux zones : « Z3-Z4 (4:41–5:14 /km) ».
  * - Repli naturel sur le texte brut : pas de VMA, discipline sans référentiel, code inconnu.
  * - Web uniquement : email et push gardent le texte brut.
  */
@@ -84,17 +84,25 @@ final class Annotateur
                 continue;
             }
             $fragment = $doc->createDocumentFragment();
-            foreach ($morceaux as $i => $morceau) {
-                if ($morceau === '') {
-                    continue;
-                }
-                $fragment->appendChild($doc->createTextNode($morceau));
+            $n = count($morceaux);
+            for ($i = 0; $i < $n; $i++) {
+                $morceau = $morceaux[$i];
                 // Les indices impairs sont les codes capturés.
                 $zone = $i % 2 === 1 ? $parCode->get(self::normaliser($morceau)) : null;
+                // Plage « Z3-Z4 » : code, tiret seul, code — une fourchette pour l'ensemble.
+                $fin = $zone !== null && $i + 2 < $n && in_array($morceaux[$i + 1], ['-', '−'], true)
+                    ? $parCode->get(self::normaliser($morceaux[$i + 2])) : null;
+                if ($fin !== null) {
+                    $morceau .= $morceaux[$i + 1].$morceaux[$i + 2];
+                    $i += 2;
+                }
+                if ($morceau !== '') {
+                    $fragment->appendChild($doc->createTextNode($morceau));
+                }
                 if ($zone !== null) {
                     $span = $doc->createElement('span');
                     $span->setAttribute('class', 'zone-allure');
-                    $span->appendChild($doc->createTextNode(' ('.self::fourchette($zone, $vma).' /km)'));
+                    $span->appendChild($doc->createTextNode(' ('.self::fourchette($zone, $vma, $fin).' /km)'));
                     $fragment->appendChild($span);
                 }
             }
@@ -113,11 +121,17 @@ final class Annotateur
         return [$out, true];
     }
 
-    /** « 4:41–4:56 » : allure au % haut (rapide) puis au % bas (lent). */
-    public static function fourchette(AllureZone $zone, float $vma): string
+    /**
+     * « 4:41–4:56 » : allure au % haut (rapide) puis au % bas (lent). Avec une seconde zone (plage),
+     * la fourchette couvre les deux, dans quelque ordre qu'elles soient écrites.
+     */
+    public static function fourchette(AllureZone $zone, float $vma, ?AllureZone $jusqua = null): string
     {
-        return Calculateur::formatAllure(Calculateur::allure($vma, $zone->pct_max))
-            .'–'.Calculateur::formatAllure(Calculateur::allure($vma, $zone->pct_min));
+        $haut = max($zone->pct_max, $jusqua->pct_max ?? $zone->pct_max);
+        $bas = min($zone->pct_min, $jusqua->pct_min ?? $zone->pct_min);
+
+        return Calculateur::formatAllure(Calculateur::allure($vma, $haut))
+            .'–'.Calculateur::formatAllure(Calculateur::allure($vma, $bas));
     }
 
     /**

@@ -104,7 +104,7 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
 
 // ── A4 · #113 · Consigne en zones : allure de Marie à côté du code, invitation pour Lucas ──
 {
-  const cible = seanceFuture(`kind='training' AND content_markdown LIKE '%Z4%'
+  const cible = seanceFuture(`kind='training' AND content_markdown LIKE '%2 blocs de 4x%'
       AND discipline_id IN (SELECT id FROM disciplines WHERE referentiel='course')`);
   for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
     const s = new Scenario(`A4 · Consigne en zones, séance ${cible} (${format})`);
@@ -127,8 +127,8 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
     const prose = page.locator('.db-prose:visible').first();
     s.check('texte brut conservé', (await prose.innerText()).includes("2' Z4 / 2' Z3"));
     s.check('aucune allure ajoutée', await page.locator('.zone-allure').count() === 0);
-    const lien = page.locator('a[href$="/allures"]:visible', { hasText: 'Renseigne ta VMA' });
-    s.check('invitation à renseigner sa VMA', await lien.count() === 1);
+    const lien = page.locator('a[href*="tab=allures"]:visible', { hasText: 'Renseigne ta VMA' });
+    s.check('invitation à renseigner sa VMA, vers l’onglet du profil', await lien.count() === 1);
     await lien.scrollIntoViewIfNeeded();
     await s.shot(page, 'allures-consigne-lucas-mobile');
     s.checkJs(page);
