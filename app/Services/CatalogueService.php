@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AllureZone;
 use App\Models\Category;
 use App\Models\Discipline;
 use App\Models\EventType;
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use RuntimeException;
 
-// Gestion des catalogues paramétrables (PRD §4.6, §4.17). Pattern commun à 6 entités :
+// Gestion des catalogues paramétrables (PRD §4.6, §4.17). Pattern commun à 7 entités :
 // création / renommage rétroactif par ID / archivage soft (si référencé) / suppression dure
 // (si zéro référence). Garde-fou « minimum 1 actif » sur Disciplines (§4.6.1) et Types d'épreuve
 // (§4.6.2). Chaque opération → AuditLog dédié. Admin uniquement (vérifié en amont par Gate).
@@ -72,6 +73,13 @@ class CatalogueService
                 'audit' => 'location_modified', 'keep_one' => false,
                 'refs' => fn (Model $m) => Session::where('location_id', $m->id)->count()
                     + SessionTemplate::where('location_id', $m->id)->count(),
+            ],
+            // Zones d'allure (#114) : citées en texte libre dans les consignes, jamais par clé
+            // étrangère — rien n'empêche la suppression dure.
+            'allure_zone' => [
+                'model' => AllureZone::class, 'archive_col' => 'archived_at',
+                'audit' => 'allure_zone_modified', 'keep_one' => false,
+                'refs' => fn (Model $m) => 0,
             ],
             default => throw new RuntimeException("Catalogue inconnu : {$type}."),
         };

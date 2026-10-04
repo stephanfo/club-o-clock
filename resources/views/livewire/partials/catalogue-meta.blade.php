@@ -10,7 +10,10 @@
         @if ($it->code)<span class="chip chip-sm chip-line">{{ $it->code }}</span>@else<span class="meta">sans code</span>@endif
         @break
     @case('discipline')
-        <span class="meta">couleur charte</span>
+        <span class="meta">couleur charte{{ ($r = $it->referentielEnum()) ? ' · allures '.mb_strtolower($r->label()) : '' }}</span>
+        @break
+    @case('allure_zone')
+        <span class="meta">{{ $it->range() }} de la VMA{{ $it->aliases ? ' · alias '.implode(', ', $it->aliasList()) : '' }}</span>
         @break
     @case('event_type')
         <span class="meta">type de compétition</span>

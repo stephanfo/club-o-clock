@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Livewire\Concerns\AuthorizesAdminGate;
+use App\Models\AllureZone;
 use App\Models\Category;
 use App\Models\Discipline;
 use App\Models\EventType;
@@ -11,6 +12,7 @@ use App\Models\Qualification;
 use App\Models\QuotaTag;
 use App\Services\CatalogueService;
 use App\Services\GeocodingService;
+use App\Support\Allures\Referentiel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
@@ -34,7 +36,7 @@ class CatalogueManager extends Component
         return 'manage-catalogues';
     }
 
-    /** Type de catalogue : discipline|category|event_type|quota_tag|qualification|location. */
+    /** Type de catalogue : discipline|category|event_type|quota_tag|qualification|location|allure_zone. */
     public string $type;
 
     /** Ligne en cours d'édition (null = aucune), ou 'new' pour l'ajout. */
@@ -50,12 +52,13 @@ class CatalogueManager extends Component
 
     /** Définition d'affichage/champs par type. */
     private const TYPES = [
-        'discipline' => ['model' => Discipline::class, 'singular' => 'Discipline', 'title' => 'Disciplines', 'fields' => ['label']],
+        'discipline' => ['model' => Discipline::class, 'singular' => 'Discipline', 'title' => 'Disciplines', 'fields' => ['label', 'referentiel']],
         'category' => ['model' => Category::class, 'singular' => 'Catégorie d’âge', 'title' => 'Catégories d’âge', 'fields' => ['label', 'age_min', 'age_max']],
         'event_type' => ['model' => EventType::class, 'singular' => 'Type d’épreuve', 'title' => 'Types d’épreuve', 'fields' => ['label']],
         'quota_tag' => ['model' => QuotaTag::class, 'singular' => 'Tag de quota', 'title' => 'Tags de quota', 'fields' => ['label', 'code', 'max_per_week']],
         'qualification' => ['model' => Qualification::class, 'singular' => 'Qualification', 'title' => 'Qualifications', 'fields' => ['label', 'code']],
         'location' => ['model' => Location::class, 'singular' => 'Lieu', 'title' => 'Lieux', 'fields' => ['name', 'address', 'kind', 'latitude', 'longitude']],
+        'allure_zone' => ['model' => AllureZone::class, 'singular' => 'Zone d’allure', 'title' => 'Zones d’allure course', 'fields' => ['code', 'label', 'aliases', 'pct_min', 'pct_max']],
     ];
 
     public function mount(string $type): void
@@ -102,7 +105,63 @@ class CatalogueManager extends Component
                 'form.latitude' => ['nullable', 'numeric', 'between:-90,90'],
                 'form.longitude' => ['nullable', 'numeric', 'between:-180,180'],
             ],
+            'discipline' => [
+                'form.label' => ['required', 'string', 'max:120'],
+                'form.referentiel' => ['nullable', Rule::in(array_keys(Referentiel::options()))],
+            ],
+            'allure_zone' => [
+                // Le code est ce que les consignes citent (#113) : court, sans espace, unique.
+                'form.code' => ['required', 'string', 'max:12', 'regex:/^\S+$/u',
+                    $this->uniqueRule('allure_zones', 'code')->where('referentiel', Referentiel::Course->value),
+                    $this->codeLibreRule()],
+                'form.label' => ['required', 'string', 'max:120'],
+                // Alias reconnus comme le code : mêmes contraintes, et aucun déjà pris par une zone.
+                'form.aliases' => ['nullable', 'string', 'max:60', $this->aliasesRule()],
+                'form.pct_min' => ['required', 'integer', 'min:30', 'max:150'],
+                'form.pct_max' => ['required', 'integer', 'min:30', 'max:150', 'gt:form.pct_min'],
+            ],
             default => ['form.label' => ['required', 'string', 'max:120']],
+        };
+    }
+
+    /**
+     * Alias d'une zone : chacun court (12 caractères), distinct du code de la zone, et ni code ni
+     * alias d'une autre zone active — sinon une consigne « SV2 » serait ambiguë.
+     */
+    private function aliasesRule(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            $aliases = AllureZone::parseAliases((string) $value);
+            $code = mb_strtolower(trim((string) ($this->form['code'] ?? '')));
+            $pris = AllureZone::query()->active()
+                ->where('referentiel', Referentiel::Course->value)
+                ->when(is_int($this->editingId), fn ($q) => $q->whereKeyNot($this->editingId))
+                ->get()
+                ->flatMap(fn (AllureZone $z) => collect([$z->code, ...$z->aliasList()])->mapWithKeys(fn ($c) => [mb_strtolower($c) => $z->code]));
+            foreach ($aliases as $alias) {
+                if (mb_strlen($alias) > 12) {
+                    $fail("Alias « {$alias} » trop long (12 caractères au plus).");
+                } elseif (mb_strtolower($alias) === $code) {
+                    $fail("« {$alias} » est déjà le code de la zone.");
+                } elseif ($pris->has(mb_strtolower($alias))) {
+                    $fail("« {$alias} » est déjà utilisé par la zone {$pris->get(mb_strtolower($alias))}.");
+                }
+            }
+        };
+    }
+
+    /** Le code d'une zone ne doit pas être l'alias d'une autre zone active. */
+    private function codeLibreRule(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            $zone = AllureZone::query()->active()
+                ->where('referentiel', Referentiel::Course->value)
+                ->when(is_int($this->editingId), fn ($q) => $q->whereKeyNot($this->editingId))
+                ->get()
+                ->first(fn (AllureZone $z) => in_array(mb_strtolower((string) $value), array_map('mb_strtolower', $z->aliasList()), true));
+            if ($zone !== null) {
+                $fail("« {$value} » est déjà un alias de la zone {$zone->code}.");
+            }
         };
     }
 
@@ -202,6 +261,22 @@ class CatalogueManager extends Component
     {
         $data = $this->validate()['form'];
 
+        if ($this->type === 'discipline') {
+            $data['referentiel'] = ($data['referentiel'] ?? null) ?: null;
+        }
+        if ($this->type === 'allure_zone') {
+            // V1 : un seul référentiel. Plages discontinues acceptées, chevauchement refusé.
+            $data['referentiel'] = Referentiel::Course->value;
+            $data['aliases'] = implode(', ', AllureZone::parseAliases($data['aliases'] ?? null)) ?: null;
+            $clash = AllureZone::overlapping(Referentiel::Course, (int) $data['pct_min'], (int) $data['pct_max'],
+                is_int($this->editingId) ? $this->editingId : null);
+            if ($clash !== null) {
+                $this->addError('form.pct_max', "Chevauche la zone {$clash->code} ({$clash->range()}).");
+
+                return;
+            }
+        }
+
         if ($this->editingId === 'new') {
             $service->create($this->type, $data, auth()->user());
             session()->flash('status', $this->def()['singular'].' ajouté·e.');
@@ -221,6 +296,13 @@ class CatalogueManager extends Component
 
     public function restore(int $id, CatalogueService $service): void
     {
+        $entity = $this->find($id);
+        if ($entity instanceof AllureZone
+            && ($clash = AllureZone::overlapping(Referentiel::Course, $entity->pct_min, $entity->pct_max, $entity->id)) !== null) {
+            session()->flash('warn', "Impossible : la zone chevaucherait {$clash->code} ({$clash->range()}).");
+
+            return;
+        }
         $this->runGuarded(fn () => $service->restore($this->type, $this->find($id), auth()->user()), 'Restauré·e.');
     }
 
@@ -259,6 +341,15 @@ class CatalogueManager extends Component
         return $base;
     }
 
+    private function orderColumn(): string
+    {
+        return match ($this->type) {
+            'location' => 'name',
+            'allure_zone' => 'pct_min',
+            default => 'label',
+        };
+    }
+
     public function render()
     {
         $col = $this->archiveCol();
@@ -267,12 +358,12 @@ class CatalogueManager extends Component
         $active = (clone $model)->when($col === 'is_archived',
             fn ($q) => $q->where('is_archived', false),
             fn ($q) => $q->whereNull($col),
-        )->orderBy($this->type === 'location' ? 'name' : 'label')->get();
+        )->orderBy($this->orderColumn())->get();
 
         $archived = (clone $model)->when($col === 'is_archived',
             fn ($q) => $q->where('is_archived', true),
             fn ($q) => $q->whereNotNull($col),
-        )->orderBy($this->type === 'location' ? 'name' : 'label')->get();
+        )->orderBy($this->orderColumn())->get();
 
         return view('livewire.admin.catalogue-manager', [
             'def' => $this->def(),
