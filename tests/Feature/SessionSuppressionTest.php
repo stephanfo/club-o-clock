@@ -6,6 +6,7 @@ use App\Livewire\Alerts;
 use App\Livewire\SessionShow;
 use App\Models\AperoFlag;
 use App\Models\AuditLog;
+use App\Models\ClubSettings;
 use App\Models\Debrief;
 use App\Models\NotificationOutbox;
 use App\Models\Registration;
@@ -291,9 +292,12 @@ class SessionSuppressionTest extends TestCase
      */
     public function test_lalerte_orpheline_garde_son_creneau_et_pas_seulement_son_titre(): void
     {
+        // Créneau relatif à aujourd'hui : figé au 26/09, l'alerte sortait de la cloche (masquée
+        // J+7 après la séance) dès le 03/10 et le test rougissait sans rapport avec le repli.
+        $start = Carbon::now('UTC')->addDays(3)->setTime(13, 0);
         $seance = $this->annulee([
             'title' => 'Sortie longue',
-            'start_at' => Carbon::parse('2026-09-26 13:00', 'UTC'),
+            'start_at' => $start,
         ]);
         $destinataire = User::factory()->create();
         $admin = User::factory()->admin()->create();
@@ -304,7 +308,7 @@ class SessionSuppressionTest extends TestCase
 
         Livewire::actingAs($destinataire)->test(Alerts::class)
             ->assertSee('Sortie longue')
-            ->assertSee('26 sept.');
+            ->assertSee($start->copy()->setTimezone(ClubSettings::current()->timezone)->locale('fr')->isoFormat('D MMM'));
     }
 
     /**
