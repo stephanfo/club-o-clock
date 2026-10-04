@@ -820,7 +820,8 @@ textarea.input { resize: vertical; min-height: 70px; line-height: 1.5; }
 .zone-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; margin-top: -8px; border-radius: 50%; background: var(--brand); border: 3px solid var(--paper); box-shadow: 0 0 0 1px var(--brand); }
 .zone-range::-moz-range-thumb { width: 22px; height: 22px; box-sizing: border-box; border-radius: 50%; background: var(--brand); border: 3px solid var(--paper); box-shadow: 0 0 0 1px var(--brand); }
 .zone-range:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-.zone-badge { color: var(--paper); }
+.zone-badge { display: flex; justify-content: center; width: 100%; margin-top: 8px; color: var(--paper); overflow: hidden; text-overflow: ellipsis; }
+.zone-badge-hors { color: var(--fg-soft); }
 .zone-readout { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; margin-top: 12px; }
 .zone-readout > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .zone-readout .num { font-size: 26px; }
