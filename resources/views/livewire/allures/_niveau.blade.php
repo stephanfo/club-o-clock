@@ -3,7 +3,7 @@
 @if ($levels->count() > 1)
     <div class="card card-pad" wire:key="al-niveau">
         <div class="eyebrow" style="margin-bottom:4px">Mon niveau</div>
-        <div class="meta" style="margin-bottom:10px">Sert à estimer ta VMA depuis une course et à projeter tes temps de course.</div>
+        <div class="meta" style="margin-bottom:10px">Sert à projeter tes temps de course et à estimer ta VMA depuis une course{{ $reference ? ' (plus bas)' : '' }}.</div>
         <div class="seg" role="radiogroup" aria-label="Niveau" style="flex-wrap:wrap">
             @foreach ($levels as $l)
                 <button type="button" role="radio" aria-checked="{{ $level?->is($l) ? 'true' : 'false' }}"

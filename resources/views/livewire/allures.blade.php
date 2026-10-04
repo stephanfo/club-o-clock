@@ -11,10 +11,13 @@
     <x-flash-float />
     <div class="meta">Ta VMA et tes allures d'entraînement. Visible de toi seul·e.</div>
 
-    {{-- Ordre du DOM, pas seulement visuel : avec une VMA enregistrée, les allures passent en tête
-         (ce qu'on vient consulter) ; sans, l'estimation d'abord, puis la saisie. --}}
+    {{-- Ordre du DOM, pas seulement visuel : avec une VMA enregistrée, les allures et la projection
+         passent en tête (ce qu'on vient consulter), le niveau juste au-dessus de la projection qu'il
+         règle ; sans, le niveau et l'estimation d'abord, puis la saisie. --}}
     @if ($reference)
         @include('livewire.allures._zones')
+        @include('livewire.allures._niveau')
+        @include('livewire.allures._projection')
     @else
         @include('livewire.allures._niveau')
         @include('livewire.allures._estimation')
@@ -59,26 +62,11 @@
     </div>
 
     @if ($reference)
-        @include('livewire.allures._niveau')
         @include('livewire.allures._estimation')
     @else
         {{-- VMA tapée sans être enregistrée : les allures s'affichent sous la saisie. --}}
         @include('livewire.allures._zones')
+        @include('livewire.allures._projection')
     @endif
 
-    @if ($vmaValue)
-        {{-- ── Projection ── --}}
-        <div class="card card-pad" wire:key="al-projection">
-            <div class="eyebrow" style="margin-bottom:8px">Projection de temps de course</div>
-            @foreach ($distances as $key => [$label])
-                @isset($projection[$key])
-                    <div class="flex ac jb" style="padding:8px 0;border-bottom:1px solid var(--divider)">
-                        <span>{{ $label }}</span>
-                        <span style="font-weight:700">{{ $range($projection[$key]) }}</span>
-                    </div>
-                @endisset
-            @endforeach
-            <div class="meta" style="font-size:12px;margin-top:10px">{{ $model }}.</div>
-        </div>
-    @endif
 </div>

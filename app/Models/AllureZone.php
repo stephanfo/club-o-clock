@@ -85,10 +85,13 @@ class AllureZone extends Model
         return implode(' · ', [$this->code, ...$this->aliasList()]);
     }
 
-    /** Badge du curseur : code, libellé, puis alias entre parenthèses — « Z3 · Seuil (SV2, SubT) ». */
+    /**
+     * Badge du curseur : code, libellé, puis alias entre parenthèses — « Z3 · Seuil (SV2, SubT) ».
+     * Un alias identique au libellé n'est pas répété.
+     */
     public function badge(): string
     {
-        $aliases = $this->aliasList();
+        $aliases = array_values(array_filter($this->aliasList(), fn ($a) => mb_strtolower($a) !== mb_strtolower($this->label)));
 
         return $this->code.' · '.$this->label.($aliases ? ' ('.implode(', ', $aliases).')' : '');
     }

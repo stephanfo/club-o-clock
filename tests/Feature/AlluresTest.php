@@ -177,7 +177,7 @@ class AlluresTest extends TestCase
             ->assertSee('<th class="r">3 km</th>', false)
             ->assertSee('Projection de temps de course')
             // VMA enregistrée : les allures en tête, la saisie ensuite.
-            ->assertSeeInOrder(['Mon allure selon', 'Mes allures par zone', 'Ma VMA', 'Estimer ma VMA']);
+            ->assertSeeInOrder(['Mon allure selon', 'Mes allures par zone', 'Projection de temps de course', 'Ma VMA', 'Estimer ma VMA']);
     }
 
     // ── Confidentialité ──
@@ -283,7 +283,10 @@ class AlluresTest extends TestCase
             ->assertHasNoErrors();
         $this->assertSame('SV2, SubT', AllureZone::where('code', 'Z3')->value('aliases'));
         // Badge du curseur : libellé en second, alias entre parenthèses.
-        $this->assertSame('Z3 · Seuil (SV2, SubT)', AllureZone::where('code', 'Z3')->firstOrFail()->badge());
+        $z3 = AllureZone::where('code', 'Z3')->firstOrFail();
+        $this->assertSame('Z3 · Seuil (SV2, SubT)', $z3->badge());
+        $z3->label = 'SubT';
+        $this->assertSame('Z3 · SubT (SV2)', $z3->badge());
 
         $user = User::factory()->create();
         app(AlluresService::class)->setReference($user, Referentiel::Course, 15.0, ReferenceValue::SOURCE_SAISIE);
