@@ -1,7 +1,7 @@
-// Allures course (#114) — écran du membre et écrans admin, aux deux formats.
+// Allures course (#114, #113) — écran du membre, écrans admin, zones dans les consignes.
 //
 // NON destructif : la VMA de Marie est remise à sa valeur de démo, celle de Lucas effacée.
-import { launch, session, sql, Scenario, MOBILE, DESKTOP, BASE } from './lib.mjs';
+import { launch, session, fiche, sql, seanceFuture, Scenario, MOBILE, DESKTOP, BASE } from './lib.mjs';
 
 const browser = await launch();
 const tous = [];
@@ -92,6 +92,41 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   s.checkJs(page);
   tous.push(s.report());
   await ctx.close();
+}
+
+// ── A4 · #113 · Consigne en zones : allure de Marie à côté du code, invitation pour Lucas ──
+{
+  const cible = seanceFuture(`kind='training' AND content_markdown LIKE '%Z4%'
+      AND discipline_id IN (SELECT id FROM disciplines WHERE referentiel='course')`);
+  for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
+    const s = new Scenario(`A4 · Consigne en zones, séance ${cible} (${format})`);
+    const { ctx, page } = await session(browser, 'marie@demo.club', viewport);
+    await fiche(page, cible);
+    const prose = page.locator('.db-prose:visible').first();
+    await prose.scrollIntoViewIfNeeded();
+    // VMA 13,5 : Z4 (90–95 %) = 4:41–4:56 /km.
+    s.check('allure de Marie à côté de Z4', (await prose.innerText()).includes('Z4 (4:41–4:56 /km)'));
+    s.check('pas d’invitation pour qui a une VMA', await page.getByText('Renseigne ta VMA').count() === 0);
+    await s.shot(page, `allures-consigne-marie-${format}`);
+    s.checkJs(page);
+    tous.push(s.report());
+    await ctx.close();
+  }
+  {
+    const s = new Scenario(`A4 · Consigne en zones, sans VMA (Lucas, mobile)`);
+    const { ctx, page } = await session(browser, 'lucas@demo.club', MOBILE);
+    await fiche(page, cible);
+    const prose = page.locator('.db-prose:visible').first();
+    s.check('texte brut conservé', (await prose.innerText()).includes("2' Z4 / 2' Z3"));
+    s.check('aucune allure ajoutée', await page.locator('.zone-allure').count() === 0);
+    const lien = page.locator('a[href$="/allures"]:visible', { hasText: 'Renseigne ta VMA' });
+    s.check('invitation à renseigner sa VMA', await lien.count() === 1);
+    await lien.scrollIntoViewIfNeeded();
+    await s.shot(page, 'allures-consigne-lucas-mobile');
+    s.checkJs(page);
+    tous.push(s.report());
+    await ctx.close();
+  }
 }
 
 await browser.close();

@@ -618,6 +618,17 @@ class DemoSeeder extends Seeder
             $athletes->push($child);
         }
 
+        // Allures course (#113) : consigne écrite en zones sur les séances de course sans programme,
+        // pour démontrer l'allure personnelle affichée à côté de chaque code de zone.
+        Session::whereHas('discipline', fn ($q) => $q->where('label', 'Course à pied'))
+            ->where('kind', 'training')
+            ->whereNull('content_markdown')
+            ->update(['content_markdown' => Markup::clean(
+                "Échauffement 20' Z1, gammes.\n\n"
+                ."- 2 blocs de 4x (2' Z4 / 2' Z3), récup 3' Z1 entre les blocs\n"
+                ."- Retour au calme 10' Z1"
+            )]);
+
         // Pose un flag apéro sur chaque séance CAP mercredi (passées ou 1 semaine à venir).
         $capSessions = Session::whereHas('discipline', fn ($q) => $q->where('label', 'Course à pied'))
             ->where('start_at', '<=', now()->addWeek())

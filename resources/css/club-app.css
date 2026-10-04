@@ -653,6 +653,8 @@ textarea.input { resize: vertical; min-height: 70px; line-height: 1.5; }
 .db-prose > :first-child { margin-top: 0; }
 .db-prose > :last-child { margin-bottom: 0; }
 .db-prose p { margin: 0 0 10px; }
+/* Allure du lecteur ajoutée après un code de zone reconnu dans une consigne (#113). */
+.db-prose .zone-allure { color: var(--brand-700); font-weight: 600; white-space: nowrap; }
 .db-prose h2 { font-family: var(--font-display); font-weight: 800; text-transform: uppercase; letter-spacing: -0.01em; font-size: 20px; line-height: 1.15; margin: 16px 0 8px; }
 .db-prose h3 { font-family: var(--font-display); font-weight: 700; font-size: 16px; line-height: 1.2; margin: 14px 0 7px; }
 .db-prose ul, .db-prose ol { margin: 8px 0 12px; padding-left: 22px; }
