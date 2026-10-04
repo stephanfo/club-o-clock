@@ -14,6 +14,7 @@ use App\Models\Location;
 use App\Models\NotificationOutbox;
 use App\Models\Qualification;
 use App\Models\QuotaTag;
+use App\Models\ReferenceValue;
 use App\Models\Registration;
 use App\Models\Session;
 use App\Models\SessionTemplate;
@@ -24,6 +25,7 @@ use App\Services\RegistrationService;
 use App\Services\SessionNotificationService;
 use App\Services\TemplateGenerationService;
 use App\Support\AgeCategory;
+use App\Support\Allures\Referentiel;
 use App\Support\Markup;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Arr;
@@ -463,6 +465,13 @@ class DemoSeeder extends Seeder
         // mais compte toujours actif (distinct de is_active). Démontre l'état dans l'admin.
         User::where('email', 'kevin@demo.club')->update(['athlete_access_suspended' => true]);
 
+        // --- Allures course (#114) : Marie a renseigné sa VMA, Lucas non (écran vide démontré). ---
+        $marie = User::where('email', 'marie@demo.club')->firstOrFail();
+        ReferenceValue::updateOrCreate(
+            ['user_id' => $marie->id, 'referentiel' => Referentiel::Course->value],
+            ['value' => 13.5, 'source' => ReferenceValue::SOURCE_ESTIMATION, 'source_distance' => '10k', 'measured_on' => Carbon::now()->subWeeks(3)->toDateString()],
+        );
+
         // --- Couples parent garant / enfant mineur (PRD §4.2, §4.15.5) ---
         // Deux phases démontrées :
         //   • P1 : mineur SANS credential (email/password null), géré par son garant seul.
@@ -608,6 +617,30 @@ class DemoSeeder extends Seeder
             $this->attachPrimaryCategory($child, $activeCats);
             $athletes->push($child);
         }
+
+        // Allures course (#113) : consignes écrites en zones sur les séances de course sans programme,
+        // pour démontrer l'allure personnelle affichée à côté de chaque code (plages « Z1-Z2 » comprises).
+        // Les jeudis tournent sur six séances types ; la PPG garde une part de course.
+        $consignesJeudi = [
+            "Échauffement 20' Z1, gammes.\n\n- 2 blocs de 4x (2' Z4 / 2' Z3), récup 3' Z1 entre les blocs\n- Retour au calme 10' Z1",
+            "Échauffement 20' Z1 + 3 lignes droites.\n\n- VMA courte : 2 séries de 10x 30\" Z5 / 30\" Z1, 3' Z1 entre les séries\n- Retour au calme 10' Z1",
+            "Échauffement 15' Z1-Z2.\n\n- Seuil : 3x 8' au SV2, récup 2' EF\n- Retour au calme 10' Z1",
+            "Échauffement 20' Z1, gammes.\n\n- Pyramide 1'-2'-3'-2'-1' en Z4, récup égale en Z1\n- 10' Z2 pour finir",
+            "Footing progressif : 20' Z1, 15' Z2, 5' Z3.\n\nÉtirements légers en fin de séance.",
+            "Échauffement 20' Z1.\n\n- Allure 10 km : 5x 1000 m en Z3-Z4, récup 1'30 Z1\n- Retour au calme 10' Z1",
+        ];
+        $consignePpg = "Footing d'échauffement 15' Z1.\n\n- Renforcement : 3 tours de gainage, squats, fentes, pompes\n"
+            ."- 6x 20\" de montées de genoux, récup 40\" Z1\n- Retour au calme 5' Z1";
+        $jeudi = 0;
+        Session::whereHas('discipline', fn ($q) => $q->where('label', 'Course à pied'))
+            ->where('kind', 'training')
+            ->whereNull('content_markdown')
+            ->orderBy('start_at')
+            ->get()
+            ->each(function (Session $s) use ($consignesJeudi, $consignePpg, &$jeudi) {
+                $texte = $s->title === 'PPG' ? $consignePpg : $consignesJeudi[$jeudi++ % count($consignesJeudi)];
+                $s->update(['content_markdown' => Markup::clean($texte)]);
+            });
 
         // Pose un flag apéro sur chaque séance CAP mercredi (passées ou 1 semaine à venir).
         $capSessions = Session::whereHas('discipline', fn ($q) => $q->where('label', 'Course à pied'))
@@ -1142,6 +1175,8 @@ class DemoSeeder extends Seeder
                 'location_id' => null,
                 'location_text' => 'Parking du vieux pont, rive sud',
                 'capacity' => null,
+                // Sortie longue en plages de zones (#113).
+                'content_markdown' => Markup::clean("Sortie longue 1h15 en Z1-Z2 sur sentiers.\n\n- Côtes en Z3, sans chercher l'allure\n- Ravitaillement à mi-parcours"),
                 'created_by' => $vincent->id,
             ],
         )->categories()->syncWithoutDetaching([$adulte->id, $master->id]);
