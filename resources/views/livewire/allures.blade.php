@@ -73,11 +73,12 @@
                     fmt(s) { s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = String(s % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; },
                     t(d) { return d * 3.6 / (this.vma * this.pct / 100); },
                     get zone() { return this.zones.find(z => this.pct >= z[2] && this.pct <= z[3]) || null; } }">
-                <label class="field-label" for="al-pct" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0">
+                <label class="field-label" for="al-pct" style="margin:0">
                     Intensité : <b x-text="pct + ' %'"></b> de VMA
-                    <span class="chip chip-sm zone-badge" x-show="zone" :style="zone && 'background:' + zone[4]" x-text="zone && (zone[0] + ' · ' + zone[1])"></span>
-                    <span class="chip chip-sm" x-show="!zone">hors zone</span>
                 </label>
+                {{-- Bandeau pleine largeur, toujours présent : hauteur fixe, aucun saut de ligne en glissant. --}}
+                <div class="chip zone-badge" :class="zone ? '' : 'zone-badge-hors'" :style="zone ? 'background:' + zone[4] : ''"
+                     x-text="zone ? zone[0] + ' · ' + zone[1] : 'Hors zone'" aria-live="polite"></div>
                 <div class="zone-strip-wrap">
                     <div class="zone-strip" aria-hidden="true">
                         @foreach ($bande as [$w, $c, $code])
