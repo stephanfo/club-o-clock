@@ -2,10 +2,13 @@
 
 namespace Database\Seeders;
 
+use App\Models\AllureLevel;
+use App\Models\AllureZone;
 use App\Models\Category;
 use App\Models\Discipline;
 use App\Models\EventType;
 use App\Models\Qualification;
+use App\Support\Allures\Referentiel;
 use Illuminate\Database\Seeder;
 
 // Seed des catalogues au déploiement (PRD §4.5, §4.6). Entièrement reconfigurable par l'admin ensuite.
@@ -19,6 +22,24 @@ class CatalogSeeder extends Seeder
         foreach ($disciplines as $i => $label) {
             Discipline::firstOrCreate(['label' => $label], ['sort_order' => $i]);
         }
+        // Allures course (#114) : référentiel de la course à pied + grille de zones générique.
+        // Les coefficients du coach se saisissent dans l'admin de l'instance, jamais ici.
+        Discipline::where('label', 'Course à pied')->whereNull('referentiel')->update(['referentiel' => Referentiel::Course->value]);
+        // Seulement sur catalogue vide : rejoué après que le coach a posé sa grille, le seed
+        // ferait chevaucher ses zones.
+        if (! AllureZone::where('referentiel', Referentiel::Course->value)->exists()) {
+            foreach (Referentiel::Course->defaultZones() as [$code, $label, $min, $max, $aliases]) {
+                AllureZone::create([
+                    'referentiel' => Referentiel::Course->value, 'code' => $code,
+                    'label' => $label, 'aliases' => $aliases, 'pct_min' => $min, 'pct_max' => $max,
+                ]);
+            }
+        }
+        // Le modèle de Riegel, niveau d'office de la table des allures cibles (comme la migration).
+        AllureLevel::firstOrCreate(
+            ['referentiel' => Referentiel::Course->value, 'model' => AllureLevel::MODEL_RIEGEL],
+            ['label' => AllureLevel::LABEL_RIEGEL, 'sort_order' => 0, 'active' => true],
+        );
 
         // Types d'épreuve (PRD §4.6).
         $eventTypes = ['Triathlon', 'Duathlon', 'Aquathlon', 'Course à pied', 'Trail', 'Autre'];

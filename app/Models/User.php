@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Notifications\ResetPasswordNotification;
 use App\Support\AgeCategory;
+use App\Support\Allures\Referentiel;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
@@ -327,6 +328,22 @@ class User extends Authenticatable implements MustVerifyEmail
     public function pushSubscriptions(): HasMany
     {
         return $this->hasMany(PushSubscription::class);
+    }
+
+    /**
+     * Valeurs de référence d'allure (#114) — visibles du seul membre.
+     *
+     * @return HasMany<ReferenceValue, $this>
+     */
+    public function referenceValues(): HasMany
+    {
+        return $this->hasMany(ReferenceValue::class);
+    }
+
+    /** Valeur de référence courante pour un référentiel (la VMA pour la course), ou null. */
+    public function referenceValue(Referentiel $referentiel): ?ReferenceValue
+    {
+        return $this->referenceValues->firstWhere('referentiel', $referentiel);
     }
 
     // --- Cycle de vie : suppression RGPD (PRD §4.3) ---
