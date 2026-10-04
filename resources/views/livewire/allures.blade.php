@@ -32,9 +32,21 @@
             <div class="meta">Pas encore renseignée. Estime-la depuis une course récente, ou saisis-la si tu la connais (test au club, en labo…).</div>
         @endif
         <div class="flex g8 wrap" style="align-items:flex-end;margin-top:12px">
-            <div style="width:140px">
+            {{-- Saisie libre, ou ajustement au dixième par − / + : la valeur passe par l'input (même
+                 anti-rebond que la frappe), bornée à la plage plausible du référentiel. --}}
+            <div x-data="{ pas(d) {
+                    const i = this.$refs.vma, [lo, hi] = [{{ $referentiel->bounds()[0] }}, {{ $referentiel->bounds()[1] }}];
+                    let v = parseFloat((i.value || '').replace(',', '.'));
+                    v = isNaN(v) ? {{ $reference?->value ?? 13 }} : Math.min(hi, Math.max(lo, Math.round((v + d) * 10) / 10));
+                    i.value = v.toFixed(1).replace('.', ',');
+                    i.dispatchEvent(new Event('input'));
+                } }">
                 <label class="field-label" for="al-vma">VMA (km/h)</label>
-                <div class="ifield"><input id="al-vma" class="ifield-input" type="text" inputmode="decimal" wire:model.live.debounce.400ms="vma" placeholder="13,5"></div>
+                <div class="stepper">
+                    <button type="button" x-on:click="pas(-0.1)" aria-label="Baisser de 0,1 km/h">−</button>
+                    <input id="al-vma" x-ref="vma" class="val" type="text" inputmode="decimal" wire:model.live.debounce.400ms="vma" placeholder="13,5">
+                    <button type="button" x-on:click="pas(0.1)" aria-label="Monter de 0,1 km/h">+</button>
+                </div>
             </div>
             <button type="button" class="btn btn-primary btn-sm" wire:click="saveVma" wire:loading.attr="disabled" wire:target="saveVma">Enregistrer</button>
             @if ($reference)

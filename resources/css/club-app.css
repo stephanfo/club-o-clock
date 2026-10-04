@@ -325,6 +325,8 @@ textarea.input { resize: vertical; min-height: 70px; line-height: 1.5; }
 .stepper button { width: 40px; height: 42px; border: none; background: var(--paper); font-size: 20px; cursor: pointer; color: var(--fg-soft); }
 .stepper button:hover { background: var(--slate-100); color: var(--ink); }
 .stepper .val { min-width: 48px; text-align: center; font-family: var(--font-display); font-weight: 800; font-size: 18px; border-left: 1px solid var(--hair); border-right: 1px solid var(--hair); height: 42px; display: flex; align-items: center; justify-content: center; }
+.stepper input.val { width: 72px; min-width: 0; padding: 0; border-top: none; border-bottom: none; border-radius: 0; background: var(--paper); color: var(--ink); }
+.stepper input.val:focus { outline: none; background: var(--slate-100); }
 
 /* =========================================================================
    BANNERS

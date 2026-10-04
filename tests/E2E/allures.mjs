@@ -18,6 +18,14 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   await page.locator('#al-vma:visible').waitFor();
   await attendre(page);
   s.check('onglet Allures du profil, avec la VMA', (await page.locator('#al-vma:visible').inputValue()) === '13,5');
+  // Boutons − / + : au dixième, sans rien enregistrer.
+  await page.getByRole('button', { name: 'Monter de 0,1 km/h' }).locator('visible=true').click();
+  await page.getByRole('button', { name: 'Monter de 0,1 km/h' }).locator('visible=true').click();
+  s.check('le + monte la VMA au dixième', (await page.locator('#al-vma:visible').inputValue()) === '13,7');
+  await page.getByRole('button', { name: 'Baisser de 0,1 km/h' }).locator('visible=true').click();
+  await page.getByRole('button', { name: 'Baisser de 0,1 km/h' }).locator('visible=true').click();
+  await attendre(page);
+  s.check('le − la redescend', (await page.locator('#al-vma:visible').inputValue()) === '13,5');
 
   const corps = (await page.locator('body').innerText()).toLowerCase();
   s.check('VMA affichée avec son origine', corps.includes('estimée depuis un 10 km'));
