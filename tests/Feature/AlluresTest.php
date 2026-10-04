@@ -168,9 +168,9 @@ class AlluresTest extends TestCase
         // 15 km/h : 90 % = 4:27 /km, 80 % = 5:00 /km.
         Livewire::actingAs($user)->test(Allures::class)
             ->assertSee('Z9')
-            ->assertSee('4:27 – 5:00')
-            // Grille de la piste au marathon : 400 m à 90–80 % = 1:47 – 2:00.
-            ->assertSee('1:47 – 2:00')
+            ->assertSeeInOrder(['<span>4:27</span>', '<span>5:00</span>'], false)
+            // Grille de la piste au marathon : 400 m à 90–80 % = 1:47 puis 2:00, sur deux lignes.
+            ->assertSeeInOrder(['<span>1:47</span>', '<span>2:00</span>'], false)
             ->assertSee('Marathon')
             ->assertSee('Projection de temps de course')
             // VMA enregistrée : les allures en tête, la saisie ensuite.

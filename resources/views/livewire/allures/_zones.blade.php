@@ -80,9 +80,10 @@
                                     <div class="meta" style="font-size:12px;margin-top:2px">{{ $z->label }}</div>
                                     <div class="meta" style="font-size:12px;white-space:nowrap">{{ $z->range() }}</div>
                                 </td>
-                                <td class="r" style="font-weight:700">{{ C::formatAllure(C::allure($vmaValue, $z->pct_max)) }} – {{ C::formatAllure(C::allure($vmaValue, $z->pct_min)) }}</td>
+                                {{-- Fourchette sur deux lignes, le plus rapide en haut : colonnes plus étroites. --}}
+                                <td class="r" style="font-weight:700"><span class="fourchette"><span>{{ C::formatAllure(C::allure($vmaValue, $z->pct_max)) }}</span><span>{{ C::formatAllure(C::allure($vmaValue, $z->pct_min)) }}</span></span></td>
                                 @foreach ($grille as $m)
-                                    <td class="r">{{ C::formatTemps(C::temps($m, $vmaValue, $z->pct_max)) }} – {{ C::formatTemps(C::temps($m, $vmaValue, $z->pct_min)) }}</td>
+                                    <td class="r"><span class="fourchette"><span>{{ C::formatTemps(C::temps($m, $vmaValue, $z->pct_max)) }}</span><span>{{ C::formatTemps(C::temps($m, $vmaValue, $z->pct_min)) }}</span></span></td>
                                 @endforeach
                             </tr>
                         @endforeach
