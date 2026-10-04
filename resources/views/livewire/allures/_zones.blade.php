@@ -21,8 +21,8 @@
     @endphp
     {{-- ── Curseur d'intensité : formule triviale recalculée côté navigateur. Les valeurs sont
          au-dessus du curseur, pour que le doigt qui glisse ne les cache pas. ── --}}
-    <div class="card card-pad"
-         x-data="{ pct: 85, vma: {{ $vmaValue }}, zones: @js($zones->map(fn ($z) => [$z->codes(), $z->label, $z->pct_min, $z->pct_max, $couleurs[$z->id]])->values()),
+    <div class="card card-pad" wire:key="al-curseur"
+         x-data="{ pct: 85, vma: {{ $vmaValue }}, zones: @js($zones->map(fn ($z) => [$z->badge(), $z->label, $z->pct_min, $z->pct_max, $couleurs[$z->id]])->values()),
             fmt(s) { s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = String(s % 60).padStart(2, '0'); return h ? h + ':' + String(m).padStart(2, '0') + ':' + ss : m + ':' + ss; },
             t(d) { return d * 3.6 / (this.vma * this.pct / 100); },
             get zone() { return this.zones.find(z => this.pct >= z[2] && this.pct <= z[3]) || null; } }">
@@ -37,7 +37,7 @@
         </div>
         {{-- Bandeau pleine largeur, toujours présent : hauteur fixe, aucun saut de ligne en glissant. --}}
         <div class="chip zone-badge" :class="zone ? '' : 'zone-badge-hors'" :style="zone ? 'background:' + zone[4] : ''"
-             x-text="zone ? zone[0] + ' · ' + zone[1] : 'Hors zone'" aria-live="polite"></div>
+             x-text="zone ? zone[0] : 'Hors zone'" aria-live="polite"></div>
         <label class="field-label" for="al-pct" style="margin:12px 0 0">
             Intensité : <b x-text="pct + ' %'"></b> de VMA
         </label>
@@ -53,7 +53,7 @@
     </div>
 
     {{-- ── Mes allures par zone ── --}}
-    <div class="card" style="overflow:hidden">
+    <div class="card" style="overflow:hidden" wire:key="al-zones">
         <div style="padding:14px 16px 10px">
             <div class="eyebrow">Mes allures par zone</div>
         </div>

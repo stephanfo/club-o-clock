@@ -50,7 +50,9 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   await page.goto(BASE + '/allures', { waitUntil: 'networkidle' });
   s.check('l’ancienne adresse mène à l’onglet du profil', page.url().includes('tab=allures'), page.url());
 
-  const premier = await page.locator('.eyebrow:visible').first().innerText();
+  // Le bloc « Mon niveau » (s'il y a plusieurs niveaux) précède l'estimation, qu'il règle.
+  const titres = await page.locator('.eyebrow:visible').allInnerTexts();
+  const premier = titres.find(t => !/mon niveau/i.test(t)) ?? '';
   s.check('sans VMA, l’estimation passe en premier', /estimer/i.test(premier), premier);
   s.check('pas de tableau des zones sans VMA', await page.locator('table.tbl').count() === 0);
   s.check('contrôle positif : l’écran est bien rendu', await page.locator('#al-vma:visible').count() === 1);
@@ -113,7 +115,7 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
     const prose = page.locator('.db-prose:visible').first();
     await prose.scrollIntoViewIfNeeded();
     // VMA 13,5 : Z4 (90–95 %) = 4:41–4:56 /km.
-    s.check('allure de Marie à côté de Z4', (await prose.innerText()).includes('Z4 (4:41–4:56 /km)'));
+    s.check('allure de Marie à côté de Z4', (await prose.innerText()).includes('Z4 [4:41–4:56 /km]'));
     s.check('pas d’invitation pour qui a une VMA', await page.getByText('Renseigne ta VMA').count() === 0);
     await s.shot(page, `allures-consigne-marie-${format}`);
     s.checkJs(page);

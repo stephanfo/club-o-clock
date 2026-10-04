@@ -62,8 +62,8 @@ class AlluresConsignesTest extends TestCase
     {
         // 15 km/h : Z4+ (95–98 %) = 4:05–4:13 ; Z4 (90–95 %) = 4:13–4:27.
         [$html] = $this->annoter('Z4+ puis Z4');
-        $this->assertStringContainsString('Z4+<span class="zone-allure"> (4:05–4:13 /km)</span>', $html);
-        $this->assertStringContainsString('Z4<span class="zone-allure"> (4:13–4:27 /km)</span>', $html);
+        $this->assertStringContainsString('Z4+<span class="zone-allure"> [4:05–4:13 /km]</span>', $html);
+        $this->assertStringContainsString('Z4<span class="zone-allure"> [4:13–4:27 /km]</span>', $html);
     }
 
     public function test_signe_moins_et_plage(): void
@@ -71,9 +71,9 @@ class AlluresConsignesTest extends TestCase
         // « Z3- » (tiret ASCII) = la zone Z3− ; « Z3-Z4 » = une plage, une seule fourchette de
         // l'allure la plus rapide de Z4 à la plus lente de Z3, quel que soit l'ordre d'écriture.
         [$html] = $this->annoter('Z3- puis Z3-Z4 puis Z4−Z3');
-        $this->assertStringContainsString('Z3-<span class="zone-allure"> (4:46–5:00 /km)</span>', $html);
-        $this->assertStringContainsString('Z3-Z4<span class="zone-allure"> (4:13–4:42 /km)</span>', $html);
-        $this->assertStringContainsString('Z4−Z3<span class="zone-allure"> (4:13–4:42 /km)</span>', $html);
+        $this->assertStringContainsString('Z3-<span class="zone-allure"> [4:46–5:00 /km]</span>', $html);
+        $this->assertStringContainsString('Z3-Z4<span class="zone-allure"> [4:13–4:42 /km]</span>', $html);
+        $this->assertStringContainsString('Z4−Z3<span class="zone-allure"> [4:13–4:42 /km]</span>', $html);
         $this->assertSame(3, substr_count($html, 'zone-allure'));
     }
 
@@ -83,8 +83,8 @@ class AlluresConsignesTest extends TestCase
 
         // 15 km/h : Z3 (85–90 %) = 4:27–4:42 ; plage « SV2-Z4 » = 4:13–4:42.
         [$html] = $this->annoter("3x10' SubT, puis SV2-Z4, puis SV2s");
-        $this->assertStringContainsString('SubT<span class="zone-allure"> (4:27–4:42 /km)</span>', $html);
-        $this->assertStringContainsString('SV2-Z4<span class="zone-allure"> (4:13–4:42 /km)</span>', $html);
+        $this->assertStringContainsString('SubT<span class="zone-allure"> [4:27–4:42 /km]</span>', $html);
+        $this->assertStringContainsString('SV2-Z4<span class="zone-allure"> [4:13–4:42 /km]</span>', $html);
         // Collé à un mot, l'alias n'est pas reconnu (contrôle : 2 annotations seulement).
         $this->assertSame(2, substr_count($html, 'zone-allure'));
     }
@@ -126,9 +126,9 @@ class AlluresConsignesTest extends TestCase
 
         // 12 km/h à 90–95 % = 5:16–5:33 ; 15 km/h = 4:13–4:27. Chacun voit la sienne.
         $this->actingAs($lent)->get(route('sessions.show', $seance))->assertOk()
-            ->assertSee('(5:16–5:33 /km)')->assertDontSee('(4:13–4:27 /km)');
+            ->assertSee('[5:16–5:33 /km]')->assertDontSee('[4:13–4:27 /km]');
         $this->actingAs($rapide)->get(route('sessions.show', $seance))->assertOk()
-            ->assertSee('(4:13–4:27 /km)')->assertDontSee('(5:16–5:33 /km)');
+            ->assertSee('[4:13–4:27 /km]')->assertDontSee('[5:16–5:33 /km]');
 
         // Le Markdown stocké n'est pas touché.
         $this->assertSame("4x (2' Z4 / 2' Z3)", $seance->refresh()->content_markdown);

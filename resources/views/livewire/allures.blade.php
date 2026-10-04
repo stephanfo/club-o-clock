@@ -16,11 +16,12 @@
     @if ($reference)
         @include('livewire.allures._zones')
     @else
+        @include('livewire.allures._niveau')
         @include('livewire.allures._estimation')
     @endif
 
     {{-- ── Ma VMA ── --}}
-    <div class="card card-pad">
+    <div class="card card-pad" wire:key="al-ma-vma">
         <div class="eyebrow" style="margin-bottom:8px">Ma VMA</div>
         @if ($reference)
             <div class="flex ac g8 wrap">
@@ -46,6 +47,7 @@
     </div>
 
     @if ($reference)
+        @include('livewire.allures._niveau')
         @include('livewire.allures._estimation')
     @else
         {{-- VMA tapée sans être enregistrée : les allures s'affichent sous la saisie. --}}
@@ -54,7 +56,7 @@
 
     @if ($vmaValue)
         {{-- ── Projection ── --}}
-        <div class="card card-pad">
+        <div class="card card-pad" wire:key="al-projection">
             <div class="eyebrow" style="margin-bottom:8px">Projection de temps de course</div>
             @foreach ($distances as $key => [$label])
                 @isset($projection[$key])

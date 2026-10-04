@@ -279,6 +279,8 @@ class AlluresTest extends TestCase
             ->call('saveRow')
             ->assertHasNoErrors();
         $this->assertSame('SV2, SubT', AllureZone::where('code', 'Z3')->value('aliases'));
+        // Badge du curseur : libellé en second, alias entre parenthèses.
+        $this->assertSame('Z3 · Seuil (SV2, SubT)', AllureZone::where('code', 'Z3')->firstOrFail()->badge());
 
         $user = User::factory()->create();
         app(AlluresService::class)->setReference($user, Referentiel::Course, 15.0, ReferenceValue::SOURCE_SAISIE);
@@ -398,7 +400,7 @@ class AlluresTest extends TestCase
 
         Livewire::actingAs($user)->test(Allures::class)
             ->assertSet('levelId', $riegel->id)
-            ->assertSee('<select id="al-level"', false)
+            ->assertSee('aria-label="Niveau"', false)
             ->set('estTime', '40:00')
             ->assertSee('Modèle de Riegel (exposant')
             // Riegel seul n'a pas de fourchette : 10 km en 40:00 → 16,7.
@@ -411,7 +413,7 @@ class AlluresTest extends TestCase
         $this->level('Réserve', 1)->update(['active' => false]);
 
         Livewire::actingAs(User::factory()->create())->test(Allures::class)
-            ->assertDontSee('<select id="al-level"', false)
+            ->assertDontSee('aria-label="Niveau"', false)
             ->assertSee('Modèle de Riegel (exposant');
     }
 

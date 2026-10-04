@@ -18,12 +18,13 @@ use Illuminate\Support\HtmlString;
  *
  * Le coach écrit comme d'habitude (« 4x (2' Z4 / 2' Z3) ») : rien ne change dans l'éditeur ni
  * dans le Markdown stocké. À l'affichage, chaque code de zone du catalogue est complété par la
- * fourchette d'allure de la personne qui lit : « Z4 (4:41–4:56 /km) ».
+ * fourchette d'allure de la personne qui lit : « Z4 [4:41–4:56 /km] » — entre crochets, les parenthèses
+ * servant souvent au fractionné lui-même (« 4x (2' Z4 / 2' Z3) »).
  *
  * - Le motif vient du catalogue (pas de `Z\d` en dur) : un club peut coder I1–I5, EF, AS10…
  * - Travail sur le HTML DÉJÀ sanitisé, dans les nœuds texte seulement, jamais dans un lien.
  * - « − » et « - » valent l'un pour l'autre ; un tiret suivi d'un code est une plage, annotée
- *   d'une seule fourchette qui couvre les deux zones : « Z3-Z4 (4:41–5:14 /km) ».
+ *   d'une seule fourchette qui couvre les deux zones : « Z3-Z4 [4:41–5:14 /km] ».
  * - Repli naturel sur le texte brut : pas de VMA, discipline sans référentiel, code inconnu.
  * - Web uniquement : email et push gardent le texte brut.
  */
@@ -103,7 +104,7 @@ final class Annotateur
                 if ($zone !== null) {
                     $span = $doc->createElement('span');
                     $span->setAttribute('class', 'zone-allure');
-                    $span->appendChild($doc->createTextNode(' ('.self::fourchette($zone, $vma, $fin).' /km)'));
+                    $span->appendChild($doc->createTextNode(' ['.self::fourchette($zone, $vma, $fin).' /km]'));
                     $fragment->appendChild($span);
                 }
             }

@@ -1,6 +1,6 @@
 {{-- Estimation de la VMA depuis un résultat de course (#114). Le temps saisi n'est jamais enregistré. --}}
 @use('App\Support\Allures\Calculateur', 'C')
-<div class="card card-pad">
+<div class="card card-pad" wire:key="al-estimation">
     <div class="eyebrow" style="margin-bottom:4px">Estimer ma VMA depuis une course</div>
     <div class="meta" style="margin-bottom:12px">Le temps saisi sert au calcul et n'est pas enregistré.</div>
     <div class="seg" style="flex-wrap:wrap;margin-bottom:10px">
@@ -13,18 +13,6 @@
             <label class="field-label" for="al-time">Temps</label>
             <div class="ifield"><input id="al-time" class="ifield-input" type="text" wire:model.live.debounce.400ms="estTime" placeholder="47:45"></div>
         </div>
-        @if ($levels->count() > 1)
-            <div style="min-width:180px">
-                <label class="field-label" for="al-level">Niveau</label>
-                <div class="ifield">
-                    <select id="al-level" class="ifield-input" wire:model.live="levelId">
-                        @foreach ($levels as $l)
-                            <option value="{{ $l->id }}">{{ $l->label }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
-        @endif
     </div>
     @if ($estTimeInvalid)
         <div class="meta" style="color:var(--warning-text);margin-top:6px">Temps illisible : écris par exemple 47:45 ou 1:49:00.</div>
