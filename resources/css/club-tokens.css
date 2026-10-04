@@ -119,6 +119,16 @@
   --danger-bg:       #fbe3e4;   /* fond d'encart danger */
   --danger-border:   #f3c5c7;   /* bordure d'encart danger */
 
+  /* intensité d'allure (#114) : échelle vert → violet, attribuée aux zones par rang de % VMA */
+  --intensite-1: #3e9b6a;
+  --intensite-2: #7bae3f;
+  --intensite-3: #c3a21c;
+  --intensite-4: #db8a17;
+  --intensite-5: #dd6a1e;
+  --intensite-6: #d24b25;
+  --intensite-7: #b92f3a;
+  --intensite-8: #7e2a6e;
+
   /* =====================================================================
      DÉGRADÉS — la signature visuelle du club
      ===================================================================== */

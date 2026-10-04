@@ -9,7 +9,11 @@
         ['type' => 'discipline', 'label' => 'Disciplines', 'sub' => 'Natation, Vélo, Course, Enchaînement…'],
         ['type' => 'event_type', 'label' => 'Types d’épreuve', 'sub' => 'Triathlon, Duathlon, Trail…'],
         ['type' => 'location', 'label' => 'Lieux', 'sub' => 'Piscine Olympique, Stade Léo…'],
-        ['type' => 'allure_zone', 'label' => 'Zones d’allure course', 'sub' => 'Codes reconnus dans les consignes, en % de VMA'],
+    ];
+    // Bloc « Allures course » (#114) : le catalogue des zones et la table club, écran dédié.
+    $allures = [
+        ['href' => route('admin.catalogues', 'allure_zone'), 'label' => 'Zones d’allure', 'count' => $counts['allure_zone'] ?? 0, 'sub' => 'Codes reconnus dans les consignes, en % de VMA'],
+        ['href' => route('admin.allure-levels'), 'label' => 'Allures cibles', 'count' => $allureLevelCount ?: 'Riegel', 'sub' => '% de VMA tenable par niveau et par distance'],
     ];
 @endphp
 <div class="form-screen">
@@ -279,12 +283,14 @@
             </div>
 
             {{-- ── Catalogues (hub vers CatalogueManager) ── --}}
+            {{-- La règle globale `a { border-bottom }` trace un filet noir : chaque ligne pose le sien,
+                 la dernière l'annule explicitement. --}}
             <div class="card card-pad">
                 <div class="eyebrow" style="margin-bottom:12px">Catalogues</div>
                 <div style="display:flex;flex-direction:column">
                     @foreach ($catalogues as $i => $c)
                         <a href="{{ route('admin.catalogues', $c['type']) }}" wire:navigate
-                           class="flex ac jb row-press" style="padding:11px 4px;{{ $i < count($catalogues) - 1 ? 'border-bottom:1px solid var(--divider)' : '' }};text-decoration:none;color:inherit">
+                           class="flex ac jb row-press" style="padding:11px 4px;border-bottom:{{ $i < count($catalogues) - 1 ? '1px solid var(--divider)' : 'none' }};text-decoration:none;color:inherit">
                             <div>
                                 <div style="font-weight:700;font-size:14px">{{ $c['label'] }} <span class="meta" style="font-size:12px">· {{ $counts[$c['type']] ?? 0 }}</span></div>
                                 <div class="meta" style="font-size:12px">{{ $c['sub'] }}</div>
@@ -292,15 +298,23 @@
                             <x-icon name="chevron-right" class="muted" />
                         </a>
                     @endforeach
-                    {{-- Table club des allures cibles (#114) : pas un catalogue à lignes, écran dédié. --}}
-                    <a href="{{ route('admin.allure-levels') }}" wire:navigate
-                       class="flex ac jb row-press" style="padding:11px 4px;border-top:1px solid var(--divider);text-decoration:none;color:inherit">
-                        <div>
-                            <div style="font-weight:700;font-size:14px">Allures cibles <span class="meta" style="font-size:12px">· {{ $allureLevelCount ?: 'Riegel' }}</span></div>
-                            <div class="meta" style="font-size:12px">% de VMA tenable par niveau et par distance</div>
-                        </div>
-                        <x-icon name="chevron-right" class="muted" />
-                    </a>
+                </div>
+            </div>
+
+            {{-- ── Allures course (#114) : zones reconnues dans les consignes + table club ── --}}
+            <div class="card card-pad" style="align-self:start">
+                <div class="eyebrow" style="margin-bottom:12px">Allures course</div>
+                <div style="display:flex;flex-direction:column">
+                    @foreach ($allures as $i => $c)
+                        <a href="{{ $c['href'] }}" wire:navigate
+                           class="flex ac jb row-press" style="padding:11px 4px;border-bottom:{{ $i < count($allures) - 1 ? '1px solid var(--divider)' : 'none' }};text-decoration:none;color:inherit">
+                            <div>
+                                <div style="font-weight:700;font-size:14px">{{ $c['label'] }} <span class="meta" style="font-size:12px">· {{ $c['count'] }}</span></div>
+                                <div class="meta" style="font-size:12px">{{ $c['sub'] }}</div>
+                            </div>
+                            <x-icon name="chevron-right" class="muted" />
+                        </a>
+                    @endforeach
                 </div>
             </div>
 

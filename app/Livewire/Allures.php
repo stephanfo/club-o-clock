@@ -10,16 +10,12 @@ use App\Services\AlluresService;
 use App\Support\Allures\Calculateur;
 use App\Support\Allures\Referentiel;
 use InvalidArgumentException;
-use Livewire\Attributes\Layout;
-use Livewire\Attributes\Title;
 use Livewire\Component;
 
-// Écran « Allures course » (#114), ouvert depuis le profil. Lecture et écriture toujours sur le
+// Onglet « Allures » du profil (#114), composant imbriqué. Lecture et écriture toujours sur le
 // compte connecté : la VMA n'est visible que de la personne (ni coach, ni admin, ni parent).
 // Les calculs vivent dans App\Support\Allures\Calculateur (testé) ; seul le curseur de % libre
 // recalcule côté navigateur. Les chronos saisis pour l'estimation ne sont jamais enregistrés.
-#[Layout('layouts.app')]
-#[Title('Allures course')]
 class Allures extends Component
 {
     /** VMA affichée (km/h, saisie libre « 13,6 ») — modifiable sans être enregistrée. */
@@ -130,7 +126,8 @@ class Allures extends Component
             'reference' => $this->user()->referenceValue($referentiel),
             'vmaValue' => $vmaOk ? $vma : null,
             'vmaInvalid' => trim($this->vma) !== '' && ! $vmaOk,
-            'zones' => AllureZone::activeFor($referentiel),
+            'zones' => $zones = AllureZone::activeFor($referentiel),
+            'couleurs' => AllureZone::intensites($zones),
             'levels' => $levels,
             'level' => $level,
             'estimate' => $estimate,

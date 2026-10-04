@@ -22,8 +22,8 @@
     </div>
 
     <div class="dk-body">
-        {{-- Plus large que les catalogues : 4 distances × 2 bornes, plus « Proposé » et actions. --}}
-        <div class="cat-wrap" style="max-width:1120px">
+        {{-- Plus large que les catalogues : les 4 distances d'un niveau tiennent sur une ligne. --}}
+        <div class="cat-wrap" style="max-width:960px">
             <x-banner kind="info"><div>
                 Sert à estimer la VMA depuis un résultat de course et à projeter les temps, sur l'écran
                 « Allures course » des membres. Le <b>modèle de Riegel</b> (exposant 1,06) est calculé :
@@ -38,56 +38,52 @@
                 <x-banner kind="warn"><div>{{ $errors->first() }}</div></x-banner>
             @endif
 
-            <div class="card" style="overflow-x:auto">
-                <table class="tbl">
-                    <thead>
-                        <tr>
-                            <th>Niveau</th>
-                            @foreach ($distances as [$label])
-                                <th>{{ $label }} <span style="text-transform:none">(min – max %)</span></th>
-                            @endforeach
-                            <th>Proposé</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($rows as $i => $row)
-                            @php $isRiegel = ($row['model'] ?? null) === \App\Models\AllureLevel::MODEL_RIEGEL; @endphp
-                            <tr wire:key="level-{{ $i }}-{{ $row['model'] ?? 'club' }}" @style(['opacity:.6' => ! ($row['active'] ?? true)])>
+            {{-- Une carte par niveau : libellé et réglages en tête, distances en grille dessous —
+                 des champs assez larges pour lire ce qu'on saisit. --}}
+            @foreach ($rows as $i => $row)
+                @php $isRiegel = ($row['model'] ?? null) === \App\Models\AllureLevel::MODEL_RIEGEL; @endphp
+                <div class="card card-pad" wire:key="level-{{ $i }}-{{ $row['model'] ?? 'club' }}" @style(['opacity:.6' => ! ($row['active'] ?? true)])>
+                    <div class="flex ac g10 wrap">
+                        <div class="f1" style="min-width:200px">
+                            @if ($isRiegel)
+                                <div style="font-weight:700;font-size:16px">{{ $row['label'] }}</div>
+                                <div class="meta" style="font-size:12px">Calculé · % tenus pour une VMA de {{ (int) $vmaLent }} → {{ (int) $vmaRapide }} km/h</div>
+                            @else
+                                <label class="field-label" for="lv-{{ $i }}">Niveau {{ $i + 1 }}</label>
+                                <div class="ifield" style="max-width:320px"><input id="lv-{{ $i }}" class="ifield-input" type="text" wire:model.blur="rows.{{ $i }}.label" placeholder="Débutant"></div>
+                            @endif
+                        </div>
+                        <div class="flex ac g8">
+                            <span class="meta" style="font-size:12px">Proposé</span>
+                            <x-toggle :on="$row['active'] ?? true" wire:click="toggleActive({{ $i }})" aria-label="Proposé aux membres : {{ $row['label'] ?: 'niveau '.($i + 1) }}" />
+                        </div>
+                        <div class="flex ac g4" style="min-width:68px;justify-content:flex-end">
+                            @if ($i > 0)
+                                <button type="button" class="iconbtn" wire:click="moveUp({{ $i }})" title="Monter" aria-label="Monter"><x-icon name="chevron-up" :size="16" /></button>
+                            @endif
+                            @unless ($isRiegel)
+                                <button type="button" class="iconbtn" wire:click="removeRow({{ $i }})" title="Retirer" aria-label="Retirer"><x-icon name="trash" :size="16" /></button>
+                            @endunless
+                        </div>
+                    </div>
+                    <div class="niveau-grille">
+                        @foreach ($distances as $key => $d)
+                            <div>
+                                <div class="eyebrow" style="margin-bottom:6px">{{ $d[0] }} <span style="text-transform:none;letter-spacing:0">· % VMA</span></div>
                                 @if ($isRiegel)
-                                    <td style="min-width:160px">
-                                        <div style="font-weight:700">{{ $row['label'] }}</div>
-                                        <div class="meta" style="font-size:12px">Calculé · VMA {{ (int) $vmaLent }} → {{ (int) $vmaRapide }} km/h</div>
-                                    </td>
-                                    @foreach ($distances as $key => $d)
-                                        <td class="meta" style="white-space:nowrap">{{ $pct($riegel[$key][0]) }} – {{ $pct($riegel[$key][1]) }} %</td>
-                                    @endforeach
+                                    <div class="meta" style="padding:10px 0">{{ $pct($riegel[$key][0]) }} – {{ $pct($riegel[$key][1]) }} %</div>
                                 @else
-                                    <td style="min-width:160px"><div class="ifield"><input class="ifield-input" type="text" wire:model.blur="rows.{{ $i }}.label" placeholder="Débutant"></div></td>
-                                    @foreach ($distances as $key => $d)
-                                        <td>
-                                            <div class="flex ac g4">
-                                                <div class="ifield" style="width:64px"><input class="ifield-input" type="number" step="0.5" min="30" max="120" wire:model.blur="rows.{{ $i }}.targets.{{ $key }}.min" aria-label="% minimum {{ $d[0] }}"></div>
-                                                <span class="meta">–</span>
-                                                <div class="ifield" style="width:64px"><input class="ifield-input" type="number" step="0.5" min="30" max="120" wire:model.blur="rows.{{ $i }}.targets.{{ $key }}.max" aria-label="% maximum {{ $d[0] }}" placeholder="+"></div>
-                                            </div>
-                                        </td>
-                                    @endforeach
+                                    <div class="flex ac g6">
+                                        <div class="ifield f1" style="min-width:0"><input class="ifield-input" type="text" inputmode="decimal" wire:model.blur="rows.{{ $i }}.targets.{{ $key }}.min" aria-label="% minimum {{ $d[0] }}" placeholder="min"></div>
+                                        <span class="meta">–</span>
+                                        <div class="ifield f1" style="min-width:0"><input class="ifield-input" type="text" inputmode="decimal" wire:model.blur="rows.{{ $i }}.targets.{{ $key }}.max" aria-label="% maximum {{ $d[0] }}" placeholder="max ou +"></div>
+                                    </div>
                                 @endif
-                                <td><x-toggle :on="$row['active'] ?? true" wire:click="toggleActive({{ $i }})" aria-label="Proposé aux membres : {{ $row['label'] ?: 'niveau '.($i + 1) }}" /></td>
-                                <td style="white-space:nowrap">
-                                    @if ($i > 0)
-                                        <button type="button" class="iconbtn" wire:click="moveUp({{ $i }})" title="Monter" aria-label="Monter"><x-icon name="chevron-up" :size="16" /></button>
-                                    @endif
-                                    @unless ($isRiegel)
-                                        <button type="button" class="iconbtn" wire:click="removeRow({{ $i }})" title="Retirer" aria-label="Retirer"><x-icon name="trash" :size="16" /></button>
-                                    @endunless
-                                </td>
-                            </tr>
+                            </div>
                         @endforeach
-                    </tbody>
-                </table>
-            </div>
+                    </div>
+                </div>
+            @endforeach
         </div>
     </div>
 </div>

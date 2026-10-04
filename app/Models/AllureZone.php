@@ -31,6 +31,22 @@ class AllureZone extends Model
     }
 
     /**
+     * Couleur d'intensité de chaque zone (token `--intensite-1` à `-8`), répartie par rang sur
+     * l'échelle vert → violet : rien à saisir, et la grille d'un club garde un dégradé lisible.
+     *
+     * @param  Collection<int, AllureZone>  $zones  triées de la plus lente à la plus rapide
+     * @return array<int, string> [id => 'var(--intensite-n)']
+     */
+    public static function intensites(Collection $zones): array
+    {
+        $n = $zones->count();
+
+        return $zones->values()->mapWithKeys(fn (AllureZone $z, int $i) => [
+            $z->id => 'var(--intensite-'.($n > 1 ? 1 + (int) round($i * 7 / ($n - 1)) : 1).')',
+        ])->all();
+    }
+
+    /**
      * Zone active qui chevauche la plage [min, max]. Des bornes qui se touchent (75–85 puis 85–90)
      * ne se chevauchent pas.
      */

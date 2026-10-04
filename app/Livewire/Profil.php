@@ -25,9 +25,10 @@ use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-// Profil de l'utilisateur connecté (porté de screen-profil.jsx). Quatre onglets :
+// Profil de l'utilisateur connecté (porté de screen-profil.jsx). Cinq onglets :
 //   Identité  — nom éditable + champs gérés par le bureau (lecture) ;
 //   Notifs    — matrice type×canal (§4.15.3) + pause globale (§4.15.4) ;
+//   Allures   — composant imbriqué App\Livewire\Allures (VMA, zones, estimation, projection) ;
 //   Quotas    — usage hebdo par tag de la semaine courante (§4.10) ;
 //   Connexion — méthodes de login liées, sessions actives, déconnexion (suppression compte §4.3 à part).
 // Lecture/écriture toujours sur le compte courant (auth()->user()) — aucune action sur un tiers.
@@ -39,7 +40,7 @@ class Profil extends Component
     // politique de mot de passe pour toutes les surfaces.
     use PasswordValidationRules;
 
-    /** Onglet actif : identite | notifs | quotas | connexion. */
+    /** Onglet actif : identite | notifs | allures | quotas | connexion. */
     #[Url]
     public string $tab = 'identite';
 

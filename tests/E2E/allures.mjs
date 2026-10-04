@@ -12,25 +12,27 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   const s = new Scenario(`A1 · Marie consulte ses allures (${format})`);
   const { ctx, page } = await session(browser, 'marie@demo.club', viewport);
 
+  // Onglet « Allures » du profil (une instance du composant par coquille : filtrer :visible).
   await page.goto(BASE + '/profil', { waitUntil: 'networkidle' });
-  const carte = page.locator('a[href$="/allures"]:visible').first();
-  s.check('carte « Mes allures course » sur le profil, avec la VMA', (await carte.innerText()).includes('VMA 13,5'));
-  await carte.click();
-  await page.waitForURL('**/allures');
+  await page.locator('button:visible', { hasText: /^\s*Allures\s*$/ }).first().click();
+  await page.locator('#al-vma:visible').waitFor();
   await attendre(page);
+  s.check('onglet Allures du profil, avec la VMA', (await page.locator('#al-vma:visible').inputValue()) === '13,5');
 
   const corps = (await page.locator('body').innerText()).toLowerCase();
   s.check('VMA affichée avec son origine', corps.includes('estimée depuis un 10 km'));
-  s.check('tableau des zones rendu (grille générique)', await page.locator('table.tbl tbody tr').count() === 5);
+  s.check('tableau des zones rendu (grille générique)', await page.locator('table.tbl:visible tbody tr').count() === 5);
+  s.check('distances de la piste au marathon', (await page.locator('table.tbl:visible thead').innerText()).toLowerCase().includes('marathon'));
+  s.check('bande de zones colorée sous le curseur', await page.locator('.zone-strip:visible > span[title]').count() === 5);
   s.check('projection affichée, modèle de Riegel annoncé', corps.includes('projection de temps') && corps.includes('riegel'));
 
   // Le curseur de % recalcule côté navigateur.
-  const avant = await page.locator('#al-pct').locator('..').innerText();
-  await page.locator('#al-pct').fill('100');
-  const apres = await page.locator('#al-pct').locator('..').innerText();
+  const avant = await page.locator('#al-pct:visible').locator('..').innerText();
+  await page.locator('#al-pct:visible').fill('100');
+  const apres = await page.locator('#al-pct:visible').locator('..').innerText();
   s.check('curseur : 100 % de 13,5 km/h = 4:27 /km', apres.includes('4:27') && apres !== avant);
 
-  await page.locator('#al-time').fill('47:45');
+  await page.locator('#al-time:visible').fill('47:45');
   await page.waitForFunction(() => document.body.innerText.toLowerCase().includes('utiliser'));
   s.check('estimation affichée depuis un 10 km en 47:45', (await page.locator('body').innerText()).includes('14,1'));
   s.check('rien d’enregistré tant qu’on ne clique pas', sql("SELECT value FROM reference_values rv JOIN users u ON u.id=rv.user_id WHERE u.email='marie@demo.club'") === '13.5');
@@ -46,18 +48,20 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   const s = new Scenario('A2 · Lucas estime puis enregistre sa VMA (mobile)');
   const { ctx, page } = await session(browser, 'lucas@demo.club', MOBILE);
   await page.goto(BASE + '/allures', { waitUntil: 'networkidle' });
+  s.check('l’ancienne adresse mène à l’onglet du profil', page.url().includes('tab=allures'), page.url());
 
   const premier = await page.locator('.eyebrow:visible').first().innerText();
   s.check('sans VMA, l’estimation passe en premier', /estimer/i.test(premier), premier);
   s.check('pas de tableau des zones sans VMA', await page.locator('table.tbl').count() === 0);
+  s.check('contrôle positif : l’écran est bien rendu', await page.locator('#al-vma:visible').count() === 1);
 
   await page.getByRole('button', { name: 'Semi' }).click();
   await attendre(page);
-  await page.locator('#al-time').fill('1:49:00');
+  await page.locator('#al-time:visible').fill('1:49:00');
   const btn = page.getByRole('button', { name: /^Utiliser/ });
   await btn.waitFor();
   await btn.click();
-  await page.waitForFunction(() => document.querySelector('table.tbl'));
+  await page.locator('table.tbl:visible').waitFor();
 
   const enBase = sql("SELECT CONCAT(value,'|',source,'|',source_distance) FROM reference_values rv JOIN users u ON u.id=rv.user_id WHERE u.email='lucas@demo.club'");
   s.check('VMA estimée enregistrée, distance sans le temps', enBase === '13.7|estimation|semi', enBase);
@@ -79,17 +83,20 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   await s.shot(page, 'allures-admin-zones');
 
   await page.goto(BASE + '/admin/allures-cibles', { waitUntil: 'networkidle' });
-  s.check('Riegel affiché d’office comme niveau calculé', await page.locator('table.tbl tbody tr').count() === 1
-    && (await page.locator('table.tbl tbody tr').first().innerText()).includes('Modèle de Riegel'));
+  const niveaux = page.locator('.niveau-grille');
+  s.check('Riegel affiché d’office comme niveau calculé', await niveaux.count() === 1
+    && (await page.locator('.cat-wrap').innerText()).includes('Modèle de Riegel'));
   await page.getByRole('button', { name: /Ajouter un niveau/ }).click();
-  await page.locator('table.tbl tbody tr').nth(1).waitFor({ timeout: 5000 }).catch(() => {});
-  s.check('une ligne de niveau ajoutée sous Riegel (non enregistrée)', await page.locator('table.tbl tbody tr').count() === 2);
+  await niveaux.nth(1).waitFor({ timeout: 5000 }).catch(() => {});
+  s.check('un niveau ajouté sous Riegel (non enregistré)', await niveaux.count() === 2);
+  await page.getByLabel('% minimum 5 km').fill('85,5');
+  s.check('saisie lisible : le champ n’est pas tronqué', await page.getByLabel('% minimum 5 km').evaluate(e => e.scrollWidth <= e.clientWidth));
   await s.shot(page, 'allures-admin-cibles');
   s.check('rien d’enregistré', sql('SELECT COUNT(*) FROM allure_levels') === '0');
 
   await page.goto(BASE + '/admin/parametres', { waitUntil: 'networkidle' });
   const hub = await page.locator('body').innerText();
-  s.check('hub des paramètres : zones et allures cibles', hub.includes('Zones d’allure course') && hub.includes('Allures cibles'));
+  s.check('bloc « Allures course » des paramètres : zones et allures cibles', hub.includes('Zones d’allure') && hub.includes('Allures cibles'));
   s.checkJs(page);
   tous.push(s.report());
   await ctx.close();
