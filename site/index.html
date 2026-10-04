@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Club'O'Clock — logiciel libre et gratuit de planning d'entraînement pour club sportif</title>
-<meta name="description" content="Application web libre et gratuite de gestion du planning d'entraînement pour club sportif associatif (triathlon, course à pied, natation…) : inscriptions, liste d'attente, quotas, tutelle parentale et notifications. Une instance par club, tes données restent chez toi.">
+<meta name="description" content="Logiciel libre et gratuit de planning d'entraînement pour club sportif associatif (triathlon, course à pied, natation…) : inscriptions, liste d'attente, compétitions, débriefs, tutelle parentale, notifications. Auto-hébergé, RGPD.">
 <link rel="canonical" href="https://cluboclock.ratelet.fr/">
 
 <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
@@ -15,7 +15,7 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://cluboclock.ratelet.fr/">
 <meta property="og:title" content="Club'O'Clock — le planning d'entraînement de ton club">
-<meta property="og:description" content="Inscriptions, liste d'attente, quotas et tutelle parentale. Libre, auto-hébergé, RGPD par construction.">
+<meta property="og:description" content="Inscriptions, liste d'attente, compétitions, débriefs et tutelle parentale. Libre, auto-hébergé, RGPD par construction.">
 <meta property="og:image" content="https://cluboclock.ratelet.fr/assets/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -32,7 +32,19 @@
       "@type": "SoftwareApplication",
       "name": "Club'O'Clock",
       "url": "https://cluboclock.ratelet.fr/",
-      "description": "Application web libre de gestion du planning d'entraînement pour club sportif associatif : inscriptions, liste d'attente, quotas, tutelle parentale et notifications.",
+      "description": "Application web libre de gestion du planning d'entraînement pour club sportif associatif : inscriptions, liste d'attente, quotas, compétitions et débriefs, tutelle parentale et notifications.",
+      "featureList": [
+        "Inscription aux séances d'entraînement depuis le téléphone",
+        "Liste d'attente avec promotion automatique",
+        "Capacité par séance et quotas par période",
+        "Notifications email et push web",
+        "Tutelle parentale pour les adhérents mineurs",
+        "Modèles de séance générant le planning de la saison",
+        "Calendrier des compétitions et ouverture des inscriptions annoncée",
+        "Débriefs de course et albums photos partagés au club",
+        "Parcours GPX et météo sur la durée de la séance",
+        "Synchronisation avec l'agenda du téléphone (iCalendar)"
+      ],
       "applicationCategory": "BusinessApplication",
       "applicationSubCategory": "Gestion de club sportif",
       "operatingSystem": "Web, Android, iOS (PWA)",
@@ -120,7 +132,7 @@
         <span class="eyebrow">Ce que ça résout</span>
         <h2>Les questions qui reviennent chaque semaine</h2>
         <p>
-          Six problèmes que tout bureau de club connaît, et ce que l'application en fait.
+          Dix problèmes que tout bureau de club connaît, et ce que l'application en fait.
         </p>
       </div>
 
@@ -165,6 +177,34 @@
           <div>
             <p class="q">Recréer la semaine type chaque saison.</p>
             <p class="a"><b>Modèles de séance</b> qui génèrent le planning.</p>
+          </div>
+        </div>
+        <div class="solve">
+          <span class="tick" aria-hidden="true">✓</span>
+          <div>
+            <p class="q">« Les inscriptions au triathlon ouvrent quand&nbsp;? »</p>
+            <p class="a"><b>Calendrier des compétitions</b> de la saison, et le club est prévenu à l'ouverture des inscriptions.</p>
+          </div>
+        </div>
+        <div class="solve">
+          <span class="tick" aria-hidden="true">✓</span>
+          <div>
+            <p class="q">« Alors, cette course&nbsp;? »</p>
+            <p class="a"><b>Débriefs</b> et album photos partagés à tout le club, avec réactions.</p>
+          </div>
+        </div>
+        <div class="solve">
+          <span class="tick" aria-hidden="true">✓</span>
+          <div>
+            <p class="q">« On part d'où, et il va pleuvoir&nbsp;? »</p>
+            <p class="a"><b>Parcours GPX</b> sur carte et <b>météo</b> sur toute la durée de la séance.</p>
+          </div>
+        </div>
+        <div class="solve">
+          <span class="tick" aria-hidden="true">✓</span>
+          <div>
+            <p class="q">« J'avais oublié que je m'étais inscrit. »</p>
+            <p class="a">Ses séances dans <b>l'agenda du téléphone</b>, par abonnement synchronisé.</p>
           </div>
         </div>
       </div>

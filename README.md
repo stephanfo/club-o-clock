@@ -24,6 +24,10 @@ adhérents administré par des bénévoles.
 | Une séance est annulée à 18 h | **Notification** email et push web à tous les inscrits |
 | Les mineurs et leurs parents | **Tutelle parentale** : le parent inscrit son enfant et reçoit ses notifications |
 | Recréer la semaine type chaque saison | **Modèles de séance** qui génèrent le planning |
+| « Les inscriptions au triathlon ouvrent quand ? » | **Calendrier des compétitions** de la saison, et le club est prévenu à l'ouverture des inscriptions |
+| « Alors, cette course ? » | **Débriefs** et album photos partagés à tout le club, avec réactions |
+| « On part d'où, et il va pleuvoir ? » | **Parcours GPX** sur carte et **météo** sur toute la durée de la séance |
+| « J'avais oublié que je m'étais inscrit. » | Ses séances dans **l'agenda du téléphone**, par abonnement synchronisé |
 
 ### Ce qui le distingue
 
