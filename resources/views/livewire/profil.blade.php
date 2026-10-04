@@ -11,10 +11,11 @@
     $tabItems = [
         ['v' => 'identite', 'l' => 'Identité'],
         ['v' => 'notifs', 'l' => 'Notifs'],
+        ['v' => 'allures', 'l' => 'Allures'],
         ['v' => 'quotas', 'l' => 'Quotas'],
         ['v' => 'connexion', 'l' => 'Connexion'],
     ];
-    $navIcons = ['identite' => 'user', 'notifs' => 'bell', 'quotas' => 'bar-chart', 'connexion' => 'shield'];
+    $navIcons = ['identite' => 'user', 'notifs' => 'bell', 'allures' => 'footprints', 'quotas' => 'bar-chart', 'connexion' => 'shield'];
 @endphp
 <div class="profil-screen">
     {{-- Feedback d'action global (revue UX 2026-07-11) : bannière flottante auto-masquée,
@@ -27,9 +28,9 @@
             <x-slot:leading><x-avatar :name="$user->fullName()" tint="tint-run" /></x-slot:leading>
             <x-slot:trailing><x-alert-bell dark /></x-slot:trailing>
         </x-topbar>
-        <x-tabs :items="$tabItems" :value="$tab" wire-set="tab" />
+        <x-tabs :items="$tabItems" :value="$tab" wire-set="tab" class="tabstrip-fit" />
         <div class="pa-scroll" style="padding:16px;background:var(--app-bg)">
-            @include('livewire.profil._panel')
+            @include('livewire.profil._panel', ['coquille' => 'mobile'])
 
             {{-- Accès mobile aux pages d'info (revue UX 2026-07-11) : sans ce lien, la page Infos
                  n'est atteignable sur mobile que via une bannière épinglée sur l'Accueil. --}}
@@ -63,7 +64,7 @@
                 </nav>
                 <div class="profil-dk-content">
                     <div style="max-width:620px;margin:0 auto">
-                        @include('livewire.profil._panel')
+                        @include('livewire.profil._panel', ['coquille' => 'desktop'])
                         <a href="{{ route('legal') }}" class="auth-fine" style="display:inline-block;margin-top:18px">
                             Mentions légales &amp; confidentialité
                         </a>
