@@ -18,6 +18,8 @@
             }
         }
         $grille = $referentiel->gridDistances();
+        // Distances officielles (1 km, 5 km, 10 km, semi, marathon) : colonnes mises en avant.
+        $officielles = $referentiel->officialGridDistances();
     @endphp
     {{-- ── Curseur d'intensité : formule triviale recalculée côté navigateur. Les valeurs sont
          au-dessus du curseur, pour que le doigt qui glisse ne les cache pas. ── --}}
@@ -68,7 +70,7 @@
                             <th>Zone</th>
                             <th class="r">Allure /km</th>
                             @foreach ($grille as $label => $m)
-                                <th class="r">{{ $label }}</th>
+                                <th @class(['r', 'col-officielle' => in_array($label, $officielles, true)])>{{ $label }}</th>
                             @endforeach
                         </tr>
                     </thead>
@@ -82,8 +84,8 @@
                                 </td>
                                 {{-- Fourchette sur deux lignes, le plus rapide en haut : colonnes plus étroites. --}}
                                 <td class="r" style="font-weight:700"><span class="fourchette"><span>{{ C::formatAllure(C::allure($vmaValue, $z->pct_max)) }}</span><span>{{ C::formatAllure(C::allure($vmaValue, $z->pct_min)) }}</span></span></td>
-                                @foreach ($grille as $m)
-                                    <td class="r"><span class="fourchette"><span>{{ C::formatTemps(C::temps($m, $vmaValue, $z->pct_max)) }}</span><span>{{ C::formatTemps(C::temps($m, $vmaValue, $z->pct_min)) }}</span></span></td>
+                                @foreach ($grille as $label => $m)
+                                    <td @class(['r', 'col-officielle' => in_array($label, $officielles, true)])><span class="fourchette"><span>{{ C::formatTemps(C::temps($m, $vmaValue, $z->pct_max)) }}</span><span>{{ C::formatTemps(C::temps($m, $vmaValue, $z->pct_min)) }}</span></span></td>
                                 @endforeach
                             </tr>
                         @endforeach

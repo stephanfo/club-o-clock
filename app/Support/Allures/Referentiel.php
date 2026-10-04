@@ -81,6 +81,18 @@ enum Referentiel: string
     }
 
     /**
+     * Distances officielles de la grille (route), mises en avant dans le tableau des zones.
+     *
+     * @return list<string> libellés de gridDistances()
+     */
+    public function officialGridDistances(): array
+    {
+        return match ($this) {
+            self::Course => ['1 km', '5 km', '10 km', 'Semi', 'Marathon'],
+        };
+    }
+
+    /**
      * Grille de zones générique posée au déploiement. Volontairement neutre (littérature, pas la
      * grille d'un coach) : chaque club saisit la sienne dans l'admin, sur son instance.
      *

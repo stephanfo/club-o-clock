@@ -172,6 +172,9 @@ class AlluresTest extends TestCase
             // Grille de la piste au marathon : 400 m à 90–80 % = 1:47 puis 2:00, sur deux lignes.
             ->assertSeeInOrder(['<span>1:47</span>', '<span>2:00</span>'], false)
             ->assertSee('Marathon')
+            // Distances officielles mises en avant, pas les autres.
+            ->assertSee('<th class="r col-officielle">5 km</th>', false)
+            ->assertSee('<th class="r">3 km</th>', false)
             ->assertSee('Projection de temps de course')
             // VMA enregistrée : les allures en tête, la saisie ensuite.
             ->assertSeeInOrder(['Mon allure selon', 'Mes allures par zone', 'Ma VMA', 'Estimer ma VMA']);
