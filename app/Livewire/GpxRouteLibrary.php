@@ -286,7 +286,7 @@ class GpxRouteLibrary extends Component
         return count(array_filter([
             $this->sector !== [], $this->discipline !== [], $this->distance !== [],
             $this->shape !== [], $this->grade !== [], $this->location !== [],
-            array_key_exists($this->used, self::USED_PERIODS),
+            $this->usedFilters(),
             $this->archived && $this->canManage(),
         ]));
     }
@@ -313,27 +313,66 @@ class GpxRouteLibrary extends Component
     /**
      * Filtre « Utilisé » : période → bornes en heure club, puis GpxRoute::scopeUsedBetween.
      *
-     * Les périodes glissantes partent du début de jour (heure club) : « les 3 derniers mois » d'un
-     * 7 octobre à 15 h commencent le 7 juillet à 0 h, pas à 15 h.
-     *
      * @param  Builder<GpxRoute>  $query
      */
     private function applyUsed(Builder $query): void
     {
+        if ($this->used === 'never') {
+            $query->neverUsed();
+        } elseif (($range = $this->usedRange()) !== null) {
+            $query->usedBetween(...$range);
+        }
+    }
+
+    /**
+     * Bornes de la période « Utilisé » active, en heure club ; null si aucune période ne filtre
+     * (pas de choix, « Jamais utilisé », ou période personnalisée encore sans date — choisir
+     * « Période… » ne doit rien masquer tant qu'aucune date n'est posée).
+     *
+     * Les périodes glissantes partent du début de jour (heure club) : « les 3 derniers mois » d'un
+     * 7 octobre à 15 h commencent le 7 juillet à 0 h, pas à 15 h.
+     *
+     * @return array{0: ?Carbon, 1: ?Carbon}|null
+     */
+    private function usedRange(): ?array
+    {
         $tz = ClubSettings::current()->timezone ?: 'Europe/Paris';
         $now = Carbon::now($tz);
 
-        match ($this->used) {
-            'month' => $query->usedBetween($now->copy()->startOfMonth(), null),
-            '3months' => $query->usedBetween($now->copy()->subMonthsNoOverflow(3)->startOfDay(), null),
-            'season' => $query->usedBetween(ClubSettings::current()->seasonStart($now), null),
-            'custom' => $query->usedBetween(
-                self::parseDay($this->usedFrom, $tz)?->startOfDay(),
-                self::parseDay($this->usedTo, $tz)?->endOfDay(),
-            ),
-            'never' => $query->neverUsed(),
+        $range = match ($this->used) {
+            'month' => [$now->copy()->startOfMonth(), null],
+            '3months' => [$now->copy()->subMonthsNoOverflow(3)->startOfDay(), null],
+            'season' => [ClubSettings::current()->seasonStart($now), null],
+            'custom' => $this->customBounds($tz),
             default => null,
         };
+
+        return $range === [null, null] ? null : $range;
+    }
+
+    /** Le filtre « Utilisé » restreint-il vraiment la liste ? (compteur « Filtres (n) ») */
+    private function usedFilters(): bool
+    {
+        return $this->used === 'never' || $this->usedRange() !== null;
+    }
+
+    /**
+     * Bornes de la période personnalisée en heure club, jour entier inclus. Des bornes inversées
+     * (saisie au clavier, URL forgée : min/max HTML ne retiennent ni l'un ni l'autre) sont
+     * permutées plutôt que de rendre une liste vide sans explication.
+     *
+     * @return array{0: ?Carbon, 1: ?Carbon}
+     */
+    private function customBounds(string $tz): array
+    {
+        $from = self::parseDay($this->usedFrom, $tz);
+        $to = self::parseDay($this->usedTo, $tz);
+
+        if ($from !== null && $to !== null && $from->gt($to)) {
+            [$from, $to] = [$to, $from];
+        }
+
+        return [$from?->startOfDay(), $to?->endOfDay()];
     }
 
     /**
@@ -382,13 +421,24 @@ class GpxRouteLibrary extends Component
     }
 
     /**
-     * Dernière utilisation et nombre d'utilisations (séances tenues), en sous-requêtes corrélées
-     * sur `sessions.route_id` (indexé) : servent au tri ET à l'affichage sur la carte.
+     * Dernière utilisation ou nombre d'utilisations (séances tenues), en sous-requête corrélée
+     * sur `sessions.route_id` (indexé) : sert au tri ET à l'affichage sur la carte. Posée
+     * seulement pour le tri qui la lit — sinon chaque rendu (frappe de recherche, mode carte)
+     * paierait deux sous-requêtes par ligne pour rien.
+     *
+     * Comptée sur la période « Utilisé » active : « Cette saison » + « Les plus utilisés » classe
+     * les parcours de la saison et affiche « 2 séances », pas leur total historique.
      */
     private function withUsage(Builder $query): void
     {
-        $query->withMax(['sessions as last_used_at' => fn ($s) => $s->held()], 'start_at')
-            ->withCount(['sessions as uses_count' => fn ($s) => $s->held()]);
+        [$from, $to] = $this->usedRange() ?? [null, null];
+        $held = fn ($s) => $s->heldBetween($from, $to);
+
+        match ($this->sort) {
+            'last-used' => $query->withMax(['sessions as last_used_at' => $held], 'start_at'),
+            'most-used' => $query->withCount(['sessions as uses_count' => $held]),
+            default => null,
+        };
     }
 
     /**

@@ -170,6 +170,14 @@ class Session extends Model
             ->where('start_at', '<=', ($now ?? Carbon::now())->copy()->utc());
     }
 
+    /** Séances tenues dans une plage ; une borne nulle est ouverte. */
+    public function scopeHeldBetween($query, ?Carbon $from, ?Carbon $to)
+    {
+        return $query->held()
+            ->when($from !== null, fn ($q) => $q->where('start_at', '>=', $from?->copy()->utc()))
+            ->when($to !== null, fn ($q) => $q->where('start_at', '<=', $to?->copy()->utc()));
+    }
+
     /**
      * Quota débloqué par le coach (#66, §4.10.4) : jusqu'à la séance, le quota ne bloque plus
      * l'inscription et le mécanisme A pioche aussi dans la file `quota_exceeded`. N'a de sens que

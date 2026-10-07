@@ -163,7 +163,34 @@ class GpxRouteLibrarySortTest extends TestCase
         $component = $this->library(['used' => 'custom', 'usedFrom' => '2026-02-31', 'usedTo' => '2026-09-30']);
         $this->assertSame(['B'], $this->names($component));
 
-        $this->library(['used' => 'custom', 'usedFrom' => '<script>'])->assertOk()->assertViewHas('total', 2);
+        // Aucune borne valide : la période personnalisée ne filtre rien.
+        $this->library(['used' => 'custom', 'usedFrom' => '<script>'])->assertOk()->assertViewHas('total', 5);
+    }
+
+    /** Choisir « Période… » ne masque rien tant qu'aucune date n'est saisie, et ne compte pas comme filtre. */
+    public function test_custom_period_without_dates_filters_nothing(): void
+    {
+        $this->usageCorpus();
+
+        $component = $this->library()->call('setUsed', 'custom');
+
+        $component->assertViewHas('total', 5);
+        $this->assertSame(0, $component->instance()->activeFilterCount());
+
+        // Contrôle positif : une borne posée filtre et compte.
+        $component->set('usedFrom', '2026-10-01');
+        $this->assertSame(['A'], $this->names($component));
+        $this->assertSame(1, $component->instance()->activeFilterCount());
+    }
+
+    /** Des bornes inversées (saisie clavier, URL) sont permutées au lieu de rendre une liste vide. */
+    public function test_reversed_custom_bounds_are_swapped(): void
+    {
+        $this->usageCorpus();
+
+        $component = $this->library(['used' => 'custom', 'usedFrom' => '2026-09-30', 'usedTo' => '2026-09-01']);
+
+        $this->assertSame(['B'], $this->names($component));
     }
 
     public function test_set_used_is_a_single_choice_toggle(): void
@@ -390,6 +417,53 @@ class GpxRouteLibrarySortTest extends TestCase
 
         $this->library(['sort' => 'last-used'])->assertSee('utilisé le sam. 3 oct.')->assertSee('jamais utilisé');
         $this->library(['sort' => 'most-used'])->assertSee('1 séance')->assertSee('jamais utilisé');
+    }
+
+    /**
+     * Avec une période « Utilisé » active, l'usage se compte sur cette période : « Cette saison » +
+     * « Les plus utilisés » classe la saison, pas l'historique, et la carte affiche le compte de la saison.
+     */
+    public function test_usage_sorts_count_within_the_active_period(): void
+    {
+        // Saison 2026-2027 ouverte en septembre : Ancien domine l'historique, Saison domine la saison.
+        $ancien = GpxRoute::factory()->create(['name' => 'Ancien']);
+        foreach (['2026-03-01', '2026-04-01', '2026-05-01', '2026-10-01'] as $day) {
+            $this->sessionOn($ancien, "$day 09:00");
+        }
+        $saison = GpxRoute::factory()->create(['name' => 'Saison']);
+        foreach (['2026-09-20', '2026-09-27'] as $day) {
+            $this->sessionOn($saison, "$day 09:00");
+        }
+
+        // Contrôle : sans période, le total historique fait foi.
+        $this->assertSame(['Ancien', 'Saison'], $this->names($this->library(['sort' => 'most-used'])));
+
+        $component = $this->library(['sort' => 'most-used', 'used' => 'season']);
+        $this->assertSame(['Saison', 'Ancien'], $this->names($component));
+        $component->assertSee('2 séances')->assertSee('1 séance')->assertDontSee('4 séances');
+
+        // Dernière utilisation bornée par la fin d'une période libre.
+        $libre = $this->library(['sort' => 'last-used', 'used' => 'custom', 'usedFrom' => '2026-09-01', 'usedTo' => '2026-09-30']);
+        $this->assertSame(['Saison'], $this->names($libre));
+        $libre->assertSee('utilisé le dim. 27 sept.');
+    }
+
+    /** Les sous-requêtes d'usage ne sont posées que pour le tri qui les lit (coût par ligne sur le mutualisé). */
+    public function test_usage_subqueries_only_run_for_usage_sorts(): void
+    {
+        $this->sessionOn(GpxRoute::factory()->create(['name' => 'Roulé']), '2026-10-03 09:00');
+
+        $byName = $this->library()->viewData('routes')->first()->getAttributes();
+        $this->assertArrayNotHasKey('last_used_at', $byName);
+        $this->assertArrayNotHasKey('uses_count', $byName);
+
+        $lastUsed = $this->library(['sort' => 'last-used'])->viewData('routes')->first()->getAttributes();
+        $this->assertArrayHasKey('last_used_at', $lastUsed);
+        $this->assertArrayNotHasKey('uses_count', $lastUsed);
+
+        $mostUsed = $this->library(['sort' => 'most-used'])->viewData('routes')->first()->getAttributes();
+        $this->assertArrayHasKey('uses_count', $mostUsed);
+        $this->assertArrayNotHasKey('last_used_at', $mostUsed);
     }
 
     /** Une utilisation d'une autre année porte son année, sinon « 3 oct. » serait ambigu. */

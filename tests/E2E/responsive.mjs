@@ -707,6 +707,10 @@ tous.push(s.report());
   const s37 = new Scenario('S37 · Bibliothèque de parcours — repli mobile, filtres, tri (#130)');
   const total = Number(sql('SELECT COUNT(*) FROM gpx_routes WHERE archived_at IS NULL'));
   s37.check('contrôle : la démo a des parcours', total > 1, `${total}`);
+  // La liste est paginée (GpxRouteLibrary::PER_PAGE) : on compare à ce qu'une page peut montrer,
+  // sans quoi une base de plus de 24 parcours ferait rougir le scénario sans régression.
+  const PAGE = 24;
+  const page1 = (n) => Math.min(n, PAGE);
   const corps = (page) => page.locator('#lib-filters-body');
   const bouton = (page) => page.locator('.lib-filters-toggle');
   const cartes = (page) => page.locator('.route-grid > a');
@@ -719,7 +723,7 @@ tous.push(s.report());
     s37.check('mobile : recherche visible', await page.getByPlaceholder('Rechercher un parcours…').isVisible());
     s37.check('mobile : tri visible', await page.locator('select.lib-sort').isVisible());
     s37.check('mobile : bouton « Filtres » visible', await bouton(page).isVisible());
-    s37.check('mobile : liste affichée sous les filtres repliés', await cartes(page).count() === total);
+    s37.check('mobile : liste affichée sous les filtres repliés', await cartes(page).count() === page1(total));
     await s37.shot(page, 's37-parcours-replie-mobile');
 
     await bouton(page).click();
@@ -735,7 +739,7 @@ tous.push(s.report());
     s37.check('mobile : compteur « Filtres (1) »', (await bouton(page).innerText()).toLowerCase().includes('filtres (1)'));
     const jamais = Number(sql(`SELECT COUNT(*) FROM gpx_routes g WHERE g.archived_at IS NULL AND NOT EXISTS (
         SELECT 1 FROM sessions s WHERE s.route_id = g.id AND s.cancelled_at IS NULL AND s.start_at <= UTC_TIMESTAMP())`));
-    s37.check('mobile : « Jamais utilisé » = le compte en base', await cartes(page).count() === jamais, `${await cartes(page).count()} / ${jamais}`);
+    s37.check('mobile : « Jamais utilisé » = le compte en base', await cartes(page).count() === page1(jamais), `${await cartes(page).count()} / ${jamais}`);
     s37.check('mobile : le filtre retire au moins un parcours', jamais < total, `${jamais} / ${total}`);
     await s37.shot(page, 's37-parcours-jamais-utilise-mobile');
 
@@ -755,11 +759,14 @@ tous.push(s.report());
     await page.locator('select.lib-sort').selectOption('grade-desc');
     await page.waitForTimeout(1200);
     s37.check('desktop : le tri passe dans l\'URL', page.url().includes('sort=grade-desc'));
+    // Un parcours sans D+ ni distance n'a pas d'indice : le tri le range en fin de liste, sans valeur.
+    const avecRelief = Number(sql(`SELECT COUNT(*) FROM gpx_routes WHERE archived_at IS NULL
+        AND dplus_m IS NOT NULL AND distance_km > 0`));
     const indices = (await cartes(page).allInnerTexts())
       .map((t) => t.match(/(\d+(?:,\d)?) m\/km/)?.[1])
       .filter(Boolean)
       .map((v) => Number(v.replace(',', '.')));
-    s37.check('desktop : chaque carte affiche son relief en m/km', indices.length === total, `${indices.length} / ${total}`);
+    s37.check('desktop : chaque carte affiche son relief en m/km', indices.length === page1(avecRelief), `${indices.length} / ${avecRelief}`);
     s37.check('desktop : relief décroissant', indices.every((v, i) => i === 0 || indices[i - 1] >= v), indices.join(' '));
     await s37.shot(page, 's37-parcours-tri-relief-desktop');
     s37.checkJs(page);

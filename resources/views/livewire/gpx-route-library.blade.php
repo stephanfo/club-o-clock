@@ -80,7 +80,7 @@
                     <div class="eyebrow" style="margin-bottom:6px">Direction</div>
                     <div class="sector-chips">
                         @foreach (\App\Models\GpxRoute::SECTORS as $s)
-                            <button type="button" wire:click="toggle('sector', '{{ $s }}')"
+                            <button type="button" wire:click="toggle('sector', '{{ $s }}')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters"
                                     class="chip{{ $this->isOn('sector', $s) ? ' is-active' : '' }}"
                                     aria-pressed="{{ $this->isOn('sector', $s) ? 'true' : 'false' }}">{{ $s }}</button>
                         @endforeach
@@ -92,7 +92,7 @@
                         <div class="eyebrow" style="margin-bottom:6px">Discipline</div>
                         <div class="flex g6 wrap">
                             @foreach ($disciplines as $d)
-                                <button type="button" wire:click="toggle('discipline', '{{ $d->id }}')"
+                                <button type="button" wire:click="toggle('discipline', '{{ $d->id }}')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters"
                                         class="chip{{ $this->isOn('discipline', (string) $d->id) ? ' is-active' : '' }}"
                                         aria-pressed="{{ $this->isOn('discipline', (string) $d->id) ? 'true' : 'false' }}">{{ $d->label }}</button>
                             @endforeach
@@ -106,7 +106,7 @@
                          plutôt qu'un flex wrap qui laisserait une dernière ligne bancale. --}}
                     <div class="sector-chips">
                         @foreach (\App\Livewire\GpxRouteLibrary::DISTANCE_BANDS as $key => [$label, $min, $max])
-                            <button type="button" wire:click="toggle('distance', '{{ $key }}')"
+                            <button type="button" wire:click="toggle('distance', '{{ $key }}')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters"
                                     class="chip{{ $this->isOn('distance', $key) ? ' is-active' : '' }}"
                                     aria-pressed="{{ $this->isOn('distance', $key) ? 'true' : 'false' }}">{{ $label }}</button>
                         @endforeach
@@ -118,9 +118,9 @@
                 <div>
                     <div class="eyebrow" style="margin-bottom:6px">Forme</div>
                     <div class="flex g6 wrap">
-                        <button type="button" wire:click="toggle('shape', 'round')" class="chip{{ $this->isOn('shape', 'round') ? ' is-active' : '' }}"
+                        <button type="button" wire:click="toggle('shape', 'round')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters" class="chip{{ $this->isOn('shape', 'round') ? ' is-active' : '' }}"
                                 aria-pressed="{{ $this->isOn('shape', 'round') ? 'true' : 'false' }}">Arrondi</button>
-                        <button type="button" wire:click="toggle('shape', 'long')" class="chip{{ $this->isOn('shape', 'long') ? ' is-active' : '' }}"
+                        <button type="button" wire:click="toggle('shape', 'long')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters" class="chip{{ $this->isOn('shape', 'long') ? ' is-active' : '' }}"
                                 aria-pressed="{{ $this->isOn('shape', 'long') ? 'true' : 'false' }}">Étiré</button>
                     </div>
                 </div>
@@ -129,11 +129,11 @@
                 <div>
                     <div class="eyebrow" style="margin-bottom:6px">Relief</div>
                     <div class="flex g6 wrap">
-                        <button type="button" wire:click="toggle('grade', 'rolling')" class="chip{{ $this->isOn('grade', 'rolling') ? ' is-active' : '' }}"
+                        <button type="button" wire:click="toggle('grade', 'rolling')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters" class="chip{{ $this->isOn('grade', 'rolling') ? ' is-active' : '' }}"
                                 aria-pressed="{{ $this->isOn('grade', 'rolling') ? 'true' : 'false' }}">Roulant</button>
-                        <button type="button" wire:click="toggle('grade', 'hilly')" class="chip{{ $this->isOn('grade', 'hilly') ? ' is-active' : '' }}"
+                        <button type="button" wire:click="toggle('grade', 'hilly')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters" class="chip{{ $this->isOn('grade', 'hilly') ? ' is-active' : '' }}"
                                 aria-pressed="{{ $this->isOn('grade', 'hilly') ? 'true' : 'false' }}">Vallonné</button>
-                        <button type="button" wire:click="toggle('grade', 'tough')" class="chip{{ $this->isOn('grade', 'tough') ? ' is-active' : '' }}"
+                        <button type="button" wire:click="toggle('grade', 'tough')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters" class="chip{{ $this->isOn('grade', 'tough') ? ' is-active' : '' }}"
                                 aria-pressed="{{ $this->isOn('grade', 'tough') ? 'true' : 'false' }}">Exigeant</button>
                     </div>
                 </div>
@@ -144,7 +144,7 @@
                     <div class="eyebrow" style="margin-bottom:6px">Utilisé</div>
                     <div class="flex g6 wrap">
                         @foreach (\App\Livewire\GpxRouteLibrary::USED_PERIODS as $key => $label)
-                            <button type="button" wire:click="setUsed('{{ $key }}')"
+                            <button type="button" wire:click="setUsed('{{ $key }}')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters"
                                     class="chip{{ $used === $key ? ' is-active' : '' }}"
                                     aria-pressed="{{ $used === $key ? 'true' : 'false' }}">{{ $label }}</button>
                         @endforeach
@@ -169,7 +169,7 @@
                         <div class="eyebrow" style="margin-bottom:6px">Départ</div>
                         <div class="flex g6 wrap">
                             @foreach ($locations as $loc)
-                                <button type="button" wire:click="toggle('location', '{{ $loc->id }}')"
+                                <button type="button" wire:click="toggle('location', '{{ $loc->id }}')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters"
                                         class="chip{{ $this->isOn('location', (string) $loc->id) ? ' is-active' : '' }}"
                                         aria-pressed="{{ $this->isOn('location', (string) $loc->id) ? 'true' : 'false' }}">{{ $loc->name }}</button>
                             @endforeach
@@ -276,7 +276,7 @@
                             <x-disc-badge :discipline="$r->discipline" :size="30" />
                             <div class="f1" style="min-width:0">
                                 <div style="font-weight:700;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $r->name }}</div>
-                                <div class="meta" style="font-size:12px">
+                                <div class="meta" style="font-size:var(--text-xs)">
                                     {{ $r->discipline?->label ?? 'Parcours' }}@if ($r->sector) · secteur {{ $r->sector }}@endif
                                 </div>
                             </div>
@@ -304,9 +304,9 @@
 
                         {{-- Donnée du tri d'usage affichée, sinon l'ordre paraîtrait arbitraire. --}}
                         @if ($sort === 'last-used')
-                            <div class="meta" style="font-size:12px">{{ \App\Livewire\GpxRouteLibrary::usedOnLabel($r->last_used_at) }}</div>
+                            <div class="meta" style="font-size:var(--text-xs)">{{ \App\Livewire\GpxRouteLibrary::usedOnLabel($r->last_used_at) }}</div>
                         @elseif ($sort === 'most-used')
-                            <div class="meta" style="font-size:12px">{{ $r->uses_count === 0 ? 'jamais utilisé' : $r->uses_count.' séance'.($r->uses_count > 1 ? 's' : '') }}</div>
+                            <div class="meta" style="font-size:var(--text-xs)">{{ $r->uses_count === 0 ? 'jamais utilisé' : $r->uses_count.' séance'.($r->uses_count > 1 ? 's' : '') }}</div>
                         @endif
                     </a>
                 @endforeach

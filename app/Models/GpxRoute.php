@@ -262,11 +262,7 @@ class GpxRoute extends Model
      */
     public function scopeUsedBetween(Builder $query, ?Carbon $from, ?Carbon $to): Builder
     {
-        $held = self::heldRouteIds()
-            ->when($from !== null, fn (Builder $s) => $s->where('start_at', '>=', $from?->copy()->utc()))
-            ->when($to !== null, fn (Builder $s) => $s->where('start_at', '<=', $to?->copy()->utc()));
-
-        return $query->whereIn('id', $held);
+        return $query->whereIn('id', self::heldRouteIds($from, $to));
     }
 
     /**
@@ -287,9 +283,9 @@ class GpxRoute extends Model
      *
      * @return Builder<Session>
      */
-    private static function heldRouteIds(): Builder
+    private static function heldRouteIds(?Carbon $from = null, ?Carbon $to = null): Builder
     {
-        return Session::query()->held()->whereNotNull('route_id')->select('route_id');
+        return Session::query()->heldBetween($from, $to)->whereNotNull('route_id')->select('route_id');
     }
 
     /** @return BelongsTo<Discipline, $this> */
