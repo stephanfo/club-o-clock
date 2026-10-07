@@ -160,6 +160,25 @@ class Session extends Model
     }
 
     /**
+     * Séances qui ont eu lieu : commencées et non annulées. C'est la définition d'une « utilisation »
+     * de parcours dans la bibliothèque (#130) — une séance seulement planifiée ne compte pas encore,
+     * une séance annulée ne comptera jamais.
+     */
+    public function scopeHeld($query, ?Carbon $now = null)
+    {
+        return $query->whereNull('cancelled_at')
+            ->where('start_at', '<=', ($now ?? Carbon::now())->copy()->utc());
+    }
+
+    /** Séances tenues dans une plage ; une borne nulle est ouverte. */
+    public function scopeHeldBetween($query, ?Carbon $from, ?Carbon $to)
+    {
+        return $query->held()
+            ->when($from !== null, fn ($q) => $q->where('start_at', '>=', $from?->copy()->utc()))
+            ->when($to !== null, fn ($q) => $q->where('start_at', '<=', $to?->copy()->utc()));
+    }
+
+    /**
      * Quota débloqué par le coach (#66, §4.10.4) : jusqu'à la séance, le quota ne bloque plus
      * l'inscription et le mécanisme A pioche aussi dans la file `quota_exceeded`. N'a de sens que
      * sur une séance taguée : sans tag, il n'y a pas de quota à débloquer.

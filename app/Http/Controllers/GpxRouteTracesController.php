@@ -44,6 +44,10 @@ class GpxRouteTracesController extends Controller
         $library->shape = self::strings($request->query('shape'));
         $library->grade = self::strings($request->query('grade'));
         $library->distance = self::strings($request->query('distance'));
+        $library->location = self::strings($request->query('location'));
+        $library->used = self::string($request->query('used'));
+        $library->usedFrom = self::string($request->query('usedFrom'));
+        $library->usedTo = self::string($request->query('usedTo'));
         $library->archived = $request->boolean('archived');
 
         // On demande UNE ligne de plus que le plafond : à exactement MAX_TRACES résultats, rien n'a
@@ -71,6 +75,12 @@ class GpxRouteTracesController extends Controller
                 'points' => $r->polyline,
             ])->values(),
         ]);
+    }
+
+    /** Paramètre d'URL scalaire attendu : tout le reste (array forgé…) vaut chaîne vide. */
+    private static function string(mixed $value): string
+    {
+        return is_scalar($value) ? (string) $value : '';
     }
 
     /**

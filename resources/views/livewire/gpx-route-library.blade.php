@@ -34,22 +34,43 @@
     </div>
 
     <div class="dk-body">
-        {{-- ═══ Recherche + filtres ═══ --}}
-        <div class="card" style="overflow:hidden;margin-bottom:16px">
-            <div class="flex g8 ac wrap" style="padding:12px;border-bottom:1px solid var(--divider)">
-                <div class="input flex ac g8 f1" style="min-width:220px">
+        {{-- ═══ Recherche + tri + filtres ═══
+             Repli mobile (#130) : sous 768px, les blocs de filtres se replient derrière « Filtres (n) » ;
+             recherche, tri et « Réinitialiser » restent visibles. Desktop : toujours dépliés, le bouton
+             est masqué. L'état est purement local (Alpine), jamais dans l'URL — et il survit aux
+             re-rendus Livewire : le morph clone l'état Alpine avant de patcher les attributs. --}}
+        @php $activeFilters = $this->activeFilterCount(); @endphp
+        <div class="card lib-filters" style="overflow:hidden;margin-bottom:16px"
+             x-data="{ open: false }" x-bind:class="{ 'is-open': open }">
+            <div class="lib-filters-head flex g8 ac wrap">
+                <div class="input lib-search flex ac g8 f1" style="min-width:220px">
                     <x-icon name="search" :size="16" style="color:var(--fg-muted)" />
                     <input type="text" wire:model.live.debounce.300ms="search" placeholder="Rechercher un parcours…"
                            style="border:none;background:none;outline:none;font:inherit;color:inherit;width:100%" />
                 </div>
+                {{-- Le tri ne s'applique qu'à la liste : la carte n'a pas d'ordre de lecture. --}}
+                @unless ($this->isMap())
+                    <select wire:model.live="sort" class="input lib-sort" aria-label="Trier les parcours">
+                        @foreach (\App\Livewire\GpxRouteLibrary::SORTS as $key => $label)
+                            <option value="{{ $key }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                @endunless
+                <button type="button" class="btn btn-ghost btn-sm lib-filters-toggle"
+                        x-on:click="open = ! open" x-bind:aria-expanded="open ? 'true' : 'false'" aria-controls="lib-filters-body">
+                    <x-icon name="filter" :size="14" /> Filtres{{ $activeFilters > 0 ? " ({$activeFilters})" : '' }}
+                    <x-icon name="chevron-down" :size="14" class="lib-filters-chevron" />
+                </button>
                 @if ($this->hasFilters())
-                    <button type="button" wire:click="resetFilters" class="btn btn-ghost btn-sm">
-                        <x-icon name="x" :size="14" /> Réinitialiser
+                    {{-- Libellé masqué sous 768px (icône seule) : il écraserait le tri sur la même ligne. --}}
+                    <button type="button" wire:click="resetFilters" class="btn btn-ghost btn-sm"
+                            aria-label="Réinitialiser les filtres" title="Réinitialiser les filtres">
+                        <x-icon name="x" :size="14" /> <span class="lib-reset-label">Réinitialiser</span>
                     </button>
                 @endif
             </div>
 
-            <div style="padding:12px;display:flex;flex-direction:column;gap:10px">
+            <div id="lib-filters-body" class="lib-filters-body" style="padding:12px;display:flex;flex-direction:column;gap:10px">
                 {{-- Chips à sélection MULTIPLE (2026-08-02) : plusieurs valeurs d'un même filtre
                      s'unissent (OU), les filtres se croisent entre eux (ET). aria-pressed reste le
                      bon rôle — ce sont des bascules, pas des cases d'un groupe exclusif. --}}
@@ -59,7 +80,7 @@
                     <div class="eyebrow" style="margin-bottom:6px">Direction</div>
                     <div class="sector-chips">
                         @foreach (\App\Models\GpxRoute::SECTORS as $s)
-                            <button type="button" wire:click="toggle('sector', '{{ $s }}')"
+                            <button type="button" wire:click="toggle('sector', '{{ $s }}')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters"
                                     class="chip{{ $this->isOn('sector', $s) ? ' is-active' : '' }}"
                                     aria-pressed="{{ $this->isOn('sector', $s) ? 'true' : 'false' }}">{{ $s }}</button>
                         @endforeach
@@ -71,7 +92,7 @@
                         <div class="eyebrow" style="margin-bottom:6px">Discipline</div>
                         <div class="flex g6 wrap">
                             @foreach ($disciplines as $d)
-                                <button type="button" wire:click="toggle('discipline', '{{ $d->id }}')"
+                                <button type="button" wire:click="toggle('discipline', '{{ $d->id }}')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters"
                                         class="chip{{ $this->isOn('discipline', (string) $d->id) ? ' is-active' : '' }}"
                                         aria-pressed="{{ $this->isOn('discipline', (string) $d->id) ? 'true' : 'false' }}">{{ $d->label }}</button>
                             @endforeach
@@ -85,7 +106,7 @@
                          plutôt qu'un flex wrap qui laisserait une dernière ligne bancale. --}}
                     <div class="sector-chips">
                         @foreach (\App\Livewire\GpxRouteLibrary::DISTANCE_BANDS as $key => [$label, $min, $max])
-                            <button type="button" wire:click="toggle('distance', '{{ $key }}')"
+                            <button type="button" wire:click="toggle('distance', '{{ $key }}')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters"
                                     class="chip{{ $this->isOn('distance', $key) ? ' is-active' : '' }}"
                                     aria-pressed="{{ $this->isOn('distance', $key) ? 'true' : 'false' }}">{{ $label }}</button>
                         @endforeach
@@ -97,9 +118,9 @@
                 <div>
                     <div class="eyebrow" style="margin-bottom:6px">Forme</div>
                     <div class="flex g6 wrap">
-                        <button type="button" wire:click="toggle('shape', 'round')" class="chip{{ $this->isOn('shape', 'round') ? ' is-active' : '' }}"
+                        <button type="button" wire:click="toggle('shape', 'round')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters" class="chip{{ $this->isOn('shape', 'round') ? ' is-active' : '' }}"
                                 aria-pressed="{{ $this->isOn('shape', 'round') ? 'true' : 'false' }}">Arrondi</button>
-                        <button type="button" wire:click="toggle('shape', 'long')" class="chip{{ $this->isOn('shape', 'long') ? ' is-active' : '' }}"
+                        <button type="button" wire:click="toggle('shape', 'long')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters" class="chip{{ $this->isOn('shape', 'long') ? ' is-active' : '' }}"
                                 aria-pressed="{{ $this->isOn('shape', 'long') ? 'true' : 'false' }}">Étiré</button>
                     </div>
                 </div>
@@ -108,14 +129,53 @@
                 <div>
                     <div class="eyebrow" style="margin-bottom:6px">Relief</div>
                     <div class="flex g6 wrap">
-                        <button type="button" wire:click="toggle('grade', 'rolling')" class="chip{{ $this->isOn('grade', 'rolling') ? ' is-active' : '' }}"
+                        <button type="button" wire:click="toggle('grade', 'rolling')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters" class="chip{{ $this->isOn('grade', 'rolling') ? ' is-active' : '' }}"
                                 aria-pressed="{{ $this->isOn('grade', 'rolling') ? 'true' : 'false' }}">Roulant</button>
-                        <button type="button" wire:click="toggle('grade', 'hilly')" class="chip{{ $this->isOn('grade', 'hilly') ? ' is-active' : '' }}"
+                        <button type="button" wire:click="toggle('grade', 'hilly')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters" class="chip{{ $this->isOn('grade', 'hilly') ? ' is-active' : '' }}"
                                 aria-pressed="{{ $this->isOn('grade', 'hilly') ? 'true' : 'false' }}">Vallonné</button>
-                        <button type="button" wire:click="toggle('grade', 'tough')" class="chip{{ $this->isOn('grade', 'tough') ? ' is-active' : '' }}"
+                        <button type="button" wire:click="toggle('grade', 'tough')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters" class="chip{{ $this->isOn('grade', 'tough') ? ' is-active' : '' }}"
                                 aria-pressed="{{ $this->isOn('grade', 'tough') ? 'true' : 'false' }}">Exigeant</button>
                     </div>
                 </div>
+
+                {{-- Utilisé (#130) : sélection UNIQUE — les périodes s'emboîtent. « Utilisé » = au moins
+                     une séance tenue (commencée, non annulée) sur la période. --}}
+                <div>
+                    <div class="eyebrow" style="margin-bottom:6px">Utilisé</div>
+                    <div class="flex g6 wrap">
+                        @foreach (\App\Livewire\GpxRouteLibrary::USED_PERIODS as $key => $label)
+                            <button type="button" wire:click="setUsed('{{ $key }}')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters"
+                                    class="chip{{ $used === $key ? ' is-active' : '' }}"
+                                    aria-pressed="{{ $used === $key ? 'true' : 'false' }}">{{ $label }}</button>
+                        @endforeach
+                    </div>
+                    @if ($used === 'custom')
+                        <div class="lib-period">
+                            <div>
+                                <label class="field-label" for="lib-used-from">Du</label>
+                                <div class="ifield"><input id="lib-used-from" class="ifield-input" type="date" wire:model.live="usedFrom" max="{{ $usedTo ?: '' }}"></div>
+                            </div>
+                            <div>
+                                <label class="field-label" for="lib-used-to">Au</label>
+                                <div class="ifield"><input id="lib-used-to" class="ifield-input" type="date" wire:model.live="usedTo" min="{{ $usedFrom ?: '' }}"></div>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Départ (#130) : seuls les lieux rattachés à au moins un parcours sont proposés. --}}
+                @if ($locations->isNotEmpty())
+                    <div>
+                        <div class="eyebrow" style="margin-bottom:6px">Départ</div>
+                        <div class="flex g6 wrap">
+                            @foreach ($locations as $loc)
+                                <button type="button" wire:click="toggle('location', '{{ $loc->id }}')" wire:loading.attr="disabled" wire:target="toggle, setUsed, resetFilters"
+                                        class="chip{{ $this->isOn('location', (string) $loc->id) ? ' is-active' : '' }}"
+                                        aria-pressed="{{ $this->isOn('location', (string) $loc->id) ? 'true' : 'false' }}">{{ $loc->name }}</button>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
 
                 @if ($canManage)
                     <label class="flex ac g8 meta" style="cursor:pointer;font-size:12.5px">
@@ -216,7 +276,7 @@
                             <x-disc-badge :discipline="$r->discipline" :size="30" />
                             <div class="f1" style="min-width:0">
                                 <div style="font-weight:700;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $r->name }}</div>
-                                <div class="meta" style="font-size:12px">
+                                <div class="meta" style="font-size:var(--text-xs)">
                                     {{ $r->discipline?->label ?? 'Parcours' }}@if ($r->sector) · secteur {{ $r->sector }}@endif
                                 </div>
                             </div>
@@ -233,12 +293,21 @@
                                 <span class="chip chip-sm chip-line">{{ $r->dplus_m }} m D+</span>
                             @endif
                             @if ($r->gradeLabel())
-                                <span class="chip chip-sm chip-blue">{{ $r->gradeLabel() }}</span>
+                                {{-- Valeur brute à côté du libellé : les seuils sont relatifs au club,
+                                     et c'est elle qu'ordonne le tri par relief. --}}
+                                <span class="chip chip-sm chip-blue">{{ $r->gradeLabel() }} · {{ str_replace('.', ',', (string) $r->gradeIndex()) }} m/km</span>
                             @endif
                             @if ($r->shapeLabel())
                                 <span class="chip chip-sm">{{ ucfirst($r->shapeLabel()) }}</span>
                             @endif
                         </div>
+
+                        {{-- Donnée du tri d'usage affichée, sinon l'ordre paraîtrait arbitraire. --}}
+                        @if ($sort === 'last-used')
+                            <div class="meta" style="font-size:var(--text-xs)">{{ \App\Livewire\GpxRouteLibrary::usedOnLabel($r->last_used_at) }}</div>
+                        @elseif ($sort === 'most-used')
+                            <div class="meta" style="font-size:var(--text-xs)">{{ $r->uses_count === 0 ? 'jamais utilisé' : $r->uses_count.' séance'.($r->uses_count > 1 ? 's' : '') }}</div>
+                        @endif
                     </a>
                 @endforeach
             </div>

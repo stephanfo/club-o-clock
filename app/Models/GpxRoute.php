@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 // Parcours GPX réutilisable (PRD §4.20, §5.1). Objet de première classe : créable sans séance,
@@ -43,6 +44,16 @@ class GpxRoute extends Model
     public const GRADE_ROLLING_MAX = 6.3;
 
     public const GRADE_HILLY_MAX = 7.3;
+
+    /**
+     * Indice de relief en SQL, NULL quand il n'est pas calculable (D+ ou distance manquant/nul).
+     *
+     * ROUND(…, 1) et non le ratio brut : le libellé PHP classe sur la valeur AFFICHÉE (arrondie) —
+     * filtre (scopeGrade) et tri (bibliothèque, #130) doivent s'accorder sur elle. Le CASE garde la
+     * division : sans lui, un parcours à 0 km vaudrait NULL ou une erreur selon le sql_mode.
+     */
+    public const GRADE_INDEX_SQL = 'CASE WHEN dplus_m IS NULL OR distance_km IS NULL OR distance_km <= 0 '
+        .'THEN NULL ELSE ROUND(dplus_m / distance_km, 1) END';
 
     protected $fillable = [
         'name', 'description', 'discipline_id',
@@ -195,10 +206,10 @@ class GpxRoute extends Model
      */
     public function scopeGrade(Builder $query, array|string|null $grade): Builder
     {
-        // ROUND(…, 1) et non le ratio brut : le libellé PHP classe sur la valeur AFFICHÉE (arrondie).
-        // Sans cet arrondi, une trace à 7,2503 s'affiche « Exigeant · 7,3 » mais sort du filtre
-        // « Exigeant » — 4 des 18 traces du corpus étaient dans ce cas. La valeur montrée fait foi.
-        $ratio = 'ROUND(dplus_m / distance_km, 1)';
+        // Arrondi de GRADE_INDEX_SQL : sans lui, une trace à 7,2503 s'affiche « Exigeant · 7,3 » mais
+        // sort du filtre « Exigeant » — 4 des 18 traces du corpus étaient dans ce cas. La valeur
+        // montrée fait foi.
+        $ratio = '('.self::GRADE_INDEX_SQL.')';
 
         $cases = [
             'rolling' => fn (Builder $q) => $q->whereRaw("$ratio < ?", [self::GRADE_ROLLING_MAX]),
@@ -240,6 +251,41 @@ class GpxRoute extends Model
         return $query->whereNotNull('bbox_min_lat')
             ->where('bbox_min_lat', '<=', $maxLat)->where('bbox_max_lat', '>=', $minLat)
             ->where('bbox_min_lng', '<=', $maxLng)->where('bbox_max_lng', '>=', $minLng);
+    }
+
+    /**
+     * Parcours utilisés par au moins une séance TENUE (Session::scopeHeld) dans la plage. Une borne
+     * nulle est ouverte ; la borne haute ne dépasse de toute façon jamais l'instant présent.
+     *
+     * @param  Builder<GpxRoute>  $query
+     * @return Builder<GpxRoute>
+     */
+    public function scopeUsedBetween(Builder $query, ?Carbon $from, ?Carbon $to): Builder
+    {
+        return $query->whereIn('id', self::heldRouteIds($from, $to));
+    }
+
+    /**
+     * Parcours qu'aucune séance tenue n'a jamais utilisés (planifiés seulement, ou orphelins).
+     *
+     * @param  Builder<GpxRoute>  $query
+     * @return Builder<GpxRoute>
+     */
+    public function scopeNeverUsed(Builder $query): Builder
+    {
+        return $query->whereNotIn('id', self::heldRouteIds());
+    }
+
+    /**
+     * Sous-requête des `route_id` de séances tenues. Le `whereNotNull` n'est pas décoratif : une seule
+     * séance sans parcours dans un `NOT IN (…, NULL)` rendrait la condition inconnue pour TOUTES les
+     * lignes, et « jamais utilisé » ne renverrait plus rien.
+     *
+     * @return Builder<Session>
+     */
+    private static function heldRouteIds(?Carbon $from = null, ?Carbon $to = null): Builder
+    {
+        return Session::query()->heldBetween($from, $to)->whereNotNull('route_id')->select('route_id');
     }
 
     /** @return BelongsTo<Discipline, $this> */

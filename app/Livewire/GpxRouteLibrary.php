@@ -2,9 +2,13 @@
 
 namespace App\Livewire;
 
+use App\Models\ClubSettings;
 use App\Models\Discipline;
 use App\Models\GpxRoute;
+use App\Models\Location;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -58,6 +62,29 @@ class GpxRouteLibrary extends Component
     #[Url]
     public array $distance = [];
 
+    /** @var list<string> ids de lieu de départ (start_location_id, #130) */
+    #[Url]
+    public array $location = [];
+
+    /**
+     * Période d'utilisation (#130) — sélection UNIQUE, contrairement aux chips ci-dessus : les
+     * périodes s'emboîtent (ce mois-ci ⊂ 3 derniers mois ⊂ saison), les unir n'aurait aucun sens.
+     * Clé de USED_PERIODS ou '' (inactif). Une clé inconnue venue de l'URL est ignorée.
+     */
+    #[Url]
+    public string $used = '';
+
+    /** Bornes de la période libre (`used` = custom), au format Y-m-d, heure club. Vides = ouvertes. */
+    #[Url]
+    public string $usedFrom = '';
+
+    #[Url]
+    public string $usedTo = '';
+
+    /** Clé de SORTS. Normalisée au montage et à chaque changement : la valeur vient de l'URL. */
+    #[Url]
+    public string $sort = 'name';
+
     /** Inclure les parcours archivés — réservé aux coachs/admins, ignoré sinon. */
     #[Url]
     public bool $archived = false;
@@ -91,18 +118,86 @@ class GpxRouteLibrary extends Component
         '100+' => ['> 100 km', 100, null],
     ];
 
+    /**
+     * Périodes d'utilisation : clé d'URL => libellé de chip. « Utilisé » = au moins une séance TENUE
+     * (commencée, non annulée — Session::scopeHeld) dans la période ; une séance seulement planifiée
+     * ne compte pas, d'où « jamais utilisé » pour un parcours prévu samedi prochain.
+     */
+    public const USED_PERIODS = [
+        'month' => 'Ce mois-ci',
+        '3months' => '3 derniers mois',
+        'season' => 'Cette saison',
+        'custom' => 'Période…',
+        'never' => 'Jamais utilisé',
+    ];
+
+    /**
+     * Tris proposés : clé d'URL => libellé. Le sens est porté par la clé (un seul sélecteur, pas un
+     * couple tri + sens), parce que pour la plupart des critères un seul sens a un usage réel.
+     * Le relief trie sur le D+ PAR KILOMÈTRE (GpxRoute::GRADE_INDEX_SQL) et non sur le D+ total, qui
+     * suit surtout la distance (#130).
+     */
+    public const SORTS = [
+        'name' => 'Nom A → Z',
+        'distance' => 'Distance croissante',
+        'distance-desc' => 'Distance décroissante',
+        'grade' => 'Relief : du plus roulant',
+        'grade-desc' => 'Relief : du plus exigeant',
+        'recent' => 'Ajoutés récemment',
+        'last-used' => 'Utilisés récemment',
+        'most-used' => 'Les plus utilisés',
+    ];
+
     public function mount(): void
     {
         $this->authorize('viewAny', GpxRoute::class);
+        $this->normalizeSort();
     }
 
     public function updated(string $name): void
     {
         // Tout changement de filtre/recherche réinitialise la fenêtre de pagination.
-        if (in_array($name, ['search', 'sector', 'discipline', 'shape', 'grade', 'distance', 'archived'], true)) {
+        if (in_array($name, ['search', 'sector', 'discipline', 'shape', 'grade', 'distance', 'location', 'usedFrom', 'usedTo', 'archived'], true)) {
             $this->perPage = self::PER_PAGE;
             $this->notifyMap();
         }
+    }
+
+    /**
+     * Le tri ne change pas le JEU affiché, seulement son ordre : pas de notifyMap(). La fenêtre est
+     * tout de même ramenée au début, sinon « charger plus » aurait étendu un autre classement.
+     */
+    public function updatedSort(): void
+    {
+        $this->normalizeSort();
+        $this->perPage = self::PER_PAGE;
+    }
+
+    private function normalizeSort(): void
+    {
+        if (! array_key_exists($this->sort, self::SORTS)) {
+            $this->sort = 'name';
+        }
+    }
+
+    /**
+     * Chip de période : sélection unique, un second clic sur la chip active la désactive. Quitter
+     * « Période… » efface ses bornes, pour qu'elles ne ressurgissent pas, invisibles, dans l'URL.
+     */
+    public function setUsed(string $period): void
+    {
+        if (! array_key_exists($period, self::USED_PERIODS)) {
+            return;
+        }
+
+        $this->used = $this->used === $period ? '' : $period;
+        if ($this->used !== 'custom') {
+            $this->usedFrom = '';
+            $this->usedTo = '';
+        }
+
+        $this->perPage = self::PER_PAGE;
+        $this->notifyMap();
     }
 
     /**
@@ -121,7 +216,7 @@ class GpxRouteLibrary extends Component
     }
 
     /** Filtres à valeurs multiples, seuls acceptés par toggle() / isOn(). */
-    private const MULTI = ['sector', 'discipline', 'shape', 'grade', 'distance'];
+    private const MULTI = ['sector', 'discipline', 'shape', 'grade', 'distance', 'location'];
 
     /**
      * Bascule d'une chip : la valeur s'ajoute au filtre, un second clic la retire (pas de chip
@@ -165,9 +260,10 @@ class GpxRouteLibrary extends Component
 
     public function resetFilters(): void
     {
-        $this->reset(['search', 'sector', 'discipline', 'shape', 'grade', 'distance', 'archived']);
+        $this->reset(['search', 'sector', 'discipline', 'shape', 'grade', 'distance', 'location', 'used', 'usedFrom', 'usedTo', 'archived']);
         $this->perPage = self::PER_PAGE;
-        // `mode` n'est PAS réinitialisé : réinitialiser les filtres ne doit pas éjecter de la carte.
+        // Ni `mode` ni `sort` ne sont réinitialisés : ce sont des manières de LIRE le jeu, pas des
+        // filtres — réinitialiser les filtres ne doit ni éjecter de la carte ni défaire un classement.
         $this->notifyMap();
     }
 
@@ -178,9 +274,21 @@ class GpxRouteLibrary extends Component
 
     public function hasFilters(): bool
     {
-        return $this->search !== '' || $this->archived
-            || $this->sector !== [] || $this->discipline !== []
-            || $this->shape !== [] || $this->grade !== [] || $this->distance !== [];
+        return $this->search !== '' || $this->activeFilterCount() > 0;
+    }
+
+    /**
+     * Nombre de BLOCS de filtres actifs, affiché sur le bouton « Filtres (n) » du repli mobile.
+     * La recherche n'y figure pas : elle reste visible, repliée ou non.
+     */
+    public function activeFilterCount(): int
+    {
+        return count(array_filter([
+            $this->sector !== [], $this->discipline !== [], $this->distance !== [],
+            $this->shape !== [], $this->grade !== [], $this->location !== [],
+            $this->usedFilters(),
+            $this->archived && $this->canManage(),
+        ]));
     }
 
     /** @return Builder<GpxRoute> */
@@ -195,9 +303,142 @@ class GpxRouteLibrary extends Component
             })
             ->when($this->sector !== [], fn (Builder $q) => $q->whereIn('sector', $this->sector))
             ->when($this->discipline !== [], fn (Builder $q) => $q->whereIn('discipline_id', $this->discipline))
+            ->when($this->location !== [], fn (Builder $q) => $q->whereIn('start_location_id', $this->location))
             ->shape($this->shape)
             ->grade($this->grade)
-            ->tap(fn (Builder $q) => $this->applyDistance($q));
+            ->tap(fn (Builder $q) => $this->applyDistance($q))
+            ->tap(fn (Builder $q) => $this->applyUsed($q));
+    }
+
+    /**
+     * Filtre « Utilisé » : période → bornes en heure club, puis GpxRoute::scopeUsedBetween.
+     *
+     * @param  Builder<GpxRoute>  $query
+     */
+    private function applyUsed(Builder $query): void
+    {
+        if ($this->used === 'never') {
+            $query->neverUsed();
+        } elseif (($range = $this->usedRange()) !== null) {
+            $query->usedBetween(...$range);
+        }
+    }
+
+    /**
+     * Bornes de la période « Utilisé » active, en heure club ; null si aucune période ne filtre
+     * (pas de choix, « Jamais utilisé », ou période personnalisée encore sans date — choisir
+     * « Période… » ne doit rien masquer tant qu'aucune date n'est posée).
+     *
+     * Les périodes glissantes partent du début de jour (heure club) : « les 3 derniers mois » d'un
+     * 7 octobre à 15 h commencent le 7 juillet à 0 h, pas à 15 h.
+     *
+     * @return array{0: ?Carbon, 1: ?Carbon}|null
+     */
+    private function usedRange(): ?array
+    {
+        $tz = ClubSettings::current()->timezone ?: 'Europe/Paris';
+        $now = Carbon::now($tz);
+
+        $range = match ($this->used) {
+            'month' => [$now->copy()->startOfMonth(), null],
+            '3months' => [$now->copy()->subMonthsNoOverflow(3)->startOfDay(), null],
+            'season' => [ClubSettings::current()->seasonStart($now), null],
+            'custom' => $this->customBounds($tz),
+            default => null,
+        };
+
+        return $range === [null, null] ? null : $range;
+    }
+
+    /** Le filtre « Utilisé » restreint-il vraiment la liste ? (compteur « Filtres (n) ») */
+    private function usedFilters(): bool
+    {
+        return $this->used === 'never' || $this->usedRange() !== null;
+    }
+
+    /**
+     * Bornes de la période personnalisée en heure club, jour entier inclus. Des bornes inversées
+     * (saisie au clavier, URL forgée : min/max HTML ne retiennent ni l'un ni l'autre) sont
+     * permutées plutôt que de rendre une liste vide sans explication.
+     *
+     * @return array{0: ?Carbon, 1: ?Carbon}
+     */
+    private function customBounds(string $tz): array
+    {
+        $from = self::parseDay($this->usedFrom, $tz);
+        $to = self::parseDay($this->usedTo, $tz);
+
+        if ($from !== null && $to !== null && $from->gt($to)) {
+            [$from, $to] = [$to, $from];
+        }
+
+        return [$from?->startOfDay(), $to?->endOfDay()];
+    }
+
+    /**
+     * Date Y-m-d venue de l'URL → Carbon en heure club, ou null si absente ou invalide. Une borne
+     * forgée est ignorée (la période reste ouverte de ce côté) plutôt que de faire échouer l'écran.
+     */
+    private static function parseDay(string $value, string $tz): ?Carbon
+    {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) !== 1) {
+            return null;
+        }
+
+        $day = Carbon::createFromFormat('!Y-m-d', $value, $tz);
+
+        // createFromFormat déborde sans broncher (2026-02-31 → 3 mars) : on refuse ce qui a bougé.
+        return $day !== null && $day->format('Y-m-d') === $value ? $day : null;
+    }
+
+    /**
+     * Tri de la liste (#130). Toujours départagé par le nom puis l'id, pour un ordre stable d'une
+     * page de « charger plus » à l'autre.
+     *
+     * Les parcours SANS la donnée triée (pas de distance, relief incalculable, jamais utilisés) vont
+     * en fin de liste quel que soit le sens : en tête d'un tri croissant, ils masqueraient
+     * précisément ce qu'on cherche. Le `IS NULL` en premier critère s'en charge — MySQL/MariaDB
+     * placent sinon les NULL en tête d'un tri croissant.
+     */
+    private function applySort(Builder $query): void
+    {
+        $grade = GpxRoute::GRADE_INDEX_SQL;
+
+        match ($this->sort) {
+            'distance' => $query->orderByRaw('distance_km IS NULL')->orderBy('distance_km'),
+            'distance-desc' => $query->orderByRaw('distance_km IS NULL')->orderByDesc('distance_km'),
+            'grade' => $query->orderByRaw("($grade) IS NULL")->orderByRaw("$grade ASC"),
+            'grade-desc' => $query->orderByRaw("($grade) IS NULL")->orderByRaw("$grade DESC"),
+            'recent' => $query->orderByDesc('created_at'),
+            // Alias des sous-requêtes posées par withUsage() ; un tri décroissant met déjà les NULL
+            // (jamais utilisé) en fin de liste.
+            'last-used' => $query->orderByDesc('last_used_at'),
+            'most-used' => $query->orderByDesc('uses_count'),
+            default => null,
+        };
+
+        $query->orderBy('name')->orderBy('id');
+    }
+
+    /**
+     * Dernière utilisation ou nombre d'utilisations (séances tenues), en sous-requête corrélée
+     * sur `sessions.route_id` (indexé) : sert au tri ET à l'affichage sur la carte. Posée
+     * seulement pour le tri qui la lit — sinon chaque rendu (frappe de recherche, mode carte)
+     * paierait deux sous-requêtes par ligne pour rien.
+     *
+     * Comptée sur la période « Utilisé » active : « Cette saison » + « Les plus utilisés » classe
+     * les parcours de la saison et affiche « 2 séances », pas leur total historique.
+     */
+    private function withUsage(Builder $query): void
+    {
+        [$from, $to] = $this->usedRange() ?? [null, null];
+        $held = fn ($s) => $s->heldBetween($from, $to);
+
+        match ($this->sort) {
+            'last-used' => $query->withMax(['sessions as last_used_at' => $held], 'start_at'),
+            'most-used' => $query->withCount(['sessions as uses_count' => $held]),
+            default => null,
+        };
     }
 
     /**
@@ -269,6 +510,10 @@ class GpxRouteLibrary extends Component
             'shape' => $this->shape,
             'grade' => $this->grade,
             'distance' => $this->distance,
+            'location' => $this->location,
+            'used' => $this->used,
+            'usedFrom' => $this->used === 'custom' ? $this->usedFrom : '',
+            'usedTo' => $this->used === 'custom' ? $this->usedTo : '',
             'archived' => $this->archived ? 1 : null,
         ]));
     }
@@ -278,12 +523,46 @@ class GpxRouteLibrary extends Component
         return auth()->user()?->can('create', GpxRoute::class) ?? false;
     }
 
+    /**
+     * Lieux proposés par le filtre « Départ » : ceux d'au moins un parcours VISIBLE (mêmes règles
+     * d'archivage que la liste), pas toute la table — une chip qui ne peut rien renvoyer est du bruit.
+     * Un lieu déjà coché reste proposé même s'il ne l'est plus, pour qu'on puisse le décocher.
+     *
+     * @return Collection<int, Location>
+     */
+    private function startLocations(): Collection
+    {
+        $routes = GpxRoute::query()
+            ->when(! ($this->archived && $this->canManage()), fn (Builder $q) => $q->active())
+            ->whereNotNull('start_location_id')
+            ->select('start_location_id');
+
+        return Location::query()
+            ->where(fn (Builder $q) => $q->whereIn('id', $routes)->orWhereIn('id', $this->location))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
+    /** Date de dernière utilisation pour une carte : année ajoutée seulement si elle diffère. */
+    public static function usedOnLabel(?string $startAt): string
+    {
+        if ($startAt === null) {
+            return 'jamais utilisé';
+        }
+
+        $tz = ClubSettings::current()->timezone ?: 'Europe/Paris';
+        $day = Carbon::parse($startAt, 'UTC')->setTimezone($tz);
+
+        return 'utilisé le '.$day->isoFormat($day->year === Carbon::now($tz)->year ? 'ddd D MMM' : 'D MMM YYYY');
+    }
+
     public function render()
     {
         $query = $this->baseQuery()
             // preventLazyLoading est actif hors prod : la vue lit la discipline de chaque carte.
             ->with('discipline')
-            ->orderBy('name');
+            ->tap(fn (Builder $q) => $this->withUsage($q))
+            ->tap(fn (Builder $q) => $this->applySort($q));
 
         $total = (clone $query)->toBase()->getCountForPagination();
 
@@ -291,6 +570,7 @@ class GpxRouteLibrary extends Component
             'routes' => $query->take($this->perPage)->get(),
             'total' => $total,
             'disciplines' => Discipline::orderBy('label')->get(),
+            'locations' => $this->startLocations(),
             'canManage' => $this->canManage(),
             // URL de DÉPART de l'îlot seulement (son x-data au montage). Les changements ultérieurs
             // ne passent PAS par ici : l'îlot est en wire:ignore, ses attributs ne sont jamais
