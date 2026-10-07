@@ -9,6 +9,13 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Ajouté
 
+- **La bibliothèque de parcours se trie et se filtre par usage.** Nouveaux filtres « Utilisé » (ce
+  mois-ci, 3 derniers mois, cette saison, période libre, jamais utilisé — seules les séances qui ont
+  eu lieu comptent) et « Départ » (lieu de départ du parcours). Un sélecteur trie la liste par nom,
+  distance, relief (D+ par km), date d'ajout, dernière utilisation ou nombre de séances ; les
+  parcours sans la donnée triée restent en fin de liste. Chaque carte affiche la valeur de relief
+  (« Vallonné · 6,8 m/km »). Sur mobile, les filtres se replient derrière « Filtres (n) » (#130).
+
 - **Chacun peut vérifier ses notifications push.** Profil → Notifs : « M'envoyer une notification de
   test » envoie un push à l'appareil en main, et à lui seul (3 essais par 10 min). La liste « Mes
   appareils » montre chaque appareil abonné, son dernier envoi réussi et l'appareil courant, et

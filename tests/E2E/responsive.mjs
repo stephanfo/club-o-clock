@@ -700,6 +700,74 @@ tous.push(s.report());
   tous.push(s36.report());
 }
 
+// ── S37 · #130 · Bibliothèque de parcours : filtres repliés sur mobile, filtre « Utilisé », tri ──
+// Rien n'est écrit en base : filtres et tri ne vivent que dans l'URL. Le point délicat est le repli
+// mobile : son état est local (Alpine) et doit SURVIVRE au re-rendu Livewire d'une chip cochée.
+{
+  const s37 = new Scenario('S37 · Bibliothèque de parcours — repli mobile, filtres, tri (#130)');
+  const total = Number(sql('SELECT COUNT(*) FROM gpx_routes WHERE archived_at IS NULL'));
+  s37.check('contrôle : la démo a des parcours', total > 1, `${total}`);
+  const corps = (page) => page.locator('#lib-filters-body');
+  const bouton = (page) => page.locator('.lib-filters-toggle');
+  const cartes = (page) => page.locator('.route-grid > a');
+
+  // Mobile : repliés au chargement, recherche et tri restent atteignables.
+  {
+    const { ctx, page } = await session(browser, 'marie@demo.club', MOBILE);
+    await page.goto(`${BASE}/parcours`, { waitUntil: 'networkidle' });
+    s37.check('mobile : filtres repliés au chargement', !(await corps(page).isVisible()));
+    s37.check('mobile : recherche visible', await page.getByPlaceholder('Rechercher un parcours…').isVisible());
+    s37.check('mobile : tri visible', await page.locator('select.lib-sort').isVisible());
+    s37.check('mobile : bouton « Filtres » visible', await bouton(page).isVisible());
+    s37.check('mobile : liste affichée sous les filtres repliés', await cartes(page).count() === total);
+    await s37.shot(page, 's37-parcours-replie-mobile');
+
+    await bouton(page).click();
+    s37.check('mobile : « Filtres » déplie les blocs', await corps(page).isVisible());
+    s37.check('mobile : aria-expanded suit l\'état', await bouton(page).getAttribute('aria-expanded') === 'true');
+    await s37.shot(page, 's37-parcours-deplie-mobile');
+
+    // Une chip déclenche un re-rendu Livewire : le bloc doit rester déplié, et le compteur s'afficher.
+    await page.locator('#lib-filters-body button.chip', { hasText: 'Jamais utilisé' }).click();
+    await page.waitForTimeout(1200);
+    s37.check('mobile : toujours déplié après le re-rendu Livewire', await corps(page).isVisible());
+    // innerText rend la casse affichée : .btn passe le libellé en capitales.
+    s37.check('mobile : compteur « Filtres (1) »', (await bouton(page).innerText()).toLowerCase().includes('filtres (1)'));
+    const jamais = Number(sql(`SELECT COUNT(*) FROM gpx_routes g WHERE g.archived_at IS NULL AND NOT EXISTS (
+        SELECT 1 FROM sessions s WHERE s.route_id = g.id AND s.cancelled_at IS NULL AND s.start_at <= UTC_TIMESTAMP())`));
+    s37.check('mobile : « Jamais utilisé » = le compte en base', await cartes(page).count() === jamais, `${await cartes(page).count()} / ${jamais}`);
+    s37.check('mobile : le filtre retire au moins un parcours', jamais < total, `${jamais} / ${total}`);
+    await s37.shot(page, 's37-parcours-jamais-utilise-mobile');
+
+    await bouton(page).click();
+    s37.check('mobile : « Filtres » replie à nouveau', !(await corps(page).isVisible()));
+    s37.checkJs(page);
+    await ctx.close();
+  }
+
+  // Desktop : filtres toujours dépliés, pas de bouton ; tri par relief décroissant.
+  {
+    const { ctx, page } = await session(browser, 'marie@demo.club', DESKTOP);
+    await page.goto(`${BASE}/parcours`, { waitUntil: 'networkidle' });
+    s37.check('desktop : filtres dépliés d\'emblée', await corps(page).isVisible());
+    s37.check('desktop : pas de bouton « Filtres »', !(await bouton(page).isVisible()));
+
+    await page.locator('select.lib-sort').selectOption('grade-desc');
+    await page.waitForTimeout(1200);
+    s37.check('desktop : le tri passe dans l\'URL', page.url().includes('sort=grade-desc'));
+    const indices = (await cartes(page).allInnerTexts())
+      .map((t) => t.match(/(\d+(?:,\d)?) m\/km/)?.[1])
+      .filter(Boolean)
+      .map((v) => Number(v.replace(',', '.')));
+    s37.check('desktop : chaque carte affiche son relief en m/km', indices.length === total, `${indices.length} / ${total}`);
+    s37.check('desktop : relief décroissant', indices.every((v, i) => i === 0 || indices[i - 1] >= v), indices.join(' '));
+    await s37.shot(page, 's37-parcours-tri-relief-desktop');
+    s37.checkJs(page);
+    await ctx.close();
+  }
+  tous.push(s37.report());
+}
+
 await browser.close();
 const ok = tous.every(Boolean);
 console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES SCÉNARIOS RESPONSIVE PASSENT' : '❌ AU MOINS UN SCÉNARIO RESPONSIVE ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);

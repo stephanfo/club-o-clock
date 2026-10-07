@@ -813,6 +813,28 @@ body:has(.scrim) { overflow: hidden; }
 .routes-pop-meta { color: var(--fg-muted); font-size: 12px; margin-top: 2px; }
 .routes-pop-link { display: inline-block; margin-top: 7px; font-weight: 600; color: var(--accent); }
 
+/* ── Bloc recherche + tri + filtres de la bibliothèque (#130) ──
+   Desktop : filtres toujours dépliés, bouton de repli masqué. Mobile (même seuil que le shell,
+   768px) : les blocs de filtres se replient derrière « Filtres (n) », que la classe .is-open
+   (posée par Alpine) déplie. */
+.lib-filters-head { padding: var(--space-3); border-bottom: 1px solid var(--divider); }
+/* `select.` : `.form-screen .input` (plus bas) impose width:100%, qui renverrait le tri à la ligne. */
+.lib-filters-head select.lib-sort { width: auto; flex: 0 1 auto; min-width: 0; }
+.lib-filters-toggle { display: none; }
+.lib-filters-chevron { transition: transform var(--dur-fast); }
+.lib-filters.is-open .lib-filters-chevron { transform: rotate(180deg); }
+.lib-period { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); margin-top: var(--space-2); }
+
+@media (max-width: 768px) {
+    .lib-filters-toggle { display: inline-flex; }
+    .lib-filters:not(.is-open) .lib-filters-body { display: none !important; }
+    .lib-filters:not(.is-open) .lib-filters-head { border-bottom: none; }
+    /* Recherche seule sur sa ligne ; dessous, le tri prend la place laissée par Filtres/Réinitialiser. */
+    .lib-filters-head .lib-search { flex-basis: 100%; }
+    .lib-filters-head select.lib-sort { flex: 1 1 0; }
+    .lib-reset-label { display: none; }
+}
+
 @media (max-width: 768px) {
     /* Sur mobile, 62vh laisserait la carte sous la ligne de flottaison une fois les filtres déroulés.
        On la borne plus court : le pincement pour zoomer reste possible, la carte est atteignable. */

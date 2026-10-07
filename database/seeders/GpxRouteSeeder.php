@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Discipline;
 use App\Models\GpxRoute;
+use App\Models\Location;
 use App\Models\Session;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -47,6 +48,11 @@ class GpxRouteSeeder extends Seeder
         // Auteur : un coach existant si le DemoSeeder est passé avant, sinon on laisse null
         // (created_by est nullable — invariant RGPD).
         $author = User::query()->whereJsonContains('roles', 'coach')->first();
+
+        // Toutes les traces partent du parking de la piscine (cf. en-tête) : le renseigner rend le
+        // filtre « Départ » de la bibliothèque démontrable (#130). Absent si le DemoSeeder n'est pas
+        // passé avant — start_location_id est nullable.
+        $depart = Location::where('name', 'Parking de la piscine de la Charbonnière')->first();
 
         $created = 0;
         foreach ($rows as $row) {
@@ -95,6 +101,7 @@ class GpxRouteSeeder extends Seeder
                 // Valeur EXPLICITE obligatoire : MySQL 8.4 interdit DEFAULT sur une colonne JSON.
                 'polyline' => $row['polyline'],
                 'elevation_profile' => $row['elevation_profile'],
+                'start_location_id' => $depart?->id,
                 'created_by' => $author?->id,
             ]);
             $created++;
