@@ -102,10 +102,8 @@ self.addEventListener('notificationclick', (event) => {
 
     event.waitUntil(
         self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-            // On compare les CHEMINS, pas les URL entières : une égalité stricte ne matchait presque
-            // jamais (slash final, query, hash), donc on ouvrait une fenêtre de plus à chaque clic
-            // au lieu de revenir sur celle qui était déjà là.
             const cible = new URL(url, self.location.origin);
+            const ouvrir = () => self.clients.openWindow(cible.href);
 
             const notres = clients.filter((client) => {
                 if (!('focus' in client)) return false;
@@ -116,29 +114,48 @@ self.addEventListener('notificationclick', (event) => {
                 }
             });
 
-            // DEUX passes, et pas une boucle qui tranche fenêtre par fenêtre : la première venue au
-            // chemin différent était détournée par navigate() alors qu'une autre était peut-être déjà
-            // sur la cible. Avec deux fenêtres ouvertes, le planning (ou un formulaire à moitié
-            // rempli) partait ailleurs pendant que la bonne page restait en arrière-plan.
-            const surLaCible = notres.find((client) => {
+            // Une fenêtre est « déjà sur la cible » quand elle a le même chemin ET porte chaque
+            // paramètre de la cible. Pas d'égalité stricte d'URL : elle ne matchait presque jamais
+            // (query en plus, hash), et on ouvrait une fenêtre de plus à chaque clic. Mais pas le
+            // chemin seul non plus : la query porte l'onglet (?tab=debriefs, #99), et une fiche déjà
+            // ouverte sur Infos était juste focalisée — sans l'onglet ni le débrief annoncé (#132).
+            const surLeChemin = (client) => {
                 try {
                     return new URL(client.url).pathname === cible.pathname;
                 } catch (e) {
                     return false;
                 }
-            });
-            if (surLaCible) {
-                return surLaCible.focus();
+            };
+            const surLaCible = (client) => {
+                const params = new URL(client.url).searchParams;
+
+                return surLeChemin(client)
+                    && [...cible.searchParams].every(([cle, valeur]) => params.get(cle) === valeur);
+            };
+
+            // DEUX passes, et pas une boucle qui tranche fenêtre par fenêtre : la première venue au
+            // chemin différent était détournée par navigate() alors qu'une autre était peut-être déjà
+            // sur la cible. Avec deux fenêtres ouvertes, le planning (ou un formulaire à moitié
+            // rempli) partait ailleurs pendant que la bonne page restait en arrière-plan.
+            const deja = notres.find(surLaCible);
+            if (deja) {
+                return deja.focus();
             }
 
-            // Aucune fenêtre sur la cible : on en réutilise une — cohérent avec launch_handler:
-            // navigate-existing.
-            const aNaviguer = notres.find((client) => 'navigate' in client);
+            // Aucune fenêtre sur la cible : on en réutilise une — de préférence celle déjà sur la
+            // fiche, qui change seulement d'onglet — cohérent avec launch_handler: navigate-existing.
+            const navigables = notres.filter((client) => 'navigate' in client);
+            const aNaviguer = navigables.find(surLeChemin) || navigables[0];
             if (aNaviguer) {
-                return aNaviguer.navigate(cible.href).then((c) => (c ? c.focus() : null));
+                // navigate() rejette sur une fenêtre que ce SW ne contrôle pas (includeUncontrolled :
+                // rechargement forcé, ancienne version) et peut résoudre à null : dans les deux cas on
+                // ouvre une fenêtre, sinon la notification se fermait sur un clic mort (#132).
+                return aNaviguer.navigate(cible.href)
+                    .then((c) => c, () => null)
+                    .then((c) => (c ? c.focus() : ouvrir()));
             }
 
-            return self.clients.openWindow(cible.href);
+            return ouvrir();
         })
     );
 });
