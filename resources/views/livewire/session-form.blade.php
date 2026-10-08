@@ -151,7 +151,7 @@
                 <div class="form-row2">
                     <div>
                         <label class="field-label">Date et heure<x-req-mark /><x-struct-tag :show="$edit" /></label>
-                        <div class="ifield @error('start_at') is-error @enderror"><input class="ifield-input" type="datetime-local" wire:model.blur="start_at"></div>
+                        <div class="ifield @error('start_at') is-error @enderror"><input class="ifield-input" type="datetime-local" wire:model.blur="start_at" x-data="{ vide: @js($start_at === '') }" @input="vide = !$el.value" :class="{ 'is-vide': vide }"></div>
                         @error('start_at')<div class="field-error">{{ $message }}</div>@enderror
                     </div>
                     <div>
@@ -270,17 +270,18 @@
                     </div>
                     {{-- Ouverture des inscriptions chez l'organisateur (#105) : date souvent connue tard,
                          heure plus rarement — les deux restent facultatives. La catégorie ciblée est
-                         prévenue 15 min avant l'heure, à 9 h le jour même sans heure. --}}
+                         prévenue 15 min avant l'heure, à 9 h le jour même sans heure. Vides, le navigateur
+                         affiche son gabarit (jj/mm/aaaa, --:--) à l'encre normale : `is-vide` le grise. --}}
                     @if ($kind === 'competition')
                         <div class="form-row2">
                             <div>
                                 <label class="field-label">Ouverture des inscriptions <span class="meta" style="text-transform:none;letter-spacing:0;font-weight:400">· optionnel</span></label>
-                                <div class="ifield @error('registration_opens_date') is-error @enderror"><input class="ifield-input" type="date" wire:model.blur="registration_opens_date"></div>
+                                <div class="ifield @error('registration_opens_date') is-error @enderror"><input class="ifield-input" type="date" wire:model.blur="registration_opens_date" x-data="{ vide: @js($registration_opens_date === '') }" @input="vide = !$el.value" :class="{ 'is-vide': vide }"></div>
                                 @error('registration_opens_date')<div class="field-error">{{ $message }}</div>@enderror
                             </div>
                             <div>
                                 <label class="field-label">Heure <span class="meta" style="text-transform:none;letter-spacing:0;font-weight:400">· si connue</span></label>
-                                <div class="ifield @error('registration_opens_time') is-error @enderror"><input class="ifield-input" type="time" wire:model.blur="registration_opens_time"></div>
+                                <div class="ifield @error('registration_opens_time') is-error @enderror"><input class="ifield-input" type="time" wire:model.blur="registration_opens_time" x-data="{ vide: @js($registration_opens_time === '') }" @input="vide = !$el.value" :class="{ 'is-vide': vide }"></div>
                                 @error('registration_opens_time')<div class="field-error">{{ $message }}</div>@enderror
                             </div>
                         </div>
