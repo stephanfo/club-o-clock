@@ -61,6 +61,26 @@ class SessionManagementTest extends TestCase
         $this->assertDatabaseHas('sessions', ['title' => 'CAP endurance', 'created_by' => $coach->id]);
     }
 
+    public function test_creation_form_proposes_no_start_nor_duration(): void
+    {
+        // Une valeur proposée (demain 18:30, 60 min) partait telle quelle quand on oubliait de la
+        // changer : le formulaire arrive vide et refuse l'enregistrement tant qu'on n'a rien saisi.
+        $coach = User::factory()->coach()->create();
+        $disc = $this->discipline();
+
+        Livewire::actingAs($coach)->test(SessionForm::class)
+            ->assertSet('start_at', '')
+            ->assertSet('duration_min', null)
+            ->set('kind', 'training')
+            ->set('title', 'Oubli de date')
+            ->set('discipline_id', $disc->id)
+            ->set('duration_min', '')
+            ->call('save')
+            ->assertHasErrors(['start_at' => 'required', 'duration_min' => 'required']);
+
+        $this->assertDatabaseMissing('sessions', ['title' => 'Oubli de date']);
+    }
+
     public function test_athlete_cannot_create_session(): void
     {
         $athlete = User::factory()->create(['roles' => ['athlete']]);

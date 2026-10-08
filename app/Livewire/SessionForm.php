@@ -47,7 +47,9 @@ class SessionForm extends Component
 
     public string $start_at = '';
 
-    public int $duration_min = 60;
+    // Ni date ni durée proposées à la création : une valeur par défaut (demain 18:30, 60 min)
+    // partait telle quelle quand on oubliait de la changer. Vides, `required` force la saisie.
+    public ?int $duration_min = null;
 
     public ?int $location_id = null;
 
@@ -154,7 +156,6 @@ class SessionForm extends Component
             $this->fillFromSession($session);
         } else {
             $this->authorize('create', Session::class);
-            $this->start_at = Carbon::now(ClubSettings::current()->timezone)->addDay()->setTime(18, 30)->format('Y-m-d\TH:i');
         }
     }
 

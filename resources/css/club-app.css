@@ -509,6 +509,8 @@ textarea.input { resize: vertical; min-height: 70px; line-height: 1.5; }
 .ifield > .ic { color: var(--fg-muted); flex: 0 0 auto; }
 .ifield-input { flex: 1; border: none; outline: none; background: none; font-family: var(--font-sans); font-size: 15px; color: var(--ink); padding: 12px 0; min-width: 0; }
 .ifield-input::placeholder { color: var(--fg-muted); }
+/* Date/heure laissée vide : le gabarit natif (jj/mm/aaaa, --:--) se lit sinon comme une valeur saisie. */
+.ifield-input.is-vide { color: var(--fg-muted); }
 .ifield-btn { background: none; border: none; color: var(--fg-muted); cursor: pointer; display: inline-flex; padding: 4px; flex: 0 0 auto; transition: color var(--dur-fast); }
 .ifield-btn:hover { color: var(--ink); }
 
