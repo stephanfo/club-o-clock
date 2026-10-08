@@ -126,6 +126,61 @@ test('le chemin est comparé sans la query ni le hash', async () => {
     assert.equal(seance.navigatedTo, null);
 });
 
+test('même fiche mais autre onglet demandé : la fenêtre y navigue (#132)', async () => {
+    // Le défaut : seul le chemin était comparé, donc une fenêtre déjà sur la fiche était juste
+    // focalisée — l'onglet restait Infos et le débrief ou le « j'aime » annoncé n'apparaissait pas.
+    const seance = fenetre('https://club.test/seances/12');
+
+    await cliquer('/seances/12?tab=debriefs', [seance]);
+
+    assert.equal(seance.navigatedTo, 'https://club.test/seances/12?tab=debriefs');
+    assert.equal(seance.focused, true);
+});
+
+test('changement d’onglet : c’est la fenêtre sur la fiche qui navigue, pas une autre (#132)', async () => {
+    const planning = fenetre('https://club.test/planning');
+    const seance = fenetre('https://club.test/seances/12');
+
+    await cliquer('/seances/12?tab=debriefs', [planning, seance]);
+
+    assert.equal(seance.navigatedTo, 'https://club.test/seances/12?tab=debriefs');
+    assert.equal(planning.navigatedTo, null, 'le planning ne doit pas être détourné');
+});
+
+test('fiche déjà ouverte sur l’onglet demandé : simple focus (#132)', async () => {
+    // Contrôle positif apparié : la query compte, mais une fenêtre déjà sur la cible n'est ni
+    // rechargée (un débrief en cours d'écriture y serait perdu) ni doublée.
+    const seance = fenetre('https://club.test/seances/12?tab=debriefs&from=push#d3');
+
+    const { ouvertes } = await cliquer('/seances/12?tab=debriefs', [seance]);
+
+    assert.equal(seance.focused, true);
+    assert.equal(seance.navigatedTo, null);
+    assert.deepEqual(ouvertes, []);
+});
+
+test('navigate() refusé : on ouvre une fenêtre au lieu de ne rien faire (#132)', async () => {
+    // Fenêtre non contrôlée (rechargement forcé, ancienne version du SW) : la spec rejette
+    // navigate() en TypeError. Sans repli, la notification se fermait et le clic était mort.
+    const planning = fenetre('https://club.test/planning');
+    planning.navigate = async () => {
+        throw new TypeError('client non contrôlé');
+    };
+
+    const { ouvertes } = await cliquer('/seances/12?tab=debriefs', [planning]);
+
+    assert.deepEqual(ouvertes, ['https://club.test/seances/12?tab=debriefs']);
+});
+
+test('navigate() sans fenêtre en retour : on en ouvre une (#132)', async () => {
+    const planning = fenetre('https://club.test/planning');
+    planning.navigate = async () => null;
+
+    const { ouvertes } = await cliquer('/seances/12', [planning]);
+
+    assert.deepEqual(ouvertes, ['https://club.test/seances/12']);
+});
+
 test('une fenêtre d’une autre origine est ignorée', async () => {
     const etranger = fenetre('https://autre.test/seances/12');
 
