@@ -291,6 +291,10 @@ class SessionSuppressionTest extends TestCase
      */
     public function test_lalerte_orpheline_garde_son_creneau_et_pas_seulement_son_titre(): void
     {
+        // Horloge figée avant le créneau : une alerte de séance supprimée n'est plus listée
+        // 7 jours après sa date (#79). Sans ce gel, le test expirait le 3 octobre 2026.
+        $this->travelTo(Carbon::parse('2026-09-20 10:00', 'UTC'));
+
         $seance = $this->annulee([
             'title' => 'Sortie longue',
             'start_at' => Carbon::parse('2026-09-26 13:00', 'UTC'),
