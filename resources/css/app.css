@@ -111,16 +111,6 @@ body { touch-action: manipulation; }
         pointer-events: none;
     }
     .demo-badge-bar .ic { flex: 0 0 auto; }
-    /* La pastille prend de la largeur dans une barre déjà chargée (retour + titre + actions +
-       cloche). Sans min-width:0, un flex item ne descend pas sous la taille de son contenu : un
-       titre long (nom de parcours, nom complet) comprimerait la pastille ou déborderait — en
-       silence, la barre étant en overflow:hidden. On rend donc le titre compressible et tronqué,
-       mais SEULEMENT quand la pastille est là : hors démo, la barre garde son rendu d'origine. */
-    .topbar:has(.demo-badge-bar) > .f1 { min-width: 0; }
-    .topbar:has(.demo-badge-bar) .topbar-title,
-    .topbar:has(.demo-badge-bar) .topbar-sub {
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
 }
 
 /* Shell applicatif (authentifié) — sidebar desktop (dk-side, design) + botnav mobile.
@@ -210,6 +200,16 @@ body { touch-action: manipulation; }
     .topbar-title { font-family: var(--font-display); font-weight: 800; text-transform: uppercase;
         font-size: 22px; line-height: 0.95; letter-spacing: -0.01em; color: var(--fg-on-dark); }
     .topbar-sub { font-size: 12px; color: var(--brand-100); margin-top: 2px; }
+    /* Titre sur UNE ligne, tronqué (#135). La barre est fixe et les écrans ne réservent sous elle
+       que --topbar-total : un titre long (nom complet, nom de parcours) passé à la ligne la faisait
+       grandir et recouvrir le haut du contenu — les onglets du profil disparaissaient. Sans
+       min-width:0, un flex item ne descend pas sous la taille de son contenu et l'ellipse ne
+       jouerait pas (la pastille démo et la cloche seraient comprimées à la place). */
+    .topbar > .f1 { min-width: 0; }
+    .topbar-title, .topbar-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* line-height 0.95 + overflow:hidden rogne les accents des capitales (É, Å) et la cédille :
+       on agrandit la boîte de rognage, la marge négative rend la place prise (hauteur inchangée). */
+    .topbar-title { padding-block: 0.15em; margin-block: -0.15em; }
     .topbar-spacer { flex: 1; }
     /* Boutons-icône (retour, réglages) : clairs sur le vert. */
     .topbar .iconbtn { color: var(--fg-on-dark); }
