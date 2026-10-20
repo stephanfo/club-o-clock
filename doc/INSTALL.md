@@ -7,9 +7,9 @@ premier démarrage réel avec ton club.
 > `.env`. Il n'y a pas de multi-tenant : pas de compte à créer chez qui que ce soit, pas de données
 > partagées entre clubs. Tu es propriétaire de ton installation.
 
-**Ce guide couvre** : prérequis · installation locale · configuration (email, Google OAuth,
-notifications push) · premier démarrage · déploiement sur mutualisé puis sur VPS · instance de
-démonstration · flux réseau sortants · maintenance et mise à jour · dépannage.
+**Ce guide couvre** : prérequis, coût et temps à prévoir · installation locale · configuration
+(email, Google OAuth, notifications push) · premier démarrage · déploiement sur mutualisé puis
+sur VPS · instance de démonstration · flux réseau sortants · maintenance et mise à jour · dépannage.
 
 ---
 
@@ -27,13 +27,36 @@ démonstration · flux réseau sortants · maintenance et mise à jour · dépan
 
 | Service | Statut | Sans lui |
 |---|---|---|
-| Fournisseur email transactionnel (Brevo, Scaleway TEM, SMTP…) | **Requis en production** | Aucun lien de connexion, aucune notification ne part |
+| Fournisseur email transactionnel (Brevo, Scaleway TEM, SMTP…) | **Requis en production** — l'offre gratuite de Brevo suffit | Aucun lien de connexion, aucune notification ne part |
 | Client Google OAuth | Optionnel | Le bouton « Google » reste inopérant, les autres connexions fonctionnent |
 | Compte OpenRunner Pro | Optionnel | Les parcours GPX s'affichent, seul l'embed interactif manque |
 
-> **Hébergement.** L'application est conçue pour tenir sur un **mutualisé** (cible de référence :
-> OVH Pro). Elle n'exige ni Docker, ni Node en fonctionnement continu, ni WebSocket, ni file
-> d'attente Redis — un cron minute et du PHP suffisent.
+> **Hébergement : accès SSH obligatoire.** L'application est conçue pour tenir sur un
+> **mutualisé** (cible de référence : OVH Pro). Elle n'exige ni Docker, ni Node en fonctionnement
+> continu, ni WebSocket, ni file d'attente Redis — une tâche planifiée et du PHP suffisent. Mais
+> l'installation et chaque mise à jour passent par des commandes tapées **en SSH** (§5.3) : **un
+> hébergement sans accès SSH ne convient pas**. Chez OVH, le SSH commence à l'offre **Pro** ; les
+> offres Starter et Perso n'en ont pas.
+
+### Ce que ça coûte au club
+
+| Poste | Par an | Note |
+|---|---|---|
+| Logiciel | **0 €** | Libre (AGPL), sans abonnement ni coût par adhérent |
+| Hébergement avec SSH | **50 à 150 €** | Selon l'hébergeur. OVH Pro, l'offre de référence testée, se situe dans le haut de la fourchette une fois passée la promotion de première année |
+| Nom de domaine | une dizaine d'euros | Souvent déjà détenu par le club : un sous-domaine (`planning.monclub.fr`) suffit |
+| Envoi des emails | **0 €** | Offre gratuite de **Brevo** (service français) : 300 emails par jour, assez pour l'usage courant d'un club de 150 adhérents |
+
+### Qui installe, et en combien de temps
+
+Une personne **à l'aise avec la ligne de commande** : compter **une demi-journée** pour une
+première installation — hébergement, domaine, compte Brevo, dépôt du code, tâche planifiée,
+premier compte (§5, « Première installation, dans l'ordre »). Le paramétrage du club (§4) se fait
+ensuite depuis l'interface, sans compétence technique. Chaque **mise à jour** — quelques-unes par
+an — prend ensuite une trentaine de minutes à la même personne (§9.2).
+
+> **Besoin d'aide ?** L'auteur peut aider un club à installer l'outil, sur demande, par le
+> [formulaire de contact](https://stephane.ratelet.fr/#contact).
 
 ---
 
@@ -142,8 +165,10 @@ VAPID a donc intérêt à **couper le push là** plutôt qu'à laisser `NOTIF_PU
 Les emails de connexion ne sont jamais concernés.
 
 > **Choix du fournisseur.** Privilégier un service **UE** pour limiter les transferts hors-UE
-> (RGPD). Vérifier surtout la délivrabilité : configurer **SPF** et **DKIM** sur le domaine
-> d'envoi, faute de quoi les emails du club partent en indésirables.
+> (RGPD). Conseillé : **Brevo**, service français et transport par défaut ci-dessus, dont l'offre
+> gratuite (300 emails par jour) suffit à l'usage courant d'un club. Vérifier surtout la
+> délivrabilité : configurer **SPF** et **DKIM** sur le domaine d'envoi, faute de quoi les emails
+> du club partent en indésirables.
 
 ### 3.2 Google OAuth (optionnel)
 
@@ -343,6 +368,9 @@ compte propre, avec compte propre sous tutelle, ou autonome).
 > d'indiquer **où trouver le code source** de l'instance déployée. Tant qu'un champ manque, la page
 > publique `/mentions-legales` affiche `[À COMPLÉTER PAR LE CLUB]` et signale qu'elle est
 > incomplète.
+>
+> Le **[kit RGPD](RGPD.md)** complète ce bloc : un texte d'information prêt à envoyer aux
+> adhérents, et la fiche du traitement à reporter dans le registre du club.
 
 ---
 
@@ -350,6 +378,29 @@ compte propre, avec compte propre sous tutelle, ou autonome).
 
 Cible de référence. Le principe tient en une phrase : **on builde le front en local, on ne transfère
 que le résultat.**
+
+### Première installation, dans l'ordre
+
+Les sections suivantes détaillent chaque geste ; voici leur enchaînement pour une instance neuve.
+
+1. **Prendre l'hébergement** — avec accès SSH, PHP ≥ 8.3 et une base MySQL ou MariaDB (§1) —,
+   créer la base, et y faire pointer le domaine ou le sous-domaine du club, en HTTPS.
+2. **Sur son ordinateur** : récupérer le code (`git clone`, §2) et builder le front (§5.1).
+3. **Transférer** les fichiers sur l'hébergement (§5.2).
+4. **En SSH, dans le dossier du site** : copier `.env.example` en `.env` et le remplir (§3 —
+   base de données, `APP_URL`, `APP_ENV=production`, `APP_DEBUG=false`, email), puis :
+   ```bash
+   composer install --no-dev --optimize-autoloader
+   php artisan key:generate          # une seule fois : la clé chiffre les sessions
+   ```
+5. **Dérouler la checklist du §5.3**.
+6. **Peupler les catalogues**, une seule fois : `php artisan db:seed --force`.
+7. **Créer la tâche planifiée** (§5.4).
+8. **Créer le premier compte** — `php artisan club:create-admin` —, puis dérouler la checklist club
+   du §4 depuis l'interface.
+
+Compter une demi-journée de bout en bout, création du compte Brevo et réglage SPF/DKIM du domaine
+compris (§3.1).
 
 > ⚠️ Sur mutualisé, `npm install` / `npm run build` ne sont **pas** exécutables en SSH (pas de
 > toolchain Node fiable, quotas process et mémoire). En revanche `composer install` et les
@@ -389,7 +440,8 @@ hors Git.
 ### 5.2 Transférer
 
 Deux voies, au choix. **La voie FTP/SFTP est celle qui a réellement servi à déployer ce projet** ;
-elle ne demande qu'un client graphique, ce qui la rend accessible sans ligne de commande.
+le transfert lui-même s'y fait avec un client graphique. L'étape suivante (§5.3), elle, demande
+la ligne de commande en SSH, quelle que soit la voie.
 
 #### Voie A — SFTP (éprouvée, recommandée)
 
@@ -738,7 +790,8 @@ php artisan demo:reset   # à la demande ; refuse si DEMO_MODE n'est pas actif
 ## 8. Flux réseau sortants (pour les mentions légales)
 
 Pour rédiger sa page mentions légales / confidentialité (une trame est fournie sur
-`/mentions-legales`), chaque club doit savoir quels services tiers son instance contacte. Voici
+`/mentions-legales`, et le [kit RGPD](RGPD.md) en tire le texte d'information et la fiche du
+registre), chaque club doit savoir quels services tiers son instance contacte. Voici
 l'inventaire complet — tous UE ou sans flux de données personnelles identifiables :
 
 | Service | Déclenché quand | Donnée transmise | UE / clé |
@@ -837,6 +890,12 @@ Le geste le plus fréquent après la première installation — et celui où l'o
 facilement une étape, parce qu'il *ressemble* à un déploiement mais n'en reprend pas les réflexes.
 Dérouler les six temps dans l'ordre.
 
+> **Combien de fois, combien de temps.** Quelques versions par an ; compter **une trentaine de
+> minutes** par mise à jour. Le club choisit quand l'appliquer : une instance qui n'est pas à jour
+> continue de fonctionner. Seuls les **correctifs de sécurité** sont à appliquer sans tarder —
+> seule la dernière version en reçoit ([SECURITY.md](../SECURITY.md)). Pour être prévenu d'une
+> nouvelle version : sur la page GitHub du projet, bouton **Watch → Custom → Releases**.
+
 **1. Lire le [CHANGELOG](../CHANGELOG.md) d'abord.** Il signale les changements de comportement (ce
 que des utilisateurs ne pourront plus faire) et les notes de version majeure. C'est aussi là que se
 trouve ce qu'il faudra annoncer au club.
@@ -894,6 +953,17 @@ composer check                     # porte de dev : style, analyse, dérives, te
 > Les deux commandes qui **sortent sur le réseau** (`notifications:drain`, `weather:refresh`) peuvent
 > échouer en SSH sur un mutualisé sans que rien ne soit cassé : leur échec n'y est pas un diagnostic
 > (§10, « Les notifications ne partent pas »).
+
+### 9.4 Récupérer les données du club
+
+Toutes les données du club sont dans **sa** base, sur **son** hébergement : rien ne l'enferme.
+
+- **En Excel, depuis l'administration** : les statistiques (*Admin → Dashboard*, bouton
+  **XLSX**) et les journaux d'activité (*Admin → Journaux*), filtres en cours appliqués.
+- **Tout le reste** — adhérents, séances, inscriptions — **par la base de données**. La sauvegarde
+  du §9 en est une copie complète ; pour l'ouvrir dans un tableur, l'outil **phpMyAdmin** de
+  l'hébergeur exporte chaque table au format **CSV**, qu'Excel ou LibreOffice lit directement (la
+  table `users` contient les adhérents).
 
 ---
 
@@ -1029,6 +1099,9 @@ L'email prend le relais.
 ## Aller plus loin
 
 - **[README](https://github.com/stephanfo/club-o-clock/blob/main/README.md)** — présentation, architecture, flux réseau sortants
+- **[Kit RGPD](RGPD.md)** — texte d'information des adhérents et fiche du registre des traitements
 - **[COMPTES_DEMO.md](COMPTES_DEMO.md)** — comptes et scénarios du jeu de démonstration
+- **[Formulaire de contact](https://stephane.ratelet.fr/#contact)** — une question, ou de l'aide
+  pour installer l'outil dans un club
 - **[CONTRIBUTING.md](../CONTRIBUTING.md)** — contribuer au projet
 - **[SECURITY.md](../SECURITY.md)** — signaler une vulnérabilité
