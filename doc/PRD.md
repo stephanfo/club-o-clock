@@ -800,6 +800,8 @@ Toutes les séances peuvent **optionnellement** porter des informations de parco
 - `routeOpenrunnerPublicUrl?` (optionnel) : URL publique du parcours `https://www.openrunner.com/r/<id_numerique>`. Renseigné ⇒ **bouton permanent** « Ouvrir sur OpenRunner » (nouvel onglet, `target="_blank" rel="noopener noreferrer"`), indépendamment de la présence ou du chargement de l'iframe.
 
 > Les deux champs ne se dérivent **pas** l'un de l'autre (le `code` opaque de l'embed n'est pas l'`id` numérique public). La section « Parcours » s'affiche dès qu'au moins l'un des deux (ou un GPX) est renseigné.
+>
+> Le lien public se **préremplit** en revanche depuis un GPX **exporté d'OpenRunner** (signé `Openrunner` par l'application, nom de trace terminé par l'identifiant du parcours), à la séance comme dans la bibliothèque de parcours (§4.20) — **seulement si le champ est vide**, jamais par-dessus une saisie. Le lien d'embed reste à coller à la main.
 
 **Stockage : URL `src` uniquement, jamais le bloc iframe HTML brut.** Stocker du HTML brut ouvrirait une porte XSS (un coach malveillant ou un compte compromis pourrait substituer n'importe quel HTML/JS) et ferait perdre le contrôle uniforme du rendu. L'app **régénère l'iframe côté client à chaque affichage** avec attributs figés (`width="100%"`, `height="650"`, `loading="lazy"`, `style="border:none"`, éventuellement `sandbox` selon ce qu'OR exige).
 
@@ -821,7 +823,7 @@ Toutes les séances peuvent **optionnellement** porter des informations de parco
 - **Le GPX déposé sur une séance alimente la bibliothèque de parcours** (§4.20) : la séance le *référence*, elle ne le possède pas. Retirer le parcours d'une séance ne supprime donc jamais le fichier.
 
 #### 4.13.3 Coexistence OR + GPX
-Les deux sources peuvent coexister sur une même séance (URL OR Pro **et** GPX). Elles sont alors présentées en **deux onglets**, et c'est le **tracé GPX qui s'ouvre par défaut** (arbitré le 2026-08-15) : c'est la source que le club maîtrise — hébergée chez lui, sans dépendance à un compte tiers ni à un jeton d'embed qui peut expirer, et accompagnée de ses métriques. La carte OpenRunner reste accessible en un clic, et **n'est chargée qu'à l'ouverture de son onglet** — un appel tiers de moins sur chaque consultation de fiche, cf. la conséquence RGPD du §4.13.1.
+Les deux sources peuvent coexister sur une même séance (URL OR Pro **et** GPX). Quand une **carte OpenRunner intégrée** (lien d'embed) existe, elles sont présentées en **deux onglets**, et c'est le **tracé GPX qui s'ouvre par défaut** (arbitré le 2026-08-15) : c'est la source que le club maîtrise — hébergée chez lui, sans dépendance à un compte tiers ni à un jeton d'embed qui peut expirer, et accompagnée de ses métriques. La carte OpenRunner reste accessible en un clic, et **n'est chargée qu'à l'ouverture de son onglet** — un appel tiers de moins sur chaque consultation de fiche, cf. la conséquence RGPD du §4.13.1. Sans carte intégrée, pas d'onglets : le bouton « Ouvrir sur OpenRunner » prend place sous le tracé GPX, après son téléchargement.
 
 #### 4.13.4 Lieux et géocodage
 **Bibliothèque `Location`** (cf. §4.6) : nom, adresse, latitude, longitude, type, notes, `is_archived`. **Coachs créent au fil de l'eau**, **admin gère/archive**.

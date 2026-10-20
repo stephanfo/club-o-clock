@@ -9,7 +9,11 @@
     $hasOR = $hasEmbed || $hasPublic;
     $gpxRoute = $session->gpxRoute;
     $hasGPX = (bool) $gpxRoute;
-    $both = $hasOR && $hasGPX;
+    // Deux onglets seulement s'il y a une carte intégrée à afficher (#138) : sans elle, l'onglet
+    // OpenRunner ne contiendrait qu'un bouton, qui rejoint alors la pile du tracé.
+    $both = $hasEmbed && $hasGPX;
+    $publicInGpx = $hasPublic && $hasGPX && ! $hasEmbed;
+    $orStack = $hasEmbed || ($hasPublic && ! $hasGPX);
 @endphp
 @if (! $hasOR && ! $hasGPX)
     <div class="card card-pad meta tc" style="padding:20px 16px;color:var(--fg-muted)">Aucun parcours associé à cette séance.</div>
@@ -71,11 +75,17 @@
                 </a>
 
                 <x-gpx-download :route="$gpxRoute" />
+
+                @if ($publicInGpx)
+                    <a class="btn btn-ghost btn-block" href="{{ $publicLink }}" target="_blank" rel="noopener noreferrer">
+                        <x-icon name="arrow-up-right" :size="15" /> Ouvrir sur OpenRunner
+                    </a>
+                @endif
             </div>
         @endif
 
         {{-- ── Carte OpenRunner ── --}}
-        @if ($hasOR)
+        @if ($orStack)
             {{-- `armed` diffère le rendu de l'iframe au premier affichage de l'onglet. Deux raisons.
                  D'abord la correction d'un piège : l'iframe porte loading="lazy", or un élément en
                  display:none n'entre jamais dans le viewport — masquée, elle ne se serait jamais

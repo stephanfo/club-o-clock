@@ -1055,6 +1055,67 @@ async function ongletMobile(page, nom) {
   tous.push(s.report());
 }
 
+// ── S38 · Lien public OpenRunner prérempli depuis un GPX d'OpenRunner (#138) ─
+//
+// La détection vit dans `parseGpx` (client) : PHPUnit ne la voit pas. Les deux hôtes de
+// `gpxField` sont joués. NON destructif : rien n'est enregistré.
+{
+  const s = new Scenario('S38 · Lien OpenRunner prérempli depuis un GPX exporté d\'OpenRunner');
+
+  const trace = (creator, name) => `<?xml version="1.0"?><gpx version="1.1" creator="${creator}"><trk><name>${name}</name><trkseg>
+<trkpt lat="47.5500" lon="1.3000"><ele>62</ele></trkpt>
+<trkpt lat="47.5600" lon="1.3200"><ele>110</ele></trkpt>
+<trkpt lat="47.5700" lon="1.3400"><ele>95</ele></trkpt>
+</trkseg></trk></gpx>`;
+  const orGpx = join(tmpdir(), `coc-e2e-or-${process.pid}.gpx`);
+  const autreGpx = join(tmpdir(), `coc-e2e-autre-${process.pid}.gpx`);
+  writeFileSync(orGpx, trace('Openrunner - https://www.openrunner.com', '2026-10-18_54km_N_B-25449348'));
+  writeFileSync(autreGpx, trace('Garmin Connect', 'Sortie-25449348'));
+  const attendu = 'https://www.openrunner.com/route-details/25449348';
+
+  const { ctx, page } = await session(browser, 'vincent@demo.club', DESKTOP);
+
+  async function deposer(url, champ, fichier, saisie = null) {
+    await page.goto(`${BASE}${url}`, { waitUntil: 'networkidle' });
+    const input = page.locator(`input[wire\\:model\\.blur="${champ}"]`);
+    if (saisie !== null) {
+      await input.fill(saisie);
+      await input.blur();
+      await page.waitForTimeout(800);
+    }
+    await page.setInputFiles('input[type=file][accept=".gpx"]', fichier);
+    await page.waitForTimeout(2500);
+    // Contrôle positif : le GPX a bien été lu, sinon un champ vide ne prouverait rien.
+    const lu = await page.locator('button[aria-label="Retirer le GPX"]').isVisible().catch(() => false);
+    return [lu, await input.inputValue()];
+  }
+
+  for (const [hote, url, champ] of [
+    ['bibliothèque', '/parcours/creer', 'openrunner_public_url'],
+    ['séance', '/seances/creer', 'route_openrunner_public_url'],
+  ]) {
+    const [lu, valeur] = await deposer(url, champ, orGpx);
+    s.check(`${hote} — GPX OpenRunner lu`, lu);
+    s.check(`${hote} — lien public prérempli`, valeur === attendu, valeur);
+    await s.shot(page, `s38-prerempli-${hote === 'séance' ? 'seance' : 'bibliotheque'}`);
+  }
+
+  const saisie = 'https://www.openrunner.com/route-details/111';
+  const [lu2, garde] = await deposer('/parcours/creer', 'openrunner_public_url', orGpx, saisie);
+  s.check('saisie existante — GPX lu', lu2);
+  s.check('saisie existante — jamais écrasée', garde === saisie, garde);
+
+  const [lu3, vide] = await deposer('/parcours/creer', 'openrunner_public_url', autreGpx);
+  s.check('GPX non OpenRunner — lu', lu3);
+  s.check('GPX non OpenRunner — champ laissé vide', vide === '', vide);
+
+  s.checkJs(page);
+  await ctx.close();
+  unlinkSync(orGpx);
+  unlinkSync(autreGpx);
+  tous.push(s.report());
+}
+
 await browser.close();
 const ok = tous.every(Boolean);
 console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES PARCOURS PASSENT' : '❌ AU MOINS UN PARCOURS ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);

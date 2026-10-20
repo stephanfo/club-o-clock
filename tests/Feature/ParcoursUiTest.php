@@ -131,4 +131,53 @@ class ParcoursUiTest extends TestCase
         // Pas de coexistence => pas de chargement différé : l'iframe doit être là d'emblée.
         $this->assertStringContainsString('armed: true', $html);
     }
+
+    /**
+     * #138 (arbitré le 17/10) : GPX + lien public SANS carte intégrée — un onglet « Carte
+     * OpenRunner » ne contiendrait qu'un bouton. Plus de bascule : le bouton rejoint la pile du
+     * tracé, sous « Télécharger le GPX ».
+     */
+    public function test_public_link_joins_the_gpx_stack_without_embed(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $disc = $this->discipline();
+        $route = GpxRoute::factory()->create(['discipline_id' => $disc->id]);
+        $s = Session::create([
+            'kind' => 'training', 'title' => 'Sortie', 'discipline_id' => $disc->id,
+            'start_at' => Carbon::now()->addDay(), 'duration_min' => 90, 'capacity' => 10,
+            'created_by' => $coach->id,
+            'route_id' => $route->id,
+            'route_openrunner_public_url' => 'https://www.openrunner.com/route-details/25449348',
+        ]);
+
+        $html = Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s])->html();
+
+        $this->assertStringNotContainsString('Carte OpenRunner', $html, 'Sans carte intégrée, pas de bascule.');
+        $this->assertStringNotContainsString('Carte du parcours OpenRunner', $html);
+        // Contrôle positif : le tracé et le lien sont bien là, le lien après le téléchargement.
+        $this->assertStringContainsString('Télécharger le GPX', $html);
+        $this->assertLessThan(
+            mb_strpos($html, 'https://www.openrunner.com/route-details/25449348'),
+            mb_strpos($html, 'Télécharger le GPX'),
+            '« Ouvrir sur OpenRunner » doit suivre « Télécharger le GPX ».'
+        );
+    }
+
+    /** Lien public seul, sans GPX : affichage inchangé (le bouton, seul). */
+    public function test_public_link_alone_still_shows_the_button(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $disc = $this->discipline();
+        $s = Session::create([
+            'kind' => 'training', 'title' => 'Sortie', 'discipline_id' => $disc->id,
+            'start_at' => Carbon::now()->addDay(), 'duration_min' => 90, 'capacity' => 10,
+            'created_by' => $coach->id,
+            'route_openrunner_public_url' => 'https://www.openrunner.com/route-details/25449348',
+        ]);
+
+        Livewire::actingAs($coach)->test(SessionShow::class, ['session' => $s])
+            ->assertSee('Ouvrir sur OpenRunner')
+            ->assertSee('https://www.openrunner.com/route-details/25449348', false)
+            ->assertDontSee('Télécharger le GPX');
+    }
 }

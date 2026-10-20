@@ -418,7 +418,7 @@
                         {{-- Fichier GPX (§4.13.2) — parsing CLIENT, fichier brut uploadé. --}}
                         <div>
                             <label class="field-label">Fichier GPX <span class="meta" style="text-transform:none;letter-spacing:0;font-weight:400">· optionnel · ≤ 5 Mo</span></label>
-                            <div wire:ignore x-data="gpxField({ stats: @js($gpxStats) })">
+                            <div wire:ignore x-data="gpxField({ stats: @js($gpxStats), publicUrlField: 'route_openrunner_public_url' })">
                                 <input type="file" accept=".gpx" x-ref="file" wire:model="gpxFile" x-on:change="onPick($event)" hidden>
                                 <template x-if="meta">
                                     <div class="gpx-loaded">
