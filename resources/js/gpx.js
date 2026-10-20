@@ -88,6 +88,7 @@ export function parseGpx(text) {
     const bearing = bearingBetween(start, { lat: (minLat + maxLat) / 2, lon: (minLon + maxLon) / 2 });
 
     return {
+        openrunnerId: openrunnerIdFrom(doc),
         points: pts.map((p) => [p.lat, p.lon]),
         pointCount: pts.length,
         distanceKm: Math.round((dist / 1000) * 10) / 10,
@@ -113,6 +114,17 @@ export function parseGpx(text) {
         // formulaire (gpxField) ne transmet au serveur que des champs choisis un à un.
         track: buildTrack(pts),
     };
+}
+
+// Identifiant numérique d'un parcours exporté d'OpenRunner (#138), ou null. OpenRunner signe ses
+// exports (`creator="Openrunner - …"`) et termine le nom de la trace par l'id du parcours :
+// `<trk><name>2026-10-18_54km_N_B-25449348</name>`. Le lien d'intégration, lui, n'est pas
+// dérivable (son `code` est un jeton opaque, §4.13.1).
+export function openrunnerIdFrom(doc) {
+    const creator = doc.documentElement?.getAttribute('creator') || '';
+    if (!/^openrunner/i.test(creator.trim())) return null;
+    const name = doc.querySelector('trk > name')?.textContent.trim() || '';
+    return name.match(/-(\d+)$/)?.[1] ?? null;
 }
 
 // Pas de graduation kilométrique en fonction de la longueur totale.
@@ -270,7 +282,9 @@ function elevationProfileFrom(pts, totalMeters) {
 }
 
 // ── Composant formulaire : drop / parse / métadonnées, pousse vers Livewire ──
-function gpxField({ stats }) {
+// `publicUrlField` : la propriété Livewire du lien public OpenRunner, préremplie depuis un GPX
+// exporté d'OpenRunner (#138) — jamais quand elle porte déjà une saisie.
+function gpxField({ stats, publicUrlField = null }) {
     return {
         meta: stats || null,   // métadonnées affichées (depuis le serveur en édition, ou après parse)
         drag: false,
@@ -327,6 +341,9 @@ function gpxField({ stats }) {
                         elevationProfile: parsed.elevationProfile,
                     },
                 }, false);
+                if (publicUrlField && parsed.openrunnerId && !String(this.$wire.get(publicUrlField) ?? '').trim()) {
+                    this.$wire.set(publicUrlField, `https://www.openrunner.com/route-details/${parsed.openrunnerId}`, false);
+                }
             } catch (e) {
                 this.error = e.message || 'GPX illisible.';
             }
