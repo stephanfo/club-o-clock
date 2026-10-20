@@ -172,6 +172,7 @@ export default defineConfig({
         items: [
           { text: 'Vue d’ensemble', link: '/doc/' },
           { text: 'Installation & déploiement', link: '/doc/INSTALL' },
+          { text: 'Kit RGPD pour le club', link: '/doc/RGPD' },
           { text: 'Comptes de démonstration', link: '/doc/COMPTES_DEMO' },
           { text: 'L’application en images', link: '/doc/CAPTURES' },
         ],

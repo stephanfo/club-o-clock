@@ -435,6 +435,45 @@ section.alt { background: var(--slate-50); }
 }
 .feat .ico svg { width: 22px; height: 22px; }
 
+/* --- Pour le bureau ------------------------------------------------------ */
+
+.feat p + p, .feat p + .cost, .cost + p { margin-top: var(--space-3); }
+.feat .btn { margin-top: var(--space-6); }
+.feat .fine { font-size: 13px; color: var(--slate-500); }
+
+/* Deux cartes seulement sous la grille : la règle à trois colonnes laisserait un trou. */
+.feats.duo { margin-top: var(--space-6); }
+@media (min-width: 720px) { .feats.duo { grid-template-columns: repeat(2, 1fr); } }
+
+.cost { width: 100%; border-collapse: collapse; font-size: 15px; }
+.cost th, .cost td {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--slate-200);
+  vertical-align: top;
+}
+.cost th { text-align: left; font-weight: 600; color: var(--slate-700); }
+.cost th small { display: block; font-weight: 500; font-size: 13px; color: var(--slate-500); }
+.cost td {
+  text-align: right;
+  white-space: nowrap;
+  padding-left: var(--space-4);
+  font-weight: 800;
+  color: var(--ink);
+}
+.cost .total th, .cost .total td { border-bottom: 0; color: var(--brand); font-weight: 800; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 /* --- Captures ------------------------------------------------------------ */
 
 /* Les captures mobiles (390×843) et la capture d'administration (1024×844) n'ont pas le même
