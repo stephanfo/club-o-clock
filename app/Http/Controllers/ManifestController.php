@@ -38,7 +38,7 @@ class ManifestController extends Controller
             'launch_handler' => ['client_mode' => ['navigate-existing', 'auto']],
             'handle_links' => 'preferred',
             'background_color' => '#ffffff',
-            'theme_color' => $settings->primary_color ?: ClubPalette::DEFAULTS['primary_color'],
+            'theme_color' => ClubPalette::themeColor($settings),
             'lang' => 'fr',
             'icons' => [
                 [
