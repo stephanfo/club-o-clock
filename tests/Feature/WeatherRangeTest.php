@@ -201,13 +201,15 @@ class WeatherRangeTest extends TestCase
 
     public function test_le_sous_titre_annonce_les_heures_du_club_et_non_utc(): void
     {
-        // 06:30 UTC = 08:30 à Paris : la cartouche parle l'heure du club, comme tout le reste.
+        // 06:30 UTC = 08:30 à Paris l'été, 07:30 l'hiver : la cartouche parle l'heure du club,
+        // comme tout le reste. Heure attendue CALCULÉE — un « 08h » en dur rougissait d'octobre à
+        // mars, le créneau étant relatif à now().
         $debut = $this->creneau(6, 30);
         $this->fakeHeures($debut, $this->troisHeures());
 
         $this->fiche($debut, 180)
             ->assertViewHas('weatherState', 'full')
-            ->assertSee('08h')
+            ->assertSee($this->heureClub($debut))
             ->assertDontSee('06h');
     }
 
