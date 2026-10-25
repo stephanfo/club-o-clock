@@ -18,17 +18,17 @@
         <meta name="club-user" content="{{ auth()->id() }}">
     @endauth
 @endif
-{{-- Même source que le theme_color du manifest (ManifestController) : une valeur en dur ici
-     divergerait de la palette réelle dès que les couleurs de démarrage sont retouchées. --}}
-<meta name="theme-color" content="{{ \App\Models\ClubSettings::current()->primary_color ?: \App\Support\ClubPalette::DEFAULTS['primary_color'] }}">
-{{-- PWA iOS standalone. Style « black-translucent » = barre d'état TRANSPARENTE : le contenu
-     (donc le dégradé vert de la topbar) remonte derrière l'heure / le Dynamic Island au lieu
-     d'une bande opaque blanche. La topbar réserve la hauteur réelle via env(safe-area-inset-top)
-     (--topbar-st) : le fond passe sous la barre, le titre/chevron restent dessous. iOS force les
-     icônes système en blanc → lisibles sur le vert foncé. --}}
+{{-- Couleur de la barre système (barre d'état Android, barre de titre d'une PWA de bureau) : le
+     HAUT du dégradé des en-têtes, cf. ClubPalette::themeColor. Même source que le theme_color du
+     manifest (ManifestController). iOS l'ignore depuis la version 26 : .barre-etat-ios y supplée. --}}
+<meta name="theme-color" content="{{ \App\Support\ClubPalette::themeColor(\App\Models\ClubSettings::current()) }}">
+{{-- PWA iOS standalone, SANS apple-mobile-web-app-status-bar-style (#112). black-translucent est
+     obsolète (WebKit 317153) : depuis iOS 26.1 la PWA ne dessine plus sous l'heure, et la meta n'y
+     laissait qu'un fondu clair avec l'heure en noir. Sans elle, iOS peint la barre d'état de la
+     couleur unie de .barre-etat-ios (layouts.app). iOS lit ce réglage À L'INSTALLATION : une icône
+     ajoutée avant ce changement garde l'ancien rendu jusqu'à sa réinstallation. --}}
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 {{-- Icône « Ajouter à l'écran d'accueil » iOS : iOS ignore largement les icons du manifest et
      s'appuie sur apple-touch-icon (180×180, opaque, sans alpha — sinon fond noir). Sans ce lien,
      iOS captait un écran de la page (login vide hors auth). --}}

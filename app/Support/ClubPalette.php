@@ -110,6 +110,22 @@ class ClubPalette
     }
 
     /**
+     * Couleur de la barre système (theme-color : barre d'état Android, barre de titre d'une PWA de
+     * bureau) : --brand-700, le HAUT du dégradé vertical des en-têtes (--grad-topbar). Une barre
+     * unie ne se raccorde sans bord qu'à cette couleur exacte (#112). Dérivée de la couleur
+     * principale comme les tokens, donc elle suit un changement de palette (thèmes de saison).
+     */
+    public static function themeColor(ClubSettings $settings): string
+    {
+        $primary = $settings->primary_color;
+        if (! $primary || ! self::isValidHex($primary)) {
+            $primary = self::DEFAULTS['primary_color'];
+        }
+
+        return self::mix($primary, self::SHADES['700']);
+    }
+
+    /**
      * Noir ou blanc, selon celui qui contraste le mieux avec $hex (WCAG 2.x).
      *
      * Les deux ratios sont comparés plutôt qu'un seuil de luminance fixe : le seuil correct

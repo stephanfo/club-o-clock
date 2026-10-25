@@ -167,6 +167,24 @@ body { touch-action: manipulation; }
    la seule chrome. Chaque écran met SON contenu d'en-tête dans une .topbar et
    réserve --topbar-total en haut de sa zone de scroll (cf. blocs par écran).
    ========================================================================= */
+/* Barre d'état iOS (#112). iOS 26.1+/27 n'applique plus black-translucent (obsolète selon Apple,
+   WebKit 317153) : la PWA ne dessine plus sous l'heure, et iOS peint la barre d'après un élément
+   fixe en haut (≥ 6px de haut, ≥ 80 % de large, ≤ 4px du bord) à background-color UNIE — un
+   dégradé ne compte pas ; sans lui, fondu clair et heure noire. Cette bande donne la couleur du
+   HAUT de --grad-topbar : barre et topbar se raccordent sans bord. iOS ignore theme-color, qui
+   joue ce rôle ailleurs (cf. ClubPalette::themeColor). Gardée sur WebKit iOS
+   (-webkit-touch-callout), jamais sur un signal qu'Android partage. */
+.barre-etat-ios { display: none; }
+@supports (-webkit-touch-callout: none) {
+    @media (max-width: 768px) {
+        .barre-etat-ios {
+            display: block; position: fixed; top: 0; left: 0; right: 0; z-index: 1151;
+            height: var(--space-2); pointer-events: none;
+            background-color: var(--brand-700);
+        }
+    }
+}
+
 .topbar { display: none; }
 @media (max-width: 768px) {
     .topbar {
@@ -181,9 +199,17 @@ body { touch-action: manipulation; }
            (calc(env(safe-area-inset-top) + socle)), validé sur iPhone. */
         padding: calc(var(--topbar-st) + 8px) 16px 8px;
         min-height: var(--topbar-total);
-        /* Dégradé horizontal de marque. */
+        /* Dégradé vertical de marque, raccordé à la barre système (cf. --grad-topbar). */
         background: var(--grad-topbar); color: var(--fg-on-dark);
         overflow: hidden;
+    }
+    /* Voile couleur de barre AU-DESSUS du filigrane (::before, z 0), sous le contenu (z 1) : le
+       filigrane, qui ne peut plus passer sous l'heure iOS (WebKit 317153), s'y fond au lieu d'être
+       coupé net. Invisible sur le fond, qui vaut déjà ~brand-700 à cette hauteur. */
+    .topbar::after {
+        content: ""; position: absolute; left: 0; right: 0; top: 0; z-index: 0;
+        height: var(--space-6); pointer-events: none;
+        background: linear-gradient(180deg, var(--brand-700), transparent);
     }
     /* Logo du club en filigrane à droite (plan open source OS2 : générique — logo custom ou
        logo neutre par défaut, cf. --club-logo-url injecté par partials.club-palette — au lieu
@@ -295,6 +321,10 @@ body { touch-action: manipulation; }
     --topbar-h: 52px;
     --topbar-st: env(safe-area-inset-top);
     --topbar-total: calc(var(--topbar-h) + var(--topbar-st));
+    /* Héros posé sous une mini-barre fixe (home, fiche) : il démarre SOUS la barre (son padding
+       réserve --topbar-total), donc son dégradé part de brand-700 au bas de la mini-barre — sinon
+       il a déjà foncé quand il en sort. La mini-barre, elle, reste unie (cf. .topbar-home). */
+    --grad-hero: linear-gradient(180deg, var(--brand-700) var(--topbar-total), var(--brand-900) 100%);
     /* Hauteur de la barre d'action collante de la fiche (S'inscrire…) : padding 12+12 + bouton ~44.
        Sert à réserver le scroll sous elle (elle est fixe au-dessus de la botnav). */
     --fiche-actions-h: 68px;
@@ -880,13 +910,15 @@ body:has(.scrim) { overflow: hidden; }
     .alerts-screen .fiche-mobile { background: var(--app-bg); min-height: 100dvh; }
     /* La mini-barre fiche n'a pas sa propre fleur (le héros fondu en porte une, cf. ::before). */
     .topbar-fiche::before { display: none; }
-    /* Héros fondu : même dégradé horizontal que la topbar → jonction invisible sous la mini-barre.
+    /* Mini-barre unie : c'est le héros qui porte le dégradé (cf. --grad-hero). */
+    .topbar-fiche { background: var(--brand-700); }
+    /* Héros fondu sous une mini-barre unie (cf. --grad-hero) → jonction invisible.
        Réserve la safe-area + le socle de la barre (comme .home-hero-m), texte clair sur le vert.
        Filigrane générique (logo du club, cf. .topbar::before). */
     .fiche-screen .fiche-head-m {
         position: relative; overflow: hidden;
         padding: calc(var(--topbar-total) + 6px) 16px 18px;
-        background: var(--grad-topbar); color: var(--paper);
+        background: var(--grad-hero); color: var(--paper);
         border-bottom: none;
     }
     /* Logo du club en filigrane à droite (reprise de .topbar::before). Ancré par le HAUT juste
@@ -944,13 +976,12 @@ body:has(.scrim) { overflow: hidden; }
     /* La topbar verte fixe (logo+cloche) couvre la safe-area et occupe --topbar-total en haut.
        Le fondu réserve donc cette hauteur puis un petit socle : la salutation démarre sous la
        barre, sans redonder la safe-area (déjà consommée par la topbar fixe).
-       Fond = MÊME dégradé horizontal que la topbar (--grad-topbar) : topbar + héros balaient
-       la même largeur d'écran gauche→droite → le dégradé est continu, la jonction disparaît. */
-    .home-hero-m { padding: calc(var(--topbar-total) + 6px) 18px 22px; background: var(--grad-topbar); }
-    /* Topbar du home : le fondu juste dessous porte déjà SON filigrane (.fondu::before). On garde
-       le même dégradé que les autres topbars pour l'uniformité, mais on masque le filigrane de la
-       topbar ici (sinon deux logos se chevaucheraient au sommet du héros). */
+       Fond = --grad-hero, qui part de la couleur unie de la mini-barre : jonction invisible. */
+    .home-hero-m { padding: calc(var(--topbar-total) + 6px) 18px 22px; background: var(--grad-hero); }
+    /* Topbar du home : le fondu juste dessous porte déjà SON filigrane (.fondu::before) et SON
+       dégradé : la mini-barre reste unie, sans filigrane (sinon deux logos se chevaucheraient). */
     .topbar-home::before { display: none; }
+    .topbar-home { background: var(--brand-700); }
     /* Le filigrane du héros démarre SOUS la topbar fixe (sinon son haut, à top:-20px hérité de
        .fondu::before, est rogné par la barre qui recouvre le sommet du fondu). On le cale juste
        sous --topbar-total. */

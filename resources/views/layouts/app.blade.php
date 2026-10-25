@@ -12,6 +12,8 @@
     @include('partials.club-palette')
 </head>
 <body class="app-body">
+    {{-- Bande unie que WebKit iOS échantillonne pour peindre la barre d'état (#112, cf. app.css). --}}
+    <div class="barre-etat-ios" aria-hidden="true"></div>
     @php
         $u = auth()->user();
         // Onglet de nav actif. Table motif de route => clé, remplaçant un ternaire de 13 niveaux

@@ -135,13 +135,13 @@
   --grad-fondu:        linear-gradient(180deg, var(--brand) 0%, var(--bg-deep) 100%);
   --grad-fondu-soft:   linear-gradient(180deg, var(--brand) 0%, var(--ink) 75%);
   --grad-fondu-radial: radial-gradient(120% 80% at 50% 0%, var(--brand) 0%, var(--ink) 70%);
-  /* Topbar + héros home : dégradé HORIZONTAL dans les tons de marque — un marque→ink vertical
-     (grad-fondu) ne « descend » pas sur ~52px et rend quasi uni. Ici il balaie la largeur.
-     Angle EXACT 90deg (to right) : à 90° le dégradé est indépendant du ratio de la boîte,
-     donc topbar (courte) et héros (haut), tous deux pleine largeur, s'alignent PARFAITEMENT au
-     pixel près à la jonction. Un angle non-90 (ex. 100deg) décalerait les deux boîtes.
-     Range plus sombre aux deux bouts (brand-600 → brand-900) pour un dégradé prononcé et profond. */
-  --grad-topbar:       linear-gradient(90deg, var(--brand-600) 0%, var(--brand-900) 100%);
+  /* Topbar : dégradé VERTICAL qui part de brand-700, la couleur UNIE de la barre système
+     (barre d'état iOS peinte par .barre-etat-ios, theme-color ailleurs — #112) : une barre unie
+     ne se raccorde à un dégradé horizontal qu'avec un bord. Pente douce (→ 800, la topbar est
+     courte) et départ ease-in : une pente qui démarre d'un coup sous l'aplat se lit comme un
+     bord, même à couleur égale. Les héros (home, fiche) ont leur propre pente, cf. app.css. */
+  --grad-topbar:       linear-gradient(180deg, var(--brand-700) 0%,
+                         color-mix(in srgb, var(--brand-700), var(--brand-800) 25%) 45%, var(--brand-800) 100%);
   --grad-energie:      linear-gradient(135deg, var(--brand) 0%, var(--accent) 100%);
   --grad-triathlon:    linear-gradient(90deg, var(--brand) 0%, var(--info) 50%, var(--accent) 100%);
   --grad-ink:          linear-gradient(180deg, var(--ink-soft) 0%, var(--bg-deep) 100%);
