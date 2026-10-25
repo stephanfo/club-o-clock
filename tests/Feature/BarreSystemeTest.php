@@ -41,6 +41,12 @@ class BarreSystemeTest extends TestCase
         $this->assertSame('#a43e08', $this->get('/manifest.webmanifest')->json('theme_color'));
     }
 
+    /** Écran de connexion : premier écran après réinstallation de la PWA, iPad compris. */
+    public function test_guest_layout_carries_the_ios_status_bar_strip(): void
+    {
+        $this->get(route('login'))->assertSee('class="barre-etat-ios barre-etat-ios--auth"', false);
+    }
+
     public function test_app_layout_carries_the_ios_status_bar_strip(): void
     {
         $this->actingAs(User::factory()->create())

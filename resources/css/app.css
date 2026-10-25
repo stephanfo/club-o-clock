@@ -176,12 +176,19 @@ body { touch-action: manipulation; }
    (-webkit-touch-callout), jamais sur un signal qu'Android partage. */
 .barre-etat-ios { display: none; }
 @supports (-webkit-touch-callout: none) {
+    .barre-etat-ios {
+        position: fixed; top: 0; left: 0; right: 0; z-index: 1151;
+        height: var(--space-2); pointer-events: none;
+    }
+    /* Format mobile seulement. iPadOS (mise en page bureau) ne peint pas la barre d'une couleur
+       unie : il y floute le haut de la page (effet de bord de défilement, comme les apps natives)
+       — une bande n'y change que ce qui est flouté. Vérifié sur iPad, assumé. */
     @media (max-width: 768px) {
-        .barre-etat-ios {
-            display: block; position: fixed; top: 0; left: 0; right: 0; z-index: 1151;
-            height: var(--space-2); pointer-events: none;
-            background-color: var(--brand-700);
-        }
+        .barre-etat-ios { display: block; background-color: var(--brand-700); }
+    }
+    /* Connexion : coquille mobile jusqu'à 880px (cf. .auth-mobile), haut du fondu = --brand. */
+    @media (max-width: 880px) {
+        .barre-etat-ios--auth { display: block; background-color: var(--brand); }
     }
 }
 

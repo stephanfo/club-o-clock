@@ -9,6 +9,8 @@
     @include('partials.club-palette')
 </head>
 <body>
+    {{-- Bande que WebKit iOS échantillonne pour peindre la barre d'état (#112, cf. app.css). --}}
+    <div class="barre-etat-ios barre-etat-ios--auth" aria-hidden="true"></div>
     @yield('content')
     @include('partials.sw-register')
 </body>
