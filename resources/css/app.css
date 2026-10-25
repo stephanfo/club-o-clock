@@ -34,7 +34,14 @@ body { touch-action: manipulation; }
         background: var(--bg-deep);
     }
     /* Le fondu pousse, la sheet blanche remonte par-dessus (margin-top négatif du design). */
-    .auth-mobile .auth-hero { flex: 0 0 auto; }
+    /* Fondu de connexion parti de brand-700, la couleur de la barre système (bande iOS,
+       theme-color ailleurs — #112), avec départ ease-in : une pente qui démarre d'un coup sous
+       l'aplat de la barre se lit comme un bord, même à couleur égale (cf. --grad-topbar). */
+    .auth-mobile .auth-hero {
+        flex: 0 0 auto;
+        background: linear-gradient(180deg, var(--brand-700) 0%,
+            color-mix(in srgb, var(--brand-700), var(--ink) 20%) 30%, var(--ink) 75%);
+    }
     .auth-mobile .auth-sheet { width: 100%; }
 }
 
@@ -186,9 +193,9 @@ body { touch-action: manipulation; }
     @media (max-width: 768px) {
         .barre-etat-ios { display: block; background-color: var(--brand-700); }
     }
-    /* Connexion : coquille mobile jusqu'à 880px (cf. .auth-mobile), haut du fondu = --brand. */
+    /* Connexion : coquille mobile jusqu'à 880px (cf. .auth-mobile), haut du fondu = brand-700. */
     @media (max-width: 880px) {
-        .barre-etat-ios--auth { display: block; background-color: var(--brand); }
+        .barre-etat-ios--auth { display: block; background-color: var(--brand-700); }
     }
 }
 
