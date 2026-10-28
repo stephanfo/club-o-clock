@@ -219,7 +219,8 @@ export default defineConfig({
     outlineTitle: 'Sur cette page',
 
     footer: {
-      message: 'Publié sous licence AGPL-3.0.',
+      message:
+        'Publié sous licence AGPL-3.0 par <a href="https://stephane.ratelet.fr/">Stéphane Ratelet</a>.',
       copyright: 'Une instance par club — tes données restent chez toi.',
     },
   },
