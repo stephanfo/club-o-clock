@@ -15,6 +15,30 @@ const NON_INDEXEES = [
   'doc/DOCKER_LOCAL.md',
 ]
 
+// Description propre aux pages principales : sans elle, toutes reprennent celle du site et
+// s'affichent avec la même phrase dans les résultats de recherche. Tenue ici plutôt qu'en
+// frontmatter, que GitHub afficherait en tableau en tête de chaque document.
+const DESCRIPTIONS = {
+  'doc/index.md':
+    "Documentation de Club'O'Clock, planning d'entraînement libre pour club sportif : une instance par club, installée et administrée par ses bénévoles.",
+  'doc/INSTALL.md':
+    "Installer Club'O'Clock pour son club : prérequis, coût, hébergement mutualisé, configuration, mise en production et premier démarrage.",
+  'doc/RGPD.md':
+    "Kit RGPD prêt à l'emploi pour le club : texte d'information des adhérents et fiche du registre des traitements pour Club'O'Clock.",
+  'doc/CAPTURES.md':
+    "Club'O'Clock en images, côté adhérent, coach et bureau : captures prises sur la démo publique, avec des données fictives.",
+  'doc/PRD.md':
+    "Spécification produit de Club'O'Clock : rôles, inscriptions, liste d'attente, quotas, compétitions et notifications d'un club sportif.",
+  'doc/CADRAGE_TECHNIQUE.md':
+    "Pourquoi Club'O'Clock repose sur Laravel, Livewire et MariaDB/MySQL en hébergement mutualisé : options comparées et arbitrages.",
+}
+
+// <title> plus court que le h1 du document, coupé sinon dans les résultats (le h1 reste tel quel).
+const TITRES = {
+  'doc/PRD.md': 'Spécification produit (PRD)',
+  'doc/CADRAGE_TECHNIQUE.md': 'Cadrage technique',
+}
+
 // Configuration du site de documentation.
 //
 // Le parti pris central : les fichiers Markdown ne bougent pas. Ils restent dans `doc/` et à la
@@ -86,6 +110,11 @@ export default defineConfig({
       ...items.filter((i) => !NON_INDEXEES.some((p) => i.url === p.replace(/\.md$/, '.html'))),
     ],
   },
+
+  transformPageData: (pageData) => ({
+    ...(TITRES[pageData.relativePath] && { title: TITRES[pageData.relativePath] }),
+    ...(DESCRIPTIONS[pageData.relativePath] && { description: DESCRIPTIONS[pageData.relativePath] }),
+  }),
 
   // URL canonique de chaque page, et `noindex` sur les pages listées plus haut. `follow` reste
   // permis : les liens qu'elles contiennent vers l'installation ou le PRD comptent toujours.
