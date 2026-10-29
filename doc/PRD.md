@@ -1216,7 +1216,7 @@ Deux gestes distincts, livrés séparément.
 
 #### 4.23.1 Principe : tout est désactivé par défaut
 
-- **Six accords distincts**, chacun activable et **révocable à tout moment, sans conséquence** depuis le profil : **nom complet**, **photo**, **catégorie**, **anniversaire**, **email**, **téléphone**. Aucun n'est pré-coché, aucun n'est demandé pour s'inscrire aux séances, aucun ne se donne pour un tiers — hors le parent garant pour son enfant (§4.23.4).
+- **Six accords distincts**, chacun activable et **révocable à tout moment, sans conséquence** depuis le profil : **nom complet**, **photo**, **catégorie**, **anniversaire**, **email**, **téléphone**. Un interrupteur **« Tout »** en tête les active ou les désactive d'un geste ; il passe en état mixte quand les six diffèrent, et un geste depuis cet état active tout. Les six restent visibles et réglables un par un sous lui. Aucun n'est pré-coché, aucun n'est demandé pour s'inscrire aux séances, aucun ne se donne pour un tiers — hors le parent garant pour son enfant (§4.23.4).
 - **Sans accord, l'adhérent figure quand même** au trombinoscope avec ce que les membres voient déjà sur les listes d'inscrits (§4.9.4) : **prénom et initiale du nom**, initiales à la place de la photo, rôles. Rien d'autre. Coachs et membres du bureau figurent toujours en nom complet, comme sur la fiche séance (§4.11.4).
 - **Retirer un accord masque, supprimer efface** — deux gestes distincts :
   - **retrait** : la donnée disparaît de l'écran des autres au chargement suivant. La photo et le numéro restent dans le profil, **visibles de l'adhérent seul** (ni des autres membres, ni du bureau, ni de l'admin) ; réactiver l'accord les réaffiche sans rien ressaisir ;
