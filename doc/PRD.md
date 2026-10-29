@@ -158,7 +158,7 @@ Au déploiement, un email de bootstrap admin est configuré (mécanisme arrêté
 - Préférences de notifications : matrice §4.15 + toggle pause global.
 - Mot de passe : changement avec MDP actuel, ou définition initiale si arrivé via magic link / Google sans MDP. **Retrait** possible également (le compte redevient passwordless), dès lors qu'il reste au moins une méthode active (§4.1.2).
 - Méthodes d'auth liées : voir et révoquer.
-- Trombinoscope : photo, téléphone et accords de diffusion (§4.23) — l'admin ne peut que retirer une photo.
+- Trombinoscope : photo, téléphone et accords de diffusion (§4.23) — l'admin peut retirer un accord ou enregistrer un accord recueilli hors app (§4.23.1), jamais déposer une photo ou un numéro.
 
 Un **changement** de mot de passe déconnecte par défaut les autres appareils (choix décochable) ;
 une **définition initiale** n'en déconnecte aucun — ajouter une méthode n'est pas un signal de
@@ -1069,7 +1069,7 @@ Distincte de la page Paramètres :
   - Accès athlète (actif / suspendu / tous).
   - Rôles (multi parmi `athlete`, `coach`, `admin`, `parent_garant` — pseudo-rôle dérivé du lien de tutelle).
   - Statut suppression (aucun / en cours de tampon / éligible / tous).
-- **Actions sur la fiche d'un user** : éditer nom + prénom + email + date de naissance + rôles + catégories + qualifications + fonction au bureau (§4.23.3), **retirer la photo** du trombinoscope (modération, §4.23.1), **suspendre** / réactiver l'accès athlète (cf. §4.4), supprimer le compte (avec bouton **« Confirmer la suppression définitive »** distinct qui apparaît / devient cliquable uniquement à partir de J+7 ; bouton **« Annuler la demande de suppression »** disponible pendant le tampon).
+- **Actions sur la fiche d'un user** : éditer nom + prénom + email + date de naissance + rôles + catégories + qualifications + fonction au bureau (§4.23.3), **retirer ou enregistrer un accord** du trombinoscope et **retirer la photo** (modération, §4.23.1), **suspendre** / réactiver l'accès athlète (cf. §4.4), supprimer le compte (avec bouton **« Confirmer la suppression définitive »** distinct qui apparaît / devient cliquable uniquement à partir de J+7 ; bouton **« Annuler la demande de suppression »** disponible pendant le tampon).
 - **Bouton « Ajouter un adhérent »** : formulaire one-shot (cf. §4.1.3).
 
 ### 4.18 Traçabilité : `AuditLog` et `ActivityLog`
@@ -1219,7 +1219,11 @@ Deux gestes distincts, livrés séparément.
 - **Quatre accords distincts**, chacun activable et **révocable à tout moment, sans conséquence** depuis le profil : **photo**, **anniversaire**, **email**, **téléphone**. Aucun n'est pré-coché, aucun n'est demandé pour s'inscrire aux séances, aucun ne se donne pour un tiers — hors le parent garant pour son enfant (§4.23.4).
 - **Sans accord, l'adhérent figure quand même** au trombinoscope avec ce que les membres voient déjà sur les listes d'inscrits (§4.9.4) : nom, prénom, initiales à la place de la photo, rôles. Rien d'autre.
 - **Le retrait est immédiat** : la donnée disparaît de l'écran au chargement suivant, la photo est effacée du stockage, le numéro de téléphone est effacé de la base. Aucune copie n'est conservée.
-- **L'admin ne donne jamais un accord à la place d'un adhérent.** Il peut seulement **retirer** une photo inappropriée (modération), ce qui révoque l'accord photo et se trace en `AuditLog`.
+- **L'admin, pour la maintenance**, depuis la fiche adhérent (§4.17.1) :
+  - **retirer** n'importe quel accord, à la demande de l'adhérent quel que soit le canal (oral, email) — le club doit honorer un retrait, d'où qu'il vienne ;
+  - **enregistrer** un accord recueilli hors de l'app (case du bulletin d'adhésion), **source obligatoire** (« bulletin d'adhésion 2027 »). Pour un mineur, seul un accord du parent garant peut être enregistré. L'adhérent (le parent pour un enfant) reçoit un message qui lui dit ce qui a été enregistré et comment le retirer ;
+  - **retirer une photo** inappropriée (modération), ce qui révoque l'accord photo.
+  Chacun de ces gestes se trace en `AuditLog`. L'admin **ne dépose jamais** de photo ni de numéro à la place de quelqu'un : la donnée vient toujours de la personne, l'accord enregistré ne fait que l'autoriser à être affichée.
 - **Preuve de l'accord** : chaque accord et chaque retrait sont horodatés, avec leur auteur et la version du texte présenté (§5.1 `Consent`). Changer ce texte de façon substantielle invalide les accords donnés sur l'ancienne version, qui sont redemandés.
 
 #### 4.23.2 Données diffusables
@@ -1255,12 +1259,13 @@ Ces informations relèvent du fonctionnement de l'association, pas de la vie pri
 - **Trombinoscope** (entrée de navigation membre, mobile et desktop) : grille de cartes — photo ou initiales, prénom NOM, badges de rôle, fonction au bureau. Recherche par nom ; filtres **Tous / Bureau / Coachs** ; vue **Anniversaires** par mois (mois courant par défaut), limitée aux accords donnés.
 - **Fiche** d'un adhérent (au toucher d'une carte) : la même chose en grand, plus les coordonnées partagées sous forme de liens d'appel et d'écriture (`tel:` / `mailto:`).
 - **Accueil** : bloc **« Anniversaires de la semaine »** (jour et prénom), **masqué s'il est vide**.
+- **Listes d'inscrits** d'une séance (§4.9.4) : la photo à côté du nom, sous les mêmes accords et pour les mêmes lecteurs que le trombinoscope — un coach reconnaît les nouveaux de sa séance.
 - **Profil** : onglet « Trombinoscope » — aperçu de sa propre carte telle que les autres la voient, dépôt de la photo, les quatre accords, saisie du téléphone.
 
 #### 4.23.7 Hors périmètre
 
 - Notification le jour d'un anniversaire.
-- Photo affichée ailleurs que dans le trombinoscope (listes d'inscrits, débriefs).
+- Photo affichée ailleurs que dans le trombinoscope et les listes d'inscrits (débriefs, notifications).
 - Messagerie ou mise en relation dans l'app, organisation du covoiturage (cf. §3.2).
 - Diffusion vers l'extérieur du club, impression, export.
 
@@ -1300,7 +1305,7 @@ Vue logique des entités. **Volontairement agnostique** à la techno de stockage
 - **`Debrief`** : `id`, `sessionId` (FK, `kind = competition` en V1), `authorId` (FK User, immuable, anonymisable), `contentMarkdown` (texte enrichi WYSIWYG §4.12.1), `createdAt`, `updatedAt`, `archivedAt?` / `archivedBy?` (soft-delete admin). **Unicité `(sessionId, authorId)`** — au plus 1 débrief par membre et par compétition. Cardinalité par séance : `0..N`. Nom d'entité volontairement **générique** (pas spécifique à la compétition) pour rester réutilisable, même si le périmètre V1 se limite à `kind = competition` (cf. §4.12.5).
 - **`DebriefReaction`** : `id`, `debriefId` (FK), `userId` (FK User, effacée avec le compte), `createdAt`. **Unicité `(debriefId, userId)`** — un « j'aime » par membre et par débrief (cf. §4.12.5).
 - **`InformationPage`** (note club, §4.19) : `id`, `title`, `contentMarkdown?` (texte enrichi WYSIWYG §4.12.1), `visibility` (`all` / `coach` / `admin` — niveau minimum cumulatif), `pinned` (épinglée en bannière d'accueil), `createdBy` (FK User, anonymisable), `createdAt`, `updatedAt`, `archivedAt?` / `archivedBy?` (soft-delete admin). Édition admin uniquement. Ajout de périmètre post-cadrage.
-- **`Consent`** (§4.23) : `userId` (la personne concernée), `type` (`trombi_photo` / `trombi_birthday` / `trombi_email` / `trombi_phone`), `version` (du texte présenté), `grantedAt`, `grantedBy` (l'intéressé, ou son parent garant), `revokedAt?`, `revokedBy?`. Un accord est **actif** s'il n'est pas révoqué et porte la version courante. Les lignes révoquées restent comme preuve ; toutes sont effacées avec le compte. Registre générique, réutilisable par d'autres accords (#71).
+- **`Consent`** (§4.23) : `userId` (la personne concernée), `type` (`trombi_photo` / `trombi_birthday` / `trombi_email` / `trombi_phone`), `version` (du texte présenté), `grantedAt`, `grantedBy` (l'intéressé, son parent garant, ou l'admin qui enregistre), `source?` (obligatoire quand l'admin enregistre un accord recueilli hors app), `revokedAt?`, `revokedBy?`. Un accord est **actif** s'il n'est pas révoqué et porte la version courante. Les lignes révoquées restent comme preuve ; toutes sont effacées avec le compte. Registre générique, réutilisable par d'autres accords (#71).
 - **`ClubSettings`** (singleton) : `name`, `logo`, `primaryColor`, `timezone`, `invitationLinkDays`, etc.
 - **`NotificationPreferences`** (rattachée à un `User`) : matrice `type × canal` + flag pause globale.
 
