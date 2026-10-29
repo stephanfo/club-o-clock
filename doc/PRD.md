@@ -82,7 +82,7 @@ Remplacer le tableur Google Sheets actuel par une **PWA** qui offre aux adhéren
 - Pages d'information (notes club) éditables par l'admin, avec visibilité par niveau de rôle et épinglage en bannière d'accueil (ajout post-cadrage, cf. §4.19).
 - Export des séances vers l'agenda personnel : ajout ponctuel d'une séance et abonnement tenu à jour (ajout post-cadrage, cf. §4.21).
 - Allures course : VMA courante du membre, allures par zone, estimation depuis un résultat de course et projection de temps (ajout post-cadrage, cf. §4.22).
-- Trombinoscope et annuaire consentis : photo, anniversaire, email et téléphone diffusés aux adhérents sur accord révocable de chacun, rôles et fonctions du bureau (ajout post-cadrage, cf. §4.23).
+- Trombinoscope et annuaire consentis : nom complet, photo, catégorie, anniversaire, email et téléphone diffusés aux adhérents sur accord révocable de chacun ; rôles, fonctions du bureau et qualifications des coachs (ajout post-cadrage, cf. §4.23).
 
 ### 3.2 Hors V1 (V2+)
 - Cotisations / paiements en ligne.
@@ -1216,8 +1216,8 @@ Deux gestes distincts, livrés séparément.
 
 #### 4.23.1 Principe : tout est désactivé par défaut
 
-- **Quatre accords distincts**, chacun activable et **révocable à tout moment, sans conséquence** depuis le profil : **photo**, **anniversaire**, **email**, **téléphone**. Aucun n'est pré-coché, aucun n'est demandé pour s'inscrire aux séances, aucun ne se donne pour un tiers — hors le parent garant pour son enfant (§4.23.4).
-- **Sans accord, l'adhérent figure quand même** au trombinoscope avec ce que les membres voient déjà sur les listes d'inscrits (§4.9.4) : nom, prénom, initiales à la place de la photo, rôles. Rien d'autre.
+- **Six accords distincts**, chacun activable et **révocable à tout moment, sans conséquence** depuis le profil : **nom complet**, **photo**, **catégorie**, **anniversaire**, **email**, **téléphone**. Aucun n'est pré-coché, aucun n'est demandé pour s'inscrire aux séances, aucun ne se donne pour un tiers — hors le parent garant pour son enfant (§4.23.4).
+- **Sans accord, l'adhérent figure quand même** au trombinoscope avec ce que les membres voient déjà sur les listes d'inscrits (§4.9.4) : **prénom et initiale du nom**, initiales à la place de la photo, rôles. Rien d'autre. Coachs et membres du bureau figurent toujours en nom complet, comme sur la fiche séance (§4.11.4).
 - **Retirer un accord masque, supprimer efface** — deux gestes distincts :
   - **retrait** : la donnée disparaît de l'écran des autres au chargement suivant. La photo et le numéro restent dans le profil, **visibles de l'adhérent seul** (ni des autres membres, ni du bureau, ni de l'admin) ; réactiver l'accord les réaffiche sans rien ressaisir ;
   - **suppression** : bouton propre à la photo et au numéro, toujours disponible, qui efface la donnée du stockage. Retirer d'abord l'accord n'est pas requis.
@@ -1233,6 +1233,8 @@ Deux gestes distincts, livrés séparément.
 #### 4.23.2 Données diffusables
 
 - **Photo** : déposée par l'adhérent lui-même (par le parent garant pour un enfant, §4.23.4), depuis son profil. JPEG, PNG ou WebP, ≤ 5 Mo à l'envoi ; recadrée au carré et réduite à la taille d'affichage. **Toutes les métadonnées du fichier sont supprimées** (dont la géolocalisation de la prise de vue). Servie aux seuls membres autorisés à la voir, jamais par une URL publique. Une seule photo par adhérent ; en déposer une nouvelle remplace l'ancienne.
+- **Nom complet** : prénom et nom en entier, à la place de l'initiale.
+- **Catégorie** : la catégorie principale (§4.5). Elle situe l'âge à deux ans près chez les jeunes, d'où un accord à part. Coachs et admins la voient sans accord dans leurs écrans, comme aujourd'hui.
 - **Anniversaire** : **jour et mois seuls**. Ni l'année, ni l'âge ne sont jamais affichés.
 - **Email** : l'email du compte (§4.1), sans champ supplémentaire.
 - **Téléphone** : **champ facultatif saisi par l'adhérent, pour le seul trombinoscope** — affiché aux autres sous accord, à lui seul sinon (§4.23.1). Ce n'est pas un contact d'urgence (géré par le bureau seul, cf. #71) et il ne sert à aucun envoi de l'application.
@@ -1242,11 +1244,12 @@ Deux gestes distincts, livrés séparément.
 Ces informations relèvent du fonctionnement de l'association, pas de la vie privée de l'adhérent :
 
 - **Rôles** `coach` et `admin`, en badges.
+- **Qualifications d'un coach** en cours de validité, avec le badge d'expiration de la fiche séance (§4.11.4), qui les montre déjà nominativement.
 - **Fonction au bureau** : liste fixe — président·e, vice-président·e, secrétaire, secrétaire adjoint·e, trésorier·e, trésorier·e adjoint·e. Attribuée par l'admin depuis la fiche adhérent (§4.17.1), **une au plus par personne**, plusieurs titulaires possibles pour une même fonction (deux vice-présidents). Tracée en `AuditLog`. Indépendante de la saison : elle reste jusqu'à ce que l'admin la change, après l'AG.
 
 #### 4.23.4 Mineurs
 
-- **Les accords photo et anniversaire d'un mineur se donnent par son parent garant**, depuis l'UI « mes enfants » (§4.2), en phases P1 et P2. En P2, l'adolescent voit ces réglages et **peut les retirer lui-même** : un retrait, d'où qu'il vienne, l'emporte.
+- **Les accords nom complet, photo, catégorie et anniversaire d'un mineur se donnent par son parent garant**, depuis l'UI « mes enfants » (§4.2), en phases P1 et P2. En P2, l'adolescent voit ces réglages et **peut les retirer lui-même** : un retrait, d'où qu'il vienne, l'emporte.
 - **Jamais de coordonnées propres à un mineur.** Les accords email et téléphone ne sont pas proposés tant que la date de naissance le désigne comme mineur (§5.1 `isMinor`).
 - **Contact du parent sur la fiche de l'enfant** : « Parent : X » avec l'email et/ou le téléphone **que le parent garant a lui-même partagés**. Si le parent n'a rien partagé, la fiche de l'enfant ne mentionne pas le lien de tutelle.
 - **À la rupture de tutelle (P2 → P3)**, les accords donnés par le parent tombent : le nouvel adulte décide seul de ce qu'il diffuse.
@@ -1260,7 +1263,7 @@ Ces informations relèvent du fonctionnement de l'association, pas de la vie pri
 
 #### 4.23.6 Écrans
 
-- **Trombinoscope** (entrée de navigation membre, mobile et desktop) : grille de cartes — photo ou initiales, prénom NOM, badges de rôle, fonction au bureau. Recherche par nom ; filtres **Tous / Bureau / Coachs** ; vue **Anniversaires** par mois (mois courant par défaut), limitée aux accords donnés.
+- **Trombinoscope** (entrée de navigation membre, mobile et desktop) : grille de cartes — photo ou initiales, nom, badges de rôle, fonction au bureau, catégorie, qualifications d'un coach. Recherche par nom ; filtres **Tous / Bureau / Coachs** ; filtre **par catégorie** (limité à qui l'affiche ; complet pour coachs et admins) ; vue **Anniversaires** par mois (mois courant par défaut), limitée aux accords donnés.
 - **Fiche** d'un adhérent (au toucher d'une carte) : la même chose en grand, plus les coordonnées partagées sous forme de liens d'appel et d'écriture (`tel:` / `mailto:`).
 - **Accueil** : bloc **« Anniversaires de la semaine »** (jour et prénom), **masqué s'il est vide**.
 - **Listes d'inscrits** d'une séance (§4.9.4) : la photo à côté du nom, sous les mêmes accords et pour les mêmes lecteurs que le trombinoscope — un coach reconnaît les nouveaux de sa séance.
@@ -1309,7 +1312,7 @@ Vue logique des entités. **Volontairement agnostique** à la techno de stockage
 - **`Debrief`** : `id`, `sessionId` (FK, `kind = competition` en V1), `authorId` (FK User, immuable, anonymisable), `contentMarkdown` (texte enrichi WYSIWYG §4.12.1), `createdAt`, `updatedAt`, `archivedAt?` / `archivedBy?` (soft-delete admin). **Unicité `(sessionId, authorId)`** — au plus 1 débrief par membre et par compétition. Cardinalité par séance : `0..N`. Nom d'entité volontairement **générique** (pas spécifique à la compétition) pour rester réutilisable, même si le périmètre V1 se limite à `kind = competition` (cf. §4.12.5).
 - **`DebriefReaction`** : `id`, `debriefId` (FK), `userId` (FK User, effacée avec le compte), `createdAt`. **Unicité `(debriefId, userId)`** — un « j'aime » par membre et par débrief (cf. §4.12.5).
 - **`InformationPage`** (note club, §4.19) : `id`, `title`, `contentMarkdown?` (texte enrichi WYSIWYG §4.12.1), `visibility` (`all` / `coach` / `admin` — niveau minimum cumulatif), `pinned` (épinglée en bannière d'accueil), `createdBy` (FK User, anonymisable), `createdAt`, `updatedAt`, `archivedAt?` / `archivedBy?` (soft-delete admin). Édition admin uniquement. Ajout de périmètre post-cadrage.
-- **`Consent`** (§4.23) : `userId` (la personne concernée), `type` (`trombi_photo` / `trombi_birthday` / `trombi_email` / `trombi_phone`), `version` (du texte présenté), `grantedAt`, `grantedBy` (l'intéressé, son parent garant, ou l'admin qui enregistre), `source?` (obligatoire quand l'admin enregistre un accord recueilli hors app), `revokedAt?`, `revokedBy?`. Un accord est **actif** s'il n'est pas révoqué et porte la version courante. Les lignes révoquées restent comme preuve ; toutes sont effacées avec le compte. Registre générique, réutilisable par d'autres accords (#71).
+- **`Consent`** (§4.23) : `userId` (la personne concernée), `type` (`trombi_full_name` / `trombi_photo` / `trombi_category` / `trombi_birthday` / `trombi_email` / `trombi_phone`), `version` (du texte présenté), `grantedAt`, `grantedBy` (l'intéressé, son parent garant, ou l'admin qui enregistre), `source?` (obligatoire quand l'admin enregistre un accord recueilli hors app), `revokedAt?`, `revokedBy?`. Un accord est **actif** s'il n'est pas révoqué et porte la version courante. Les lignes révoquées restent comme preuve ; toutes sont effacées avec le compte. Registre générique, réutilisable par d'autres accords (#71).
 - **`ClubSettings`** (singleton) : `name`, `logo`, `primaryColor`, `timezone`, `invitationLinkDays`, etc.
 - **`NotificationPreferences`** (rattachée à un `User`) : matrice `type × canal` + flag pause globale.
 
