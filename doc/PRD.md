@@ -82,6 +82,7 @@ Remplacer le tableur Google Sheets actuel par une **PWA** qui offre aux adhéren
 - Pages d'information (notes club) éditables par l'admin, avec visibilité par niveau de rôle et épinglage en bannière d'accueil (ajout post-cadrage, cf. §4.19).
 - Export des séances vers l'agenda personnel : ajout ponctuel d'une séance et abonnement tenu à jour (ajout post-cadrage, cf. §4.21).
 - Allures course : VMA courante du membre, allures par zone, estimation depuis un résultat de course et projection de temps (ajout post-cadrage, cf. §4.22).
+- Trombinoscope et annuaire consentis : photo, anniversaire, email et téléphone diffusés aux adhérents sur accord révocable de chacun, rôles et fonctions du bureau (ajout post-cadrage, cf. §4.23).
 
 ### 3.2 Hors V1 (V2+)
 - Cotisations / paiements en ligne.
@@ -95,11 +96,11 @@ Remplacer le tableur Google Sheets actuel par une **PWA** qui offre aux adhéren
 - Plusieurs tags de quota par séance.
 - Récap hebdomadaire email.
 - Apple Sign-In.
-- Stockage du téléphone et du certificat médical (minimisation RGPD).
+- Stockage du certificat médical (minimisation RGPD). Le téléphone n'est stocké que partagé volontairement au trombinoscope, et effacé au retrait de l'accord (§4.23.2).
 - Compteur / classement public d'apéros offerts.
 - Débrief sur `training` / `club_event` (V1 = compétition uniquement).
 - Commentaires / fil de discussion sous un débrief (la réaction « j'aime » est en V1, §4.12.5).
-- Hébergement ou intégration des photos dans l'app (V1 = simple lien externe vers un album tiers ; aucune galerie native).
+- Hébergement ou intégration des photos dans l'app (V1 = simple lien externe vers un album tiers ; aucune galerie native). Seule exception : la photo de l'adhérent au trombinoscope (§4.23).
 
 ---
 
@@ -157,6 +158,7 @@ Au déploiement, un email de bootstrap admin est configuré (mécanisme arrêté
 - Préférences de notifications : matrice §4.15 + toggle pause global.
 - Mot de passe : changement avec MDP actuel, ou définition initiale si arrivé via magic link / Google sans MDP. **Retrait** possible également (le compte redevient passwordless), dès lors qu'il reste au moins une méthode active (§4.1.2).
 - Méthodes d'auth liées : voir et révoquer.
+- Trombinoscope : photo, téléphone et accords de diffusion (§4.23) — l'admin ne peut que retirer une photo.
 
 Un **changement** de mot de passe déconnecte par défaut les autres appareils (choix décochable) ;
 une **définition initiale** n'en déconnecte aucun — ajouter une méthode n'est pas un signal de
@@ -1067,7 +1069,7 @@ Distincte de la page Paramètres :
   - Accès athlète (actif / suspendu / tous).
   - Rôles (multi parmi `athlete`, `coach`, `admin`, `parent_garant` — pseudo-rôle dérivé du lien de tutelle).
   - Statut suppression (aucun / en cours de tampon / éligible / tous).
-- **Actions sur la fiche d'un user** : éditer nom + prénom + email + date de naissance + rôles + catégories + qualifications, **suspendre** / réactiver l'accès athlète (cf. §4.4), supprimer le compte (avec bouton **« Confirmer la suppression définitive »** distinct qui apparaît / devient cliquable uniquement à partir de J+7 ; bouton **« Annuler la demande de suppression »** disponible pendant le tampon).
+- **Actions sur la fiche d'un user** : éditer nom + prénom + email + date de naissance + rôles + catégories + qualifications + fonction au bureau (§4.23.3), **retirer la photo** du trombinoscope (modération, §4.23.1), **suspendre** / réactiver l'accès athlète (cf. §4.4), supprimer le compte (avec bouton **« Confirmer la suppression définitive »** distinct qui apparaît / devient cliquable uniquement à partir de J+7 ; bouton **« Annuler la demande de suppression »** disponible pendant le tampon).
 - **Bouton « Ajouter un adhérent »** : formulaire one-shot (cf. §4.1.3).
 
 ### 4.18 Traçabilité : `AuditLog` et `ActivityLog`
@@ -1208,6 +1210,60 @@ Deux gestes distincts, livrés séparément.
 - **Consignes de séance** (disciplines rattachées au référentiel) : chaque code de zone cité est complété, à l'affichage web, par la fourchette d'allure du lecteur ; une plage (« Z1-Z2 ») reçoit une seule fourchette couvrant les deux zones. Sans VMA renseignée : texte inchangé et invitation à la renseigner.
 - **Hors périmètre** : tests de VMA guidés, outillage coach (saisie collective, groupes de niveau), vélo et natation.
 
+### 4.23 Trombinoscope et annuaire consentis
+
+*Ajout de périmètre post-cadrage (#72).* Mettre un visage sur les prénoms croisés à l'entraînement, retrouver qui fait quoi au club, souhaiter les anniversaires et se joindre entre adhérents (covoiturage vers une course, logistique d'un événement). Ce que le club diffusait jusqu'ici en PDF sur une messagerie — sans accord recueilli ni retrait possible — passe dans l'app **sous le contrôle de chaque adhérent**.
+
+#### 4.23.1 Principe : tout est désactivé par défaut
+
+- **Quatre accords distincts**, chacun activable et **révocable à tout moment, sans conséquence** depuis le profil : **photo**, **anniversaire**, **email**, **téléphone**. Aucun n'est pré-coché, aucun n'est demandé pour s'inscrire aux séances, aucun ne se donne pour un tiers — hors le parent garant pour son enfant (§4.23.4).
+- **Sans accord, l'adhérent figure quand même** au trombinoscope avec ce que les membres voient déjà sur les listes d'inscrits (§4.9.4) : nom, prénom, initiales à la place de la photo, rôles. Rien d'autre.
+- **Le retrait est immédiat** : la donnée disparaît de l'écran au chargement suivant, la photo est effacée du stockage, le numéro de téléphone est effacé de la base. Aucune copie n'est conservée.
+- **L'admin ne donne jamais un accord à la place d'un adhérent.** Il peut seulement **retirer** une photo inappropriée (modération), ce qui révoque l'accord photo et se trace en `AuditLog`.
+- **Preuve de l'accord** : chaque accord et chaque retrait sont horodatés, avec leur auteur et la version du texte présenté (§5.1 `Consent`). Changer ce texte de façon substantielle invalide les accords donnés sur l'ancienne version, qui sont redemandés.
+
+#### 4.23.2 Données diffusables
+
+- **Photo** : déposée par l'adhérent lui-même (par le parent garant pour un enfant, §4.23.4), depuis son profil. JPEG, PNG ou WebP, ≤ 5 Mo à l'envoi ; recadrée au carré et réduite à la taille d'affichage. **Toutes les métadonnées du fichier sont supprimées** (dont la géolocalisation de la prise de vue). Servie aux seuls membres autorisés à la voir, jamais par une URL publique. Une seule photo par adhérent ; en déposer une nouvelle remplace l'ancienne.
+- **Anniversaire** : **jour et mois seuls**. Ni l'année, ni l'âge ne sont jamais affichés.
+- **Email** : l'email du compte (§4.1), sans champ supplémentaire.
+- **Téléphone** : **champ facultatif saisi par l'adhérent, qui n'existe que pour être partagé** — il est saisi en même temps que l'accord et effacé avec lui. Ce n'est pas un contact d'urgence (géré par le bureau seul, cf. #71) et il ne sert à aucun envoi de l'application.
+
+#### 4.23.3 Données affichées sans accord
+
+Ces informations relèvent du fonctionnement de l'association, pas de la vie privée de l'adhérent :
+
+- **Rôles** `coach` et `admin`, en badges.
+- **Fonction au bureau** : liste fixe — président·e, vice-président·e, secrétaire, secrétaire adjoint·e, trésorier·e, trésorier·e adjoint·e. Attribuée par l'admin depuis la fiche adhérent (§4.17.1), **une au plus par personne**, plusieurs titulaires possibles pour une même fonction (deux vice-présidents). Tracée en `AuditLog`. Indépendante de la saison : elle reste jusqu'à ce que l'admin la change, après l'AG.
+
+#### 4.23.4 Mineurs
+
+- **Les accords photo et anniversaire d'un mineur se donnent par son parent garant**, depuis l'UI « mes enfants » (§4.2), en phases P1 et P2. En P2, l'adolescent voit ces réglages et **peut les retirer lui-même** : un retrait, d'où qu'il vienne, l'emporte.
+- **Jamais de coordonnées propres à un mineur.** Les accords email et téléphone ne sont pas proposés tant que la date de naissance le désigne comme mineur (§5.1 `isMinor`).
+- **Contact du parent sur la fiche de l'enfant** : « Parent : X » avec l'email et/ou le téléphone **que le parent garant a lui-même partagés**. Si le parent n'a rien partagé, la fiche de l'enfant ne mentionne pas le lien de tutelle.
+- **À la rupture de tutelle (P2 → P3)**, les accords donnés par le parent tombent : le nouvel adulte décide seul de ce qu'il diffuse.
+
+#### 4.23.5 Qui voit quoi
+
+- **Figurent au trombinoscope** : les adhérents de la saison en cours — compte actif et accès athlète non suspendu (§4.4), ou rôle `coach` / `admin`. Un adhérent non renouvelé en disparaît dès la bascule de saison, sans perdre ses accords s'il revient.
+- **Le consultent** : ces mêmes adhérents, plus les parents garants d'un adhérent de la saison (ils accompagnent leurs enfants aux courses).
+- **Coordonnées masquées aux comptes mineurs** : un adolescent en P2 voit les visages, les rôles et les anniversaires, jamais un email ou un téléphone.
+- **Pas d'export** du trombinoscope, ni de l'annuaire, ni aucune liste de coordonnées — y compris pour l'admin.
+
+#### 4.23.6 Écrans
+
+- **Trombinoscope** (entrée de navigation membre, mobile et desktop) : grille de cartes — photo ou initiales, prénom NOM, badges de rôle, fonction au bureau. Recherche par nom ; filtres **Tous / Bureau / Coachs** ; vue **Anniversaires** par mois (mois courant par défaut), limitée aux accords donnés.
+- **Fiche** d'un adhérent (au toucher d'une carte) : la même chose en grand, plus les coordonnées partagées sous forme de liens d'appel et d'écriture (`tel:` / `mailto:`).
+- **Accueil** : bloc **« Anniversaires de la semaine »** (jour et prénom), **masqué s'il est vide**.
+- **Profil** : onglet « Trombinoscope » — aperçu de sa propre carte telle que les autres la voient, dépôt de la photo, les quatre accords, saisie du téléphone.
+
+#### 4.23.7 Hors périmètre
+
+- Notification le jour d'un anniversaire.
+- Photo affichée ailleurs que dans le trombinoscope (listes d'inscrits, débriefs).
+- Messagerie ou mise en relation dans l'app, organisation du covoiturage (cf. §3.2).
+- Diffusion vers l'extérieur du club, impression, export.
+
 ---
 
 ## 5. Modèle conceptuel (entités et relations)
@@ -1216,7 +1272,7 @@ Vue logique des entités. **Volontairement agnostique** à la techno de stockage
 
 ### 5.1 Entités principales
 
-- **`User`** : `firstName`, `lastName`, `email?` (nullable en P1), `dob`, `isActive`, `athleteAccessSuspended` (booléen — suspend la capacité d'inscription comme athlète, séparé de `isActive`), `deletionRequestedAt?` (timestamp — posé au déclenchement du flow §4.3, remis à `null` à l'annulation), `isMinor` (**dérivé de `dob`**, jamais saisi ni figé : la minorité change d'elle-même au 18ᵉ anniversaire), `roles[]` (`athlete` / `coach` / `admin` cumulables). Lien optionnel `0..1` vers le parent garant. **Pas de stockage du n° de licence FFTri** (RGPD).
+- **`User`** : `firstName`, `lastName`, `email?` (nullable en P1), `dob`, `isActive`, `athleteAccessSuspended` (booléen — suspend la capacité d'inscription comme athlète, séparé de `isActive`), `deletionRequestedAt?` (timestamp — posé au déclenchement du flow §4.3, remis à `null` à l'annulation), `isMinor` (**dérivé de `dob`**, jamais saisi ni figé : la minorité change d'elle-même au 18ᵉ anniversaire), `roles[]` (`athlete` / `coach` / `admin` cumulables), `boardRole?` (fonction au bureau, liste fixe §4.23.3), `photo?` (référence stockage objets, présente seulement sous accord), `phone?` (présent seulement sous accord, §4.23.2). Lien optionnel `0..1` vers le parent garant. **Pas de stockage du n° de licence FFTri** (RGPD).
 - **`Category`** : `label`, `ageMin`, `ageMax` (inclusives), `sortOrder`, `archivedAt?`. Pas de chevauchement entre catégories actives.
 - **`UserCategory`** (M:N) : un `User` ↔ une ou plusieurs `Category`. Une catégorie est dite « principale » (dérivée auto, surclassable).
 - **`Session`** :
@@ -1244,6 +1300,7 @@ Vue logique des entités. **Volontairement agnostique** à la techno de stockage
 - **`Debrief`** : `id`, `sessionId` (FK, `kind = competition` en V1), `authorId` (FK User, immuable, anonymisable), `contentMarkdown` (texte enrichi WYSIWYG §4.12.1), `createdAt`, `updatedAt`, `archivedAt?` / `archivedBy?` (soft-delete admin). **Unicité `(sessionId, authorId)`** — au plus 1 débrief par membre et par compétition. Cardinalité par séance : `0..N`. Nom d'entité volontairement **générique** (pas spécifique à la compétition) pour rester réutilisable, même si le périmètre V1 se limite à `kind = competition` (cf. §4.12.5).
 - **`DebriefReaction`** : `id`, `debriefId` (FK), `userId` (FK User, effacée avec le compte), `createdAt`. **Unicité `(debriefId, userId)`** — un « j'aime » par membre et par débrief (cf. §4.12.5).
 - **`InformationPage`** (note club, §4.19) : `id`, `title`, `contentMarkdown?` (texte enrichi WYSIWYG §4.12.1), `visibility` (`all` / `coach` / `admin` — niveau minimum cumulatif), `pinned` (épinglée en bannière d'accueil), `createdBy` (FK User, anonymisable), `createdAt`, `updatedAt`, `archivedAt?` / `archivedBy?` (soft-delete admin). Édition admin uniquement. Ajout de périmètre post-cadrage.
+- **`Consent`** (§4.23) : `userId` (la personne concernée), `type` (`trombi_photo` / `trombi_birthday` / `trombi_email` / `trombi_phone`), `version` (du texte présenté), `grantedAt`, `grantedBy` (l'intéressé, ou son parent garant), `revokedAt?`, `revokedBy?`. Un accord est **actif** s'il n'est pas révoqué et porte la version courante. Les lignes révoquées restent comme preuve ; toutes sont effacées avec le compte. Registre générique, réutilisable par d'autres accords (#71).
 - **`ClubSettings`** (singleton) : `name`, `logo`, `primaryColor`, `timezone`, `invitationLinkDays`, etc.
 - **`NotificationPreferences`** (rattachée à un `User`) : matrice `type × canal` + flag pause globale.
 
@@ -1251,7 +1308,7 @@ Vue logique des entités. **Volontairement agnostique** à la techno de stockage
 - Le statut `participating` est **uniforme sur les 3 `kind`**. La distinction engagement ferme vs intention déclarée est portée par `Session.kind` + l'absence de `quotaTagId` + capacité optionnelle pour competition/club_event — **pas par la valeur de `status`**. Pas d'entité `Competition` ni `ClubEvent` séparée.
 - Pas d'entité `Attendance` en V1 (pas de pointage formel).
 - Pas de notion de tenant ni d'isolation multi-club.
-- Pas de stockage de téléphone, ni de certificat médical (minimisation RGPD).
+- Pas de stockage de certificat médical (minimisation RGPD). Le téléphone n'existe que partagé au trombinoscope (§4.23.2).
 - `AuditLog` et `ActivityLog` sont deux entités séparées — pas de relation directe (jointure éventuelle via `sessionId` ou via le marqueur anonymisé).
 - **Cycle de vie compte mineur** : en P1, le `User` enfant existe en base **sans credential** et avec `email` nul. La transition P1→P2 crée le credential et renseigne l'email. La transition P2→P3 rompt le lien de tutelle, mais le `User` athlète et son historique restent intacts.
 - **Règle d'accès clé** : un parent doit pouvoir lire et écrire sur les `Registration` de tout `User` enfant dont il est garant (sans quoi il ne peut pas agir en P1 ni P2). À formaliser dans le moteur de règles d'accès choisi au cadrage technique.
@@ -1266,7 +1323,7 @@ Vue logique des entités. **Volontairement agnostique** à la techno de stockage
 | **Hébergement** | **UE obligatoire** pour le stockage de toutes les données utilisateurs et leurs sauvegardes (RGPD). Région privilégiée : Paris (sinon Francfort ou équivalent UE). |
 | **Distribution** | **AGPL-3.0 self-hosting un-instance-par-club.** Pas de multi-tenant. |
 | **Sécurité** | Contrôle d'accès appliqué côté backend (pas seulement client). Toute donnée a ses règles d'accès définies dès sa première migration en production. |
-| **RGPD** | Données UE. Suppression de compte = anonymisation des inscriptions et des débriefs (auteur anonymisé, texte conservé — cf. §4.12.5) ; les réactions « j'aime » sont effacées. Pas de stockage santé (certif médical exclu) ni de téléphone (minimisation). Mentions légales / CGU accessibles depuis le footer (rédaction différée pré-prod). |
+| **RGPD** | Données UE. Suppression de compte = anonymisation des inscriptions et des débriefs (auteur anonymisé, texte conservé — cf. §4.12.5) ; les réactions « j'aime » sont effacées. Pas de stockage santé (certif médical exclu) ; téléphone et photo seulement sur accord révocable, effacés au retrait et avec le compte (§4.23). Mentions légales / CGU accessibles depuis le footer (rédaction différée pré-prod). |
 | **Conservation** | Pas de purge auto, conservation indéfinie. Monitoring du volume de stockage. |
 | **Performance** | Chargement initial < 2s sur 4G. Planning quasi-instantané après mise en cache. **Évaluation du quota en temps quasi-constant** à l'inscription (cf. §4.10). |
 | **Sérialisation des inscriptions** | Sur la dernière place, deux inscriptions concurrentes sérialisées atomiquement sur timestamp serveur. Premier = `participating`, second = `waitlist capacity`. **Pas de double-acceptation, jamais.** Implémentation libre. À garantir par tests E2E. |
