@@ -96,7 +96,7 @@ Remplacer le tableur Google Sheets actuel par une **PWA** qui offre aux adhéren
 - Plusieurs tags de quota par séance.
 - Récap hebdomadaire email.
 - Apple Sign-In.
-- Stockage du certificat médical (minimisation RGPD). Le téléphone n'est stocké que partagé volontairement au trombinoscope, et effacé au retrait de l'accord (§4.23.2).
+- Stockage du certificat médical (minimisation RGPD). Le téléphone n'est stocké que saisi volontairement par l'adhérent pour le trombinoscope, et jamais employé à autre chose (§4.23.2).
 - Compteur / classement public d'apéros offerts.
 - Débrief sur `training` / `club_event` (V1 = compétition uniquement).
 - Commentaires / fil de discussion sous un débrief (la réaction « j'aime » est en V1, §4.12.5).
@@ -1218,7 +1218,11 @@ Deux gestes distincts, livrés séparément.
 
 - **Quatre accords distincts**, chacun activable et **révocable à tout moment, sans conséquence** depuis le profil : **photo**, **anniversaire**, **email**, **téléphone**. Aucun n'est pré-coché, aucun n'est demandé pour s'inscrire aux séances, aucun ne se donne pour un tiers — hors le parent garant pour son enfant (§4.23.4).
 - **Sans accord, l'adhérent figure quand même** au trombinoscope avec ce que les membres voient déjà sur les listes d'inscrits (§4.9.4) : nom, prénom, initiales à la place de la photo, rôles. Rien d'autre.
-- **Le retrait est immédiat** : la donnée disparaît de l'écran au chargement suivant, la photo est effacée du stockage, le numéro de téléphone est effacé de la base. Aucune copie n'est conservée.
+- **Retirer un accord masque, supprimer efface** — deux gestes distincts :
+  - **retrait** : la donnée disparaît de l'écran des autres au chargement suivant. La photo et le numéro restent dans le profil, **visibles de l'adhérent seul** (ni des autres membres, ni du bureau, ni de l'admin) ; réactiver l'accord les réaffiche sans rien ressaisir ;
+  - **suppression** : bouton propre à la photo et au numéro, toujours disponible, qui efface la donnée du stockage. Retirer d'abord l'accord n'est pas requis.
+- **Conservation d'une donnée masquée** : tant que l'adhérent fait partie du club. À la bascule de saison, la photo et le numéro de qui **n'a pas réadhéré de toute la saison écoulée** sont effacés, et ses accords révoqués (§4.4) — un retour l'année suivante ne fait rien ressaisir, un départ durable ne laisse rien derrière lui.
+- **Effacement immédiat** sans passer par le masquage : photo retirée par l'admin (modération), suppression du compte (§4.3).
 - **L'admin, pour la maintenance**, depuis la fiche adhérent (§4.17.1) :
   - **retirer** n'importe quel accord, à la demande de l'adhérent quel que soit le canal (oral, email) — le club doit honorer un retrait, d'où qu'il vienne ;
   - **enregistrer** un accord recueilli hors de l'app (case du bulletin d'adhésion), **source obligatoire** (« bulletin d'adhésion 2027 »). Pour un mineur, seul un accord du parent garant peut être enregistré. L'adhérent (le parent pour un enfant) reçoit un message qui lui dit ce qui a été enregistré et comment le retirer ;
@@ -1231,7 +1235,7 @@ Deux gestes distincts, livrés séparément.
 - **Photo** : déposée par l'adhérent lui-même (par le parent garant pour un enfant, §4.23.4), depuis son profil. JPEG, PNG ou WebP, ≤ 5 Mo à l'envoi ; recadrée au carré et réduite à la taille d'affichage. **Toutes les métadonnées du fichier sont supprimées** (dont la géolocalisation de la prise de vue). Servie aux seuls membres autorisés à la voir, jamais par une URL publique. Une seule photo par adhérent ; en déposer une nouvelle remplace l'ancienne.
 - **Anniversaire** : **jour et mois seuls**. Ni l'année, ni l'âge ne sont jamais affichés.
 - **Email** : l'email du compte (§4.1), sans champ supplémentaire.
-- **Téléphone** : **champ facultatif saisi par l'adhérent, qui n'existe que pour être partagé** — il est saisi en même temps que l'accord et effacé avec lui. Ce n'est pas un contact d'urgence (géré par le bureau seul, cf. #71) et il ne sert à aucun envoi de l'application.
+- **Téléphone** : **champ facultatif saisi par l'adhérent, pour le seul trombinoscope** — affiché aux autres sous accord, à lui seul sinon (§4.23.1). Ce n'est pas un contact d'urgence (géré par le bureau seul, cf. #71) et il ne sert à aucun envoi de l'application.
 
 #### 4.23.3 Données affichées sans accord
 
@@ -1277,7 +1281,7 @@ Vue logique des entités. **Volontairement agnostique** à la techno de stockage
 
 ### 5.1 Entités principales
 
-- **`User`** : `firstName`, `lastName`, `email?` (nullable en P1), `dob`, `isActive`, `athleteAccessSuspended` (booléen — suspend la capacité d'inscription comme athlète, séparé de `isActive`), `deletionRequestedAt?` (timestamp — posé au déclenchement du flow §4.3, remis à `null` à l'annulation), `isMinor` (**dérivé de `dob`**, jamais saisi ni figé : la minorité change d'elle-même au 18ᵉ anniversaire), `roles[]` (`athlete` / `coach` / `admin` cumulables), `boardRole?` (fonction au bureau, liste fixe §4.23.3), `photo?` (référence stockage objets, présente seulement sous accord), `phone?` (présent seulement sous accord, §4.23.2). Lien optionnel `0..1` vers le parent garant. **Pas de stockage du n° de licence FFTri** (RGPD).
+- **`User`** : `firstName`, `lastName`, `email?` (nullable en P1), `dob`, `isActive`, `athleteAccessSuspended` (booléen — suspend la capacité d'inscription comme athlète, séparé de `isActive`), `deletionRequestedAt?` (timestamp — posé au déclenchement du flow §4.3, remis à `null` à l'annulation), `isMinor` (**dérivé de `dob`**, jamais saisi ni figé : la minorité change d'elle-même au 18ᵉ anniversaire), `roles[]` (`athlete` / `coach` / `admin` cumulables), `boardRole?` (fonction au bureau, liste fixe §4.23.3), `photo?` (référence stockage objets), `phone?` — tous deux déposés par l'adhérent, affichés aux autres sous accord seulement (§4.23.1). Lien optionnel `0..1` vers le parent garant. **Pas de stockage du n° de licence FFTri** (RGPD).
 - **`Category`** : `label`, `ageMin`, `ageMax` (inclusives), `sortOrder`, `archivedAt?`. Pas de chevauchement entre catégories actives.
 - **`UserCategory`** (M:N) : un `User` ↔ une ou plusieurs `Category`. Une catégorie est dite « principale » (dérivée auto, surclassable).
 - **`Session`** :
@@ -1313,7 +1317,7 @@ Vue logique des entités. **Volontairement agnostique** à la techno de stockage
 - Le statut `participating` est **uniforme sur les 3 `kind`**. La distinction engagement ferme vs intention déclarée est portée par `Session.kind` + l'absence de `quotaTagId` + capacité optionnelle pour competition/club_event — **pas par la valeur de `status`**. Pas d'entité `Competition` ni `ClubEvent` séparée.
 - Pas d'entité `Attendance` en V1 (pas de pointage formel).
 - Pas de notion de tenant ni d'isolation multi-club.
-- Pas de stockage de certificat médical (minimisation RGPD). Le téléphone n'existe que partagé au trombinoscope (§4.23.2).
+- Pas de stockage de certificat médical (minimisation RGPD). Le téléphone ne sert qu'au trombinoscope (§4.23.2).
 - `AuditLog` et `ActivityLog` sont deux entités séparées — pas de relation directe (jointure éventuelle via `sessionId` ou via le marqueur anonymisé).
 - **Cycle de vie compte mineur** : en P1, le `User` enfant existe en base **sans credential** et avec `email` nul. La transition P1→P2 crée le credential et renseigne l'email. La transition P2→P3 rompt le lien de tutelle, mais le `User` athlète et son historique restent intacts.
 - **Règle d'accès clé** : un parent doit pouvoir lire et écrire sur les `Registration` de tout `User` enfant dont il est garant (sans quoi il ne peut pas agir en P1 ni P2). À formaliser dans le moteur de règles d'accès choisi au cadrage technique.
@@ -1328,7 +1332,7 @@ Vue logique des entités. **Volontairement agnostique** à la techno de stockage
 | **Hébergement** | **UE obligatoire** pour le stockage de toutes les données utilisateurs et leurs sauvegardes (RGPD). Région privilégiée : Paris (sinon Francfort ou équivalent UE). |
 | **Distribution** | **AGPL-3.0 self-hosting un-instance-par-club.** Pas de multi-tenant. |
 | **Sécurité** | Contrôle d'accès appliqué côté backend (pas seulement client). Toute donnée a ses règles d'accès définies dès sa première migration en production. |
-| **RGPD** | Données UE. Suppression de compte = anonymisation des inscriptions et des débriefs (auteur anonymisé, texte conservé — cf. §4.12.5) ; les réactions « j'aime » sont effacées. Pas de stockage santé (certif médical exclu) ; téléphone et photo seulement sur accord révocable, effacés au retrait et avec le compte (§4.23). Mentions légales / CGU accessibles depuis le footer (rédaction différée pré-prod). |
+| **RGPD** | Données UE. Suppression de compte = anonymisation des inscriptions et des débriefs (auteur anonymisé, texte conservé — cf. §4.12.5) ; les réactions « j'aime » sont effacées. Pas de stockage santé (certif médical exclu) ; téléphone et photo déposés par l'adhérent, diffusés sur accord révocable, effacés à sa demande, à son départ du club et avec le compte (§4.23). Mentions légales / CGU accessibles depuis le footer (rédaction différée pré-prod). |
 | **Conservation** | Pas de purge auto, conservation indéfinie. Monitoring du volume de stockage. |
 | **Performance** | Chargement initial < 2s sur 4G. Planning quasi-instantané après mise en cache. **Évaluation du quota en temps quasi-constant** à l'inscription (cf. §4.10). |
 | **Sérialisation des inscriptions** | Sur la dernière place, deux inscriptions concurrentes sérialisées atomiquement sur timestamp serveur. Premier = `participating`, second = `waitlist capacity`. **Pas de double-acceptation, jamais.** Implémentation libre. À garantir par tests E2E. |
