@@ -34,8 +34,10 @@ class MemberUiTest extends TestCase
     public function test_list_search_and_access_filter(): void
     {
         $admin = User::factory()->admin()->create(['first_name' => 'Admin', 'last_name' => 'Bureau']);
-        User::factory()->create(['first_name' => 'Camille', 'last_name' => 'Durand', 'athlete_access_suspended' => false]);
-        User::factory()->create(['first_name' => 'Léo', 'last_name' => 'Martin', 'athlete_access_suspended' => true]);
+        // Emails fixés : la recherche porte aussi sur l'email, et Faker en tirait parfois un contenant
+        // « durand » pour Léo — le filtre « Durand » le gardait alors, une fois sur N.
+        User::factory()->create(['first_name' => 'Camille', 'last_name' => 'Durand', 'email' => 'camille@exemple.test', 'athlete_access_suspended' => false]);
+        User::factory()->create(['first_name' => 'Léo', 'last_name' => 'Martin', 'email' => 'leo@exemple.test', 'athlete_access_suspended' => true]);
 
         Livewire::actingAs($admin)->test(MemberList::class)
             ->set('search', 'Durand')
