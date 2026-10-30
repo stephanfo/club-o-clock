@@ -25,6 +25,7 @@
             'alerts' => 'alerts',
             'planning' => 'planning',
             'gpx-routes.*' => 'parcours',
+            'trombi*' => 'trombi',
             'children' => 'children',
             'infos' => 'infos',
             'dashboard' => 'home',
@@ -42,6 +43,7 @@
         $isAdmin = $u?->hasRole('admin');
         // Parent garant (§4.2) : relation, pas un rôle — l'entrée « Mes enfants » n'apparaît qu'à lui.
         $isGuardian = $u && \App\Support\SubjectContext::isGuardian($u);
+        $canTrombi = $u && app(\App\Policies\TrombiPolicy::class)->consult($u);
         // Badge alertes non lues (revue UX 2026-07-11) — sidebar desktop. Le layout ne re-rend pas
         // sur une action Livewire, MAIS le seul geste qui marque des alertes lues est l'ouverture
         // de la page Alertes (Alerts::mount), une navigation pleine page qui reconstruit ce layout
@@ -68,6 +70,13 @@
                 <a href="{{ route('gpx-routes.index') }}" wire:navigate class="dk-navitem {{ $active === 'parcours' ? 'on' : '' }}">
                     <x-icon name="route" /> Parcours
                 </a>
+                {{-- Trombinoscope (#72) : barre latérale seulement. Sur mobile, la barre du bas reste à
+                     six entrées au plus ; l'accès passe par l'accueil et le profil (PRD §4.23.6). --}}
+                @if ($canTrombi)
+                    <a href="{{ route('trombi') }}" wire:navigate class="dk-navitem {{ $active === 'trombi' ? 'on' : '' }}">
+                        <x-icon name="users" /> Trombinoscope
+                    </a>
+                @endif
                 <a href="{{ route('alerts') }}" wire:navigate class="dk-navitem {{ $active === 'alerts' ? 'on' : '' }}">
                     <x-icon name="bell" /> Alertes
                     <x-alert-badge :count="$unreadAlerts" :size="18" />

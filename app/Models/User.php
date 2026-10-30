@@ -372,6 +372,20 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Consent::class)->whereNull('revoked_at');
     }
 
+    /**
+     * Adhérents de la saison, en SQL — miroir de TrombiPolicy::figures() (PRD §4.23.5).
+     *
+     * @param  Builder<User>  $query
+     */
+    public function scopeAuTrombinoscope(Builder $query): void
+    {
+        $query->whereNull('anonymized_at')->where('is_active', true)
+            ->where(fn (Builder $q) => $q
+                ->where(fn (Builder $a) => $a->whereJsonContains('roles', 'athlete')->where('athlete_access_suspended', false))
+                ->orWhereJsonContains('roles', 'coach')
+                ->orWhereJsonContains('roles', 'admin'));
+    }
+
     /** Accord actif (non révoqué, version courante) pour ce type. */
     public function hasConsent(ConsentType $type): bool
     {
