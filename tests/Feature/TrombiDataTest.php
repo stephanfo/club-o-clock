@@ -100,6 +100,38 @@ class TrombiDataTest extends TestCase
         $this->assertCount(2, Storage::disk('local')->allFiles('trombi'), 'L\'original n\'est pas conservé.');
     }
 
+    /** Couleur dominante du centre de la vignette 192 : 'rouge' ou 'bleu'. */
+    private function centre(User $u): string
+    {
+        $c = imagecolorsforindex($img = $this->decoded($u->refresh(), 192), imagecolorat($img, 96, 96));
+
+        return $c['red'] > $c['blue'] ? 'rouge' : 'bleu';
+    }
+
+    public function test_cadrage_choisi_au_depot_rectangle_et_quart_de_tour(): void
+    {
+        $u = User::factory()->create();
+        $photo = fn (?array $crop) => $this->service()->storePhoto($u, $this->tmp($this->jpeg()), $u, $crop);
+
+        // 400×200, rouge | bleu : le carré de droite.
+        $photo(['x' => 0.5, 'y' => 0.0, 's' => 1.0, 'r' => 0]);
+        $this->assertSame('bleu', $this->centre($u));
+        $photo(['x' => 0.0, 'y' => 0.0, 's' => 1.0, 'r' => 0]);
+        $this->assertSame('rouge', $this->centre($u));
+
+        // Quart de tour horaire : 200×400, le rouge (gauche) passe en haut.
+        $photo(['x' => 0.0, 'y' => 0.0, 's' => 1.0, 'r' => 90]);
+        $this->assertSame('rouge', $this->centre($u));
+        $photo(['x' => 0.0, 'y' => 0.5, 's' => 1.0, 'r' => 90]);
+        $this->assertSame('bleu', $this->centre($u));
+
+        // Hors bornes : le serveur ramène le carré dans l'image (ici, tout à droite).
+        $photo(['x' => 0.9, 'y' => 5.0, 's' => 3.0, 'r' => 0]);
+        $this->assertSame('bleu', $this->centre($u));
+        $this->assertSame([192, 192], [imagesx($img = $this->decoded($u, 192)), imagesy($img)]);
+        $this->assertCount(2, Storage::disk('local')->allFiles('trombi'), 'Chaque dépôt remplace le précédent.');
+    }
+
     public function test_formats_et_tailles_refuses(): void
     {
         $u = User::factory()->create();

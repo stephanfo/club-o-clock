@@ -6,6 +6,7 @@ use App\Livewire\TrombiSettings;
 use App\Models\Consent;
 use App\Models\User;
 use App\Services\ConsentService;
+use App\Services\TrombiService;
 use App\Support\Trombi\ConsentType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -80,6 +81,34 @@ class TrombiSettingsTest extends TestCase
             ->set('photo', UploadedFile::fake()->image('lourde.jpg', 300, 300)->size(6000))
             ->assertHasErrors('photo');
         $this->assertSame([], $tmp(), 'Un envoi refusé ne reste pas non plus.');
+    }
+
+    public function test_le_cadrage_du_dialog_part_avec_la_photo_et_est_valide_cote_serveur(): void
+    {
+        $u = User::factory()->create();
+        $image = function () {
+            $f = UploadedFile::fake()->image('moi.jpg', 400, 200);
+            $img = imagecreatetruecolor(400, 200);
+            imagefilledrectangle($img, 200, 0, 399, 199, (int) imagecolorallocate($img, 0, 0, 255));
+            imagejpeg($img, $f->getRealPath());
+
+            return $f;
+        };
+
+        Livewire::actingAs($u)->test(TrombiSettings::class, ['subjectId' => $u->id])
+            ->set('crop', ['x' => 0.5, 'y' => 0, 's' => 1, 'r' => 0])
+            ->set('photo', $image())
+            ->assertHasNoErrors()->assertSet('crop', []);
+        $thumb = imagecreatefromstring(Storage::disk('local')->get(TrombiService::photoFile($u->fresh(), 192)));
+        $this->assertGreaterThan(200, imagecolorsforindex($thumb, imagecolorat($thumb, 96, 96))['blue'], 'Le carré de droite (bleu) est gardé.');
+
+        $before = $u->fresh()->photo_path;
+        Livewire::actingAs($u)->test(TrombiSettings::class, ['subjectId' => $u->id])
+            ->set('crop', ['x' => 0, 'y' => 0, 's' => 1, 'r' => 45])
+            ->set('photo', $image())
+            ->assertHasErrors('crop.r');
+        $this->assertSame($before, $u->fresh()->photo_path, 'Cadrage refusé : la photo en place ne change pas.');
+        $this->assertSame([], FileUploadConfiguration::storage()->allFiles(FileUploadConfiguration::path()));
     }
 
     public function test_pas_de_reglages_pour_un_tiers(): void

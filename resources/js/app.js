@@ -15,3 +15,5 @@ import './planning';
 import './push';
 // Barre de navigation basse décollée en PWA iOS après rotation ou reprise, et panneau ?diag=viewport (#42).
 import './viewport';
+// Trombinoscope : dialog de recadrage de la photo au dépôt (#72).
+import './photo-crop';

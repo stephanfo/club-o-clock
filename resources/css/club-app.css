@@ -787,6 +787,12 @@ textarea.input { resize: vertical; min-height: 70px; line-height: 1.5; }
 .trombi-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
 .trombi-bday { display: flex; align-items: center; gap: 12px; }
 .trombi-bday-day { font-family: var(--font-display); font-weight: 800; font-size: var(--text-xl); width: 34px; text-align: center; flex: 0 0 auto; }
+/* Recadrage de la photo au dépôt (#72) : cadre carré, image déplaçable dessous, cercle de l'avatar
+   par-dessus (l'ombre géante assombrit ce qui sera coupé). */
+.crop-stage { position: relative; width: 100%; max-width: 300px; aspect-ratio: 1; margin: 0 auto; overflow: hidden; border-radius: var(--radius-md); background: var(--ink); touch-action: none; cursor: grab; user-select: none; }
+.crop-stage:active { cursor: grabbing; }
+.crop-img { position: absolute; left: 50%; top: 50%; max-width: none; pointer-events: none; }
+.crop-mask { position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 999px rgba(10,10,10,0.55); outline: 2px solid var(--paper); outline-offset: -2px; pointer-events: none; }
 
 /* Grille de chips en 8 valeurs : rose des vents (N NE E SE / S SO O NO) et tranches de distance.
    4 colonnes sur mobile, 8 dès qu'il y a la place — un flex wrap laisserait une dernière ligne

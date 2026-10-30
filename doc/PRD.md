@@ -1267,7 +1267,7 @@ Ces informations relèvent du fonctionnement de l'association, pas de la vie pri
 - **Fiche** d'un adhérent (au toucher d'une carte) : la même chose en grand, plus les coordonnées partagées sous forme de liens d'appel et d'écriture (`tel:` / `mailto:`).
 - **Accueil** : bloc **« Anniversaires de la semaine »** (jour et prénom), **masqué s'il est vide**.
 - **Listes d'inscrits** d'une séance (§4.9.4) : la photo à côté du nom, sous les mêmes accords et pour les mêmes lecteurs que le trombinoscope — un coach reconnaît les nouveaux de sa séance.
-- **Profil** : onglet « Trombinoscope » — aperçu de sa propre carte telle que les autres la voient, dépôt de la photo, les six accords et l'interrupteur « Tout », saisie du téléphone.
+- **Profil** : onglet « Trombinoscope » — aperçu de sa propre carte telle que les autres la voient, dépôt de la photo, les six accords et l'interrupteur « Tout », saisie du téléphone. Le dépôt ouvre toujours un **recadrage** dans le cercle de l'avatar — déplacer, zoomer, pivoter d'un quart de tour —, déjà cadré comme le ferait l'application seule ; rien n'est envoyé avant validation. L'original n'étant pas gardé, recadrer une photo en place, c'est la déposer à nouveau.
 
 #### 4.23.7 Hors périmètre
 

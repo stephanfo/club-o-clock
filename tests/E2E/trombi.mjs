@@ -3,7 +3,8 @@
 //
 // NON destructif : le seul accord posé (T4) est retiré dans le même scénario, et ses lignes du
 // registre et du journal sont effacées par leur id.
-import { launch, session, fiche, sql, seance, repereJournaux, purgeJournaux, Scenario, MOBILE, DESKTOP, BASE } from './lib.mjs';
+import { execFileSync } from 'node:child_process';
+import { launch, session, fiche, sql, seance, repereJournaux, purgeJournaux, Scenario, MOBILE, DESKTOP, BASE, SHOTS } from './lib.mjs';
 
 const browser = await launch();
 const tous = [];
@@ -205,6 +206,60 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   s.check('l’admin voit que la photo et le numéro existent', (await page.locator('.mc-show-grid').innerText()).includes('Photo : déposée · Téléphone : saisi'));
   s.check('mais ne voit ni le numéro ni la photo', !html.includes('39 98 01 12') && !html.includes('trombi-photo'));
   s.checkJs(page);
+  tous.push(s.report());
+  await ctx.close();
+}
+
+// ── T8 · Recadrage au dépôt : Lucas garde la moitié ROUGE d'une photo rouge | bleu ──
+// La photo est fabriquée par GD (paysage 600×300 : rouge à gauche, bleu à droite). Sans toucher, le
+// recadrage automatique la centrerait sur la frontière ; on glisse vers la droite pour ne garder que
+// le rouge, et c'est la vignette STOCKÉE (relue par le navigateur) qui doit être rouge.
+for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
+  const s = new Scenario(`T8 · Recadrer sa photo au dépôt (${format})`);
+  const fichier = `${SHOTS}rouge-bleu.png`;
+  execFileSync('php', ['-r', `$i=imagecreatetruecolor(600,300);imagefilledrectangle($i,0,0,299,299,imagecolorallocate($i,220,30,30));imagefilledrectangle($i,300,0,599,299,imagecolorallocate($i,30,60,220));imagepng($i,'${fichier}');`]);
+  const lucas = id('lucas@demo.club');
+  const repere = repereJournaux();
+  s.check('contrôle : Lucas sans photo au départ', sql(`SELECT IFNULL(photo_path,'') FROM users WHERE id=${lucas}`) === '');
+
+  const { ctx, page } = await session(browser, 'lucas@demo.club', viewport);
+  page.on('dialog', d => d.accept()); // wire:confirm de la suppression finale
+  await page.goto(BASE + '/profil?tab=trombi', { waitUntil: 'networkidle' });
+  await page.locator('input[type=file]:visible, label:visible input[type=file]').first().setInputFiles(fichier);
+  const stage = page.locator('.crop-stage:visible');
+  await stage.waitFor();
+  await page.waitForFunction(() => [...document.querySelectorAll('.crop-img')].some(i => i.offsetParent && i.complete && i.naturalWidth));
+  s.check('le dialog s’ouvre, rien n’est encore envoyé', sql(`SELECT IFNULL(photo_path,'') FROM users WHERE id=${lucas}`) === '');
+  await s.shot(page, `trombi-recadrage-${format}`);
+
+  const box = await stage.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 1.5, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await page.getByRole('button', { name: 'Valider' }).click();
+  await page.waitForFunction(() => !document.querySelector('.crop-stage'), null, { timeout: 15000 });
+  await attendre(page);
+  const path = sql(`SELECT IFNULL(photo_path,'') FROM users WHERE id=${lucas}`);
+  s.check('photo enregistrée après « Valider »', path !== '');
+
+  // Couleur du centre de la vignette 192 servie par l'app.
+  const rgb = await page.evaluate(async (url) => {
+    const blob = await (await fetch(url)).blob();
+    const bmp = await createImageBitmap(blob);
+    const c = new OffscreenCanvas(bmp.width, bmp.height);
+    const g = c.getContext('2d');
+    g.drawImage(bmp, 0, 0);
+    return [...g.getImageData(bmp.width / 2, bmp.height / 2, 1, 1).data].slice(0, 3);
+  }, `${BASE}/trombi-photo/${lucas}/192`);
+  s.check('la vignette est la partie choisie (rouge)', rgb[0] > 150 && rgb[2] < 100, rgb.join(','));
+  s.checkJs(page);
+
+  // Restauration : la photo repart par l'interface, comme Lucas le ferait.
+  await page.locator('button:visible', { hasText: /Supprimer/ }).first().click();
+  await attendre(page);
+  s.check('restauré : Lucas sans photo', sql(`SELECT IFNULL(photo_path,'') FROM users WHERE id=${lucas}`) === '');
+  purgeJournaux(repere);
   tous.push(s.report());
   await ctx.close();
 }

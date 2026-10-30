@@ -61,14 +61,22 @@ class TrombiService
      * Dépose (ou remplace) la photo : recadrée au carré, réencodée en WebP par GD. Le réencodage
      * ne recopie AUCUNE métadonnée — l'EXIF, géolocalisation comprise, disparaît par construction.
      * L'original n'est jamais conservé.
+     *
+     * $crop : le cadrage choisi dans le dialog du profil, sinon le recadrage automatique. Exprimé
+     * sur l'image REDRESSÉE (orientation EXIF, comme l'affiche le navigateur) puis tournée de `r`
+     * degrés dans le sens horaire : `x`, `y` = coin haut gauche en fraction de la largeur et de la
+     * hauteur, `s` = côté en fraction du petit côté. Le serveur borne tout : le navigateur ne fait
+     * que proposer un rectangle, le recadrage et le réencodage restent ici.
+     *
+     * @param  array{x:float,y:float,s:float,r:int}|null  $crop
      */
-    public function storePhoto(User $subject, string $file, User $actor): void
+    public function storePhoto(User $subject, string $file, User $actor, ?array $crop = null): void
     {
         if (! $this->canEdit($actor, $subject)) {
             throw new RuntimeException('Tu ne peux pas déposer de photo pour ce compte.');
         }
 
-        $encoded = $this->process($file);
+        $encoded = $this->process($file, $crop);
         $base = 'trombi/'.Str::random(40);
         foreach ($encoded as $size => $bytes) {
             Storage::disk(self::DISK)->put("{$base}-{$size}.webp", $bytes);
@@ -204,9 +212,10 @@ class TrombiService
     /**
      * Contrôle, décode, redresse, recadre et réencode.
      *
+     * @param  array{x:float,y:float,s:float,r:int}|null  $crop
      * @return array<int, string> [taille => octets WebP]
      */
-    private function process(string $file): array
+    private function process(string $file, ?array $crop): array
     {
         $bytes = @filesize($file);
         if ($bytes === false || $bytes > self::MAX_BYTES) {
@@ -238,12 +247,28 @@ class TrombiService
             $image = $this->orient($image, $file);
         }
 
+        $rotation = $crop['r'] ?? 0;
+        if ($rotation !== 0) {
+            // imagerotate tourne dans le sens TRIGONOMÉTRIQUE : le quart de tour horaire est -90.
+            $image = imagerotate($image, -$rotation, 0) ?: $image;
+        }
+
         $w = imagesx($image);
         $h = imagesy($image);
-        $side = min($w, $h);
-        $srcX = intdiv($w - $side, 2);
-        // Portrait : calé sur le tiers supérieur, où se trouve le visage.
-        $srcY = intdiv($h - $side, 3);
+        if ($crop === null) {
+            $side = min($w, $h);
+            $srcX = intdiv($w - $side, 2);
+            // Portrait : calé sur le tiers supérieur, où se trouve le visage.
+            $srcY = intdiv($h - $side, 3);
+        } else {
+            // Bornes serveur : un carré d'au moins 5 % du petit côté (et 32 px), tout entier dans l'image.
+            $side = (int) round(max(0.05, min(1.0, $crop['s'])) * min($w, $h));
+            $side = max(min(32, $w, $h), min($side, $w, $h));
+            $srcX = (int) round(max(0.0, min(1.0, $crop['x'])) * $w);
+            $srcY = (int) round(max(0.0, min(1.0, $crop['y'])) * $h);
+            $srcX = min($srcX, $w - $side);
+            $srcY = min($srcY, $h - $side);
+        }
 
         $out = [];
         foreach (self::SIZES as $size) {
