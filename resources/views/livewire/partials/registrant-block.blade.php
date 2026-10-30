@@ -15,8 +15,17 @@
                 @php($label = ($nameLabels[$reg->user_id] ?? null) ?: trim(($reg->user?->first_name ?? '?').' '.($reg->user?->last_name ?? '')))
                 <li class="reg-item">
                     <span class="reg-rank">{{ $i + 1 }}</span>
-                    <x-avatar :name="$label" tint="tint-run" :photo="$photoUrls[$reg->user_id] ?? null" />
-                    <span class="reg-name">{{ $label }}</span>
+                    {{-- Vers la fiche du trombinoscope (§4.23.6) : elle ne montre que ce que la personne
+                         partage. Pas de lien quand le lecteur ne consulte pas le trombinoscope. --}}
+                    @if ($profile = $profileUrls[$reg->user_id] ?? null)
+                        <a href="{{ $profile }}" wire:navigate class="reg-link">
+                            <x-avatar :name="$label" tint="tint-run" :photo="$photoUrls[$reg->user_id] ?? null" />
+                            <span class="reg-name">{{ $label }}</span>
+                        </a>
+                    @else
+                        <x-avatar :name="$label" tint="tint-run" :photo="$photoUrls[$reg->user_id] ?? null" />
+                        <span class="reg-name">{{ $label }}</span>
+                    @endif
                     {{-- Badge override : visible coachs/admins seulement (§4.10.5). --}}
                     @if (($isStaff ?? false) && $reg->override_by)
                         <span class="chip chip-sm chip-ink" @if ($reg->override_reason) title="{{ $reg->override_reason }}" @endif>override</span>

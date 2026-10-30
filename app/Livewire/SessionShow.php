@@ -212,6 +212,8 @@ class SessionShow extends Component
             'nameLabels' => $this->nameLabels(),
             // Vignettes du trombinoscope (§4.23.5) : seulement celles que le lecteur peut voir.
             'photoUrls' => RegistrantDisplay::photos($this->activeRegistrants(), $me),
+            // Nom et vignette mènent à la fiche du trombinoscope, quand le lecteur peut l'ouvrir.
+            'profileUrls' => RegistrantDisplay::profiles($this->activeRegistrants(), $me),
             'aperoPayers' => $aperoPayers,
             'iAmAperoPayer' => $me !== null && $aperoPayers->contains('user_id', $me->id),
             // Le bouton « J'offre » n'apparaît qu'aux inscrits actifs, séance ouverte (§4.14.1/.3).

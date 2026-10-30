@@ -168,7 +168,9 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   const s = new Scenario('T6 · Photos des inscrits sur la fiche séance (desktop)');
   const avecPhoto = `id IN (SELECT r.session_id FROM registrations r JOIN users u ON u.id=r.user_id
       JOIN consents c ON c.user_id=u.id AND c.type='trombi_photo' AND c.revoked_at IS NULL
-      WHERE r.status='participating' AND u.photo_path IS NOT NULL AND u.athlete_access_suspended=0)`;
+      WHERE r.status='participating' AND u.photo_path IS NOT NULL AND u.athlete_access_suspended=0)
+    AND id IN (SELECT r.session_id FROM registrations r JOIN users u ON u.id=r.user_id
+      WHERE r.status='participating' AND u.photo_path IS NULL)`; // et au moins un inscrit sans photo : contrôle des initiales
   // Toute séance à venir (pas seulement un entraînement) : la règle est la même sur les trois kinds.
   const cible = seance(`cancelled_at IS NULL AND start_at > NOW() AND ${avecPhoto}`);
   const { ctx, page } = await session(browser, 'vincent@demo.club', DESKTOP);
@@ -178,6 +180,19 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   s.check('au moins une vignette chargée dans la liste', await imagesChargees(page, '.reg-list img'));
   s.check('contrôle : des inscrits sans photo gardent leurs initiales', await page.locator('.reg-list:visible .avatar:not(.has-photo)').count() > 0);
   await s.shot(page, 'trombi-inscrits-desktop');
+
+  // Un inscrit mène à sa fiche du trombinoscope, et le retour ramène à la séance.
+  const lien = page.locator('.reg-list:visible a.reg-link').first();
+  const nom = (await lien.innerText()).trim();
+  const href = await lien.getAttribute('href');
+  s.check('les inscrits sont des liens vers leur fiche', await page.locator('.reg-list:visible a.reg-link').count() > 0);
+  await lien.click();
+  await page.waitForURL(/\/trombinoscope\/\d+$/);
+  await attendre(page);
+  s.check('la fiche ouverte est celle de l’inscrit', page.url() === href && (await texte(page)).includes(nom.toLowerCase()), `${nom} → ${page.url()}`);
+  await page.locator('[onclick*="clubBack"]:visible').first().click();
+  await page.waitForURL(new RegExp(`/seances/${cible}`));
+  s.check('le retour ramène à la séance', page.url().includes(`/seances/${cible}`), page.url());
   s.checkJs(page);
   tous.push(s.report());
   await ctx.close();
