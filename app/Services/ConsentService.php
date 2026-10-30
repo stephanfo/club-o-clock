@@ -185,6 +185,12 @@ class ConsentService
         ));
     }
 
+    /** Retrait d'un type sans trace propre : le geste appelant (modération d'une photo) a la sienne. */
+    public function revokeType(User $subject, ConsentType $type, ?User $actor): int
+    {
+        return $this->closeWhere($subject, $actor, fn ($q) => $q->where('type', $type->value));
+    }
+
     /** Tous les accords de $subject — purge de bascule de saison (§4.4). */
     public function revokeAll(User $subject, ?User $actor): int
     {

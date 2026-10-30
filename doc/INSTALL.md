@@ -17,7 +17,7 @@ sur VPS · instance de démonstration · flux réseau sortants · maintenance et
 
 | Besoin | Version | Note |
 |---|---|---|
-| **PHP** | ≥ 8.3 | Extensions : `pdo_mysql`, `mbstring`, `openssl`, `bcmath`, `intl`, `fileinfo`, `zip`, `gd` |
+| **PHP** | ≥ 8.3 | Extensions : `pdo_mysql`, `mbstring`, `openssl`, `bcmath`, `intl`, `fileinfo`, `zip`, `gd` (avec WebP) ; `exif` recommandée (redresse les photos du trombinoscope) |
 | **MariaDB** ou **MySQL** | MariaDB ≥ 10.6 · MySQL ≥ 8.0 | Moteur **InnoDB**. Les deux sont joués à chaque intégration continue (MySQL 8.4, MariaDB 11.4) : ce n'est pas une compatibilité annoncée mais non vérifiée. |
 | **Composer** | ≥ 2 | Dépendances PHP |
 | **Node.js + npm** | ≥ 20 | **Build des assets uniquement** — pas nécessaire sur le serveur (cf. §5) |
