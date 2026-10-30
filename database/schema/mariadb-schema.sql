@@ -218,6 +218,28 @@ CREATE TABLE `club_settings` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `consents`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `consents` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) unsigned NOT NULL,
+  `type` varchar(40) NOT NULL,
+  `version` smallint(5) unsigned NOT NULL,
+  `granted_at` timestamp NOT NULL,
+  `granted_by` bigint(20) unsigned DEFAULT NULL,
+  `source` varchar(120) DEFAULT NULL,
+  `revoked_at` timestamp NULL DEFAULT NULL,
+  `revoked_by` bigint(20) unsigned DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `consents_user_id_type_revoked_at_index` (`user_id`,`type`,`revoked_at`),
+  KEY `consents_granted_by_foreign` (`granted_by`),
+  KEY `consents_revoked_by_foreign` (`revoked_by`),
+  CONSTRAINT `consents_granted_by_foreign` FOREIGN KEY (`granted_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `consents_revoked_by_foreign` FOREIGN KEY (`revoked_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `consents_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `debrief_reactions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -826,6 +848,9 @@ CREATE TABLE `users` (
   `password` varchar(255) DEFAULT NULL,
   `dob` date DEFAULT NULL,
   `roles` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`roles`)),
+  `board_role` varchar(30) DEFAULT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `photo_path` varchar(255) DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `athlete_access_suspended` tinyint(1) NOT NULL DEFAULT 0,
   `guardian_id` bigint(20) unsigned DEFAULT NULL,
@@ -903,19 +928,20 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (34,'2026_01_01_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (35,'2026_01_01_000360_create_session_coach_table',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (36,'2026_01_01_000370_create_activity_logs_table',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (37,'2026_01_01_000380_create_apero_flags_table',1);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (38,'2026_08_21_000000_add_pwa_icon_paths_to_club_settings',2);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (39,'2026_08_23_000000_add_code_to_magic_link_tokens',3);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (40,'2026_08_24_000000_add_last_login_at_to_users',4);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (41,'2026_08_24_000010_purge_sent_outbox_secrets',4);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (42,'2026_09_04_000000_drop_is_minor_from_users',5);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (43,'2026_09_13_000000_add_ad_hoc_location_to_sessions',6);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (44,'2026_09_13_000010_add_external_staff_label_to_sessions',7);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (45,'2026_09_15_000000_add_quota_release_to_sessions',8);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (46,'2026_09_16_000000_add_dismissed_at_to_notification_outbox',9);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (47,'2026_09_17_000000_create_calendar_feeds_table',10);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (48,'2026_10_01_000000_add_registration_opening_to_sessions',11);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (49,'2026_10_02_000000_create_debrief_reactions_table',12);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (50,'2026_10_03_000000_add_push_health',13);
-INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (51,'2026_10_04_000000_create_allures_tables',14);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (38,'2026_08_21_000000_add_pwa_icon_paths_to_club_settings',1);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (39,'2026_08_23_000000_add_code_to_magic_link_tokens',1);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (40,'2026_08_24_000000_add_last_login_at_to_users',1);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (41,'2026_08_24_000010_purge_sent_outbox_secrets',1);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (42,'2026_09_04_000000_drop_is_minor_from_users',1);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (43,'2026_09_13_000000_add_ad_hoc_location_to_sessions',1);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (44,'2026_09_13_000010_add_external_staff_label_to_sessions',1);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (45,'2026_09_15_000000_add_quota_release_to_sessions',1);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (46,'2026_09_16_000000_add_dismissed_at_to_notification_outbox',1);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (47,'2026_09_17_000000_create_calendar_feeds_table',1);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (48,'2026_10_01_000000_add_registration_opening_to_sessions',1);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (49,'2026_10_02_000000_create_debrief_reactions_table',1);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (50,'2026_10_03_000000_add_push_health',1);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (51,'2026_10_04_000000_create_allures_tables',1);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (52,'2026_10_30_000000_create_trombinoscope',1);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;

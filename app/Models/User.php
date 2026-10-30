@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Notifications\ResetPasswordNotification;
 use App\Support\AgeCategory;
 use App\Support\Allures\Referentiel;
+use App\Support\Trombi\BoardRole;
+use App\Support\Trombi\ConsentType;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
@@ -74,6 +76,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'guardianship_linked_at' => 'datetime',
         'deletion_requested_at' => 'datetime',
         'anonymized_at' => 'datetime',
+        'board_role' => BoardRole::class,
     ];
 
     // --- Rôles ---
@@ -344,6 +347,35 @@ class User extends Authenticatable implements MustVerifyEmail
     public function referenceValue(Referentiel $referentiel): ?ReferenceValue
     {
         return $this->referenceValues->firstWhere('referentiel', $referentiel);
+    }
+
+    // --- Trombinoscope (PRD §4.23) ---
+
+    /**
+     * Toutes les lignes du registre, révoquées comprises (la preuve).
+     *
+     * @return HasMany<Consent, $this>
+     */
+    public function consents(): HasMany
+    {
+        return $this->hasMany(Consent::class);
+    }
+
+    /**
+     * Lignes non révoquées — à charger d'avance sur une liste (cadrage §7.18, pas de N+1). Une
+     * ligne d'une version périmée y figure encore : hasConsent() l'écarte.
+     *
+     * @return HasMany<Consent, $this>
+     */
+    public function unrevokedConsents(): HasMany
+    {
+        return $this->hasMany(Consent::class)->whereNull('revoked_at');
+    }
+
+    /** Accord actif (non révoqué, version courante) pour ce type. */
+    public function hasConsent(ConsentType $type): bool
+    {
+        return $this->unrevokedConsents->contains(fn (Consent $c) => $c->type === $type && $c->isActive());
     }
 
     // --- Cycle de vie : suppression RGPD (PRD §4.3) ---
