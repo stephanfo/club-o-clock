@@ -81,7 +81,12 @@
             </div>
 
             {{-- ═══ Onglets ═══ --}}
-            <x-tabs :items="[['v' => 'profil', 'l' => 'Profil & accès'], ['v' => 'histo', 'l' => 'Historique d\'inscriptions', 'badge' => $future->count() + $past->count()]]" :value="$tab" wire-set="tab" />
+            <x-tabs :items="[['v' => 'profil', 'l' => 'Profil & accès'], ['v' => 'trombi', 'l' => 'Trombinoscope'], ['v' => 'histo', 'l' => 'Historique d\'inscriptions', 'badge' => $future->count() + $past->count()]]" :value="$tab" wire-set="tab" />
+
+            {{-- Trombinoscope (#72) : composant imbriqué, gestes et dialogs isolés de la fiche. --}}
+            @if ($tab === 'trombi')
+                <livewire:admin.member-trombi :member-id="$u->id" :key="'member-trombi-'.$u->id" />
+            @endif
 
             @if ($tab === 'profil')
                 <div class="mc-show-grid">
@@ -511,7 +516,7 @@
                         </div>
                     </div>
                 </div>
-            @else
+            @elseif ($tab === 'histo')
                 {{-- ═══ Historique d'inscriptions ═══ --}}
                 @php
                     $presences = $past->where('status', 'participating')->count();

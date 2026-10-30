@@ -28,13 +28,15 @@ adhérents administré par des bénévoles.
 | « Alors, cette course ? » | **Débriefs** et album photos partagés à tout le club, avec réactions |
 | « On part d'où, et il va pleuvoir ? » | **Parcours GPX** sur carte et **météo** sur toute la durée de la séance |
 | « J'avais oublié que je m'étais inscrit. » | Ses séances dans **l'agenda du téléphone**, par abonnement synchronisé |
+| « C'est qui, le nouveau du jeudi ? » | **Trombinoscope** du club : chacun choisit ce qu'il partage (photo, nom, contacts), accord par accord |
 
 ### Ce qui le distingue
 
 - 🔒 **Tes données restent chez toi.** Une instance par club, sur ton hébergement. Pas de SaaS, pas
   d'abonnement, pas de tiers qui exploite le fichier de tes adhérents.
-- 🇫🇷 **RGPD par construction.** Ni numéro de téléphone, ni certificat médical, ni numéro de
-  licence. Aucun service non européen dans le chemin critique, polices auto-hébergées, aucun
+- 🇫🇷 **RGPD par construction.** Ni certificat médical, ni numéro de licence ; un téléphone
+  seulement si l'adhérent le saisit lui-même pour le trombinoscope, où rien ne s'affiche sans son
+  accord. Aucun service non européen dans le chemin critique, polices auto-hébergées, aucun
   traqueur.
 - 🪶 **Ça tourne sur un mutualisé à quelques euros.** Ni Docker, ni serveur Node, ni WebSocket :
   du PHP et un cron.

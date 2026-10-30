@@ -22,6 +22,7 @@ class GuardianshipService
     public function __construct(
         private NotificationDispatcher $notifier,
         private InvitationService $invitations,
+        private ConsentService $consents,
     ) {}
 
     /**
@@ -154,6 +155,9 @@ class GuardianshipService
             $guardian = $ward->loadMissing('guardian')->guardian;
 
             $ward->update(['guardian_id' => null, 'guardianship_linked_at' => null]);
+            // Trombinoscope (§4.23.4) : les accords donnés par le parent ou enregistrés par l'admin
+            // tombent, le nouvel adulte décide seul de ce qu'il diffuse.
+            $this->consents->revokeGrantedByOthers($ward, $actor);
 
             AuditLogger::record('guardianship_severed', $actor, [
                 'target_type' => User::class,
@@ -278,6 +282,8 @@ class GuardianshipService
                 'guardian_id' => $newGuardian->id,
                 'guardianship_linked_at' => Carbon::now(),
             ]);
+            // Trombinoscope (§4.23.4) : le nouveau parent décide, les accords d'un tiers tombent.
+            $this->consents->revokeGrantedByOthers($ward, $actor);
 
             AuditLogger::record('guardianship_severed', $actor, [
                 'target_type' => User::class,

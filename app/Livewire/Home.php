@@ -7,7 +7,10 @@ use App\Models\ClubSettings;
 use App\Models\InformationPage;
 use App\Models\Session;
 use App\Models\User;
+use App\Policies\TrombiPolicy;
 use App\Services\QuotaService;
+use App\Support\Trombi\ConsentType;
+use App\Support\Trombi\TrombiCard;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
@@ -44,7 +47,42 @@ class Home extends Component
             ->values();
     }
 
-    public function render()
+    /**
+     * « Anniversaires de la semaine » (§4.23.6) : jour et prénom, sous accord, du lundi au dimanche
+     * de la semaine en cours — à cheval sur deux années la dernière semaine de décembre. Un
+     * 29 février se fête le 28 les années non bissextiles.
+     *
+     * @return list<array{id:int, first_name:string, date:Carbon, photo:?string}>
+     */
+    private function weekBirthdays(Carbon $now, User $viewer, TrombiPolicy $policy): array
+    {
+        $days = [];
+        $monday = $now->copy()->startOfWeek(Carbon::MONDAY)->startOfDay();
+        for ($i = 0; $i < 7; $i++) {
+            $day = $monday->copy()->addDays($i);
+            $days[$day->format('m-d')] = $day;
+            if ($day->format('m-d') === '02-28' && ! $day->isLeapYear()) {
+                $days['02-29'] = $day;
+            }
+        }
+
+        return User::query()->auTrombinoscope()->whereNotNull('dob')
+            ->whereHas('unrevokedConsents', fn ($q) => $q->where('type', ConsentType::Birthday->value))
+            ->with('unrevokedConsents')
+            ->get()
+            ->filter(fn (User $u) => $policy->birthday($u) && isset($days[$u->dob->format('m-d')]))
+            ->map(fn (User $u) => [
+                'id' => $u->id,
+                'first_name' => $u->first_name,
+                'date' => $days[$u->dob->format('m-d')],
+                'photo' => TrombiCard::photoUrl($viewer, $u, 192, $policy),
+            ])
+            ->sortBy([fn ($a, $b) => $a['date'] <=> $b['date'], fn ($a, $b) => strcmp($a['first_name'], $b['first_name'])])
+            ->values()
+            ->all();
+    }
+
+    public function render(TrombiPolicy $policy)
     {
         $tz = $this->tz();
         $now = Carbon::now($tz);
@@ -90,7 +128,13 @@ class Home extends Component
         $nextIsCoach = auth()->id() && $next && $subject?->id === auth()->id() && $next->coaches->contains('id', auth()->id());
         $nextIsParticipant = $uid && $next && $next->registrations->where('user_id', $uid)->where('status', 'participating')->isNotEmpty();
 
+        // Trombinoscope (§4.23.6) : lien depuis l'accueil mobile, anniversaires de la semaine.
+        $viewer = auth()->user();
+        $canTrombi = $viewer !== null && $policy->consult($viewer);
+
         return view('livewire.home', [
+            'canTrombi' => $canTrombi,
+            'weekBirthdays' => $canTrombi ? $this->weekBirthdays($now, $viewer, $policy) : [],
             'tz' => $tz,
             'now' => $now,
             'next' => $next,

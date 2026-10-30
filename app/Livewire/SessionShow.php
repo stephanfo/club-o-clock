@@ -11,12 +11,14 @@ use App\Livewire\Concerns\WithSubject;
 use App\Models\ClubSettings;
 use App\Models\Debrief;
 use App\Models\Session;
+use App\Models\User;
 use App\Services\RegistrationService;
 use App\Services\SessionDeletionService;
 use App\Services\WeatherService;
 use App\Support\QualificationDisplay;
 use App\Support\RegistrantDisplay;
 use App\Support\SubjectContext;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -72,7 +74,7 @@ class SessionShow extends Component
     }
 
     /** Relations de la fiche — même jeu au mount, au refresh et à la ré-hydratation. */
-    private const EAGER = ['discipline', 'eventType', 'quotaTag', 'location', 'creator', 'coaches.qualifications', 'categories', 'registrations.user', 'activeAperoFlags.user', 'debriefs.author', 'debriefs.archiver', 'debriefs.reactions.user', 'gpxRoute.discipline'];
+    private const EAGER = ['discipline', 'eventType', 'quotaTag', 'location', 'creator', 'coaches.qualifications', 'categories', 'registrations.user.unrevokedConsents', 'activeAperoFlags.user', 'debriefs.author.unrevokedConsents', 'debriefs.archiver', 'debriefs.reactions.user.unrevokedConsents', 'gpxRoute.discipline'];
 
     private function tz(): string
     {
@@ -158,11 +160,15 @@ class SessionShow extends Component
             || $this->session->coaches->contains('id', $viewer->id)
         );
 
-        $users = $this->session->registrations
+        return RegistrantDisplay::labels($this->activeRegistrants(), $fullNames);
+    }
+
+    /** @return Collection<int, User> */
+    private function activeRegistrants(): Collection
+    {
+        return $this->session->registrations
             ->whereIn('status', ['participating', 'waitlist'])
             ->map(fn ($r) => $r->user);
-
-        return RegistrantDisplay::labels($users, $fullNames);
     }
 
     public function render()
@@ -204,6 +210,8 @@ class SessionShow extends Component
             'hasConflict' => $this->hasScheduleConflict(),
             'requeueNotice' => $me ? $this->requeueNotice() : null,
             'nameLabels' => $this->nameLabels(),
+            // Vignettes du trombinoscope (§4.23.5) : seulement celles que le lecteur peut voir.
+            'photoUrls' => RegistrantDisplay::photos($this->activeRegistrants(), $me),
             'aperoPayers' => $aperoPayers,
             'iAmAperoPayer' => $me !== null && $aperoPayers->contains('user_id', $me->id),
             // Le bouton « J'offre » n'apparaît qu'aux inscrits actifs, séance ouverte (§4.14.1/.3).

@@ -47,6 +47,12 @@
             <x-banner kind="warn"><span><b>{{ $w->first_name }}</b> a déjà {{ $c['quotaFull']['used'] }}/{{ $c['quotaFull']['max'] }} sur #{{ $c['quotaFull']['tag'] }} cette semaine — une inscription de plus passera en waitlist quota.</span></x-banner>
         @endif
 
+        {{-- Trombinoscope (#72) : le parent garant donne les accords de son enfant. --}}
+        <div class="sect-head" style="margin-top:16px"><span class="sect-title">Trombinoscope</span></div>
+        <a href="{{ route('children.trombi', $w) }}" wire:navigate class="btn btn-ghost btn-sm" wire:key="trombi-{{ $scope }}-{{ $w->id }}">
+            <x-icon name="users" :size="14" /> Photo et accords de {{ $w->first_name }}
+        </a>
+
         <div class="sect-head" style="margin-top:16px"><span class="sect-title">Lien de tutelle</span></div>
         <div class="flex ac jb g8">
             <span class="meta" style="font-size:12.5px;line-height:1.4">Phase {{ $c['phase'] }} · {{ $c['phase'] === 'P1' ? 'tu agis en son nom' : 'enfant + parent destinataires' }}</span>

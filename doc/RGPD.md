@@ -39,14 +39,19 @@ club. Les passages entre crochets — `[Nom du club]` — sont à remplacer.
 > l'identité de son représentant légal, qui crée et gère son compte. Si vous le souhaitez, vous
 > pouvez aussi y renseigner votre VMA ; elle n'est visible que par vous.
 >
-> **Ce qu'elle n'enregistre jamais** : ni numéro de téléphone, ni certificat médical, ni numéro de
-> licence.
+> **Le trombinoscope du club** : rien n'y paraît sans votre accord, donné séparément pour votre nom
+> complet, votre photo, votre catégorie, votre anniversaire (jour et mois), votre email et votre
+> téléphone, et retirable à tout moment depuis votre profil. Le téléphone n'est enregistré que si
+> vous le saisissez, pour ce seul usage. Pour un mineur, c'est le représentant légal qui décide, et
+> ni email ni téléphone ne sont jamais montrés.
+>
+> **Ce qu'elle n'enregistre jamais** : ni certificat médical, ni numéro de licence.
 >
 > **Pourquoi** : uniquement pour organiser les entraînements et la vie sportive du club, dans le
 > cadre de votre adhésion. Aucune publicité, aucune revente, aucun outil de mesure d'audience.
 >
 > **Qui voit quoi** : les membres du bureau gèrent les comptes ; les coachs et les autres adhérents
-> voient les noms des inscrits à une séance. Les emails sont envoyés par [Nom du service d'email,
+> voient les noms des inscrits à une séance, et le trombinoscope selon vos accords. Les emails sont envoyés par [Nom du service d'email,
 > ex. Brevo], un prestataire européen.
 >
 > **Combien de temps** : le temps de votre adhésion. À votre départ, ou à votre demande, votre
@@ -79,16 +84,16 @@ Une ligne du registre, dans l'ordre des rubriques du modèle de la CNIL.
 | **Nom du traitement** | Planning d'entraînement et inscriptions aux séances |
 | **Responsable** | [Nom du club], [adresse du siège], représenté par [président·e] |
 | **Contact pour les données** | [adresse email de contact du club] |
-| **Finalités** | Publier le planning des séances ; gérer les inscriptions, la liste d'attente et les quotas ; prévenir les inscrits (annulation, place libérée, ouverture des inscriptions à une compétition) ; partager les débriefs de course ; établir les statistiques de fréquentation du bureau |
-| **Base légale** | Exécution du contrat d'adhésion au club. Options facultatives (notifications sur le téléphone, connexion Google, VMA) : choix de l'adhérent, qui peut y renoncer à tout moment depuis son profil |
+| **Finalités** | Publier le planning des séances ; gérer les inscriptions, la liste d'attente et les quotas ; prévenir les inscrits (annulation, place libérée, ouverture des inscriptions à une compétition) ; partager les débriefs de course ; établir les statistiques de fréquentation du bureau ; trombinoscope du club |
+| **Base légale** | Exécution du contrat d'adhésion au club. Options facultatives (notifications sur le téléphone, connexion Google, VMA) : choix de l'adhérent, qui peut y renoncer à tout moment depuis son profil. Trombinoscope : consentement, donné et retiré accord par accord depuis le profil (par le représentant légal pour un mineur), horodaté pour en garder la preuve |
 | **Personnes concernées** | Adhérents (adultes et mineurs), coachs, membres du bureau, représentants légaux des mineurs |
-| **Données** | Nom, prénom, email, date de naissance ; rôles et qualifications au club ; lien entre un mineur et son représentant légal ; inscriptions et historique de participation ; textes et réactions publiés dans l'application ; VMA si l'adhérent la saisit ; données techniques de connexion (adresse IP et navigateur pendant la session, abonnement aux notifications de l'appareil) ; journal des actions faites dans l'application |
-| **Données sensibles** | Aucune. Ni téléphone, ni certificat médical, ni numéro de licence |
-| **Destinataires** | Membres du bureau (gestion des comptes) ; coachs et adhérents (noms des inscrits aux séances) |
+| **Données** | Nom, prénom, email, date de naissance ; rôles et qualifications au club ; lien entre un mineur et son représentant légal ; inscriptions et historique de participation ; textes et réactions publiés dans l'application ; VMA si l'adhérent la saisit ; trombinoscope : photo et téléphone si l'adhérent les dépose, fonction au bureau, registre horodaté des accords ; données techniques de connexion (adresse IP et navigateur pendant la session, abonnement aux notifications de l'appareil) ; journal des actions faites dans l'application |
+| **Données sensibles** | Aucune. Ni certificat médical, ni numéro de licence. Téléphone : seulement saisi par l'adhérent, pour le trombinoscope, jamais utilisé pour un envoi |
+| **Destinataires** | Membres du bureau (gestion des comptes) ; coachs et adhérents (noms des inscrits aux séances) ; adhérents de la saison et parents d'enfants adhérents (trombinoscope, selon les accords ; jamais d'email ni de téléphone pour un lecteur mineur ; aucun export) |
 | **Sous-traitants** | Hébergement : [Nom de l'hébergeur, ex. OVH — France]. Envoi des emails : [Nom du service, ex. Brevo — France]. Notifications sur le téléphone : service du navigateur de l'adhérent (Google, Apple ou Mozilla), qui transmet un message chiffré qu'il ne peut pas lire |
 | **Services sans donnée personnelle** | Météo : Open-Meteo (coordonnées du lieu de séance). Adresses : Photon / OpenStreetMap (adresse d'un lieu, saisie par un coach) |
 | **Transferts hors Union européenne** | Aucun pour les données du club. Notifications sur le téléphone : le service du navigateur (Google, Apple) peut être situé hors UE ; il ne reçoit qu'un message chiffré et l'adresse de l'appareil. Connexion Google, si le club l'active (Google, États-Unis) |
-| **Durée de conservation** | Le temps de l'adhésion. Le bureau supprime le compte au départ de l'adhérent ou à sa demande (*Admin → Adhérents*) : suppression effective sept jours après la demande, puis anonymisation des traces. Il n'y a pas de suppression automatique : prévoir une revue des comptes à chaque début de saison. Liens de connexion et invitations : effacés automatiquement à expiration. Sauvegardes : selon la politique de l'hébergeur |
+| **Durée de conservation** | Le temps de l'adhésion. Le bureau supprime le compte au départ de l'adhérent ou à sa demande (*Admin → Adhérents*) : suppression effective sept jours après la demande, puis anonymisation des traces. Il n'y a pas de suppression automatique : prévoir une revue des comptes à chaque début de saison. Trombinoscope : photo, téléphone et accords effacés avec le compte, et à la bascule de saison pour un adhérent qui n'a pas réadhéré de toute la saison écoulée. Liens de connexion et invitations : effacés automatiquement à expiration. Sauvegardes : selon la politique de l'hébergeur |
 | **Sécurité** | Connexion chiffrée (HTTPS) ; mots de passe stockés sous une forme illisible, que le bureau ne peut ni voir ni choisir ; liens de connexion à usage unique et à durée limitée ; accès selon le rôle (athlète, coach, administrateur) ; journal des actions des administrateurs ; aucun traqueur ni outil de mesure d'audience ; sauvegardes de la base ([guide d'installation](INSTALL.md), §9) |
 
 ---

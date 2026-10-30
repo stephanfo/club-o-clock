@@ -27,6 +27,12 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // Photos du trombinoscope (PRD §4.23) : jamais en cache hors ligne, même ouvertes en navigation
+    // directe — une photo retirée ne doit survivre nulle part.
+    if (new URL(request.url).pathname.startsWith('/trombi-photo/')) {
+        return;
+    }
+
     if (request.mode === 'navigate') {
         event.respondWith(
             fetch(request)

@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\ClubSettings;
 use App\Models\NotificationOutbox;
+use App\Support\Trombi\ConsentType;
 use Illuminate\Support\Carbon;
 
 // Rend une ligne d'outbox en contenu présentable (titre, corps, lien profond), partagé par les
@@ -79,6 +80,10 @@ class NotificationRenderer
 
         if ($type === NotificationType::GuardianshipLinked) {
             return $this->linkedBody($payload, $subjectId);
+        }
+
+        if ($type === NotificationType::ConsentRecorded && isset($payload['types'])) {
+            return $this->consentBody($payload, $subjectId);
         }
 
         if ($type === NotificationType::RegistrationOpening && isset($payload['session_title'])) {
@@ -219,6 +224,23 @@ class NotificationRenderer
     }
 
     /**
+     * Accord enregistré par l'admin (#72) : quoi, d'après quelle source, et où le retirer.
+     *
+     * @param  array<string,mixed>  $payload
+     */
+    private function consentBody(array $payload, ?int $subjectId): string
+    {
+        $types = collect((array) $payload['types'])
+            ->map(fn ($v) => ConsentType::tryFrom((string) $v)?->label())
+            ->filter();
+        $labels = $types->implode(', ');
+        $source = isset($payload['source']) ? ' d\'après « '.$payload['source'].' »' : '';
+        $where = $subjectId !== null ? 'depuis Mes enfants' : 'depuis ton profil';
+
+        return $labels.$source.'. Tu peux '.($types->count() > 1 ? 'les' : 'le').' retirer à tout moment '.$where.'.';
+    }
+
+    /**
      * Réactivation d'accès lue par le GARANT : la description du type tutoie le sujet (elle sert
      * d'abord de sous-titre dans la matrice de préférences, où le lecteur EST le sujet). Adressée
      * au parent, « Ton accès athlète est réactivé » désigne la mauvaise personne — celle qui lit.
@@ -330,6 +352,11 @@ class NotificationRenderer
             // Rattachement : le garant va voir l'enfant qui vient d'apparaître dans « Mes enfants » ;
             // le pupille, son profil, où figure son garant.
             NotificationType::GuardianshipLinked => $subjectId !== null ? route('children') : route('profil'),
+
+            // Accord enregistré (#72) : là où il se retire.
+            NotificationType::ConsentRecorded => $subjectId !== null
+                ? route('children.trombi', $subjectId)
+                : route('profil', ['tab' => 'trombi']),
 
             // Réactivation d'accès (§4.4) : lue par le garant d'un mineur, elle parle de l'enfant.
             // L'envoyer sur le dashboard du parent ne lui montrait rien de ce qui a changé.

@@ -18,7 +18,7 @@
                 @foreach ($aperoPayers as $flag)
                     @php $label = $nameLabels[$flag->user_id] ?? 'Membre'; @endphp
                     <div class="flex ac g10" style="padding:10px;background:var(--bg-alt);border-radius:var(--radius-md)">
-                        <x-avatar :name="$label" size="sm" />
+                        <x-avatar :name="$label" size="sm" :photo="$photoUrls[$flag->user_id] ?? null" />
                         <span class="f1" style="min-width:0">
                             <span style="font-weight:700;font-size:14px">{{ $label }}</span>
                             @if ($flag->motif)

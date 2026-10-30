@@ -6,6 +6,7 @@ use App\Actions\Fortify\PasswordValidationRules;
 use App\Models\CalendarFeed;
 use App\Models\PushSubscription;
 use App\Notifications\Channels\PushChannel;
+use App\Policies\TrombiPolicy;
 use App\Services\AuthMethodService;
 use App\Services\CalendarFeedService;
 use App\Services\MemberService;
@@ -25,11 +26,12 @@ use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-// Profil de l'utilisateur connecté (porté de screen-profil.jsx). Cinq onglets :
+// Profil de l'utilisateur connecté (porté de screen-profil.jsx). Six onglets :
 //   Identité  — nom éditable + champs gérés par le bureau (lecture) ;
 //   Notifs    — matrice type×canal (§4.15.3) + pause globale (§4.15.4) ;
 //   Allures   — composant imbriqué App\Livewire\Allures (VMA, zones, estimation, projection) ;
 //   Quotas    — usage hebdo par tag de la semaine courante (§4.10) ;
+//   Trombi    — composant imbriqué App\Livewire\TrombiSettings (photo, téléphone, accords, §4.23) ;
 //   Connexion — méthodes de login liées, sessions actives, déconnexion (suppression compte §4.3 à part).
 // Lecture/écriture toujours sur le compte courant (auth()->user()) — aucune action sur un tiers.
 #[Layout('layouts.app')]
@@ -40,7 +42,7 @@ class Profil extends Component
     // politique de mot de passe pour toutes les surfaces.
     use PasswordValidationRules;
 
-    /** Onglet actif : identite | notifs | allures | quotas | connexion. */
+    /** Onglet actif : identite | notifs | allures | quotas | trombi | connexion. */
     #[Url]
     public string $tab = 'identite';
 
@@ -441,6 +443,7 @@ class Profil extends Component
             'canRemovePassword' => auth()->user()->password !== null
                 && $authMethods->keepsAnotherWayIn(auth()->user(), 'password'),
             'demo' => DemoMode::enabled(),
+            'canTrombi' => app(TrombiPolicy::class)->consult(auth()->user()),
             'feed' => $this->tab === 'notifs' ? $feeds->active(auth()->user()) : null,
             'pushDevices' => $this->tab === 'notifs' ? $this->pushDevices() : [],
             'feedHasWards' => $this->tab === 'notifs' && $feeds->hasWards(auth()->user()),

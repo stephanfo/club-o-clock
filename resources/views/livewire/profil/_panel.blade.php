@@ -10,6 +10,10 @@
     @case('quotas')
         @include('livewire.profil._quotas')
         @break
+    @case('trombi')
+        {{-- Composant imbriqué (#72), une instance par coquille : clé distincte. --}}
+        <livewire:trombi-settings :subject-id="$user->id" :key="'trombi-'.$coquille" />
+        @break
     @case('connexion')
         @include('livewire.profil._connexion')
         @break

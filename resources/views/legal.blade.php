@@ -49,7 +49,20 @@
         L'application traite les données nécessaires à la gestion du planning d'entraînement et
         des inscriptions aux séances : identité (nom, prénom, email), rôle au sein du club,
         historique de participation, et, pour les mineurs, l'identité du ou des représentants
-        légaux. Aucun numéro de téléphone ni certificat médical n'est stocké par l'application.
+        légaux. Aucun certificat médical n'est stocké par l'application.
+    </p>
+    <p>
+        Le trombinoscope du club ne montre rien sans l'accord de chacun : nom complet, photo,
+        catégorie, anniversaire (jour et mois seuls), email et téléphone font chacun l'objet d'un
+        accord distinct, désactivé par défaut et révocable à tout moment depuis le profil. Pour un
+        mineur, l'accord est donné par son représentant légal, et ni email ni téléphone ne sont
+        jamais diffusés. Le numéro de téléphone n'est stocké que s'il est saisi par l'adhérent
+        lui-même, pour ce seul usage : l'application ne s'en sert pour aucun envoi. La photo est
+        réencodée à l'envoi, sans ses métadonnées (dont la géolocalisation), et l'original n'est pas
+        conservé. Chaque accord et chaque retrait sont horodatés, pour pouvoir prouver le
+        consentement. Le trombinoscope n'est visible que des adhérents de la saison et des parents
+        d'enfants adhérents, sans aucun export ; ses données sont effacées avec le compte, et à la
+        bascule de saison pour un adhérent qui n'a pas réadhéré de toute la saison écoulée.
     </p>
     <p>
         Un adhérent peut, s'il le souhaite, renseigner sa VMA pour afficher ses allures

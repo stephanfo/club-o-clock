@@ -13,9 +13,10 @@
         ['v' => 'notifs', 'l' => 'Notifs'],
         ['v' => 'allures', 'l' => 'Allures'],
         ['v' => 'quotas', 'l' => 'Quotas'],
+        ['v' => 'trombi', 'l' => 'Trombi'],
         ['v' => 'connexion', 'l' => 'Connexion'],
     ];
-    $navIcons = ['identite' => 'user', 'notifs' => 'bell', 'allures' => 'footprints', 'quotas' => 'bar-chart', 'connexion' => 'shield'];
+    $navIcons = ['identite' => 'user', 'notifs' => 'bell', 'allures' => 'footprints', 'quotas' => 'bar-chart', 'trombi' => 'users', 'connexion' => 'shield'];
 @endphp
 <div class="profil-screen">
     {{-- Feedback d'action global (revue UX 2026-07-11) : bannière flottante auto-masquée,
@@ -34,7 +35,13 @@
 
             {{-- Accès mobile aux pages d'info (revue UX 2026-07-11) : sans ce lien, la page Infos
                  n'est atteignable sur mobile que via une bannière épinglée sur l'Accueil. --}}
-            <a href="{{ route('infos') }}" wire:navigate class="btn btn-ghost btn-block" style="margin-top:14px">
+            {{-- Accès mobile au trombinoscope (#72) : pas d'entrée dans la barre du bas. --}}
+            @if ($canTrombi)
+                <a href="{{ route('trombi') }}" wire:navigate class="btn btn-ghost btn-block" style="margin-top:14px">
+                    <x-icon name="users" :size="15" /> Trombinoscope du club
+                </a>
+            @endif
+            <a href="{{ route('infos') }}" wire:navigate class="btn btn-ghost btn-block" style="margin-top:{{ $canTrombi ? '6' : '14' }}px">
                 <x-icon name="info" :size="15" /> Infos du club
             </a>
             <a href="{{ route('legal') }}" class="btn btn-ghost btn-block" style="margin-top:6px">

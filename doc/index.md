@@ -71,8 +71,9 @@ un oubli d'internationalisation : c'est un choix assumé pour la version 1.
 majoritairement consultée au mobile par les adhérents, mais les écrans d'administration
 supposent un grand écran.
 
-**Aucune donnée sensible n'est stockée** : ni numéro de téléphone, ni certificat médical, ni
-numéro de licence fédérale. C'est une contrainte de conception, pas un réglage.
+**Aucune donnée sensible n'est stockée** : ni certificat médical, ni numéro de licence fédérale.
+Le téléphone n'existe que saisi par l'adhérent pour le trombinoscope, et ne s'y affiche que sous
+son accord. C'est une contrainte de conception, pas un réglage.
 
 ---
 

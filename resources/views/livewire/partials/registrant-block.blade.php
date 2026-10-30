@@ -15,7 +15,7 @@
                 @php($label = ($nameLabels[$reg->user_id] ?? null) ?: trim(($reg->user?->first_name ?? '?').' '.($reg->user?->last_name ?? '')))
                 <li class="reg-item">
                     <span class="reg-rank">{{ $i + 1 }}</span>
-                    <x-avatar :name="$label" tint="tint-run" />
+                    <x-avatar :name="$label" tint="tint-run" :photo="$photoUrls[$reg->user_id] ?? null" />
                     <span class="reg-name">{{ $label }}</span>
                     {{-- Badge override : visible coachs/admins seulement (§4.10.5). --}}
                     @if (($isStaff ?? false) && $reg->override_by)

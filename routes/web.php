@@ -10,6 +10,7 @@ use App\Http\Controllers\LegalController;
 use App\Http\Controllers\ManifestController;
 use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\SessionIcsController;
+use App\Http\Controllers\TrombiPhotoController;
 use App\Livewire\Activation;
 use App\Livewire\Admin\AllureLevels;
 use App\Livewire\Admin\CatalogueManager;
@@ -25,6 +26,7 @@ use App\Livewire\Admin\Outbox;
 use App\Livewire\Admin\TemplateForm;
 use App\Livewire\Admin\TemplateList;
 use App\Livewire\Alerts;
+use App\Livewire\ChildTrombi;
 use App\Livewire\GpxRouteForm;
 use App\Livewire\GpxRouteLibrary;
 use App\Livewire\GpxRouteShow;
@@ -35,6 +37,8 @@ use App\Livewire\Planning;
 use App\Livewire\Profil;
 use App\Livewire\SessionForm;
 use App\Livewire\SessionShow;
+use App\Livewire\Trombinoscope;
+use App\Livewire\TrombiShow;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -105,10 +109,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // « Mes enfants » — parent garant uniquement (PRD §4.2). Garde 403 dans le composant.
     Route::get('/enfants', ParentChildren::class)->name('children');
+    // Trombinoscope d'un enfant (#72, PRD §4.23.4) : garde « parent garant de cet enfant » au mount.
+    Route::get('/enfants/{child}/trombinoscope', ChildTrombi::class)->name('children.trombi');
 
     // Pages d'information (notes club, ajout post-cadrage). Consultation par tout membre —
     // la liste est filtrée par visibilité (scopeVisibleTo), pas de garde de rôle.
     Route::get('/infos', InformationPages::class)->name('infos');
+
+    // Trombinoscope et annuaire consentis (#72, PRD §4.23). Garde TrombiPolicy dans les composants
+    // et le contrôleur : adhérents de la saison et parents garants. Photos jamais publiques ;
+    // segment propre (`/trombi-photo`) pour que le service worker l'exclue par préfixe.
+    Route::get('/trombinoscope', Trombinoscope::class)->name('trombi');
+    Route::get('/trombinoscope/{user}', TrombiShow::class)->name('trombi.show');
+    Route::get('/trombi-photo/{user}/{size}', [TrombiPhotoController::class, 'show'])
+        ->whereIn('size', ['192', '512'])->name('trombi.photo');
 
     // Planning + séances (J1, PRD §4.7)
     Route::get('/planning', Planning::class)->name('planning');

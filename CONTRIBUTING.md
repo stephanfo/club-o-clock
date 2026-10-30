@@ -47,8 +47,9 @@ Quelques partis pris structurants, pour t'éviter un travail voué au refus :
 
 - **Pas de multi-tenant.** Un club = une instance. Aucune notion de `tenant_id`, aucune isolation
   logique multi-club. C'est ce qui garde le modèle de données et les autorisations simples.
-- **Pas de stockage de numéro de téléphone ni de certificat médical**, et pas de numéro de licence
-  fédérale — minimisation RGPD. Ces données vivent sur l'extranet de la fédération.
+- **Pas de stockage de certificat médical** ni de numéro de licence fédérale — minimisation RGPD.
+  Ces données vivent sur l'extranet de la fédération. Le téléphone n'existe que saisi par
+  l'adhérent pour le trombinoscope (PRD §4.23) : aucun autre usage, aucun envoi.
 - **Pas d'application native** iOS/Android : c'est une PWA installable.
 - **Pas de dépendance à un service non-UE** dans le chemin critique.
 
