@@ -311,6 +311,9 @@ textarea.input { resize: vertical; min-height: 70px; line-height: 1.5; }
 .toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--paper); box-shadow: var(--shadow-sm); transition: left var(--dur-fast) var(--ease-spring); }
 .toggle.on { background: var(--brand); }
 .toggle.on::after { left: 20px; }
+.toggle.mixed { background: var(--brand-300); }
+.toggle.mixed::after { left: 11px; }
+.toggle:disabled { opacity: .45; cursor: not-allowed; }
 
 .check { width: 20px; height: 20px; border-radius: var(--radius-xs); border: var(--border-base) solid var(--hair-strong); background: var(--paper); cursor: pointer; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; transition: all var(--dur-fast); padding: 0; }
 .check.on { background: var(--ink); border-color: var(--ink); color: var(--paper); }

@@ -26,6 +26,7 @@ use App\Livewire\Admin\Outbox;
 use App\Livewire\Admin\TemplateForm;
 use App\Livewire\Admin\TemplateList;
 use App\Livewire\Alerts;
+use App\Livewire\ChildTrombi;
 use App\Livewire\GpxRouteForm;
 use App\Livewire\GpxRouteLibrary;
 use App\Livewire\GpxRouteShow;
@@ -108,6 +109,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // « Mes enfants » — parent garant uniquement (PRD §4.2). Garde 403 dans le composant.
     Route::get('/enfants', ParentChildren::class)->name('children');
+    // Trombinoscope d'un enfant (#72, PRD §4.23.4) : garde « parent garant de cet enfant » au mount.
+    Route::get('/enfants/{child}/trombinoscope', ChildTrombi::class)->name('children.trombi');
 
     // Pages d'information (notes club, ajout post-cadrage). Consultation par tout membre —
     // la liste est filtrée par visibilité (scopeVisibleTo), pas de garde de rôle.

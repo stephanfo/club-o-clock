@@ -59,6 +59,18 @@ final class TrombiCard
         return route('trombi.photo', ['user' => $subject->id, 'size' => $size, 'v' => substr(md5((string) $subject->photo_path), 0, 10)]);
     }
 
+    /**
+     * La carte telle qu'un adhérent majeur ordinaire la voit (aperçu du profil) : ni coach ni
+     * admin, donc sans la catégorie non consentie ; ni l'intéressé, donc sans la photo masquée.
+     */
+    public static function asSeenByMembers(User $subject): self
+    {
+        $member = new User(['roles' => ['athlete'], 'is_active' => true, 'athlete_access_suspended' => false]);
+        $member->id = 0;
+
+        return self::make($member, $subject, new TrombiPolicy);
+    }
+
     public static function make(User $viewer, User $subject, TrombiPolicy $policy): self
     {
         $roles = array_values(array_filter([
