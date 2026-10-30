@@ -547,6 +547,9 @@ class MemberService
             app(DebriefReactionService::class)->forgetUser($member);
             // Valeur de référence d'allure (#114) : donnée personnelle sans intérêt pour le club.
             $member->referenceValues()->delete();
+            // Trombinoscope (§4.23, cadrage §7.18) : photo (fichier supprimé après le commit),
+            // numéro, fonction au bureau et registre des accords partent avec la personne.
+            app(TrombiService::class)->erase($member);
             if ($email !== null) {
                 MagicLinkToken::where('email', $email)->delete();
                 DB::table('password_reset_tokens')->where('email', $email)->delete();

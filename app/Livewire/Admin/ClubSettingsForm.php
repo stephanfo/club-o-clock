@@ -380,7 +380,8 @@ class ClubSettingsForm extends Component
 
         $result = $season->deactivateAllAthletes(auth()->user(), $this->basculeMotif ?: null);
         $this->reset('showBascule', 'basculeCheck1', 'basculeCheck2', 'basculeMotif');
-        session()->flash('status', "Saison basculée : {$result['accounts']} comptes suspendus, {$result['registrations']} inscriptions annulées.");
+        $purged = $result['trombi_purged'] > 0 ? ", {$result['trombi_purged']} trombinoscopes effacés" : '';
+        session()->flash('status', "Saison basculée : {$result['accounts']} comptes suspendus, {$result['registrations']} inscriptions annulées{$purged}.");
     }
 
     /** §4.5 — démarrage de la nouvelle année sportive (recalcul catégories + purge surclassements). */

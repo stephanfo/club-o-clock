@@ -21,6 +21,7 @@ class SeasonService
     public function __construct(
         private RegistrationService $registrations,
         private NotificationDispatcher $notifier,
+        private TrombiService $trombi,
     ) {}
 
     /** Périmètre suspension/recalcul : tout compte non anonymisé ayant le rôle athlete (§4.4). */
@@ -29,6 +30,20 @@ class SeasonService
         return User::query()
             ->whereNull('anonymized_at')
             ->whereJsonContains('roles', 'athlete');
+    }
+
+    /**
+     * Trombinoscope à purger à la bascule (cadrage §7.18) : athlètes ENCORE suspendus à ce moment,
+     * donc non réadhérents de toute la saison écoulée, qui ne figurent pas à un autre titre (coach,
+     * admin) et laissent une photo, un numéro ou un accord.
+     */
+    private function staleTrombiQuery()
+    {
+        return $this->athletesQuery()
+            ->where('athlete_access_suspended', true)
+            ->whereJsonDoesntContain('roles', 'coach')
+            ->whereJsonDoesntContain('roles', 'admin')
+            ->where(fn ($q) => $q->whereNotNull('photo_path')->orWhereNotNull('phone')->orWhereHas('unrevokedConsents'));
     }
 
     /** Compteurs d'impact affichés dans les modales de confirmation (sans muter). */
@@ -48,6 +63,7 @@ class SeasonService
                 ->whereIn('user_id', $athleteIds)
                 ->where('is_primary', false)
                 ->count(),
+            'trombi_purge' => $this->staleTrombiQuery()->count(),
         ];
     }
 
@@ -57,10 +73,18 @@ class SeasonService
      * + promotions auto mécanisme A), trace 1 AuditLog global bulk_athlete_deactivation. isActive
      * non touché : un coach reste coach, un admin reste admin.
      *
-     * @return array{accounts:int,registrations:int}
+     * @return array{accounts:int,registrations:int,trombi_purged:int}
      */
     public function deactivateAllAthletes(User $admin, ?string $motif = null): array
     {
+        // AVANT la suspension : après elle, tout le monde est suspendu et l'état ne distingue plus
+        // qui n'a pas réadhéré de la saison écoulée (cadrage §7.18).
+        $purged = 0;
+        foreach ($this->staleTrombiQuery()->get() as $stale) {
+            $this->trombi->purge($stale, $admin);
+            $purged++;
+        }
+
         $athletes = $this->athletesQuery()->get();
 
         $accounts = 0;
@@ -88,10 +112,10 @@ class SeasonService
 
         // 1 entrée globale (pas d'entrées individuelles, §4.4). Compteurs + motif dans le champ libre.
         AuditLogger::record('bulk_athlete_deactivation', $admin, [
-            'motif' => trim(sprintf('%d comptes · %d inscriptions annulées%s', $accounts, $registrations, $motif ? ' — '.$motif : '')),
+            'motif' => trim(sprintf('%d comptes · %d inscriptions annulées · %d trombinoscopes effacés%s', $accounts, $registrations, $purged, $motif ? ' — '.$motif : '')),
         ]);
 
-        return ['accounts' => $accounts, 'registrations' => $registrations];
+        return ['accounts' => $accounts, 'registrations' => $registrations, 'trombi_purged' => $purged];
     }
 
     /**

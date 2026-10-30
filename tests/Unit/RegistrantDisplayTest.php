@@ -2,18 +2,25 @@
 
 namespace Tests\Unit;
 
+use App\Models\Consent;
 use App\Models\User;
 use App\Support\RegistrantDisplay;
+use App\Support\Trombi\ConsentType;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use PHPUnit\Framework\TestCase;
 
 // Affichage RGPD des noms d'inscrits (PRD §4.9.4).
 class RegistrantDisplayTest extends TestCase
 {
-    private function user(int $id, string $first, string $last): User
+    private function user(int $id, string $first, string $last, bool $fullNameConsent = false): User
     {
-        $u = new User(['first_name' => $first, 'last_name' => $last]);
+        $u = new User(['first_name' => $first, 'last_name' => $last, 'roles' => ['athlete']]);
         $u->id = $id;
+        $consents = $fullNameConsent
+            ? [new Consent(['type' => ConsentType::FullName, 'version' => ConsentType::FullName->version()])]
+            : [];
+        $u->setRelation('unrevokedConsents', new EloquentCollection($consents));
 
         return $u;
     }
@@ -61,5 +68,18 @@ class RegistrantDisplayTest extends TestCase
 
         $this->assertSame('Marc S.', $labels[1]);
         $this->assertSame('Léa S.', $labels[2]);
+    }
+
+    public function test_nom_complet_pour_qui_l_a_accepte_au_trombinoscope(): void
+    {
+        $users = new Collection([
+            $this->user(1, 'Marc', 'Sapin', fullNameConsent: true),
+            $this->user(2, 'Marc', 'Simon'),
+        ]);
+
+        $labels = RegistrantDisplay::labels($users, fullNames: false);
+
+        $this->assertSame('Marc Sapin', $labels[1]);
+        $this->assertSame('Marc Si.', $labels[2]);
     }
 }

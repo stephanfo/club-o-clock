@@ -2,10 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Home;
+use App\Livewire\SessionShow;
 use App\Livewire\Trombinoscope;
 use App\Livewire\TrombiShow;
 use App\Models\Category;
 use App\Models\Qualification;
+use App\Models\Registration;
+use App\Models\Session;
 use App\Models\User;
 use App\Services\ConsentService;
 use App\Services\TrombiService;
@@ -219,5 +223,68 @@ class TrombiScreenTest extends TestCase
 
         $this->actingAs($parent)->get(route('trombi.photo', ['user' => $child->id, 'size' => 512]))->assertOk();
         $this->actingAs($this->viewer)->get(route('trombi.photo', ['user' => $child->id, 'size' => 512]))->assertNotFound();
+    }
+
+    public function test_listes_d_inscrits_nom_consenti_et_vignette_visible(): void
+    {
+        $s = Session::create([
+            'kind' => 'training', 'title' => 'Natation seuil',
+            'start_at' => Carbon::now()->addDays(2)->setTime(19, 0), 'duration_min' => 90,
+            'created_by' => User::factory()->coach()->create()->id,
+        ]);
+        $paul = User::factory()->create(['first_name' => 'Paul', 'last_name' => 'Qwertzuiop']);
+        $marie = User::factory()->create(['first_name' => 'Marie', 'last_name' => 'Zyxwabcd']);
+        $this->grant($paul, ConsentType::FullName, ConsentType::Photo);
+        $this->photo($paul);
+        $this->photo($marie);
+        foreach ([$paul, $marie, $this->viewer] as $u) {
+            Registration::create(['session_id' => $s->id, 'user_id' => $u->id, 'status' => 'participating', 'registered_at' => Carbon::now()]);
+        }
+
+        // Paul a tout partagé ; Marie, rien : initiale du nom, et sa photo masquée ne sort pas.
+        Livewire::actingAs($this->viewer)->test(SessionShow::class, ['session' => $s])
+            ->assertSee('Paul Qwertzuiop')->assertSee('Marie Z.')->assertDontSee('Zyxwabcd')
+            ->assertSee('trombi-photo/'.$paul->id.'/192', false)
+            ->assertDontSee('trombi-photo/'.$marie->id.'/', false);
+    }
+
+    public function test_accueil_anniversaires_de_la_semaine_a_cheval_sur_deux_annees(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 12, 30, 12, 0, 0, 'Europe/Paris'));
+        $home = fn (User $u) => Livewire::actingAs($u)->test(Home::class);
+
+        // Aucun accord : bloc masqué, le lien vers le trombinoscope reste.
+        User::factory()->create(['first_name' => 'Sansaccord', 'dob' => '2000-01-02']);
+        $home($this->viewer)->assertDontSee('Anniversaires de la semaine')->assertSee('Trombinoscope du club');
+
+        $jan = User::factory()->create(['first_name' => 'Janvier', 'dob' => '2000-01-02']);
+        $dec = User::factory()->create(['first_name' => 'Decembre', 'dob' => '1999-12-29']);
+        $later = User::factory()->create(['first_name' => 'Plustard', 'dob' => '2000-01-05']);
+        $gone = User::factory()->create(['first_name' => 'Suspendu', 'dob' => '2000-12-31']);
+        foreach ([$jan, $dec, $later, $gone] as $u) {
+            $this->grant($u, ConsentType::Birthday);
+        }
+        $gone->forceFill(['athlete_access_suspended' => true])->save();
+
+        $home($this->viewer)
+            ->assertSee('Anniversaires de la semaine')
+            ->assertSeeInOrder(['Decembre', 'mar. 29 déc.', 'Janvier', 'sam. 2 janv.'])
+            ->assertDontSee('Sansaccord')->assertDontSee('Plustard')->assertDontSee('Suspendu')
+            ->assertDontSee('2000');
+
+        // Qui ne consulte pas le trombinoscope n'a ni le bloc ni le lien.
+        $home(User::factory()->create(['roles' => []]))
+            ->assertDontSee('Anniversaires de la semaine')->assertDontSee('Trombinoscope du club');
+    }
+
+    public function test_accueil_29_fevrier_fete_le_28_hors_annee_bissextile(): void
+    {
+        Carbon::setTestNow(Carbon::create(2027, 3, 1, 9, 0, 0, 'Europe/Paris'));
+        $leap = User::factory()->create(['first_name' => 'Bissextile', 'dob' => '2004-02-29']);
+        $this->grant($leap, ConsentType::Birthday);
+
+        Livewire::actingAs($this->viewer)->test(Home::class)->assertDontSee('Bissextile');
+        Carbon::setTestNow(Carbon::create(2027, 2, 24, 9, 0, 0, 'Europe/Paris'));
+        Livewire::actingAs($this->viewer)->test(Home::class)->assertSee('Bissextile')->assertSee('dim. 28 févr.');
     }
 }

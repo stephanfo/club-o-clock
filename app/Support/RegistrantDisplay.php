@@ -3,11 +3,15 @@
 namespace App\Support;
 
 use App\Models\User;
+use App\Policies\TrombiPolicy;
+use App\Support\Trombi\TrombiCard;
 use Illuminate\Support\Collection;
 
 // Affichage RGPD des noms d'inscrits (PRD §4.9.4).
 // Entre athlètes : prénom + initiale, étendue au minimum nécessaire pour lever
-// l'homonymie sur une même séance (« Marc Sa. » / « Marc Sm. »). Coachs/admins : nom complet.
+// l'homonymie sur une même séance (« Marc Sa. » / « Marc Sm. »), ou nom complet pour qui l'a
+// accepté au trombinoscope (§4.23.1, TrombiPolicy::fullName). Coachs/admins : nom complet.
+// Relation à charger sur chaque utilisateur : `unrevokedConsents`.
 class RegistrantDisplay
 {
     /**
@@ -26,15 +30,36 @@ class RegistrantDisplay
             ])->all();
         }
 
-        // Entre athlètes : prénom + initiale du nom, étendue par groupe d'homonymes.
+        // Entre athlètes : prénom + initiale du nom, étendue par groupe d'homonymes, sauf accord.
+        $policy = new TrombiPolicy;
         $labels = [];
         foreach ($users->groupBy(fn (User $u) => mb_strtolower($u->first_name)) as $group) {
             foreach ($group as $user) {
-                $labels[$user->id] = trim($user->first_name.' '.self::initials($user, $group));
+                $labels[$user->id] = $policy->fullName($user)
+                    ? $user->fullName()
+                    : trim($user->first_name.' '.self::initials($user, $group));
             }
         }
 
         return $labels;
+    }
+
+    /**
+     * Table [user_id => URL de la vignette] des photos que $viewer peut voir (§4.23.5).
+     *
+     * @param  Collection<int, User>  $users
+     * @return array<int, string>
+     */
+    public static function photos(Collection $users, ?User $viewer): array
+    {
+        if ($viewer === null) {
+            return [];
+        }
+        $policy = app(TrombiPolicy::class);
+
+        return $users->filter()->unique('id')
+            ->mapWithKeys(fn (User $u) => [$u->id => TrombiCard::photoUrl($viewer, $u, 192, $policy)])
+            ->filter()->all();
     }
 
     /**

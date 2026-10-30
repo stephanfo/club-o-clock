@@ -95,6 +95,7 @@
             </div>
             @include('livewire.partials.home-quotas')
             @include('livewire.partials.home-apero')
+            @include('livewire.partials.home-trombi', ['withLink' => true])
             @include('livewire.partials.home-debriefs')
         </div>
     </div>
@@ -192,6 +193,7 @@
                     </div>
                     @include('livewire.partials.home-quotas')
                     @include('livewire.partials.home-apero')
+                    @include('livewire.partials.home-trombi', ['withLink' => false])
                     @include('livewire.partials.home-debriefs')
                 </div>
             </div>

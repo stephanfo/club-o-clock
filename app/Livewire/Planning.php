@@ -217,7 +217,7 @@ class Planning extends Component
         $base = function () {
             $query = Session::query()
                 ->where('kind', 'competition')
-                ->with(['discipline', 'eventType', 'location', 'coaches', 'registrations.user:id,first_name,last_name'])
+                ->with(['discipline', 'eventType', 'location', 'coaches', 'registrations.user:id,first_name,last_name,roles,board_role', 'registrations.user.unrevokedConsents'])
                 ->visibleToCategories($this->subject());
 
             if ($this->mine && auth()->check()) {
