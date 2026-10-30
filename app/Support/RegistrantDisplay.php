@@ -45,6 +45,26 @@ class RegistrantDisplay
     }
 
     /**
+     * Table [user_id => URL de la fiche du trombinoscope] : seulement si $viewer consulte le
+     * trombinoscope et que l'inscrit y figure — sinon la fiche répondrait 404, le lien serait mort.
+     *
+     * @param  Collection<int, User>  $users
+     * @return array<int, string>
+     */
+    public static function profiles(Collection $users, ?User $viewer): array
+    {
+        $policy = app(TrombiPolicy::class);
+        if ($viewer === null || ! $policy->consult($viewer)) {
+            return [];
+        }
+
+        return $users->filter()->unique('id')
+            ->filter(fn (User $u) => $policy->figures($u))
+            ->mapWithKeys(fn (User $u) => [$u->id => route('trombi.show', $u)])
+            ->all();
+    }
+
+    /**
      * Table [user_id => URL de la vignette] des photos que $viewer peut voir (§4.23.5).
      *
      * @param  Collection<int, User>  $users

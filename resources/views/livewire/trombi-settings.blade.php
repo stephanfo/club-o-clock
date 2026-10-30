@@ -23,11 +23,11 @@
     {{-- Photo --}}
     <div>
         <div class="sect-head"><span class="sect-title">Photo</span></div>
-        <div class="card card-pad flex ac g10" style="gap:14px">
+        <div class="card card-pad flex ac g10" style="gap:14px" x-data="photoCrop()">
             <x-avatar :name="$subject->fullName()" size="lg" tint="tint-run" :photo="$ownPhoto" />
             <div class="f1" style="min-width:0">
                 @if ($subject->photo_path === null)
-                    <div class="meta" style="font-size:12.5px">Aucune photo. JPEG, PNG ou WebP, 5 Mo au plus ; recadrée au carré, sans ses métadonnées (lieu de prise de vue compris).</div>
+                    <div class="meta" style="font-size:12.5px">Aucune photo. JPEG, PNG ou WebP, directement depuis ta pellicule : tu la cadres avant l'envoi, et elle part sans ses métadonnées (lieu de prise de vue compris).</div>
                 @elseif ($masked)
                     <div class="meta" style="font-size:12.5px">Masquée : visible de {{ $self ? 'toi' : 'toi et '.$subject->first_name }} seulement. Active l'accord « Photo » pour la montrer.</div>
                 @else
@@ -35,8 +35,10 @@
                 @endif
                 <div class="flex g6 wrap" style="margin-top:8px">
                     @if ($canEdit)
+                        {{-- Pas de wire:model : ce qui part, après « Valider » dans le dialog de recadrage
+                             (resources/js/photo-crop.js), est le carré cadré, réduit par le navigateur. --}}
                         <label class="btn btn-ghost btn-sm" style="cursor:pointer">
-                            <input type="file" accept="image/jpeg,image/png,image/webp" wire:model="photo" hidden>
+                            <input type="file" accept="image/jpeg,image/png,image/webp" x-on:change="choose($event)" hidden>
                             <x-icon name="upload" :size="14" /> {{ $subject->photo_path ? 'Changer' : 'Choisir une photo' }}
                         </label>
                     @endif
@@ -47,9 +49,51 @@
                         </button>
                     @endif
                 </div>
-                <div wire:loading wire:target="photo" class="meta" style="font-size:12px;margin-top:6px">Envoi en cours…</div>
+                <div class="meta" style="color:var(--danger);font-size:12px;margin-top:6px" x-show="error && !open" x-text="error" x-cloak></div>
                 @error('photo') <div class="meta" style="color:var(--danger);font-size:12px;margin-top:6px">{{ $message }}</div> @enderror
             </div>
+
+            {{-- Dialog de recadrage : mêmes classes que <x-dialog>, piloté par Alpine (rien ne part
+                 au serveur avant « Valider »). Glisser pour déplacer, curseur / molette / pincement
+                 pour zoomer, quart de tour horaire. --}}
+            <template x-if="open">
+                <div class="scrim" x-on:click="close()">
+                    <div class="dialog" style="max-width:380px" x-on:click.stop role="dialog" aria-modal="true" aria-labelledby="crop-title-{{ $this->getId() }}">
+                        <div class="dialog-head">
+                            <div class="flex ac jb g8">
+                                <div class="dialog-title" id="crop-title-{{ $this->getId() }}">Cadrer la photo</div>
+                                <button type="button" class="iconbtn" aria-label="Fermer" x-on:click="close()" :disabled="busy"><x-icon name="x" /></button>
+                            </div>
+                            <div class="dialog-sub">Ce que montre le cercle est ce que verront les adhérents.</div>
+                        </div>
+                        <div class="dialog-body" style="display:flex;flex-direction:column;gap:12px">
+                            <div class="crop-stage" x-ref="stage"
+                                 x-on:pointerdown.prevent="down($event)" x-on:pointermove="move($event)"
+                                 x-on:pointerup="up($event)" x-on:pointercancel="up($event)"
+                                 x-on:wheel.prevent="wheel($event)">
+                                <img class="crop-img" x-ref="img" :src="src" alt="" draggable="false" :style="imgStyle"
+                                     x-on:load="loaded($el)" x-on:error="unreadable()">
+                                <div class="crop-mask" aria-hidden="true"></div>
+                            </div>
+                            <div class="flex ac g10">
+                                <x-icon name="minus" :size="16" style="color:var(--fg-muted);flex:0 0 auto" />
+                                <input type="range" class="zone-range f1" min="1" max="4" step="0.01" aria-label="Zoom"
+                                       :value="zoom" x-on:input="setZoom($event.target.value)" :disabled="busy">
+                                <x-icon name="plus" :size="16" style="color:var(--fg-muted);flex:0 0 auto" />
+                                <button type="button" class="iconbtn" aria-label="Pivoter d'un quart de tour" title="Pivoter" x-on:click="rotate()" :disabled="busy">
+                                    <x-icon name="rotate-ccw" :size="18" style="transform:scaleX(-1)" />
+                                </button>
+                            </div>
+                            <div class="meta" style="font-size:12px" x-show="busy" x-text="'Envoi en cours… ' + progress + ' %'"></div>
+                            <div class="meta" style="color:var(--danger);font-size:12px" x-show="error" x-text="error"></div>
+                        </div>
+                        <div class="dialog-foot">
+                            <button type="button" class="btn btn-ghost" x-on:click="close()" :disabled="busy">Annuler</button>
+                            <button type="button" class="btn btn-primary" x-on:click="confirm()" :disabled="busy || !nw">Valider</button>
+                        </div>
+                    </div>
+                </div>
+            </template>
         </div>
     </div>
 

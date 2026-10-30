@@ -3,7 +3,9 @@
 //
 // NON destructif : le seul accord posé (T4) est retiré dans le même scénario, et ses lignes du
 // registre et du journal sont effacées par leur id.
-import { launch, session, fiche, sql, seance, repereJournaux, purgeJournaux, Scenario, MOBILE, DESKTOP, BASE } from './lib.mjs';
+import { execFileSync } from 'node:child_process';
+import { statSync } from 'node:fs';
+import { launch, session, fiche, sql, seance, repereJournaux, purgeJournaux, Scenario, MOBILE, DESKTOP, BASE, SHOTS } from './lib.mjs';
 
 const browser = await launch();
 const tous = [];
@@ -166,7 +168,9 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   const s = new Scenario('T6 · Photos des inscrits sur la fiche séance (desktop)');
   const avecPhoto = `id IN (SELECT r.session_id FROM registrations r JOIN users u ON u.id=r.user_id
       JOIN consents c ON c.user_id=u.id AND c.type='trombi_photo' AND c.revoked_at IS NULL
-      WHERE r.status='participating' AND u.photo_path IS NOT NULL AND u.athlete_access_suspended=0)`;
+      WHERE r.status='participating' AND u.photo_path IS NOT NULL AND u.athlete_access_suspended=0)
+    AND id IN (SELECT r.session_id FROM registrations r JOIN users u ON u.id=r.user_id
+      WHERE r.status='participating' AND u.photo_path IS NULL)`; // et au moins un inscrit sans photo : contrôle des initiales
   // Toute séance à venir (pas seulement un entraînement) : la règle est la même sur les trois kinds.
   const cible = seance(`cancelled_at IS NULL AND start_at > NOW() AND ${avecPhoto}`);
   const { ctx, page } = await session(browser, 'vincent@demo.club', DESKTOP);
@@ -176,6 +180,19 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   s.check('au moins une vignette chargée dans la liste', await imagesChargees(page, '.reg-list img'));
   s.check('contrôle : des inscrits sans photo gardent leurs initiales', await page.locator('.reg-list:visible .avatar:not(.has-photo)').count() > 0);
   await s.shot(page, 'trombi-inscrits-desktop');
+
+  // Un inscrit mène à sa fiche du trombinoscope, et le retour ramène à la séance.
+  const lien = page.locator('.reg-list:visible a.reg-link').first();
+  const nom = (await lien.innerText()).trim();
+  const href = await lien.getAttribute('href');
+  s.check('les inscrits sont des liens vers leur fiche', await page.locator('.reg-list:visible a.reg-link').count() > 0);
+  await lien.click();
+  await page.waitForURL(/\/trombinoscope\/\d+$/);
+  await attendre(page);
+  s.check('la fiche ouverte est celle de l’inscrit', page.url() === href && (await texte(page)).includes(nom.toLowerCase()), `${nom} → ${page.url()}`);
+  await page.locator('[onclick*="clubBack"]:visible').first().click();
+  await page.waitForURL(new RegExp(`/seances/${cible}`));
+  s.check('le retour ramène à la séance', page.url().includes(`/seances/${cible}`), page.url());
   s.checkJs(page);
   tous.push(s.report());
   await ctx.close();
@@ -205,6 +222,75 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   s.check('l’admin voit que la photo et le numéro existent', (await page.locator('.mc-show-grid').innerText()).includes('Photo : déposée · Téléphone : saisi'));
   s.check('mais ne voit ni le numéro ni la photo', !html.includes('39 98 01 12') && !html.includes('trombi-photo'));
   s.checkJs(page);
+  tous.push(s.report());
+  await ctx.close();
+}
+
+// ── T8 · Recadrage au dépôt : Lucas garde la moitié ROUGE d'une photo rouge | bleu de PLUS de 5 Mo ──
+// Fabriquée par GD : paysage 3000×1500 bruité (incompressible, comme une photo de téléphone), rouge à
+// gauche, bleu à droite. Sans toucher, le recadrage automatique la centrerait sur la frontière ; on
+// glisse vers la droite pour ne garder que le rouge, et c'est la vignette STOCKÉE (relue par le
+// navigateur) qui doit être rouge. Le poids prouve que la limite de 5 Mo ne bloque plus : le
+// navigateur n'envoie que le carré cadré, réduit.
+const fichier = `${SHOTS}rouge-bleu.png`;
+execFileSync('php', ['-r', `$w=3000;$h=1500;$i=imagecreatetruecolor($w,$h);$r=fn($v)=>max(0,min(255,$v+mt_rand(-40,40)));for($y=0;$y<$h;$y++)for($x=0;$x<$w;$x++){[$a,$b,$c]=$x<$w/2?[200,30,30]:[30,60,200];imagesetpixel($i,$x,$y,($r($a)<<16)|($r($b)<<8)|$r($c));}imagepng($i,'${fichier}',9);`]);
+for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
+  const s = new Scenario(`T8 · Recadrer sa photo au dépôt (${format})`);
+  s.check('contrôle : la photo de départ dépasse 5 Mo', statSync(fichier).size > 5 * 1024 * 1024, `${(statSync(fichier).size / 1048576).toFixed(1)} Mo`);
+  const lucas = id('lucas@demo.club');
+  const repere = repereJournaux();
+  s.check('contrôle : Lucas sans photo au départ', sql(`SELECT IFNULL(photo_path,'') FROM users WHERE id=${lucas}`) === '');
+
+  const { ctx, page } = await session(browser, 'lucas@demo.club', viewport);
+  page.on('dialog', d => d.accept()); // wire:confirm de la suppression finale
+  await page.goto(BASE + '/profil?tab=trombi', { waitUntil: 'networkidle' });
+  await page.locator('input[type=file]:visible, label:visible input[type=file]').first().setInputFiles(fichier);
+  const stage = page.locator('.crop-stage:visible');
+  await stage.waitFor();
+  await page.waitForFunction(() => [...document.querySelectorAll('.crop-img')].some(i => i.offsetParent && i.complete && i.naturalWidth));
+  s.check('le dialog s’ouvre, rien n’est encore envoyé', sql(`SELECT IFNULL(photo_path,'') FROM users WHERE id=${lucas}`) === '');
+  await s.shot(page, `trombi-recadrage-${format}`);
+
+  const box = await stage.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 1.5, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.up();
+  // Poids réellement envoyé : Playwright ne mesure pas un corps multipart, on le lit dans la page
+  // (Livewire envoie les fichiers par XMLHttpRequest).
+  await page.evaluate(() => {
+    window.__envoye = 0;
+    const send = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function (body) {
+      if (body instanceof FormData) for (const v of body.values()) if (v instanceof Blob) window.__envoye += v.size;
+      return send.call(this, body);
+    };
+  });
+  await page.getByRole('button', { name: 'Valider' }).click();
+  await page.waitForFunction(() => !document.querySelector('.crop-stage'), null, { timeout: 15000 });
+  await attendre(page);
+  const path = sql(`SELECT IFNULL(photo_path,'') FROM users WHERE id=${lucas}`);
+  s.check('photo enregistrée après « Valider »', path !== '');
+  const envoye = await page.evaluate(() => window.__envoye);
+  s.check('seul le carré réduit est parti (< 1 Mo)', envoye > 0 && envoye < 1024 * 1024, `${Math.round(envoye / 1024)} Ko`);
+
+  // Couleur du centre de la vignette 192 servie par l'app.
+  const rgb = await page.evaluate(async (url) => {
+    const blob = await (await fetch(url)).blob();
+    const bmp = await createImageBitmap(blob);
+    const c = new OffscreenCanvas(bmp.width, bmp.height);
+    const g = c.getContext('2d');
+    g.drawImage(bmp, 0, 0);
+    return [...g.getImageData(bmp.width / 2, bmp.height / 2, 1, 1).data].slice(0, 3);
+  }, `${BASE}/trombi-photo/${lucas}/192`);
+  s.check('la vignette est la partie choisie (rouge)', rgb[0] > 150 && rgb[2] < 100, rgb.join(','));
+  s.checkJs(page);
+
+  // Restauration : la photo repart par l'interface, comme Lucas le ferait.
+  await page.locator('button:visible', { hasText: /Supprimer/ }).first().click();
+  await attendre(page);
+  s.check('restauré : Lucas sans photo', sql(`SELECT IFNULL(photo_path,'') FROM users WHERE id=${lucas}`) === '');
+  purgeJournaux(repere);
   tous.push(s.report());
   await ctx.close();
 }

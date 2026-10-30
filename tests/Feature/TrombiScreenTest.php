@@ -245,7 +245,15 @@ class TrombiScreenTest extends TestCase
         Livewire::actingAs($this->viewer)->test(SessionShow::class, ['session' => $s])
             ->assertSee('Paul Qwertzuiop')->assertSee('Marie Z.')->assertDontSee('Zyxwabcd')
             ->assertSee('trombi-photo/'.$paul->id.'/192', false)
-            ->assertDontSee('trombi-photo/'.$marie->id.'/', false);
+            ->assertDontSee('trombi-photo/'.$marie->id.'/', false)
+            // Nom et vignette mènent à la fiche du trombinoscope…
+            ->assertSee('href="'.route('trombi.show', $paul).'"', false)
+            ->assertSee('href="'.route('trombi.show', $marie).'"', false);
+
+        // … mais pas pour qui ne consulte pas le trombinoscope : la fiche lui répondrait 403.
+        Livewire::actingAs(User::factory()->create(['roles' => []]))->test(SessionShow::class, ['session' => $s])
+            ->assertSee('Marie Z.')
+            ->assertDontSee('href="'.route('trombi.show', $marie).'"', false);
     }
 
     public function test_accueil_anniversaires_de_la_semaine_a_cheval_sur_deux_annees(): void

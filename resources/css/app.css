@@ -586,6 +586,10 @@ a.scard { text-decoration: none; color: inherit; }
 .reg-item { display: flex; align-items: center; gap: 10px; }
 .reg-rank { width: 18px; text-align: center; font-variant-numeric: tabular-nums; color: var(--fg-muted, #999); font-size: 13px; }
 .reg-name { font-size: 14px; }
+/* Inscrit cliquable vers sa fiche du trombinoscope (#72) : même rangée, sans le soulignement des liens. */
+.reg-link { display: flex; align-items: center; gap: 10px; min-width: 0; color: inherit; border-bottom: 0; }
+.reg-link:hover { color: inherit; }
+.reg-link:hover .reg-name { text-decoration: underline; }
 
 /* Coquille mobile : appbar + hero + tabs + barre collante (proto TrainingFicheMobile) */
 .fiche-mobile { display: none; }

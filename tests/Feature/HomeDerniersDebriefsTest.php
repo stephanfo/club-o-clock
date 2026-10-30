@@ -48,8 +48,10 @@ class HomeDerniersDebriefsTest extends TestCase
         $ancienne = $this->competition('Tri de Dijon', Carbon::now()->subDays(10));
         $recente = $this->competition('Duathlon de Beaune', Carbon::now()->subDays(3));
         $this->debrief($ancienne, 'Julie', Carbon::now()->subDay());
+        // Une minute d'écart : à horodatage égal, l'ordre de `latest()` est laissé au SGBD (MySQL et
+        // MariaDB ne rendent pas toujours le même), et « Marc, Léa » devenait aléatoire en CI.
         $this->debrief($recente, 'Marc', Carbon::now()->subDays(2));
-        $this->debrief($recente, 'Léa', Carbon::now()->subDays(2));
+        $this->debrief($recente, 'Léa', Carbon::now()->subDays(2)->subMinute());
 
         $this->actingAs(User::factory()->create());
         Livewire::test(Home::class)
