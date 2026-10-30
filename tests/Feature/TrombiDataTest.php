@@ -240,6 +240,20 @@ class TrombiDataTest extends TestCase
         $this->assertNull($u->fresh()->phone);
     }
 
+    public function test_supprimer_le_numero_retire_son_accord(): void
+    {
+        $u = User::factory()->create();
+        $this->service()->setPhone($u, '06 12 34 56 78', $u);
+        app(ConsentService::class)->grant($u, ConsentType::Phone, $u);
+
+        $this->service()->deletePhone($u, $u);
+        $this->service()->setPhone($u, '07 98 76 54 32', $u);
+
+        // Le nouveau numéro n'est montré qu'après un nouvel accord.
+        $this->assertSame('+33798765432', $u->fresh()->phone);
+        $this->assertFalse($u->fresh()->hasConsent(ConsentType::Phone));
+    }
+
     public function test_purge_et_effacement(): void
     {
         $u = User::factory()->create();

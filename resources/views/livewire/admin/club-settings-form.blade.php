@@ -352,9 +352,10 @@
     @if ($showBascule && $impact)
         <x-dialog title="Bascule de saison" sub="Action irréversible · double validation" :danger="true" :width="440" close="$set('showBascule', false)">
             <x-banner kind="danger"><div>Tu vas <b>suspendre {{ $impact['athletes'] }} compte{{ $impact['athletes'] > 1 ? 's' : '' }} athlète</b> et <b>annuler {{ $impact['future_registrations'] }} inscription{{ $impact['future_registrations'] > 1 ? 's' : '' }} future{{ $impact['future_registrations'] > 1 ? 's' : '' }}</b>. Les comptes coach/admin ne sont pas affectés.</div></x-banner>
-            @if ($impact['trombi_purge'] > 0)
+            @php $purge = $impact['trombi_purge']; @endphp
+            @if ($purge > 0)
                 {{-- Cadrage §7.18 : non réadhérents de toute la saison écoulée → données du trombinoscope effacées. --}}
-                <x-banner kind="warn"><div><b>{{ $impact['trombi_purge'] }} compte{{ $impact['trombi_purge'] > 1 ? 's' : '' }}</b> déjà suspendu{{ $impact['trombi_purge'] > 1 ? 's' : '' }} depuis la saison passée : photo, téléphone et accords du trombinoscope seront effacés.</div></x-banner>
+                <x-banner kind="warn"><div><b>{{ $purge }} compte{{ $purge > 1 ? 's' : '' }}</b> déjà suspendu{{ $purge > 1 ? 's' : '' }} depuis la saison passée : photo, téléphone et accords du trombinoscope seront effacés.</div></x-banner>
             @endif
             <label class="field-label" style="margin-top:14px">Motif (visible dans le bandeau inscrit)</label>
             <textarea class="input" style="margin-top:6px" rows="2" wire:model.blur="basculeMotif" placeholder="Saison N — réactive ton accès depuis ton profil après réinscription."></textarea>
@@ -367,12 +368,16 @@
             <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">
                 <div class="flex ac g10" style="font-size:14px;cursor:pointer" wire:click="$toggle('basculeCheck1')"><x-check :on="$basculeCheck1" wire:click.stop="$toggle('basculeCheck1')" aria-labelledby="txt-bascule-1" /> <span id="txt-bascule-1">Je comprends que {{ $impact['athletes'] }} comptes seront suspendus</span></div>
                 <div class="flex ac g10" style="font-size:14px;cursor:pointer" wire:click="$toggle('basculeCheck2')"><x-check :on="$basculeCheck2" wire:click.stop="$toggle('basculeCheck2')" aria-labelledby="txt-bascule-2" /> <span id="txt-bascule-2">Je comprends que {{ $impact['future_registrations'] }} inscriptions seront annulées</span></div>
+                @if ($purge > 0)
+                    <div class="flex ac g10" style="font-size:14px;cursor:pointer" wire:click="$toggle('basculeCheck3')"><x-check :on="$basculeCheck3" wire:click.stop="$toggle('basculeCheck3')" aria-labelledby="txt-bascule-3" /> <span id="txt-bascule-3">Je comprends que le trombinoscope de {{ $purge }} compte{{ $purge > 1 ? 's' : '' }} sera effacé</span></div>
+                @endif
             </div>
             @error('bascule')<div class="meta" style="color:var(--danger);margin-top:8px">{{ $message }}</div>@enderror
             <x-slot:footer>
                 <button type="button" class="btn btn-ghost" wire:click="$set('showBascule', false)">Annuler</button>
-                <button type="button" class="btn btn-danger-solid{{ ($basculeCheck1 && $basculeCheck2) ? '' : ' is-disabled' }}"
-                        @if ($basculeCheck1 && $basculeCheck2) wire:click="deactivateAllAthletes" @endif>Basculer la saison</button>
+                @php $armed = $basculeCheck1 && $basculeCheck2 && ($basculeCheck3 || $purge === 0); @endphp
+                <button type="button" class="btn btn-danger-solid{{ $armed ? '' : ' is-disabled' }}"
+                        @if ($armed) wire:click="deactivateAllAthletes" @endif>Basculer la saison</button>
             </x-slot:footer>
         </x-dialog>
     @endif

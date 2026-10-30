@@ -408,4 +408,19 @@ class SeasonTest extends TestCase
         Livewire::actingAs($admin)->test(Home::class)->assertSee('Rentrée sportive');
         Livewire::actingAs($athlete)->test(Home::class)->assertDontSee('Rentrée sportive');
     }
+
+    public function test_la_purge_du_trombinoscope_exige_son_propre_accuse_de_reception(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $stale = User::factory()->create(['athlete_access_suspended' => true, 'phone' => '+33639980101']);
+        $bascule = fn () => Livewire::actingAs($admin)->test(ClubSettingsForm::class)
+            ->call('openBascule')->assertSee('le trombinoscope de 1 compte sera effacé')
+            ->set('basculeCheck1', true)->set('basculeCheck2', true);
+
+        $bascule()->call('deactivateAllAthletes')->assertHasErrors('bascule');
+        $this->assertNotNull($stale->fresh()->phone, 'Sans la troisième case, rien n\'est effacé.');
+
+        $bascule()->set('basculeCheck3', true)->call('deactivateAllAthletes')->assertHasNoErrors();
+        $this->assertNull($stale->fresh()->phone);
+    }
 }

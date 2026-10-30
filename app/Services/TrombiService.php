@@ -150,7 +150,12 @@ class TrombiService
             throw new RuntimeException('Tu ne peux pas supprimer ce numéro.');
         }
 
-        $subject->forceFill(['phone' => null])->save();
+        // L'accord portait sur CE numéro : sans le retirer, un numéro saisi plus tard serait
+        // aussitôt montré, sans que personne ait consenti à le diffuser.
+        DB::transaction(function () use ($subject, $actor) {
+            $subject->forceFill(['phone' => null])->save();
+            $this->consents->revokeType($subject, ConsentType::Phone, $actor);
+        });
     }
 
     /**

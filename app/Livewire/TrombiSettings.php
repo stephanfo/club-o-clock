@@ -49,13 +49,14 @@ class TrombiSettings extends Component
     /** Dépôt dès le choix du fichier : pas de bouton « Enregistrer » à oublier. */
     public function updatedPhoto(TrombiService $service): void
     {
-        $this->validate(['photo' => ['image', 'mimes:jpeg,png,webp', 'max:5120']], [
-            'photo.image' => 'Choisis une image.',
-            'photo.mimes' => 'Formats acceptés : JPEG, PNG ou WebP.',
-            'photo.max' => 'La photo dépasse 5 Mo.',
-        ]);
-
         try {
+            // Dans le try : un envoi refusé (trop lourd, mauvais format) ne doit pas laisser
+            // l'original, EXIF compris, dans le dossier temporaire.
+            $this->validate(['photo' => ['image', 'mimes:jpeg,png,webp', 'max:5120']], [
+                'photo.image' => 'Choisis une image.',
+                'photo.mimes' => 'Formats acceptés : JPEG, PNG ou WebP.',
+                'photo.max' => 'La photo dépasse 5 Mo.',
+            ]);
             $service->storePhoto($this->subject(), $this->photo->getRealPath(), auth()->user());
             session()->flash('status', 'Photo enregistrée.');
         } catch (RuntimeException $e) {

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Admin\MemberShow;
 use App\Livewire\Admin\MemberTrombi;
 use App\Models\AuditLog;
 use App\Models\Consent;
@@ -37,7 +38,9 @@ class TrombiAdminTest extends TestCase
         $u = User::factory()->create();
 
         Livewire::actingAs(User::factory()->coach()->create())->test(MemberTrombi::class, ['memberId' => $u->id])->assertForbidden();
-        $this->actingAs($this->admin)->get(route('admin.members.show', $u).'?tab=trombi')->assertOk();
+        // L'onglet ne se lit pas dans l'URL : on l'ouvre comme l'admin, d'un clic.
+        Livewire::actingAs($this->admin)->test(MemberShow::class, ['user' => $u])
+            ->set('tab', 'trombi')->assertSeeLivewire(MemberTrombi::class)->assertSee('Fonction au bureau');
     }
 
     public function test_fonction_au_bureau_tracee(): void

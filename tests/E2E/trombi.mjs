@@ -23,6 +23,12 @@ const imagesChargees = (page, sel) => page.waitForFunction((sel) => {
 }, sel, { timeout: 5000 }).then(() => true, () => false);
 
 // ── T1 · Marie : accueil, grille, filtre Bureau, fiche d'un majeur qui a tout partagé ──
+// Le seed place l'anniversaire de Camille dans la semaine OÙ IL A TOURNÉ : la semaine suivante, le
+// bloc de l'accueil serait vide. On le pose donc aujourd'hui le temps de T1 (année 1992, bissextile :
+// un 29 février reste une date valide), puis on rend sa date de naissance d'origine.
+const dobCamille = sql("SELECT dob FROM users WHERE email='camille@demo.club'");
+sql("UPDATE users SET dob = CONCAT('1992-', DATE_FORMAT(CURDATE(), '%m-%d')) WHERE email='camille@demo.club'");
+try {
 for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   const s = new Scenario(`T1 · Marie consulte le trombinoscope (${format})`);
   const { ctx, page } = await session(browser, 'marie@demo.club', viewport);
@@ -71,6 +77,9 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   s.checkJs(page);
   tous.push(s.report());
   await ctx.close();
+}
+} finally {
+  sql(`UPDATE users SET dob='${dobCamille}' WHERE email='camille@demo.club'`);
 }
 
 // ── T2 · Théo (mineur, P2) : visages oui, coordonnées jamais — y compris dans le HTML ──

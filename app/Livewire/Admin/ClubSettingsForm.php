@@ -112,6 +112,9 @@ class ClubSettingsForm extends Component
 
     public bool $basculeCheck2 = false;
 
+    /** Accusé de la purge du trombinoscope (#72), exigé seulement quand il y a des comptes à purger. */
+    public bool $basculeCheck3 = false;
+
     public string $basculeMotif = '';
 
     // Nouvelle année sportive (§4.5) : modale de recalcul des catégories.
@@ -365,7 +368,7 @@ class ClubSettingsForm extends Component
 
     public function openBascule(): void
     {
-        $this->reset('basculeCheck1', 'basculeCheck2', 'basculeMotif');
+        $this->reset('basculeCheck1', 'basculeCheck2', 'basculeCheck3', 'basculeMotif');
         $this->showBascule = true;
     }
 
@@ -377,9 +380,14 @@ class ClubSettingsForm extends Component
 
             return;
         }
+        if (! $this->basculeCheck3 && $season->impactCounters()['trombi_purge'] > 0) {
+            $this->addError('bascule', 'Coche aussi la confirmation de l\'effacement du trombinoscope.');
+
+            return;
+        }
 
         $result = $season->deactivateAllAthletes(auth()->user(), $this->basculeMotif ?: null);
-        $this->reset('showBascule', 'basculeCheck1', 'basculeCheck2', 'basculeMotif');
+        $this->reset('showBascule', 'basculeCheck1', 'basculeCheck2', 'basculeCheck3', 'basculeMotif');
         $purged = $result['trombi_purged'] > 0 ? ", {$result['trombi_purged']} trombinoscopes effacés" : '';
         session()->flash('status', "Saison basculée : {$result['accounts']} comptes suspendus, {$result['registrations']} inscriptions annulées{$purged}.");
     }

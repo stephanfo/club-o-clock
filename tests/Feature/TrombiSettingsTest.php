@@ -10,6 +10,7 @@ use App\Support\Trombi\ConsentType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Features\SupportFileUploads\FileUploadConfiguration;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -68,11 +69,17 @@ class TrombiSettingsTest extends TestCase
 
         $this->assertNotNull($u->fresh()->photo_path);
         $this->assertCount(2, Storage::disk('local')->allFiles('trombi'));
-        $this->assertSame([], Storage::disk('local')->allFiles('livewire-tmp'), 'L\'envoi temporaire est effacé.');
+        // Sous test, Livewire range les envois sur son propre disque (tmp-for-tests), pas sous local.
+        $tmp = fn () => FileUploadConfiguration::storage()->allFiles(FileUploadConfiguration::path());
+        $this->assertSame([], $tmp(), 'L\'envoi temporaire est effacé.');
 
         Livewire::actingAs($u)->test(TrombiSettings::class, ['subjectId' => $u->id])
             ->set('photo', UploadedFile::fake()->create('cv.pdf', 10, 'application/pdf'))
             ->assertHasErrors('photo');
+        Livewire::actingAs($u)->test(TrombiSettings::class, ['subjectId' => $u->id])
+            ->set('photo', UploadedFile::fake()->image('lourde.jpg', 300, 300)->size(6000))
+            ->assertHasErrors('photo');
+        $this->assertSame([], $tmp(), 'Un envoi refusé ne reste pas non plus.');
     }
 
     public function test_pas_de_reglages_pour_un_tiers(): void
