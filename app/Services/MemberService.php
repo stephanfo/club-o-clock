@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Support\AgeCategory;
 use App\Support\Logging\ActivityLogger;
 use App\Support\Logging\AuditLogger;
+use App\Support\Trombi\BoardRole;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -225,6 +226,32 @@ class MemberService
             ]);
 
             return $granted;
+        });
+    }
+
+    /**
+     * Fonction au bureau (PRD §4.23.3) : une au plus par personne, plusieurs titulaires possibles.
+     * Trace board_role_changed (Audit) avec l'ancienne et la nouvelle fonction.
+     */
+    public function setBoardRole(User $member, ?BoardRole $role, User $actor): void
+    {
+        if ($member->anonymized_at !== null) {
+            throw new RuntimeException('Ce compte a été anonymisé.');
+        }
+        // Valeur brute : la colonne est nullable, ce que l'analyse statique du cast enum ignore.
+        $before = $member->getRawOriginal('board_role');
+        if ($before === $role?->value) {
+            return;
+        }
+
+        DB::transaction(function () use ($member, $role, $actor, $before) {
+            $member->forceFill(['board_role' => $role])->save();
+
+            AuditLogger::record('board_role_changed', $actor, [
+                'target_type' => User::class,
+                'target_id' => $member->id,
+                'motif' => ($before ?? 'aucune').' → '.($role === null ? 'aucune' : $role->value),
+            ]);
         });
     }
 

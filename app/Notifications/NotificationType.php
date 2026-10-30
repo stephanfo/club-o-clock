@@ -29,6 +29,7 @@ enum NotificationType: string
     case GuardianshipInvitation = 'guardianship_invitation';
     case GuardianshipSevered = 'guardianship_severed';
     case GuardianshipLinked = 'guardianship_linked';
+    case ConsentRecorded = 'consent_recorded';
 
     /** Libellé FR affiché dans la matrice de préférences (§4.15.3) et l'écran outbox (§4.15.6). */
     public function label(): string
@@ -54,6 +55,7 @@ enum NotificationType: string
             self::GuardianshipInvitation => 'Invitation à créer ton compte',
             self::GuardianshipSevered => 'Lien de tutelle rompu',
             self::GuardianshipLinked => 'Nouveau parent garant',
+            self::ConsentRecorded => 'Accord enregistré au trombinoscope',
         };
     }
 
@@ -94,6 +96,9 @@ enum NotificationType: string
     {
         return match ($this) {
             self::MemberInvitation, self::GuardianshipInvitation => true,
+            // Accord enregistré par l'admin (#72, §4.23.1) : la personne doit l'apprendre, quels que
+            // soient ses réglages — c'est ce qui lui permet de le retirer.
+            self::ConsentRecorded => true,
             default => false,
         };
     }
@@ -136,6 +141,7 @@ enum NotificationType: string
             self::GuardianshipInvitation => 'Un compte autonome t\'est ouvert : active-le via le lien reçu',
             self::GuardianshipSevered => 'Le lien de tutelle a été rompu',
             self::GuardianshipLinked => 'Un parent garant t\'est rattaché',
+            self::ConsentRecorded => 'Le bureau a enregistré un accord de diffusion au trombinoscope, recueilli hors de l\'application',
         };
     }
 
@@ -143,7 +149,8 @@ enum NotificationType: string
      * Groupes de la matrice de préférences (§4.15.3), dans l'ordre d'affichage. Chaque groupe
      * porte les types qu'un utilisateur peut moduler ; `coachOnly` masque le groupe aux non-coachs.
      * Hors matrice (notifs transactionnelles, toujours émises) : `athlete_reactivated`,
-     * `member_invitation`, `guardianship_invitation`, `guardianship_severed` et `guardianship_linked`.
+     * `member_invitation`, `guardianship_invitation`, `guardianship_severed`, `guardianship_linked` et
+     * `consent_recorded`.
      *
      * @return list<array{label:string,coachOnly:bool,types:list<self>}>
      */

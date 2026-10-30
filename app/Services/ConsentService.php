@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Consent;
 use App\Models\User;
+use App\Notifications\NotificationDispatcher;
+use App\Notifications\NotificationType;
 use App\Support\Logging\AuditLogger;
 use App\Support\Trombi\ConsentType;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,6 +19,8 @@ use RuntimeException;
 // l'AuditLog. Un retrait ne touche jamais au stockage (photo, téléphone) : il masque.
 class ConsentService
 {
+    public function __construct(private NotificationDispatcher $notifier) {}
+
     /**
      * $actor peut-il ACCORDER pour $subject dans l'app ? L'intéressé majeur pour lui-même ; pour un
      * mineur, son parent garant seul (§4.23.4) — un mineur sans garant ne s'accorde rien lui-même,
@@ -151,7 +155,32 @@ class ConsentService
         });
         $subject->unsetRelation('unrevokedConsents');
 
+        if ($recorded !== []) {
+            $this->notifyRecorded($subject, $recorded, $source);
+        }
+
         return $recorded;
+    }
+
+    /**
+     * L'intéressé apprend ce qui a été enregistré et comment le retirer ; pour un mineur, son parent
+     * garant (à défaut, le mineur s'il a un compte). Adressage explicite, sans routage parent/enfant.
+     *
+     * @param  list<ConsentType>  $types
+     */
+    private function notifyRecorded(User $subject, array $types, string $source): void
+    {
+        $payload = ['types' => array_map(fn (ConsentType $t) => $t->value, $types), 'source' => $source];
+        $guardian = $subject->isLegallyMinor() ? $subject->guardian : null;
+
+        if ($guardian !== null) {
+            $this->notifier->dispatchTo(NotificationType::ConsentRecorded, $guardian, $payload + [
+                'subject_id' => $subject->id,
+                'subject_first_name' => $subject->first_name,
+            ]);
+        } elseif ($subject->email !== null) {
+            $this->notifier->dispatchTo(NotificationType::ConsentRecorded, $subject, $payload);
+        }
     }
 
     /** L'admin retire un accord à la demande de l'adhérent, quel que soit le canal (§4.23.1). */
