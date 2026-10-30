@@ -27,7 +27,7 @@
             <x-avatar :name="$subject->fullName()" size="lg" tint="tint-run" :photo="$ownPhoto" />
             <div class="f1" style="min-width:0">
                 @if ($subject->photo_path === null)
-                    <div class="meta" style="font-size:12.5px">Aucune photo. JPEG, PNG ou WebP, 5 Mo au plus ; recadrée au carré, sans ses métadonnées (lieu de prise de vue compris).</div>
+                    <div class="meta" style="font-size:12.5px">Aucune photo. JPEG, PNG ou WebP, directement depuis ta pellicule : tu la cadres avant l'envoi, et elle part sans ses métadonnées (lieu de prise de vue compris).</div>
                 @elseif ($masked)
                     <div class="meta" style="font-size:12.5px">Masquée : visible de {{ $self ? 'toi' : 'toi et '.$subject->first_name }} seulement. Active l'accord « Photo » pour la montrer.</div>
                 @else
@@ -35,8 +35,8 @@
                 @endif
                 <div class="flex g6 wrap" style="margin-top:8px">
                     @if ($canEdit)
-                        {{-- Pas de wire:model : le fichier ne part qu'après « Valider » dans le dialog de
-                             recadrage (resources/js/photo-crop.js), avec le cadrage choisi. --}}
+                        {{-- Pas de wire:model : ce qui part, après « Valider » dans le dialog de recadrage
+                             (resources/js/photo-crop.js), est le carré cadré, réduit par le navigateur. --}}
                         <label class="btn btn-ghost btn-sm" style="cursor:pointer">
                             <input type="file" accept="image/jpeg,image/png,image/webp" x-on:change="choose($event)" hidden>
                             <x-icon name="upload" :size="14" /> {{ $subject->photo_path ? 'Changer' : 'Choisir une photo' }}
@@ -51,7 +51,6 @@
                 </div>
                 <div class="meta" style="color:var(--danger);font-size:12px;margin-top:6px" x-show="error && !open" x-text="error" x-cloak></div>
                 @error('photo') <div class="meta" style="color:var(--danger);font-size:12px;margin-top:6px">{{ $message }}</div> @enderror
-                @error('crop.*') <div class="meta" style="color:var(--danger);font-size:12px;margin-top:6px">{{ $message }}</div> @enderror
             </div>
 
             {{-- Dialog de recadrage : mêmes classes que <x-dialog>, piloté par Alpine (rien ne part
@@ -72,7 +71,7 @@
                                  x-on:pointerdown.prevent="down($event)" x-on:pointermove="move($event)"
                                  x-on:pointerup="up($event)" x-on:pointercancel="up($event)"
                                  x-on:wheel.prevent="wheel($event)">
-                                <img class="crop-img" :src="src" alt="" draggable="false" :style="imgStyle"
+                                <img class="crop-img" x-ref="img" :src="src" alt="" draggable="false" :style="imgStyle"
                                      x-on:load="loaded($el)" x-on:error="unreadable()">
                                 <div class="crop-mask" aria-hidden="true"></div>
                             </div>

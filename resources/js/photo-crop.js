@@ -2,16 +2,23 @@
 // cadré comme le recadrage automatique du serveur (centré pour un paysage, tiers supérieur pour un
 // portrait) : « Valider » sans toucher donne le même résultat qu'avant.
 //
-// Le navigateur ne fait que PROPOSER un rectangle : il pose `crop` sur le composant Livewire, puis
-// envoie le fichier ; le serveur redresse, tourne, recadre et réencode (TrombiService::storePhoto),
-// en bornant tout ce qui arrive d'ici. Rien ne part tant que l'adhérent n'a pas validé.
+// À la validation, le navigateur dessine le carré choisi dans un canvas et n'envoie QUE lui, en JPEG
+// de 1024 px : une photo de téléphone de 10 à 20 Mo ne pèse plus que quelques centaines de Ko, et
+// la limite de 5 Mo du serveur ne gêne plus personne. L'original ne quitte jamais l'appareil, et le
+// canvas n'emporte aucune métadonnée. Le serveur contrôle et réencode ce carré comme toute photo
+// (TrombiService::storePhoto) : c'est lui qui garantit le format, le navigateur ne fait que réduire.
+// Rien ne part tant que l'adhérent n'a pas validé.
 //
 // Repère : l'image telle que le navigateur l'affiche — orientation EXIF appliquée, comme le fait le
 // serveur — puis tournée de `rot` quarts de tour HORAIRES. `naturalWidth/Height` d'un <img> y sont
 // déjà redressés (image-orientation: from-image, défaut de tous les navigateurs actuels).
 
-const MAX_BYTES = 5 * 1024 * 1024; // aligné sur TrombiService::MAX_BYTES
-const TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+// L'original n'est que lu ici, jamais envoyé : la borne protège la mémoire du téléphone, pas le
+// serveur. HEIC/HEIF accepté quand le navigateur sait le décoder (Safari) : il part en JPEG.
+const MAX_SOURCE = 40 * 1024 * 1024;
+const TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+const OUT = 1024;      // côté du carré envoyé (le serveur en tire 512 et 192)
+const QUALITY = 0.9;
 const ZOOM_MAX = 4;
 
 function photoCrop() {
@@ -35,8 +42,8 @@ function photoCrop() {
             event.target.value = ''; // rechoisir le même fichier rouvre le dialog
             if (!file) return;
             // Refus immédiats, sans envoyer 5 Mo pour rien ; le serveur revérifie de toute façon.
-            this.error = !TYPES.includes(file.type) ? 'Formats acceptés : JPEG, PNG ou WebP.'
-                : file.size > MAX_BYTES ? 'La photo dépasse 5 Mo.' : '';
+            this.error = !TYPES.includes(file.type) ? 'Formats acceptés : JPEG, PNG, WebP ou HEIC.'
+                : file.size > MAX_SOURCE ? 'Cette photo dépasse 40 Mo.' : '';
             if (this.error) return;
             this.file = file;
             this.src = URL.createObjectURL(file);
@@ -136,26 +143,54 @@ function photoCrop() {
                 + `transform:translate(-50%,-50%) translate(${this.ox}px,${this.oy}px) rotate(${this.rot * 90}deg)`;
         },
 
-        // Rectangle choisi, en fractions de l'image tournée (cf. TrombiService::storePhoto).
-        crop() {
+        // Le carré choisi, dessiné à OUT px. Repère : l'image tournée de `rot` quarts de tour, dont
+        // le cadre couvre [left, left + side] × [top, top + side]. drawImage applique l'orientation
+        // EXIF comme l'<img> de l'aperçu : ce qui part est exactement ce que montre le cercle.
+        render() {
             const s = this.scale;
+            const side = this.stage / s;
             const left = ((this.W * s) / 2 - this.stage / 2 - this.ox) / s;
             const top = ((this.H * s) / 2 - this.stage / 2 - this.oy) / s;
-            const clip = (v) => Math.min(1, Math.max(0, v));
-            return { x: clip(left / this.W), y: clip(top / this.H), s: clip(1 / this.zoom), r: this.rot * 90 };
+
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = OUT;
+            const g = canvas.getContext('2d');
+            g.fillStyle = '#fff'; // fond d'un PNG transparent, comme côté serveur
+            g.fillRect(0, 0, OUT, OUT);
+            g.imageSmoothingQuality = 'high';
+            g.scale(OUT / side, OUT / side);
+            g.translate(-left, -top);
+            g.translate(this.W / 2, this.H / 2);
+            g.rotate((this.rot * Math.PI) / 2);
+            g.drawImage(this.$refs.img, -this.nw / 2, -this.nh / 2);
+
+            return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', QUALITY));
         },
 
-        confirm() {
+        async confirm() {
             if (this.busy || !this.file) return;
             this.busy = true;
             this.error = '';
             this.progress = 0;
-            // Différé (pas de requête) : il part avec la requête qui termine l'envoi du fichier, où le
-            // serveur le lit avant de traiter la photo (TrombiSettings::updatedPhoto).
-            this.$wire.crop = this.crop();
-            this.$wire.upload('photo', this.file,
+
+            let blob = null;
+            try {
+                blob = await this.render();
+            } catch (e) {
+                blob = null;
+            }
+            // Pas de repli muet : sans canvas exploitable, on le dit plutôt que d'envoyer l'original
+            // (que le serveur refuserait au-delà de 5 Mo, et sans le cadrage choisi).
+            if (!blob) {
+                this.busy = false;
+                this.error = 'Ce navigateur n’a pas pu préparer la photo. Essaie avec une autre photo ou un autre navigateur.';
+                return;
+            }
+
+            const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+            this.$wire.upload('photo', file,
                 () => { this.busy = false; this.close(); },
-                () => { this.busy = false; this.error = 'L’envoi a échoué. Réessaie, ou choisis une photo plus légère.'; },
+                () => { this.busy = false; this.error = 'L’envoi a échoué. Vérifie la connexion et réessaie.'; },
                 (e) => { this.progress = e.detail.progress; },
             );
         },

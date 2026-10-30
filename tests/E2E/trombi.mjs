@@ -4,6 +4,7 @@
 // NON destructif : le seul accord posé (T4) est retiré dans le même scénario, et ses lignes du
 // registre et du journal sont effacées par leur id.
 import { execFileSync } from 'node:child_process';
+import { statSync } from 'node:fs';
 import { launch, session, fiche, sql, seance, repereJournaux, purgeJournaux, Scenario, MOBILE, DESKTOP, BASE, SHOTS } from './lib.mjs';
 
 const browser = await launch();
@@ -210,14 +211,17 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   await ctx.close();
 }
 
-// ── T8 · Recadrage au dépôt : Lucas garde la moitié ROUGE d'une photo rouge | bleu ──
-// La photo est fabriquée par GD (paysage 600×300 : rouge à gauche, bleu à droite). Sans toucher, le
-// recadrage automatique la centrerait sur la frontière ; on glisse vers la droite pour ne garder que
-// le rouge, et c'est la vignette STOCKÉE (relue par le navigateur) qui doit être rouge.
+// ── T8 · Recadrage au dépôt : Lucas garde la moitié ROUGE d'une photo rouge | bleu de PLUS de 5 Mo ──
+// Fabriquée par GD : paysage 3000×1500 bruité (incompressible, comme une photo de téléphone), rouge à
+// gauche, bleu à droite. Sans toucher, le recadrage automatique la centrerait sur la frontière ; on
+// glisse vers la droite pour ne garder que le rouge, et c'est la vignette STOCKÉE (relue par le
+// navigateur) qui doit être rouge. Le poids prouve que la limite de 5 Mo ne bloque plus : le
+// navigateur n'envoie que le carré cadré, réduit.
+const fichier = `${SHOTS}rouge-bleu.png`;
+execFileSync('php', ['-r', `$w=3000;$h=1500;$i=imagecreatetruecolor($w,$h);$r=fn($v)=>max(0,min(255,$v+mt_rand(-40,40)));for($y=0;$y<$h;$y++)for($x=0;$x<$w;$x++){[$a,$b,$c]=$x<$w/2?[200,30,30]:[30,60,200];imagesetpixel($i,$x,$y,($r($a)<<16)|($r($b)<<8)|$r($c));}imagepng($i,'${fichier}',9);`]);
 for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   const s = new Scenario(`T8 · Recadrer sa photo au dépôt (${format})`);
-  const fichier = `${SHOTS}rouge-bleu.png`;
-  execFileSync('php', ['-r', `$i=imagecreatetruecolor(600,300);imagefilledrectangle($i,0,0,299,299,imagecolorallocate($i,220,30,30));imagefilledrectangle($i,300,0,599,299,imagecolorallocate($i,30,60,220));imagepng($i,'${fichier}');`]);
+  s.check('contrôle : la photo de départ dépasse 5 Mo', statSync(fichier).size > 5 * 1024 * 1024, `${(statSync(fichier).size / 1048576).toFixed(1)} Mo`);
   const lucas = id('lucas@demo.club');
   const repere = repereJournaux();
   s.check('contrôle : Lucas sans photo au départ', sql(`SELECT IFNULL(photo_path,'') FROM users WHERE id=${lucas}`) === '');
@@ -237,11 +241,23 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * 1.5, box.y + box.height / 2, { steps: 8 });
   await page.mouse.up();
+  // Poids réellement envoyé : Playwright ne mesure pas un corps multipart, on le lit dans la page
+  // (Livewire envoie les fichiers par XMLHttpRequest).
+  await page.evaluate(() => {
+    window.__envoye = 0;
+    const send = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function (body) {
+      if (body instanceof FormData) for (const v of body.values()) if (v instanceof Blob) window.__envoye += v.size;
+      return send.call(this, body);
+    };
+  });
   await page.getByRole('button', { name: 'Valider' }).click();
   await page.waitForFunction(() => !document.querySelector('.crop-stage'), null, { timeout: 15000 });
   await attendre(page);
   const path = sql(`SELECT IFNULL(photo_path,'') FROM users WHERE id=${lucas}`);
   s.check('photo enregistrée après « Valider »', path !== '');
+  const envoye = await page.evaluate(() => window.__envoye);
+  s.check('seul le carré réduit est parti (< 1 Mo)', envoye > 0 && envoye < 1024 * 1024, `${Math.round(envoye / 1024)} Ko`);
 
   // Couleur du centre de la vignette 192 servie par l'app.
   const rgb = await page.evaluate(async (url) => {

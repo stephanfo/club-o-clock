@@ -29,14 +29,6 @@ class TrombiSettings extends Component
     /** @var TemporaryUploadedFile|null */
     public $photo = null;
 
-    /**
-     * Cadrage choisi dans le dialog, posé par le navigateur AVANT l'envoi du fichier (même requête
-     * que la fin de l'envoi). Vide = recadrage automatique. Cf. TrombiService::storePhoto.
-     *
-     * @var array<string, mixed>
-     */
-    public array $crop = [];
-
     public string $phone = '';
 
     public function mount(int $subjectId): void
@@ -60,23 +52,12 @@ class TrombiSettings extends Component
         try {
             // Dans le try : un envoi refusé (trop lourd, mauvais format) ne doit pas laisser
             // l'original, EXIF compris, dans le dossier temporaire.
-            $this->validate([
-                'photo' => ['image', 'mimes:jpeg,png,webp', 'max:5120'],
-                'crop.x' => ['required_with:crop', 'numeric', 'between:0,1'],
-                'crop.y' => ['required_with:crop', 'numeric', 'between:0,1'],
-                'crop.s' => ['required_with:crop', 'numeric', 'between:0.05,1'],
-                'crop.r' => ['required_with:crop', 'integer', 'in:0,90,180,270'],
-            ], [
+            $this->validate(['photo' => ['image', 'mimes:jpeg,png,webp', 'max:5120']], [
                 'photo.image' => 'Choisis une image.',
                 'photo.mimes' => 'Formats acceptés : JPEG, PNG ou WebP.',
                 'photo.max' => 'La photo dépasse 5 Mo.',
-                'crop.*' => 'Cadrage invalide : choisis la photo à nouveau.',
             ]);
-            $crop = $this->crop === [] ? null : [
-                'x' => (float) $this->crop['x'], 'y' => (float) $this->crop['y'],
-                's' => (float) $this->crop['s'], 'r' => (int) $this->crop['r'],
-            ];
-            $service->storePhoto($this->subject(), $this->photo->getRealPath(), auth()->user(), $crop);
+            $service->storePhoto($this->subject(), $this->photo->getRealPath(), auth()->user());
             session()->flash('status', 'Photo enregistrée.');
         } catch (RuntimeException $e) {
             session()->flash('warn', $e->getMessage());
@@ -84,7 +65,6 @@ class TrombiSettings extends Component
             // L'original n'est jamais conservé, pas même dans le dossier temporaire des envois.
             $this->photo?->delete();
             $this->photo = null;
-            $this->crop = [];
         }
     }
 
