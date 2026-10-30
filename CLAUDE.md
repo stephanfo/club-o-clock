@@ -99,7 +99,7 @@ Le design system existe : tout écran doit lui être fidèle.
 ### Modèle
 
 - **Pas de multi-tenant, jamais.** Pas de `tenant_id`, pas d'isolation logique multi-club, pas de plumbing « préparé pour plus tard ». Un autre club déploie sa propre instance.
-- **Pas de stockage** de numéro de téléphone ni de certificat médical (minimisation RGPD).
+- **Pas de stockage** de certificat médical (minimisation RGPD). Le numéro de téléphone n'existe que saisi par l'adhérent pour le trombinoscope (PRD §4.23) : aucun autre usage, aucun envoi.
 - **Pas de stockage** du numéro de licence fédérale (géré sur l'extranet fédéral externe).
 
 ### Vocabulaire

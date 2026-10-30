@@ -498,7 +498,7 @@ Pour toute `Session` des 3 `kind`, **tout membre connecté du club** voit :
 **Pas d'accès public anonyme** (authentification club requise).
 
 **Niveau d'affichage** :
-- **Entre athlètes** : prénom + initiale. **Extension automatique de l'initiale en cas d'homonymie** sur une même séance (« Marc Sa. » / « Marc Sm. ») — l'algorithme étend à la longueur minimale nécessaire pour différencier.
+- **Entre athlètes** : prénom + initiale, ou nom complet pour qui l'a accepté au trombinoscope (§4.23.1). **Extension automatique de l'initiale en cas d'homonymie** sur une même séance (« Marc Sa. » / « Marc Sm. ») — l'algorithme étend à la longueur minimale nécessaire pour différencier.
 - **Coachs encadrants** (sur la fiche séance, partout) : prénom + nom complet (cf. §4.11.4).
 - **Coachs / admins consultant** : prénom + nom complet partout.
 
@@ -1249,10 +1249,10 @@ Ces informations relèvent du fonctionnement de l'association, pas de la vie pri
 
 #### 4.23.4 Mineurs
 
-- **Les accords nom complet, photo, catégorie et anniversaire d'un mineur se donnent par son parent garant**, depuis l'UI « mes enfants » (§4.2), en phases P1 et P2. En P2, l'adolescent voit ces réglages et **peut les retirer lui-même** : un retrait, d'où qu'il vienne, l'emporte.
+- **Les accords nom complet, photo, catégorie et anniversaire d'un mineur se donnent par son parent garant**, depuis l'UI « mes enfants » (§4.2), en phases P1 et P2. En P2, l'adolescent voit ces réglages et **peut les retirer lui-même** : un retrait, d'où qu'il vienne, l'emporte. Un mineur sans parent garant dans l'app ne se les accorde pas lui-même : seul l'admin peut enregistrer l'accord signé par un parent sur le bulletin (§4.23.1).
 - **Jamais de coordonnées propres à un mineur.** Les accords email et téléphone ne sont pas proposés tant que la date de naissance le désigne comme mineur (§5.1 `isMinor`).
 - **Contact du parent sur la fiche de l'enfant** : « Parent : X » avec l'email et/ou le téléphone **que le parent garant a lui-même partagés**. Si le parent n'a rien partagé, la fiche de l'enfant ne mentionne pas le lien de tutelle.
-- **À la rupture de tutelle (P2 → P3)**, les accords donnés par le parent tombent : le nouvel adulte décide seul de ce qu'il diffuse.
+- **À la rupture de tutelle (P2 → P3)**, les accords qui ne viennent pas du jeune lui-même (donnés par le parent, ou enregistrés par l'admin) tombent : le nouvel adulte décide seul de ce qu'il diffuse. **Au changement de garant**, ils tombent de même : le nouveau parent décide.
 
 #### 4.23.5 Qui voit quoi
 
@@ -1263,11 +1263,11 @@ Ces informations relèvent du fonctionnement de l'association, pas de la vie pri
 
 #### 4.23.6 Écrans
 
-- **Trombinoscope** (entrée de navigation membre, mobile et desktop) : grille de cartes — photo ou initiales, nom, badges de rôle, fonction au bureau, catégorie, qualifications d'un coach. Recherche par nom ; filtres **Tous / Bureau / Coachs** ; filtre **par catégorie** (limité à qui l'affiche ; complet pour coachs et admins) ; vue **Anniversaires** par mois (mois courant par défaut), limitée aux accords donnés.
+- **Trombinoscope** (entrée de la barre latérale sur desktop ; sur mobile, lien depuis l'accueil et le profil, la barre du bas restant à six entrées au plus) : grille de cartes — photo ou initiales, nom, badges de rôle, fonction au bureau, catégorie, qualifications d'un coach. Recherche par nom ; filtres **Tous / Bureau / Coachs** ; filtre **par catégorie** (limité à qui l'affiche ; complet pour coachs et admins) ; vue **Anniversaires** par mois (mois courant par défaut), limitée aux accords donnés.
 - **Fiche** d'un adhérent (au toucher d'une carte) : la même chose en grand, plus les coordonnées partagées sous forme de liens d'appel et d'écriture (`tel:` / `mailto:`).
 - **Accueil** : bloc **« Anniversaires de la semaine »** (jour et prénom), **masqué s'il est vide**.
 - **Listes d'inscrits** d'une séance (§4.9.4) : la photo à côté du nom, sous les mêmes accords et pour les mêmes lecteurs que le trombinoscope — un coach reconnaît les nouveaux de sa séance.
-- **Profil** : onglet « Trombinoscope » — aperçu de sa propre carte telle que les autres la voient, dépôt de la photo, les quatre accords, saisie du téléphone.
+- **Profil** : onglet « Trombinoscope » — aperçu de sa propre carte telle que les autres la voient, dépôt de la photo, les six accords et l'interrupteur « Tout », saisie du téléphone.
 
 #### 4.23.7 Hors périmètre
 
