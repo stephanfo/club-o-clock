@@ -61,7 +61,7 @@
                 <label class="field-label" for="trombi-phone-{{ $subject->id }}">Numéro à partager</label>
                 <div class="flex g6 wrap">
                     <input id="trombi-phone-{{ $subject->id }}" type="tel" inputmode="tel" autocomplete="tel" class="input f1"
-                           style="min-width:180px" wire:model="phone" placeholder="06 12 34 56 78" @disabled(! $canEdit)>
+                           style="min-width:180px" wire:model="phone" placeholder="Ex. 06 12 34 56 78" @disabled(! $canEdit)>
                     @if ($canEdit)
                         <button type="button" class="btn btn-primary btn-sm" wire:click="savePhone" wire:loading.attr="disabled" wire:target="savePhone">Enregistrer</button>
                     @endif

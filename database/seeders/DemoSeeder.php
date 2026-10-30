@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\AperoFlag;
 use App\Models\Category;
 use App\Models\ClubSettings;
+use App\Models\Consent;
 use App\Models\Debrief;
 use App\Models\DebriefReaction;
 use App\Models\Discipline;
@@ -21,12 +22,16 @@ use App\Models\SessionTemplate;
 use App\Models\User;
 use App\Notifications\NotificationType;
 use App\Services\AperoService;
+use App\Services\ConsentService;
 use App\Services\RegistrationService;
 use App\Services\SessionNotificationService;
 use App\Services\TemplateGenerationService;
+use App\Services\TrombiService;
 use App\Support\AgeCategory;
 use App\Support\Allures\Referentiel;
 use App\Support\Markup;
+use App\Support\Trombi\BoardRole;
+use App\Support\Trombi\ConsentType;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
@@ -1181,10 +1186,13 @@ class DemoSeeder extends Seeder
             ],
         )->categories()->syncWithoutDetaching([$adulte->id, $master->id]);
 
+        $trombi = $this->seedTrombinoscope($admin);
+
         $this->command->info(sprintf(
             'DemoSeeder : packs testeurs — séance annulée:%s · qualifs:4 · template archivé:1 · désactivé/suppression:3 · AG inscrits · surclassement · lieu libre.',
             $toCancel?->title ?? 'aucune',
         ));
+        $this->command->info(sprintf('DemoSeeder : trombinoscope — %d photos · %d accords actifs · bureau:%d.', ...$trombi));
 
         $this->command->info(sprintf(
             'DemoSeeder : %d templates, séances générées du %s au %s. %d flags apéro CAP.',
@@ -1215,6 +1223,128 @@ class DemoSeeder extends Seeder
      *
      * @param  Collection<int, Category>  $activeCats
      */
+    /**
+     * Trombinoscope de démo (#72, PRD §4.23) : de tout, pour que chaque règle se voie.
+     * - Bureau : Paul président, Mathieu vice-président, Camille secrétaire, Sophie trésorière.
+     * - Accords variés : Sophie et Paul ont tout partagé ; Marie (compte de démo athlète) nom,
+     *   photo et anniversaire ; Lucas rien (initiale et initiales d'avatar) ; Camille fête son
+     *   anniversaire cette semaine, pour que le bloc de l'accueil ne soit jamais vide.
+     * - Mineurs : Florence accorde pour Lucie (P1) et partage ses coordonnées (« Parent : »),
+     *   Olivier pour Théo (P2), et Timéo, sans garant, a un accord enregistré par l'admin sur bulletin.
+     * - Kévin et Brigitte, suspendus, ont une photo partagée : absents du trombinoscope, et Brigitte
+     *   est comptée dans la purge de la bascule de saison.
+     * Numéros dans la plage réservée à la fiction par l'ARCEP (06 39 98 xx xx). Photos : silhouettes
+     * dessinées par GD — aucun visage réel. Rejouable : rien n'est réécrit qui existe déjà.
+     *
+     * @return array{0:int,1:int,2:int}
+     */
+    private function seedTrombinoscope(User $admin): array
+    {
+        $consents = app(ConsentService::class);
+        $trombi = app(TrombiService::class);
+        $u = fn (string $email) => User::where('email', $email)->first();
+
+        // Anniversaire de Camille : le jeudi de la semaine en cours (jamais un 29 février), même âge.
+        $jeudi = Carbon::now()->startOfWeek(Carbon::MONDAY)->addDays(3)->format('m-d');
+        $u('camille@demo.club')?->forceFill(['dob' => $this->naissancePour(34, $jeudi === '02-29' ? '02-28' : $jeudi)])->save();
+
+        foreach ([
+            'paul@demo.club' => BoardRole::President, 'mathieu@demo.club' => BoardRole::VicePresident,
+            'camille@demo.club' => BoardRole::Secretary, 'sophie@demo.club' => BoardRole::Treasurer,
+        ] as $email => $role) {
+            $u($email)?->forceFill(['board_role' => $role])->save();
+        }
+
+        $all = ConsentType::cases();
+        $profils = [
+            // email => [téléphone, photo ?, accords]
+            'sophie@demo.club' => ['06 39 98 01 12', true, $all],
+            'paul@demo.club' => ['06 39 98 02 23', true, $all],
+            'marie@demo.club' => [null, true, [ConsentType::FullName, ConsentType::Photo, ConsentType::Birthday]],
+            'camille@demo.club' => [null, true, [ConsentType::FullName, ConsentType::Photo, ConsentType::Category, ConsentType::Birthday]],
+            'julie@demo.club' => [null, true, [ConsentType::FullName, ConsentType::Photo]],
+            'antoine@demo.club' => ['06 39 98 03 34', true, [ConsentType::Photo, ConsentType::Phone]],
+            'sarah@demo.club' => [null, true, [ConsentType::Photo, ConsentType::Category]],
+            'emilie@demo.club' => [null, false, [ConsentType::Birthday, ConsentType::Email]],
+            'vincent@demo.club' => ['06 39 98 04 45', true, [ConsentType::Photo, ConsentType::Email, ConsentType::Phone]],
+            'karine@demo.club' => [null, true, [ConsentType::Photo]],
+            'florence@demo.club' => ['06 39 98 05 56', false, [ConsentType::Email, ConsentType::Phone]],
+            'kevin@demo.club' => [null, true, [ConsentType::Photo]],
+            'brigitte@demo.club' => [null, true, [ConsentType::Photo, ConsentType::FullName]],
+        ];
+        foreach ($profils as $email => [$phone, $photo, $types]) {
+            $member = $u($email);
+            if ($member === null) {
+                continue;
+            }
+            if ($phone !== null && $member->phone === null) {
+                $trombi->setPhone($member, $phone, $member);
+            }
+            if ($photo && $member->photo_path === null) {
+                $file = $this->silhouette($email);
+                $trombi->storePhoto($member, $file, $member);
+                @unlink($file);
+            }
+            foreach ($types as $type) {
+                if (! $member->fresh()->hasConsent($type)) {
+                    $consents->grant($member, $type, $member);
+                }
+            }
+        }
+
+        // Mineurs : l'accord vient du parent garant (§4.23.4).
+        $lucie = User::where('first_name', 'Lucie')->where('last_name', 'Garnier')->first();
+        $theo = $u('theo.mercier@demo.club');
+        foreach ([[$lucie, [ConsentType::Photo, ConsentType::Birthday], true], [$theo, [ConsentType::FullName, ConsentType::Photo], true]] as [$child, $types, $photo]) {
+            if ($child === null || $child->guardian === null) {
+                continue;
+            }
+            if ($photo && $child->photo_path === null) {
+                $file = $this->silhouette('child-'.$child->id);
+                $trombi->storePhoto($child, $file, $child->guardian);
+                @unlink($file);
+            }
+            foreach ($types as $type) {
+                if (! $child->fresh()->hasConsent($type)) {
+                    $consents->grant($child, $type, $child->guardian);
+                }
+            }
+        }
+
+        // Mineur sans garant : accord recueilli sur bulletin, enregistré par l'admin. Écrit en
+        // direct, sans la notification de recordByAdmin : un jeu de démo ne doit rien envoyer.
+        $timeo = User::where('first_name', 'Timéo')->where('last_name', 'Vidal')->first();
+        if ($timeo !== null && ! $timeo->hasConsent(ConsentType::Birthday)) {
+            Consent::create([
+                'user_id' => $timeo->id, 'type' => ConsentType::Birthday, 'version' => ConsentType::Birthday->version(),
+                'granted_at' => Carbon::now(), 'granted_by' => $admin->id, 'source' => 'Bulletin d\'adhésion (démo)',
+            ]);
+        }
+
+        return [
+            User::whereNotNull('photo_path')->count(),
+            Consent::query()->whereNull('revoked_at')->count(),
+            User::whereNotNull('board_role')->count(),
+        ];
+    }
+
+    /** Silhouette tête-épaules sur un fond de couleur stable par personne (JPEG temporaire). */
+    private function silhouette(string $seed): string
+    {
+        $fonds = [[67, 56, 202], [245, 158, 11], [8, 145, 178], [5, 150, 105], [219, 39, 119], [71, 85, 105]];
+        [$r, $g, $b] = $fonds[crc32($seed) % count($fonds)];
+        $img = imagecreatetruecolor(600, 600);
+        imagefill($img, 0, 0, imagecolorallocate($img, $r, $g, $b));
+        $clair = imagecolorallocate($img, (int) (($r + 255 * 2) / 3), (int) (($g + 255 * 2) / 3), (int) (($b + 255 * 2) / 3));
+        imagefilledellipse($img, 300, 245, 210, 240, $clair);
+        imagefilledellipse($img, 300, 640, 480, 420, $clair);
+        $file = tempnam(sys_get_temp_dir(), 'demo-trombi');
+        imagejpeg($img, $file, 90);
+        imagedestroy($img);
+
+        return $file;
+    }
+
     /**
      * Date de naissance donnant l'âge de saison voulu (§4.5), pour la saison EN COURS.
      *

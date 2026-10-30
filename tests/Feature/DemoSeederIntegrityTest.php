@@ -4,12 +4,16 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\ClubSettings;
+use App\Models\Consent;
 use App\Models\Registration;
 use App\Models\User;
+use App\Support\Trombi\ConsentType;
 use Database\Seeders\CatalogSeeder;
 use Database\Seeders\DemoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -21,6 +25,13 @@ use Tests\TestCase;
 class DemoSeederIntegrityTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Le jeu de démo dépose des photos du trombinoscope : hors du vrai storage/.
+        Storage::fake('local');
+    }
 
     /**
      * Revue open source 2026-08-08, constat n°9 — le seeder écrasait inconditionnellement nom et
@@ -244,5 +255,38 @@ class DemoSeederIntegrityTest extends TestCase
             (bool) User::where('email', 'gilles@demo.club')->firstOrFail()->is_active,
             'Gilles (suppression demandée) doit être inactif : c\'est le seul cas légitime.'
         );
+    }
+
+    /**
+     * Trombinoscope de démo (#72) : rejouable sans doublon, aucun accord de coordonnées pour un
+     * mineur, numéros dans la plage de fiction, et un anniversaire partagé dans la semaine pour
+     * que le bloc de l'accueil se montre.
+     */
+    public function test_le_trombinoscope_de_demo_respecte_les_regles_et_se_rejoue(): void
+    {
+        $this->seed(CatalogSeeder::class);
+        $this->seed(DemoSeeder::class);
+        $rows = Consent::count();
+        $photos = User::whereNotNull('photo_path')->pluck('photo_path', 'id');
+        $this->seed(DemoSeeder::class);
+
+        $this->assertGreaterThan(20, $rows);
+        $this->assertSame($rows, Consent::count(), 'Un second passage n\'ajoute aucun accord.');
+        $this->assertEquals($photos, User::whereNotNull('photo_path')->pluck('photo_path', 'id'), 'Ni ne remplace une photo.');
+        Storage::disk('local')->assertExists($photos->first().'-192.webp');
+
+        foreach (User::query()->with('unrevokedConsents')->get() as $u) {
+            if ($u->isLegallyMinor()) {
+                $this->assertFalse($u->hasConsent(ConsentType::Email) || $u->hasConsent(ConsentType::Phone), $u->first_name);
+            }
+            if ($u->phone !== null) {
+                $this->assertStringStartsWith('+3363998', $u->phone);
+            }
+        }
+
+        $week = Carbon::now()->startOfWeek(Carbon::MONDAY);
+        $camille = User::where('email', 'camille@demo.club')->with('unrevokedConsents')->sole();
+        $this->assertTrue($camille->hasConsent(ConsentType::Birthday));
+        $this->assertSame($week->copy()->addDays(3)->format('m-d') === '02-29' ? '02-28' : $week->copy()->addDays(3)->format('m-d'), $camille->dob->format('m-d'));
     }
 }

@@ -25,7 +25,7 @@ class ResetDemoCommand extends Command
     /** Répertoires d'uploads purgés à chaque remise à zéro, par disque. */
     private const UPLOADS = [
         'public' => ['logos'],
-        'local' => ['gpx', 'livewire-tmp'],
+        'local' => ['gpx', 'livewire-tmp', 'trombi'],
     ];
 
     public function handle(): int

@@ -34,7 +34,7 @@ seed, et la subtilité du partage de pile réseau qui rend `BASE` joignable —,
 ## Exécution
 
 ```bash
-node tests/E2E/run.mjs          # les 5 suites non destructives (verdict agrégé)
+node tests/E2E/run.mjs          # les suites non destructives (verdict agrégé)
 
 node tests/E2E/scenarios.mjs    # S1–S5   gardes d'inscription et bascule de rôle
 node tests/E2E/parcours.mjs     # S7–S17, S21, S23, S28–S30, S32  parcours métier, cloisonnement, alertes parent, survol du tracé, agenda, lien vers un onglet
@@ -42,6 +42,7 @@ node tests/E2E/retour.mjs       # R1–R3   navigation « retour » : pile d'his
 node tests/E2E/comptes.mjs      # S18–S20 messages d'auth, correction d'email, suspension d'accès
 node tests/E2E/responsive.mjs   # S6, S24–S27, S31–S37  bascule mobile/desktop, rendu des cartes, morphing, ouverture de semaine, éditeur de débrief, vue Courses, ouvertures, « j'aime », mes appareils, bibliothèque de parcours
 node tests/E2E/allures.mjs     # A1–A4 allures course : écran du membre (deux formats), estimation, écrans admin, zones dans les consignes
+node tests/E2E/trombi.mjs      # T1–T7 trombinoscope : grille et fiche selon le lecteur, accueil, coordonnées jamais pour un mineur, réglages du profil et de l'enfant, inscrits, onglet admin
 ```
 
 Sortie : une ligne par assertion (✅/❌), code de sortie non nul si un scénario échoue.

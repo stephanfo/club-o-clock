@@ -192,6 +192,10 @@ class DemoModeTest extends TestCase
     public function test_reset_leaves_every_seeded_route_with_its_file_on_disk(): void
     {
         $this->enableDemo();
+        // Disques simulés : la purge réelle viderait storage/ du poste — parcours et photos du
+        // trombinoscope de la démo locale. L'ordre purge → seed se vérifie tout aussi bien.
+        Storage::fake('local');
+        Storage::fake('public');
 
         $this->artisan('demo:reset')->assertSuccessful();
 
@@ -204,6 +208,13 @@ class DemoModeTest extends TestCase
                 Storage::disk('local')->exists($route->gpx_path),
                 "Parcours {$route->id} : fichier absent ({$route->gpx_path}). La purge a-t-elle tourné après le seed ?"
             );
+        }
+
+        // Même invariant pour les photos du trombinoscope (#72), purgées puis redéposées par le seed.
+        $photos = User::query()->whereNotNull('photo_path')->pluck('photo_path');
+        $this->assertNotEmpty($photos, 'Le seed doit déposer des photos.');
+        foreach ($photos as $path) {
+            $this->assertTrue(Storage::disk('local')->exists($path.'-192.webp'), "Photo absente ({$path}).");
         }
     }
 
