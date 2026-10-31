@@ -7,6 +7,14 @@
 @endphp
 <div class="form-screen">
     <x-flash-float />
+    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. Actions de terrain seulement,
+         l'export XLSX et l'import CSV restent au bureau. --}}
+    <x-topbar title="Allures cibles" :back="route('admin.settings')" back-label="Retour aux paramètres">
+        <x-slot:trailing>
+            <button type="button" wire:click="addRow" class="iconbtn" aria-label="Ajouter un niveau"><x-icon name="plus" /></button>
+            <button type="button" wire:click="save" wire:loading.attr="disabled" wire:target="save" class="iconbtn" aria-label="Enregistrer"><x-icon name="check" /></button>
+        </x-slot:trailing>
+    </x-topbar>
     <div class="dk-topbar">
         <a href="{{ route('admin.settings') }}" class="btn btn-ghost btn-sm" wire:navigate>
             <x-icon name="chevron-left" :size="15" /> Paramètres

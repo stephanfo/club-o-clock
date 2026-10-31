@@ -5,6 +5,9 @@
          flash('status') = succès (vert) · flash('warn') = refus (orange). --}}
     <x-flash-float />
     {{-- ─── Topbar ─── --}}
+    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. Actions de terrain seulement,
+         l'export XLSX et l'import CSV restent au bureau. --}}
+    <x-topbar title="Dashboard admin" :sub="$periodLabel" :back="route('club')" back-label="Retour au club" />
     <div class="dk-topbar">
         <div class="f1">
             <div class="dsp" style="font-size:26px">Dashboard admin</div>
@@ -112,7 +115,9 @@
             {{-- ═══ Activité coachs ═══ --}}
             <div class="card card-pad">
                 <div class="flex ac jb" style="margin-bottom:10px"><div class="eyebrow">Activité coachs</div><span class="meta" style="font-size:12px">séances training · {{ $periodLabel }}</span></div>
-                <table class="tbl">
+                {{-- Tableau croisé (une colonne par discipline) : défilement horizontal, coach figé (#151). --}}
+                <div style="overflow-x:auto">
+                <table class="tbl tbl-figee">
                     <thead>
                         <tr>
                             <th>Coach</th>
@@ -132,6 +137,7 @@
                         @endforelse
                     </tbody>
                 </table>
+                </div>
                 @if ($coachActivity['future_without_coach'] > 0)
                     <x-banner kind="warn" style="margin-top:12px">
                         <span><b>{{ $coachActivity['future_without_coach'] }} séance{{ $coachActivity['future_without_coach'] > 1 ? 's' : '' }} future{{ $coachActivity['future_without_coach'] > 1 ? 's' : '' }}</b> sans coach inscrit · <a href="{{ route('planning') }}" class="underline-link" wire:navigate>voir le planning</a></span>

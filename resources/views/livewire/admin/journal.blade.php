@@ -9,6 +9,9 @@
          flash('status') = succès (vert) · flash('warn') = refus (orange). --}}
     <x-flash-float />
     {{-- ─── Topbar ─── --}}
+    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. Actions de terrain seulement,
+         l'export XLSX et l'import CSV restent au bureau. --}}
+    <x-topbar title="Journaux" :sub="$periodLabel" :back="route('club')" back-label="Retour au club" />
     <div class="dk-topbar">
         <div class="f1">
             <div class="dsp" style="font-size:24px">Journaux</div>
@@ -140,20 +143,20 @@
                 <div class="meta tc" style="padding:32px">Aucune entrée ne correspond à ces filtres.</div>
             @else
                 <div style="padding:0 14px">
-                    <table class="tbl">
+                    <table class="tbl tbl-cartes">
                         <thead><tr><th>Date</th><th></th><th>Acteur</th><th>Action</th><th>Cible</th><th></th></tr></thead>
                         <tbody>
                             @foreach ($rows as $r)
                                 <tr wire:key="{{ $r['source'] }}-{{ $r['id'] }}" wire:click="showDetail('{{ $r['source'] }}', {{ $r['id'] }})" style="cursor:pointer">
                                     <td class="meta mono" style="font-size:12px;white-space:nowrap">{{ $r['at']->copy()->setTimezone($tz)->format('d/m H:i') }}</td>
                                     <td><span class="chip chip-sm {{ $r['source'] === 'audit' ? 'chip-pink' : 'chip-line' }}">{{ $r['source'] }}</span></td>
-                                    <td>{{ $r['actor'] }}@if ($r['actor_role'])<span class="muted"> ({{ $r['actor_role'] }})</span>@endif</td>
-                                    <td class="mono" style="font-size:12px">{{ $r['action'] }}</td>
-                                    <td>
+                                    <td class="tbl-m-titre">{{ $r['actor'] }}@if ($r['actor_role'])<span class="muted"> ({{ $r['actor_role'] }})</span>@endif</td>
+                                    <td class="mono tbl-m-ligne" style="font-size:12px">{{ $r['action'] }}</td>
+                                    <td class="tbl-m-ligne">
                                         {{ $r['target'] }}
                                         @if ($r['session'])<div class="meta" style="font-size:11px">{{ \Illuminate\Support\Str::limit($r['session'], 36) }}</div>@endif
                                     </td>
-                                    <td style="text-align:right"><x-icon name="chevron-right" :size="16" class="muted" /></td>
+                                    <td class="tbl-m-cache" style="text-align:right"><x-icon name="chevron-right" :size="16" class="muted" /></td>
                                 </tr>
                             @endforeach
                         </tbody>

@@ -5,6 +5,13 @@
          flash('status') = succès (vert) · flash('warn') = refus (orange). --}}
     <x-flash-float />
     {{-- ─── Topbar ─── --}}
+    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. Actions de terrain seulement,
+         l'export XLSX et l'import CSV restent au bureau. --}}
+    <x-topbar title="Adhérents" :back="route('club')" back-label="Retour au club">
+        <x-slot:trailing>
+            <a href="{{ route('admin.members.create') }}" wire:navigate class="iconbtn" aria-label="Ajouter un adhérent"><x-icon name="plus" /></a>
+        </x-slot:trailing>
+    </x-topbar>
     <div class="dk-topbar">
         <div class="f1">
             <div class="dsp" style="font-size:24px">Adhérents</div>
@@ -79,7 +86,7 @@
                 <div class="meta tc" style="padding:32px">Aucun adhérent ne correspond à ces critères.</div>
             @else
                 <div style="padding:0 14px">
-                    <table class="tbl">
+                    <table class="tbl tbl-cartes">
                         <thead><tr><th></th><th>Nom</th><th>Email</th><th>Cat.</th><th>Rôles</th><th>Accès</th><th>Parent</th><th></th></tr></thead>
                         <tbody>
                             @foreach ($members as $m)
@@ -91,8 +98,8 @@
                                 <tr class="row-press" style="cursor:pointer" wire:key="m-{{ $m->id }}"
                                     onclick="window.location='{{ route('admin.members.show', $m) }}'">
                                     <td><x-avatar :name="$m->fullName()" size="sm" :photo="$photoUrls[$m->id] ?? null" /></td>
-                                    <td style="font-weight:700">{{ $m->fullName() }}</td>
-                                    <td class="meta" style="font-size:13px">{{ $m->email ?? '—' }}</td>
+                                    <td class="tbl-m-titre" style="font-weight:700">{{ $m->fullName() }}</td>
+                                    <td class="meta tbl-m-ligne" style="font-size:13px">{{ $m->email ?? '—' }}</td>
                                     <td>{{ $primary?->label ?? '—' }}</td>
                                     <td>
                                         <div class="flex wrap" style="gap:3px">
@@ -112,8 +119,9 @@
                                             <span class="chip chip-sm chip-green">● actif</span>
                                         @endif
                                     </td>
-                                    <td class="meta" style="font-size:12px">{{ $m->guardian?->fullName() ?? '—' }}</td>
-                                    <td style="text-align:right">
+                                    {{-- Sur mobile, le parent ne s'affiche que s'il existe : « Parent · — » ne dirait rien. --}}
+                                    <td class="meta {{ $m->guardian ? '' : 'tbl-m-cache' }}" style="font-size:12px" data-label="Parent">{{ $m->guardian?->fullName() ?? '—' }}</td>
+                                    <td class="tbl-m-cache" style="text-align:right">
                                         <a href="{{ route('admin.members.show', $m) }}" class="iconbtn" wire:navigate aria-label="Voir la fiche" onclick="event.stopPropagation()">
                                             <x-icon name="more-horizontal" />
                                         </a>
