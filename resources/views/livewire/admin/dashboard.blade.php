@@ -48,6 +48,30 @@
                 </x-banner>
             @endif
 
+            {{-- ═══ Séances à encadrer (§4.16.2, bloc 2) — à venir, ignore la période ═══ --}}
+            <div class="card card-pad">
+                <div class="flex ac jb wrap g8"><div class="eyebrow">Séances à encadrer</div><span class="meta" style="font-size:12px">sans coach ni intervenant · {{ \App\Services\StatsService::STAFFING_HORIZON_DAYS }} prochains jours</span></div>
+                @if (count($toStaff))
+                    <div style="overflow-x:auto;margin-top:6px">
+                        <table class="tbl tbl-cartes">
+                            <thead><tr><th>Date</th><th>Créneau</th><th>Discipline</th></tr></thead>
+                            <tbody>
+                                @foreach ($toStaff as $s)
+                                    <tr class="row-press" style="cursor:pointer" wire:key="staff-{{ $s['id'] }}"
+                                        onclick="window.location='{{ route('sessions.show', $s['id']) }}'">
+                                        <td class="tbl-m-titre" style="font-weight:700"><a href="{{ route('sessions.show', $s['id']) }}" wire:navigate onclick="event.stopPropagation()">{{ $s['start_at']->copy()->setTimezone($tz)->locale('fr')->isoFormat('ddd D MMM · HH:mm') }}</a></td>
+                                        <td class="tbl-m-ligne">{{ $s['slot'] }}</td>
+                                        <td class="meta">{{ $s['discipline'] ?? '—' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="meta" style="font-size:13px;margin-top:12px">Toutes les séances des {{ \App\Services\StatsService::STAFFING_HORIZON_DAYS }} prochains jours sont encadrées.</div>
+                @endif
+            </div>
+
             {{-- ═══ Chiffres clés (§4.16.2, bloc 3) ═══ --}}
             <div class="dash-kpi">
                 <div class="stat">
@@ -209,10 +233,20 @@
                     </tbody>
                 </table>
                 </div>
-                @if ($coachActivity['future_without_coach'] > 0)
-                    <x-banner kind="warn" style="margin-top:12px">
-                        <span><b>{{ $coachActivity['future_without_coach'] }} séance{{ $coachActivity['future_without_coach'] > 1 ? 's' : '' }} future{{ $coachActivity['future_without_coach'] > 1 ? 's' : '' }}</b> sans coach inscrit · <a href="{{ route('planning') }}" class="underline-link" wire:navigate>voir le planning</a></span>
-                    </x-banner>
+                @if (count($coachActivity['staffed']))
+                    <div class="eyebrow" style="margin-top:16px">Séances tenues encadrées · par discipline</div>
+                    <table class="tbl tbl-cartes" style="margin-top:6px">
+                        <thead><tr><th>Discipline</th><th class="r">Séances</th><th class="r">Encadrées</th></tr></thead>
+                        <tbody>
+                            @foreach ($coachActivity['staffed'] as $d)
+                                <tr>
+                                    <td class="tbl-m-titre" style="font-weight:700">{{ $d['discipline'] }}</td>
+                                    <td class="r num" data-label="Séances">{{ $d['sessions'] }}</td>
+                                    <td class="r num" data-label="Encadrées" @if ($d['pct'] < 100) style="color:var(--warning-text)" @endif>{{ $d['staffed'] }} · {{ $d['pct'] }} %</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 @endif
             </div>
 

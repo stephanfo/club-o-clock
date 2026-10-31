@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Livewire\Concerns\AuthorizesAdminGate;
+use App\Models\ClubSettings;
 use App\Models\User;
 use App\Services\StatsExportService;
 use App\Services\StatsService;
@@ -86,6 +87,8 @@ class Dashboard extends Component
 
         return view('livewire.admin.dashboard', [
             'periodLabel' => $period['label'],
+            'toStaff' => $stats->sessionsToStaff($f),
+            'tz' => ClubSettings::current()->timezone,
             'headline' => $stats->headline($f),
             'weekly' => $stats->weeklyAttendance($f),
             'slots' => $stats->slots($f),

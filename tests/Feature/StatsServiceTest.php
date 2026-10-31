@@ -257,7 +257,7 @@ class StatsServiceTest extends TestCase
         $this->assertSame(33, $w['promotion_rate']); // 1 promu / (1 + 2 en attente)
     }
 
-    public function test_coach_activity_and_future_without_coach(): void
+    public function test_coach_activity_by_coach_and_discipline(): void
     {
         $coach = User::factory()->coach()->create(['first_name' => 'Élise', 'last_name' => 'Dubois']);
 
@@ -266,16 +266,63 @@ class StatsServiceTest extends TestCase
         $s2 = $this->training($this->bike, null, Carbon::now()->subDays(8));
         $s2->coaches()->attach($coach->id);
 
-        // Séance future sans coach.
-        $this->training($this->swim, null, Carbon::now()->addDays(5));
-
         $ca = $this->stats()->coachActivity($this->season());
 
         $this->assertCount(1, $ca['rows']);
         $this->assertSame('Élise Dubois', $ca['rows'][0]['coach']);
         $this->assertSame(2, $ca['rows'][0]['total']);
         $this->assertSame(1, $ca['rows'][0]['by_discipline'][$this->swim->id]);
-        $this->assertSame(1, $ca['future_without_coach']);
+    }
+
+    // ── Encadrement (§4.16.2, blocs 2 et 11 — #162) ──
+
+    public function test_staffed_share_per_discipline_counts_held_sessions_only(): void
+    {
+        $coach = User::factory()->coach()->create();
+        $this->training($this->bike, null, Carbon::now()->subDays(10))->coaches()->attach($coach->id);
+        $this->training($this->bike, null, Carbon::now()->subDays(3)); // sans encadrement
+        $this->training($this->swim, null, Carbon::now()->subDays(4))->update(['external_staff_label' => 'MNS piscine']);
+        $this->training($this->bike, null, Carbon::now()->addDays(2)); // à venir : pas encore tenue
+
+        $staffed = collect($this->stats()->coachActivity($this->season())['staffed'])->keyBy('discipline');
+
+        $this->assertSame(['discipline' => 'Vélo', 'sessions' => 2, 'staffed' => 1, 'pct' => 50], $staffed['Vélo']);
+        $this->assertSame(100, $staffed['Natation']['pct']); // un intervenant extérieur vaut encadrement
+        $this->assertSame(['Natation', 'Vélo'], $staffed->keys()->all()); // ordre des disciplines
+    }
+
+    public function test_sessions_to_staff_lists_upcoming_unstaffed_trainings(): void
+    {
+        $toStaff = $this->training($this->bike, null, Carbon::now()->addDays(3));
+        $this->training($this->bike, null, Carbon::now()->addDays(4))->coaches()->attach(User::factory()->coach()->create()->id);
+        $this->training($this->swim, null, Carbon::now()->addDays(5))->update(['external_staff_label' => 'MNS piscine']);
+        $this->training($this->bike, null, Carbon::now()->addDays(16)); // hors horizon
+        $this->training($this->bike, null, Carbon::now()->addDays(6))->forceFill(['cancelled_at' => Carbon::now()])->save();
+        $this->training($this->bike, null, Carbon::now()->subDays(2)); // passée
+        Session::create(['kind' => 'club_event', 'title' => 'AG', 'start_at' => Carbon::now()->addDays(7),
+            'duration_min' => 60, 'created_by' => User::factory()->coach()->create()->id]);
+
+        $rows = $this->stats()->sessionsToStaff($this->season());
+
+        $this->assertSame([$toStaff->id], array_column($rows, 'id'));
+        $this->assertSame('Séance Vélo', $rows[0]['slot']);
+        $this->assertSame('Vélo', $rows[0]['discipline']);
+    }
+
+    public function test_sessions_to_staff_ignore_period_but_follow_discipline_filter(): void
+    {
+        $bike = $this->training($this->bike, null, Carbon::now()->addDays(3));
+        $swim = $this->training($this->swim, null, Carbon::now()->addDays(4));
+        $template = SessionTemplate::factory()->create(['label' => 'Piscine du jeudi', 'discipline_id' => $this->swim->id]);
+        $this->fromTemplate($swim, $template);
+
+        // Fenêtre passée de 30 jours : la liste « à venir » n'en dépend pas.
+        $f = ['from' => Carbon::now()->subDays(30), 'to' => Carbon::now(), 'discipline_id' => $this->swim->id, 'category_id' => null];
+        $rows = $this->stats()->sessionsToStaff($f);
+
+        $this->assertSame([$swim->id], array_column($rows, 'id'));
+        $this->assertSame('Piscine du jeudi', $rows[0]['slot']);
+        $this->assertSame([$bike->id, $swim->id], array_column($this->stats()->sessionsToStaff($this->season()), 'id'));
     }
 
     // ── Fréquentation hebdomadaire (§4.16.2, bloc 4 — #160) ──
@@ -452,6 +499,20 @@ class StatsServiceTest extends TestCase
         $this->assertSame('Natation', $book->getSheetByName('Désinscriptions')->getCell('A2')->getValue());
         $this->assertSame('Total', $book->getSheetByName('Désinscriptions')->getCell('A3')->getValue());
         $this->assertSame(100, $book->getSheetByName('Désinscriptions')->getCell('D3')->getValue());
+    }
+
+    public function test_export_has_staffing_sheets(): void
+    {
+        $this->training($this->swim, null, Carbon::now()->subDays(3));
+        $this->training($this->bike, null, Carbon::create(2026, 6, 23, 17)); // 19 h à Paris
+
+        $book = app(StatsExportService::class)->build($this->season(), $this->stats()->resolvePeriod('season'));
+
+        $toStaff = $book->getSheetByName('Séances à encadrer');
+        $this->assertSame('23/06/2026', $toStaff->getCell('A2')->getValue());
+        $this->assertSame('19:00', $toStaff->getCell('B2')->getValue());
+        $this->assertSame('Natation', $book->getSheetByName('Encadrement')->getCell('A2')->getValue());
+        $this->assertSame(0, $book->getSheetByName('Encadrement')->getCell('D2')->getValue());
     }
 
     public function test_active_members_by_category_for_export(): void
