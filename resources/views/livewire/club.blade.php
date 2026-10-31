@@ -2,7 +2,7 @@
      l'entrée trombinoscope de l'accueil (card row row-press), intertitres comme la barre latérale.
      Section « Administration » (admins) : un écran n'y entre qu'une fois adapté au mobile, jamais
      avant (#152, #153). Les réglages (paramètres, catalogues, allures, modèles) restent au bureau
-     et n'y figurent pas. --}}
+     et n'y figurent pas. Un coach sans rôle admin y trouve le pilotage en vue réduite (§4.16.3). --}}
 @php
     // color:inherit + bordure explicite : sans elles, la règle globale `a` (club-tokens.css) teinte
     // le libellé en couleur de lien et souligne la rangée.
@@ -77,6 +77,19 @@
                                 <x-icon name="chevron-right" style="color:var(--fg-muted);flex:0 0 auto" />
                             </a>
                         @endforeach
+                    </div>
+                </div>
+            @endif
+
+            @if ($isCoach && ! $isAdmin)
+                <div>
+                    <div class="sect-head"><span class="sect-title">Coach</span></div>
+                    <div class="card" style="overflow:hidden">
+                        <a href="{{ route('admin.dashboard') }}" wire:navigate class="row row-press" style="{{ $last }}{{ $rowStyle }}">
+                            <x-icon name="bar-chart" :size="18" style="color:var(--fg-muted);flex:0 0 auto" />
+                            <span class="f1" style="font-weight:700;font-size:14px">Pilotage</span>
+                            <x-icon name="chevron-right" style="color:var(--fg-muted);flex:0 0 auto" />
+                        </a>
                     </div>
                 </div>
             @endif

@@ -73,7 +73,9 @@ class AppServiceProvider extends ServiceProvider
         // Adhérents (PRD §4.17.1, §4.1.3) : liste, fiche, création = admin uniquement (J6.2).
         Gate::define('manage-members', fn (User $user) => $user->isAdmin());
 
-        // Dashboard statistiques bureau + export XLSX (PRD §4.16) : admin uniquement (J6.6).
+        // Pilotage (PRD §4.16.3) : l'écran s'ouvre aux coachs, mais tous les blocs et l'export XLSX
+        // restent à l'admin. Deux gates : l'accès à l'écran, puis le contenu complet.
+        Gate::define('view-pilotage', fn (User $user) => $user->isAdmin() || $user->hasRole('coach'));
         Gate::define('view-dashboard', fn (User $user) => $user->isAdmin());
 
         // Journaux Audit/Activity + export XLSX (PRD §4.18.5) : admin uniquement (J6.7).

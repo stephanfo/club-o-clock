@@ -67,6 +67,24 @@ class ClubHubTest extends TestCase
             ->assertDontSee('href="'.route('admin.members').'"', false);
     }
 
+    /** Coach sans rôle admin : une seule entrée, le pilotage en vue réduite (§4.16.3). */
+    public function test_le_coach_trouve_le_pilotage_et_pas_l_athlete(): void
+    {
+        Livewire::actingAs(User::factory()->create(['roles' => ['coach', 'athlete']]))->test(Club::class)
+            ->assertSee('Pilotage')
+            ->assertSee('href="'.route('admin.dashboard').'"', false);
+
+        Livewire::actingAs(User::factory()->create(['roles' => ['athlete']]))->test(Club::class)
+            ->assertSee('href="'.route('infos').'"', false)
+            ->assertDontSee('Pilotage')
+            ->assertDontSee('href="'.route('admin.dashboard').'"', false);
+
+        // L'admin coach l'a déjà sous « Administration » : pas de doublon.
+        Livewire::actingAs(User::factory()->create(['roles' => ['admin', 'coach']]))->test(Club::class)
+            ->assertSee('Administration')
+            ->assertDontSee('Pilotage');
+    }
+
     public function test_la_barre_du_bas_mene_au_hub_et_non_plus_au_profil(): void
     {
         $u = User::factory()->create();

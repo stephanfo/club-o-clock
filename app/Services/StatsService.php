@@ -362,7 +362,7 @@ class StatsService
      * Séances training encadrées par coach × discipline sur la fenêtre, et part des séances tenues
      * encadrées par discipline. Seuls les `training` comptent (pas competition/club_event).
      *
-     * @return array{disciplines:Collection<int,Discipline>,rows:array<int,array{coach:string,by_discipline:array<int,int>,total:int}>,staffed:array<int,array{discipline:string,sessions:int,staffed:int,pct:int}>}
+     * @return array{disciplines:Collection<int,Discipline>,rows:array<int,array{id:int,coach:string,by_discipline:array<int,int>,total:int}>,staffed:array<int,array{discipline:string,sessions:int,staffed:int,pct:int}>}
      */
     public function coachActivity(array $f): array
     {
@@ -374,7 +374,7 @@ class StatsService
         $byCoach = [];
         foreach ($sessions as $s) {
             foreach ($s->coaches as $coach) {
-                $byCoach[$coach->id] ??= ['coach' => $coach->fullName(), 'counts' => []];
+                $byCoach[$coach->id] ??= ['id' => $coach->id, 'coach' => $coach->fullName(), 'counts' => []];
                 $byCoach[$coach->id]['counts'][$s->discipline_id] = ($byCoach[$coach->id]['counts'][$s->discipline_id] ?? 0) + 1;
             }
         }
@@ -388,7 +388,7 @@ class StatsService
                 $total += $n;
             }
 
-            return ['coach' => $c['coach'], 'by_discipline' => $byDiscipline, 'total' => $total];
+            return ['id' => $c['id'], 'coach' => $c['coach'], 'by_discipline' => $byDiscipline, 'total' => $total];
         })->sortByDesc('total')->values()->all();
 
         return ['disciplines' => $disciplines, 'rows' => $rows, 'staffed' => $this->staffedShare($f)];
