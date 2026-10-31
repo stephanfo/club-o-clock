@@ -5,12 +5,11 @@
          flash('status') = succès (vert) · flash('warn') = refus (orange). --}}
     <x-flash-float />
     {{-- ─── Topbar ─── --}}
-    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. Actions de terrain seulement,
-         l'export XLSX et l'import CSV restent au bureau. --}}
+    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. L'import CSV reste au bureau. --}}
     <x-topbar title="Adhérents" :back="route('club')" back-label="Retour au club">
         <x-slot:trailing>
             @if ($awaiting > 0)
-                <button type="button" wire:click="confirmBulkInvite" class="iconbtn" aria-label="Inviter {{ $awaiting }} en attente"><x-icon name="mail" /></button>
+                <button type="button" wire:click="confirmBulkInvite" wire:loading.attr="disabled" wire:target="confirmBulkInvite" class="iconbtn" aria-label="Inviter {{ $awaiting }} en attente"><x-icon name="mail" /></button>
             @endif
             <a href="{{ route('admin.members.create') }}" wire:navigate class="iconbtn" aria-label="Ajouter un adhérent"><x-icon name="plus" /></a>
         </x-slot:trailing>

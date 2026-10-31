@@ -5,9 +5,9 @@
          flash('status') = succès (vert) · flash('warn') = refus (orange). --}}
     <x-flash-float />
     {{-- ─── Topbar ─── --}}
-    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. Actions de terrain seulement,
-         l'export XLSX et l'import CSV restent au bureau. --}}
-    <x-topbar title="Pages d'info" :back="route('club')" back-label="Retour au club">
+    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. --}}
+    {{-- :back-target : on y revient par redirection après enregistrement d'une page (#153). --}}
+    <x-topbar title="Pages d'info" :back="route('club')" :back-target="route('club')" back-label="Retour au club">
         <x-slot:trailing>
             <a href="{{ route('admin.infos.create') }}" wire:navigate class="iconbtn" aria-label="Nouvelle page"><x-icon name="plus" /></a>
         </x-slot:trailing>

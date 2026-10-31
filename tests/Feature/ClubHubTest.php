@@ -33,6 +33,15 @@ class ClubHubTest extends TestCase
             ->assertSee('href="'.route('legal').'"', false);
     }
 
+    public function test_la_carte_profil_reprend_le_sous_titre_du_profil(): void
+    {
+        $u = User::factory()->create(['roles' => ['athlete', 'coach']]);
+
+        $this->assertSame('Athlète · Coach', $u->roleSummary());
+        Livewire::actingAs($u)->test(Club::class)->assertSee('Athlète · Coach');
+        $this->actingAs($u)->get(route('profil'))->assertSee('Athlète · Coach');
+    }
+
     public function test_sans_acces_au_trombinoscope_pas_d_entree(): void
     {
         Livewire::actingAs(User::factory()->create(['roles' => []]))->test(Club::class)
@@ -63,7 +72,8 @@ class ClubHubTest extends TestCase
         $u = User::factory()->create();
 
         $this->actingAs($u)->get(route('dashboard'))
-            ->assertSee('href="'.route('club').'" wire:navigate class="botnav-item "', false)
+            ->assertSee('href="'.route('club').'" wire:navigate class="botnav-item', false)
+            ->assertSee('<span>Club</span>', false)
             ->assertDontSee('<span>Profil</span>', false);
     }
 

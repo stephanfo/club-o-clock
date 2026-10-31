@@ -46,7 +46,28 @@ class AdminMobileTopbarTest extends TestCase
             if ($action !== null) {
                 $this->assertStringContainsString('aria-label="'.$action.'"', $topbar, $url);
             }
+            // Tout bouton serveur de la topbar est protégé du double tap (CLAUDE.md, CTA serveur).
+            preg_match_all('/<button\b[^>]*>/', $topbar, $boutons);
+            foreach ($boutons[0] as $bouton) {
+                $this->assertStringContainsString('wire:loading.attr="disabled"', $bouton, "{$url} : {$bouton}");
+                $this->assertStringContainsString('wire:target=', $bouton, "{$url} : {$bouton}");
+            }
         }
+    }
+
+    public function test_les_listes_atteintes_apres_enregistrement_visent_le_hub(): void
+    {
+        // Pages d'info et modèles : on y revient par redirection navigate après un enregistrement ;
+        // sans cible, le chevron rouvrirait le formulaire laissé dans la pile.
+        $admin = User::factory()->create(['roles' => ['admin']]);
+
+        foreach ([route('admin.infos'), route('admin.templates')] as $url) {
+            $topbar = $this->topbar($this->actingAs($admin)->get($url)->getContent(), $url);
+            $this->assertStringContainsString('window.clubBack?.(&#039;'.route('club').'&#039;)', $topbar, $url);
+        }
+        // Contrôle : un écran sans redirection d'arrivée garde le retour arrière ordinaire.
+        $journal = $this->topbar($this->actingAs($admin)->get(route('admin.journal'))->getContent(), 'journal');
+        $this->assertStringContainsString('window.clubBack?.()', $journal);
     }
 
     public function test_l_import_csv_et_l_export_restent_au_bureau(): void

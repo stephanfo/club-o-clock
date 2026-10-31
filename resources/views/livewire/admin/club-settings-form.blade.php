@@ -20,8 +20,7 @@
     {{-- Feedback d'action global (revue UX 2026-07-11) : bannière flottante auto-masquée,
          flash('status') = succès (vert) · flash('warn') = refus (orange). --}}
     <x-flash-float />
-    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. Actions de terrain seulement,
-         l'export XLSX et l'import CSV restent au bureau. --}}
+    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. --}}
     <x-topbar title="Paramètres du club" :back="route('club')" back-label="Retour au club" />
     <div class="dk-topbar">
         <div class="f1">

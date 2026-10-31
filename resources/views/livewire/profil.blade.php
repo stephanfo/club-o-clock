@@ -1,12 +1,8 @@
 {{-- Profil utilisateur — porté de screen-profil.jsx (Profil mobile + ProfilDesktop). Deux coquilles,
      une seule visible par breakpoint (CSS, comme l'accueil). Onglets partagés via le partial _panel. --}}
 @php
-    $roleMap = ['athlete' => 'Athlète', 'coach' => 'Coach', 'admin' => 'Admin'];
-    $roles = array_map(fn ($r) => $roleMap[$r] ?? ucfirst($r), $user->roles ?? []);
-    $roleSub = implode(' · ', $roles);
-    if ($cat = $user->primaryCategory()) {
-        $roleSub = trim($roleSub.' · '.$cat->label, ' ·');
-    }
+    $roles = $user->roleLabels();
+    $roleSub = $user->roleSummary();
     $memberSince = $user->created_at?->locale('fr')->isoFormat('MMMM YYYY');
     $tabItems = [
         ['v' => 'identite', 'l' => 'Identité'],

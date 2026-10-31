@@ -14,13 +14,12 @@
          flash('status') = succès (vert) · flash('warn') = refus (orange). --}}
     <x-flash-float />
     {{-- ─── Topbar ─── --}}
-    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. Actions de terrain seulement,
-         l'export XLSX et l'import CSV restent au bureau. --}}
+    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. --}}
     <x-topbar title="Envois" :back="route('club')" back-label="Retour au club">
         {{-- Annuler la file est le geste urgent du terrain (#153) : un envoi parti par erreur. --}}
         <x-slot:trailing>
             <button type="button" wire:click="pushAllPending" wire:loading.attr="disabled" wire:target="pushAllPending" class="iconbtn" aria-label="Pousser tous les en attente"><x-icon name="send" /></button>
-            <button type="button" wire:click="askCancel('all')" class="iconbtn" aria-label="Annuler tous les en attente"><x-icon name="x" /></button>
+            <button type="button" wire:click="askCancel('all')" wire:loading.attr="disabled" wire:target="askCancel" class="iconbtn" aria-label="Annuler tous les en attente"><x-icon name="x" /></button>
         </x-slot:trailing>
     </x-topbar>
     <div class="dk-topbar">
