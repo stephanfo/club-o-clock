@@ -62,6 +62,18 @@ class AdminMobileTopbarTest extends TestCase
         $this->assertStringNotContainsString('export', $this->topbar($journal, 'journal'));
     }
 
+    public function test_l_invitation_groupee_n_apparait_que_s_il_reste_des_comptes_en_attente(): void
+    {
+        $admin = User::factory()->create(['roles' => ['admin']]);
+        $topbar = fn () => $this->topbar($this->actingAs($admin)->get(route('admin.members'))->getContent(), 'adhérents');
+
+        $this->assertStringContainsString('aria-label="Ajouter un adhérent"', $topbar());
+        $this->assertStringNotContainsString('confirmBulkInvite', $topbar());
+
+        User::factory()->create(['email' => 'jamais@club.test', 'password' => null]);
+        $this->assertStringContainsString('aria-label="Inviter 1 en attente"', $topbar());
+    }
+
     public function test_l_onglet_club_reste_allume_dans_l_administration(): void
     {
         $admin = User::factory()->create(['roles' => ['admin']]);

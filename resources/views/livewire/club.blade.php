@@ -1,7 +1,8 @@
 {{-- Hub « Club » (#150) — index mobile des écrans hors barre du bas. Rangées reprises de
      l'entrée trombinoscope de l'accueil (card row row-press), intertitres comme la barre latérale.
-     La section « Administration » viendra avec #151-#153 : un écran n'y entre qu'une fois adapté
-     au mobile, jamais avant. --}}
+     Section « Administration » (admins) : un écran n'y entre qu'une fois adapté au mobile, jamais
+     avant (#152 adhérents, #153 envois, journaux, tableau de bord, infos). Les réglages (paramètres,
+     catalogues, allures, modèles) restent au bureau et n'y figurent pas. --}}
 @php
     // color:inherit + bordure explicite : sans elles, la règle globale `a` (club-tokens.css) teinte
     // le libellé en couleur de lien et souligne la rangée.
@@ -56,6 +57,19 @@
                     </a>
                 </div>
             </div>
+
+            @if ($isAdmin)
+                <div>
+                    <div class="sect-head"><span class="sect-title">Administration</span></div>
+                    <div class="card" style="overflow:hidden">
+                        <a href="{{ route('admin.members') }}" wire:navigate class="row row-press" style="{{ $last }}{{ $rowStyle }}">
+                            <x-icon name="users" :size="18" style="color:var(--fg-muted);flex:0 0 auto" />
+                            <span class="f1" style="font-weight:700;font-size:14px">Adhérents</span>
+                            <x-icon name="chevron-right" style="color:var(--fg-muted);flex:0 0 auto" />
+                        </a>
+                    </div>
+                </div>
+            @endif
 
             <a href="{{ route('legal') }}" class="card row row-press" style="{{ $rowStyle }}">
                 <x-icon name="shield" :size="18" style="color:var(--fg-muted);flex:0 0 auto" />

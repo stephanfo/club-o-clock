@@ -1136,7 +1136,19 @@ body:has(.scrim) { overflow: hidden; }
     .tpl-grid, .tpl-list-grid { grid-template-columns: 1fr; gap: 18px; }
     .tpl-row2 { grid-template-columns: 1fr; }
     .settings-grid { grid-template-columns: 1fr; }
-    .mc-create-grid, .mc-show-grid { grid-template-columns: 1fr; gap: 14px; }
+    /* minmax(0, …) : un 1fr seul vaut minmax(auto, 1fr), et une rangée insécable de la fiche élargissait
+       la colonne au-delà de l’écran sur mobile (#152). */
+    .mc-create-grid, .mc-show-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+}
+
+/* Compteurs de la liste des adhérents (#152) : sur mobile, une seule rangée qui défile plutôt que
+   trois lignes de tuiles avant le premier adhérent. Marges négatives : la rangée court jusqu'aux
+   bords de l'écran, la première tuile reste alignée sur le contenu. */
+@media (max-width: 768px) {
+    .stat-rangee { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: calc(-1 * var(--space-4)); padding-inline: var(--space-4); }
+    .stat-rangee::-webkit-scrollbar { display: none; }
+    .stat-rangee > .stat { flex: 0 0 auto; }
+    .stat-rangee > .f1 { display: none; }
 }
 
 @media (max-width: 880px) {

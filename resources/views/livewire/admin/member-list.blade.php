@@ -9,6 +9,9 @@
          l'export XLSX et l'import CSV restent au bureau. --}}
     <x-topbar title="Adhérents" :back="route('club')" back-label="Retour au club">
         <x-slot:trailing>
+            @if ($awaiting > 0)
+                <button type="button" wire:click="confirmBulkInvite" class="iconbtn" aria-label="Inviter {{ $awaiting }} en attente"><x-icon name="mail" /></button>
+            @endif
             <a href="{{ route('admin.members.create') }}" wire:navigate class="iconbtn" aria-label="Ajouter un adhérent"><x-icon name="plus" /></a>
         </x-slot:trailing>
     </x-topbar>
@@ -32,7 +35,7 @@
 
     <div class="dk-body">
         {{-- ═══ Compteurs ═══ --}}
-        <div class="flex g12 ac wrap" style="margin-bottom:16px">
+        <div class="flex g12 ac wrap stat-rangee" style="margin-bottom:16px">
             <div class="stat" style="padding:12px;min-width:110px">
                 <div class="n" style="font-size:28px">{{ $counts['active'] }}</div><div class="l">actifs</div>
             </div>
