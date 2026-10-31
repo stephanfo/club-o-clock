@@ -177,8 +177,12 @@
             </a>
         @endif
         {{-- Hub « Club » (#150) : index des écrans sans entrée dans la barre. L'onglet reste allumé
-             sur ces écrans, pour qu'on sache d'où l'on vient. --}}
-        <a href="{{ route('club') }}" wire:navigate class="botnav-item {{ in_array($active, ['club', 'profil', 'trombi', 'infos', 'alerts'], true) ? 'on' : '' }}">
+             sur ces écrans, administration comprise (#151), pour qu'on sache d'où l'on vient. --}}
+        @php
+            $sousClub = ['club', 'profil', 'trombi', 'infos', 'alerts',
+                'admin-dashboard', 'members', 'templates', 'admin-infos', 'admin-journal', 'admin-outbox', 'settings'];
+        @endphp
+        <a href="{{ route('club') }}" wire:navigate class="botnav-item {{ in_array($active, $sousClub, true) ? 'on' : '' }}">
             <x-icon name="menu" :size="22" /><span>Club</span>
         </a>
     </nav>

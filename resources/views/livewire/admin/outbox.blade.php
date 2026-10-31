@@ -14,6 +14,9 @@
          flash('status') = succès (vert) · flash('warn') = refus (orange). --}}
     <x-flash-float />
     {{-- ─── Topbar ─── --}}
+    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. Actions de terrain seulement,
+         l'export XLSX et l'import CSV restent au bureau. --}}
+    <x-topbar title="Envois sortants" :back="route('club')" back-label="Retour au club" />
     <div class="dk-topbar">
         <div class="f1">
             <div class="dsp" style="font-size:24px">Envois sortants</div>
@@ -164,7 +167,7 @@
                 <div class="meta tc" style="padding:32px">Aucun envoi ne correspond à ces filtres.</div>
             @else
                 <div style="padding:0 14px">
-                    <table class="tbl">
+                    <table class="tbl tbl-cartes">
                         <thead><tr><th></th><th>Date</th><th>Statut</th><th>Canal</th><th>Type</th><th>Destinataire</th><th>Tentatives</th><th></th></tr></thead>
                         <tbody>
                             @foreach ($rows as $r)
@@ -175,10 +178,10 @@
                                     <td class="meta mono" style="font-size:12px;white-space:nowrap">{{ $r->created_at->copy()->setTimezone($tz)->format('d/m H:i') }}</td>
                                     <td><span class="chip chip-sm {{ $statusChip[$r->status] ?? 'chip-line' }}">{{ $statusLabels[$r->status] ?? $r->status }}</span></td>
                                     <td><span class="chip chip-sm chip-line">{{ $r->channel }}</span></td>
-                                    <td style="font-size:13px">{{ $typeLabel($r->type) }}</td>
-                                    <td>{{ $r->user?->fullName() ?? '—' }}</td>
-                                    <td class="meta mono" style="font-size:12px">{{ $r->attempts }}</td>
-                                    <td style="text-align:right"><x-icon name="chevron-right" :size="16" class="muted" /></td>
+                                    <td class="tbl-m-ligne" style="font-size:13px">{{ $typeLabel($r->type) }}</td>
+                                    <td class="tbl-m-titre">{{ $r->user?->fullName() ?? '—' }}</td>
+                                    <td class="meta mono" style="font-size:12px" data-label="Tentatives">{{ $r->attempts }}</td>
+                                    <td class="tbl-m-cache" style="text-align:right"><x-icon name="chevron-right" :size="16" class="muted" /></td>
                                 </tr>
                             @endforeach
                         </tbody>
