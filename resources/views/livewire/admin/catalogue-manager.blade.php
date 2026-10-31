@@ -17,11 +17,10 @@
     {{-- Feedback d'action global (revue UX 2026-07-11) : bannière flottante auto-masquée,
          flash('status') = succès (vert) · flash('warn') = refus (orange). --}}
     <x-flash-float />
-    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. Actions de terrain seulement,
-         l'export XLSX et l'import CSV restent au bureau. --}}
+    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. --}}
     <x-topbar :title="$def['title']" :back="route('admin.settings')" back-label="Retour aux paramètres">
         <x-slot:trailing>
-            <button type="button" wire:click="startAdd" class="iconbtn" aria-label="Ajouter"><x-icon name="plus" /></button>
+            <button type="button" wire:click="startAdd" wire:loading.attr="disabled" wire:target="startAdd" class="iconbtn" aria-label="Ajouter"><x-icon name="plus" /></button>
         </x-slot:trailing>
     </x-topbar>
     <div class="dk-topbar">

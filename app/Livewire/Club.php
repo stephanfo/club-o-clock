@@ -19,15 +19,9 @@ class Club extends Component
     {
         $user = auth()->user();
 
-        $roleMap = ['athlete' => 'Athlète', 'coach' => 'Coach', 'admin' => 'Admin'];
-        $roleSub = implode(' · ', array_map(fn ($r) => $roleMap[$r] ?? ucfirst($r), $user->roles ?? []));
-        if ($cat = $user->primaryCategory()) {
-            $roleSub = trim($roleSub.' · '.$cat->label, ' ·');
-        }
-
         return view('livewire.club', [
             'user' => $user,
-            'roleSub' => $roleSub,
+            'roleSub' => $user->roleSummary(),
             'canTrombi' => app(TrombiPolicy::class)->consult($user),
             'isAdmin' => $user->hasRole('admin'),
             'unreadAlerts' => NotificationOutbox::unreadCountFor($user->id),

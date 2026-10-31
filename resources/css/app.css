@@ -1160,6 +1160,14 @@ body:has(.scrim) { overflow: hidden; }
     .ligne-repliable > .ligne-repliable-actions { flex-basis: 100%; flex-wrap: wrap; justify-content: flex-end; }
 }
 
+/* Textes insécables du design system (.sect-title, .btn) : sur mobile, un intitulé long sortait de
+   sa carte, rogné sans signe (« Enregistrer un accord recueilli hors de l'app », « Déconnecter tous
+   les autres appareils »). Titres de section et boutons pleine largeur passent à la ligne. */
+@media (max-width: 768px) {
+    .sect-title { white-space: normal; }
+    .btn-block { white-space: normal; line-height: 1.25; text-align: center; }
+}
+
 /* Compteurs de la liste des adhérents (#152) : sur mobile, une seule rangée qui défile plutôt que
    trois lignes de tuiles avant le premier adhérent. Marges négatives : la rangée court jusqu'aux
    bords de l'écran, la première tuile reste alignée sur le contenu. */
