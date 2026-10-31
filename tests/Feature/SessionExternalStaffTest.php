@@ -96,18 +96,18 @@ class SessionExternalStaffTest extends TestCase
         $this->assertLessThan(mb_strpos($html, 'Intervenant extérieur'), mb_strpos($html, 'Vincent Durand'));
     }
 
-    // ------------------------------------------------------------------ compteur admin (§4.16.1)
+    // ------------------------------------------------------------------ séances à encadrer (§4.16.2, bloc 2)
 
-    public function test_une_seance_avec_intervenant_sort_du_compteur_sans_coach(): void
+    public function test_une_seance_avec_intervenant_sort_des_seances_a_encadrer(): void
     {
         $this->seance(['start_at' => Carbon::now()->addWeek(), 'external_staff_label' => 'Surveillant de baignade']);
-        $this->seance(['start_at' => Carbon::now()->addWeek()]);
+        $sansCoach = $this->seance(['start_at' => Carbon::now()->addWeek()]);
 
         $stats = app(StatsService::class);
         $p = $stats->resolvePeriod('season');
-        $ca = $stats->coachActivity(['from' => $p['from'], 'to' => $p['to'], 'discipline_id' => null, 'category_id' => null]);
+        $rows = $stats->sessionsToStaff(['from' => $p['from'], 'to' => $p['to'], 'discipline_id' => null, 'category_id' => null]);
 
-        $this->assertSame(1, $ca['future_without_coach']);
+        $this->assertSame([$sansCoach->id], array_column($rows, 'id'));
     }
 
     // ------------------------------------------------------------------ périmètre training (garde serveur)

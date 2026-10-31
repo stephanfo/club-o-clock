@@ -18,7 +18,7 @@ use Illuminate\Support\Collection;
 // Dashboard statistiques bureau (PRD §4.16.1 — J6.6). Calcule tous les indicateurs de pilotage à
 // partir des données produites J2–J5 (inscriptions, quotas, encadrement). Trois filtres globaux —
 // période, discipline, catégorie — appliqués partout où ils ont du sens. Service pur lecture : aucune
-// mutation, aucun log. Les fenêtres « live » (séances futures sans coach) ignorent la période.
+// mutation, aucun log. Les fenêtres « à venir » (séances à encadrer) ignorent la période.
 class StatsService
 {
     public const PERIODS = ['season', '30d', '90d', '12m'];
@@ -358,10 +358,10 @@ class StatsService
     // ── Activité coachs (§4.16.1, bloc dédié) ──
 
     /**
-     * Séances training encadrées par coach × discipline sur la fenêtre + compteur live de séances
-     * futures sans coach (hors période). Seuls les `training` comptent (pas competition/club_event).
+     * Séances training encadrées par coach × discipline sur la fenêtre, et part des séances tenues
+     * encadrées par discipline. Seuls les `training` comptent (pas competition/club_event).
      *
-     * @return array{disciplines:Collection<int,Discipline>,rows:array<int,array{coach:string,by_discipline:array<int,int>,total:int}>,future_without_coach:int}
+     * @return array{disciplines:Collection<int,Discipline>,rows:array<int,array{coach:string,by_discipline:array<int,int>,total:int}>,staffed:array<int,array{discipline:string,sessions:int,staffed:int,pct:int}>}
      */
     public function coachActivity(array $f): array
     {
@@ -390,16 +390,73 @@ class StatsService
             return ['coach' => $c['coach'], 'by_discipline' => $byDiscipline, 'total' => $total];
         })->sortByDesc('total')->values()->all();
 
-        $futureWithoutCoach = $this->applySessionFilters(
-            // Un intervenant extérieur signalé (#38) vaut encadrement : la piscine du dimanche
-            // tenue par un surveillant prestataire n'est pas une séance « sans coach » à traiter.
-            Session::query()->where('kind', 'training')->whereNull('cancelled_at')
-                ->where('start_at', '>', Carbon::now())->doesntHave('coaches')
-                ->whereNull('external_staff_label'),
-            $f
-        )->count();
+        return ['disciplines' => $disciplines, 'rows' => $rows, 'staffed' => $this->staffedShare($f)];
+    }
 
-        return ['disciplines' => $disciplines, 'rows' => $rows, 'future_without_coach' => $futureWithoutCoach];
+    /**
+     * Part des séances tenues de la période encadrées, par discipline. Encadrée = au moins un coach
+     * inscrit ou un intervenant extérieur (#38), comme la colonne « sans encadrement » des créneaux.
+     *
+     * @return array<int,array{discipline:string,sessions:int,staffed:int,pct:int}>
+     */
+    private function staffedShare(array $f): array
+    {
+        $sessions = $this->heldTrainingSessions($f)->withCount('coaches')
+            ->get(['id', 'discipline_id', 'external_staff_label']);
+        $disciplines = Discipline::query()->whereIn('id', $sessions->pluck('discipline_id')->filter()->unique())
+            ->orderBy('sort_order')->get(['id', 'label', 'sort_order'])->keyBy('id');
+
+        return $sessions->groupBy('discipline_id')
+            ->map(function (Collection $group, $id) use ($disciplines) {
+                $staffed = $group->filter(fn (Session $s) => $s->coaches_count > 0 || filled($s->external_staff_label))->count();
+
+                return [
+                    'discipline' => $disciplines->get($id)->label ?? 'Sans discipline',
+                    'order' => $disciplines->get($id)->sort_order ?? PHP_INT_MAX,
+                    'sessions' => $group->count(),
+                    'staffed' => $staffed,
+                    'pct' => (int) round($staffed / $group->count() * 100),
+                ];
+            })
+            ->sortBy('order')->map(fn (array $r) => array_diff_key($r, ['order' => 0]))->values()->all();
+    }
+
+    // ── Séances à encadrer (§4.16.2, bloc 2) ──
+
+    /** Horizon de la liste « séances à encadrer », en jours à partir de maintenant. */
+    public const STAFFING_HORIZON_DAYS = 15;
+
+    /**
+     * Séances training à venir sur l'horizon, non annulées, sans coach inscrit ni intervenant
+     * extérieur (#38) : la piscine tenue par un surveillant prestataire n'est pas à traiter. Bloc « à
+     * venir » : ignore la période, mais suit les filtres discipline et catégorie.
+     *
+     * @return array<int,array{id:int,start_at:Carbon,slot:string,discipline:?string}>
+     */
+    public function sessionsToStaff(array $f): array
+    {
+        $now = Carbon::now();
+
+        $sessions = $this->applySessionFilters(
+            Session::query()->where('kind', 'training')->whereNull('cancelled_at')
+                ->where('start_at', '>', $now)
+                ->where('start_at', '<=', $now->copy()->addDays(self::STAFFING_HORIZON_DAYS))
+                ->doesntHave('coaches')
+                ->where(fn (Builder $q) => $q->whereNull('external_staff_label')->orWhere('external_staff_label', '')),
+            $f
+        )->with('discipline:id,label')->orderBy('start_at')
+            ->get(['id', 'title', 'start_at', 'discipline_id', 'source_template_id']);
+
+        $templates = SessionTemplate::query()
+            ->whereIn('id', $sessions->pluck('source_template_id')->filter()->unique())
+            ->pluck('label', 'id');
+
+        return $sessions->map(fn (Session $s) => [
+            'id' => $s->id,
+            'start_at' => $s->start_at,
+            'slot' => $templates->get($s->source_template_id) ?? $s->title,
+            'discipline' => $s->discipline?->label,
+        ])->all();
     }
 
     // ── Détails pour l'export XLSX (non affichés à l'écran, fidèle au design) ──

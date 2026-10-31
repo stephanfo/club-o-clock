@@ -62,6 +62,12 @@ class StatsExportService
             ['Overrides coach', $headline['overrides']],
         ]);
 
+        // Bloc « à venir » : ignore la période, comme à l'écran. Date et heure en heure du club.
+        $tz = ClubSettings::current()->timezone;
+        $this->addSheet($book, 'Séances à encadrer', ['Date', 'Heure', 'Créneau', 'Discipline'],
+            array_map(fn ($r) => [$this->frDate($r['start_at']->copy()->setTimezone($tz)), $r['start_at']->copy()->setTimezone($tz)->format('H:i'), $r['slot'], $r['discipline'] ?? '—'],
+                $this->stats->sessionsToStaff($f)));
+
         $this->addSheet($book, 'Fréquentation hebdo', ['Semaine du', 'Séances', 'Participations', 'Athlètes distincts'],
             array_map(fn ($r) => [$this->frDate($r['start']).($r['partial'] ? ' (en cours)' : ''), $r['sessions'], $r['participations'], $r['athletes']],
                 $this->stats->weeklyAttendance($f)));
@@ -102,6 +108,9 @@ class StatsExportService
         }, $coach['rows']);
         $this->addSheet($book, 'Activité coachs', $coachHeader, $coachRows);
 
+        $this->addSheet($book, 'Encadrement', ['Discipline', 'Séances tenues', 'Encadrées', 'Part encadrée (%)'],
+            array_map(fn ($r) => [$r['discipline'], $r['sessions'], $r['staffed'], $r['pct']], $coach['staffed']));
+
         $this->addSheet($book, 'Adhérents actifs', ['Catégorie', 'Effectif'],
             array_map(fn ($r) => [$r['label'], $r['count']], $this->stats->activeMembersByCategory($f)));
 
@@ -129,7 +138,8 @@ class StatsExportService
     private function writeTable($sheet, array $header, array $rows): void
     {
         $sheet->fromArray($header, null, 'A1');
-        $sheet->fromArray($rows, null, 'A2');
+        // Comparaison stricte : sinon PhpSpreadsheet assimile 0 à null et laisse la cellule vide.
+        $sheet->fromArray($rows, null, 'A2', true);
 
         $lastCol = $sheet->getHighestColumn(1); // dernière colonne de l'en-tête
         $sheet->getStyle('A1:'.$lastCol.'1')->getFont()->setBold(true);
