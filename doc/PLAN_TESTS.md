@@ -50,7 +50,7 @@
 ### 1.2 Accueil
 - [ ] Salutation personnalisée + **prochaine séance** en vedette (badge « Tu participes » si inscrite).
 - [ ] Liste « Mes prochaines séances » : ne liste que les séances où **Marie est inscrite** (participating), pas tout le planning ; la prochaine (en vedette) n'y est pas dupliquée.
-- [ ] Bloc **quotas de la semaine** (ex. NAT 0/1 ou 1/1 selon les inscriptions seedées).
+- [ ] Bloc **quotas de la semaine** (ex. NAT 0/1 ou 1/1 selon les inscriptions seedées) : séances comptées listées, alerte « Quota atteint » à 1/1.
 - [ ] Bloc « Apéro à venir » si un flag apéro existe sur une séance future.
 - [ ] **Bannière info épinglée** : la note « Sport Attitude » (épinglée) apparaît en tête de l'accueil ; clic → page **Infos** ancrée sur la note (voir §1.10).
 
@@ -98,7 +98,7 @@
 - [ ] (Si VAPID configuré) activer le push sur l'appareil → notification test reçue.
 
 ### 1.9 Profil (PRD §4.1.5, §4.3, §4.10)
-- [ ] Identité + catégorie ; compteurs **quotas de la semaine** cohérents avec l'Accueil.
+- [ ] Identité + catégorie (les compteurs de quota sont sur l'Accueil, plus d'onglet Quotas).
 - [ ] Méthodes de connexion listées ; révocation impossible s'il n'en reste qu'une.
 - [ ] **Demande de suppression de compte** → message « demande envoyée » ; un bandeau propose l'**annulation** pendant 7 jours ; annuler.
 

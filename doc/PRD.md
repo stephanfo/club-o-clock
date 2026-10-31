@@ -626,7 +626,7 @@ Le coach peut **forcer une inscription `participating`**, en outrepassant quota 
 
 #### 4.10.7 UX et transparence
 - Bandeau d'avertissement systématique avant validation d'une inscription qui partira en waitlist pour cause de quota.
-- **Compteurs visibles dans le profil athlète, regroupés par tag** (et non par discipline) : « cette semaine : 1/1 piscine, 0/2 home-trainer-collectif, 2/3 endurance ». Les séances sans tag n'apparaissent dans aucun compteur.
+- **Compteurs visibles sur l'accueil de l'athlète, regroupés par tag** (et non par discipline) : « cette semaine : 1/1 piscine, 0/2 home-trainer-collectif, 2/3 endurance », chaque compteur détaillant les séances comptées et signalant un quota atteint. Les séances sans tag n'apparaissent dans aucun compteur.
 - **Vue coach** : sur la liste des inscrits/waitlist, indication visuelle du statut (`quota_exceeded` vs `capacity`) et du nb de séances déjà faites cette semaine.
 - **Vue coach (gestion de séance)** : bouton **« Débloquer le quota »** sur toute séance future, non annulée et taguée. Au clic, modale de confirmation : ce que le déblocage change jusqu'à la séance, liste nominative des athlètes promus, champ « motif » optionnel partagé ; dès qu'au moins un athlète est promu, accusé de réception chiffré (« Je comprends que N athlètes seront prévenu·e·s ») avant d'armer le bouton. Une fois débloqué, le bouton devient **« Refermer le quota »** (simple confirmation).
 - **Chip « Quota débloqué »** sur la fiche séance, visible de tous — athlètes compris, pour qu'ils sachent pouvoir s'inscrire.
