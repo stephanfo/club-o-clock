@@ -90,7 +90,7 @@
                                 @endphp
                                 <tr class="row-press" style="cursor:pointer" wire:key="m-{{ $m->id }}"
                                     onclick="window.location='{{ route('admin.members.show', $m) }}'">
-                                    <td><x-avatar :name="$m->fullName()" size="sm" /></td>
+                                    <td><x-avatar :name="$m->fullName()" size="sm" :photo="$photoUrls[$m->id] ?? null" /></td>
                                     <td style="font-weight:700">{{ $m->fullName() }}</td>
                                     <td class="meta" style="font-size:13px">{{ $m->email ?? '—' }}</td>
                                     <td>{{ $primary?->label ?? '—' }}</td>

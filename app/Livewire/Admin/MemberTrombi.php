@@ -4,18 +4,21 @@ namespace App\Livewire\Admin;
 
 use App\Livewire\Concerns\AuthorizesAdminGate;
 use App\Models\User;
+use App\Policies\TrombiPolicy;
 use App\Services\ConsentService;
 use App\Services\MemberService;
 use App\Services\TrombiService;
 use App\Support\Trombi\BoardRole;
 use App\Support\Trombi\ConsentType;
+use App\Support\Trombi\TrombiCard;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use RuntimeException;
 
 // Trombinoscope d'un adhérent, côté admin (#72, PRD §4.23.1, §4.17.1) : fonction au bureau, retrait
 // d'un accord à la demande, enregistrement d'un accord recueilli hors de l'app (source obligatoire),
-// modération de la photo. L'admin ne dépose ni photo ni numéro, et ne voit pas une photo masquée.
+// modération de la photo, affichée pour en juger. L'admin ne dépose ni photo ni numéro, et ne voit
+// pas une photo masquée.
 // Imbriqué dans l'onglet « Trombinoscope » de la fiche adhérent.
 class MemberTrombi extends Component
 {
@@ -129,7 +132,7 @@ class MemberTrombi extends Component
         }
     }
 
-    public function render(ConsentService $consents)
+    public function render(ConsentService $consents, TrombiPolicy $policy)
     {
         $member = $this->member();
         $types = $consents->applicableTypes($member);
@@ -144,6 +147,8 @@ class MemberTrombi extends Component
             'recordable' => array_values(array_filter($types, fn (ConsentType $t) => ! $active->has($t->value)
                 && ($t !== ConsentType::Phone || $member->phone !== null))),
             'recipient' => $member->isLegallyMinor() ? $member->guardian : $member,
+            // Ce que voient les adhérents, donc ce qui peut demander une modération : rien si masquée.
+            'photo' => TrombiCard::photoUrl(auth()->user(), $member, 512, $policy),
         ]);
     }
 }

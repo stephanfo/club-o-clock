@@ -14,6 +14,8 @@ enum BoardRole: string
     case DeputySecretary = 'deputy_secretary';
     case Treasurer = 'treasurer';
     case DeputyTreasurer = 'deputy_treasurer';
+    // Élu·e sans fonction nommée. En dernier : l'ordre des cas est celui du filtre « Bureau ».
+    case Member = 'member';
 
     public function label(): string
     {
@@ -24,6 +26,7 @@ enum BoardRole: string
             self::DeputySecretary => 'Secrétaire adjoint·e',
             self::Treasurer => 'Trésorier·e',
             self::DeputyTreasurer => 'Trésorier·e adjoint·e',
+            self::Member => 'Membre du bureau',
         };
     }
 }

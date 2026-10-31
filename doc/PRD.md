@@ -1245,7 +1245,7 @@ Ces informations relèvent du fonctionnement de l'association, pas de la vie pri
 
 - **Rôles** `coach` et `admin`, en badges.
 - **Qualifications d'un coach** en cours de validité, avec le badge d'expiration de la fiche séance (§4.11.4), qui les montre déjà nominativement.
-- **Fonction au bureau** : liste fixe — président·e, vice-président·e, secrétaire, secrétaire adjoint·e, trésorier·e, trésorier·e adjoint·e. Attribuée par l'admin depuis la fiche adhérent (§4.17.1), **une au plus par personne**, plusieurs titulaires possibles pour une même fonction (deux vice-présidents). Tracée en `AuditLog`. Indépendante de la saison : elle reste jusqu'à ce que l'admin la change, après l'AG.
+- **Fonction au bureau** : liste fixe — président·e, vice-président·e, secrétaire, secrétaire adjoint·e, trésorier·e, trésorier·e adjoint·e, membre du bureau (élu·e sans fonction nommée). Attribuée par l'admin depuis la fiche adhérent (§4.17.1), **une au plus par personne**, plusieurs titulaires possibles pour une même fonction (deux vice-présidents). Tracée en `AuditLog`. Indépendante de la saison : elle reste jusqu'à ce que l'admin la change, après l'AG.
 
 #### 4.23.4 Mineurs
 

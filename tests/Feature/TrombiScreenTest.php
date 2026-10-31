@@ -93,6 +93,20 @@ class TrombiScreenTest extends TestCase
             ->assertSee('Anne Tresornom')->assertSee('Trésorier·e');
     }
 
+    public function test_membre_du_bureau_apres_les_fonctions_nommees(): void
+    {
+        $member = User::factory()->create(['first_name' => 'Alain', 'last_name' => 'Membrenom']);
+        $member->forceFill(['board_role' => BoardRole::Member])->save();
+        $treasurer = User::factory()->create(['first_name' => 'Zelie', 'last_name' => 'Tresornom']);
+        $treasurer->forceFill(['board_role' => BoardRole::Treasurer])->save();
+
+        // Alain passe avant Zelie par le prénom, après elle par la fonction.
+        Livewire::actingAs($this->viewer)->test(Trombinoscope::class)
+            ->set('filtre', 'bureau')
+            ->assertSeeInOrder(['Zelie Tresornom', 'Alain Membrenom'])->assertSee('Membre du bureau')
+            ->assertDontSee('Lecteur Lambda');
+    }
+
     public function test_la_recherche_ne_porte_que_sur_le_nom_affiche(): void
     {
         User::factory()->create(['first_name' => 'Marie', 'last_name' => 'Zyxwabcd']);
