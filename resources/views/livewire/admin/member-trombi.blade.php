@@ -1,5 +1,6 @@
-{{-- Onglet Trombinoscope de la fiche adhérent (#72, PRD §4.23.1, §4.17.1). Ni la photo masquée ni
-     le numéro n'apparaissent ici : l'admin voit seulement qu'ils existent. --}}
+{{-- Onglet Trombinoscope de la fiche adhérent (#72, PRD §4.23.1, §4.17.1). La photo partagée s'affiche
+     pour en juger ; ni la photo masquée ni le numéro n'apparaissent : l'admin voit seulement qu'ils
+     existent. --}}
 @php
     $who = $member->first_name;
     $recipientName = $recipient?->first_name;
@@ -94,7 +95,15 @@
         @if ($member->photo_path)
             <div class="card card-pad">
                 <div class="sect-title">Modération</div>
-                <div class="meta" style="font-size:12px;margin-top:4px">Supprime une photo inappropriée et retire l'accord photo.</div>
+                @if ($photo)
+                    <div class="flex ac g12" style="margin-top:12px">
+                        <x-avatar :name="$member->fullName()" size="xxl" tint="tint-run" :photo="$photo" />
+                        <div class="meta" style="font-size:12px">Telle que les adhérents la voient au trombinoscope.</div>
+                    </div>
+                @else
+                    <div class="meta" style="font-size:12px;margin-top:4px">Photo non partagée : ni les adhérents ni toi ne la voyez.</div>
+                @endif
+                <div class="meta" style="font-size:12px;margin-top:10px">Supprime une photo inappropriée et retire l'accord photo.</div>
                 <button type="button" class="btn btn-ghost btn-sm" style="margin-top:10px" wire:click="$set('confirmingPhotoRemoval', true)">
                     <x-icon name="trash" :size="14" /> Supprimer la photo
                 </button>

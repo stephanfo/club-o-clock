@@ -6,6 +6,7 @@ use App\Livewire\Concerns\AuthorizesAdminGate;
 use App\Models\User;
 use App\Services\InvitationService;
 use App\Services\MemberImportService;
+use App\Support\RegistrantDisplay;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Livewire\Attributes\Layout;
@@ -212,6 +213,7 @@ class MemberList extends Component
         $this->perPage += 20;
     }
 
+    /** @return Builder<User> */
     private function baseQuery(): Builder
     {
         return User::query()
@@ -235,7 +237,7 @@ class MemberList extends Component
     public function render()
     {
         $query = $this->baseQuery()
-            ->with(['categories', 'guardian'])
+            ->with(['categories', 'guardian', 'unrevokedConsents'])
             ->orderBy('last_name')
             ->orderBy('first_name');
 
@@ -254,6 +256,8 @@ class MemberList extends Component
 
         return view('livewire.admin.member-list', [
             'members' => $members,
+            // Vignettes filtrées par TrombiPolicy : l'admin ne voit pas une photo masquée (§4.23.1).
+            'photoUrls' => RegistrantDisplay::photos($members, auth()->user()),
             'total' => $total,
             'counts' => $counts,
             // Comptes jamais entrés et sans invitation en cours : le bouton de rattrapage n'apparaît

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Admin\MemberList;
 use App\Livewire\Admin\MemberShow;
 use App\Livewire\Admin\MemberTrombi;
 use App\Models\AuditLog;
@@ -128,10 +129,42 @@ class TrombiAdminTest extends TestCase
 
         Livewire::actingAs($this->admin)->test(MemberTrombi::class, ['memberId' => $u->id])
             ->assertSee('Photo : déposée')->assertSee('Téléphone : saisi')
-            ->assertDontSee('12 34 56 78')->assertDontSee('trombi-photo')
+            ->assertDontSee('12 34 56 78')->assertDontSee('trombi-photo')->assertSee('Photo non partagée')
             ->set('confirmingPhotoRemoval', true)->call('removePhoto');
 
         $this->assertNull($u->fresh()->photo_path);
         $this->assertSame(1, AuditLog::query()->where('action', 'trombi_photo_removed')->count());
+    }
+
+    private function photo(User $u): void
+    {
+        $img = imagecreatetruecolor(40, 40);
+        $file = tempnam(sys_get_temp_dir(), 'trombi');
+        imagejpeg($img, $file);
+        app(TrombiService::class)->storePhoto($u, $file, $u);
+    }
+
+    public function test_la_photo_partagee_s_affiche_pour_la_moderer(): void
+    {
+        $u = User::factory()->create();
+        $this->photo($u);
+        app(ConsentService::class)->grant($u, ConsentType::Photo, $u);
+
+        Livewire::actingAs($this->admin)->test(MemberTrombi::class, ['memberId' => $u->id])
+            ->assertSee('trombi-photo/'.$u->id.'/512', false)->assertDontSee('Photo non partagée');
+    }
+
+    public function test_liste_des_adherents_vignette_des_photos_partagees_seules(): void
+    {
+        $shared = User::factory()->create(['last_name' => 'Aaapartage']);
+        $masked = User::factory()->create(['last_name' => 'Aaamasque']);
+        $this->photo($shared);
+        $this->photo($masked);
+        app(ConsentService::class)->grant($shared, ConsentType::Photo, $shared);
+
+        Livewire::actingAs($this->admin)->test(MemberList::class)
+            ->assertSee('Aaamasque')
+            ->assertSee('trombi-photo/'.$shared->id.'/192', false)
+            ->assertDontSee('trombi-photo/'.$masked->id.'/', false);
     }
 }
