@@ -4,24 +4,18 @@ namespace Tests\Feature;
 
 use App\Livewire\Profil;
 use App\Models\AuthIdentity;
-use App\Models\ClubSettings;
 use App\Models\NotificationPreferences;
-use App\Models\QuotaTag;
-use App\Models\Session;
 use App\Models\User;
-use App\Services\RegistrationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
-use Tests\Concerns\EnrollableCategory;
 use Tests\TestCase;
 
-// J8.4 — Profil utilisateur : préférences notif (§4.15.3/.4), quotas (§4.10), connexion (§4.1.1),
+// J8.4 — Profil utilisateur : préférences notif (§4.15.3/.4), connexion (§4.1.1),
 // suppression de compte (§4.3 voie 1). Toujours sur le compte courant — aucune action sur un tiers.
 class ProfilTest extends TestCase
 {
-    use EnrollableCategory;
     use RefreshDatabase;
 
     // ── Accès ──
@@ -180,31 +174,6 @@ class ProfilTest extends TestCase
         Livewire::actingAs($u)->test(Profil::class)->call('revokeOtherSessions');
 
         $this->assertNotSame('stale-token', $u->fresh()->remember_token);
-    }
-
-    // ── Quotas (§4.10) ──
-
-    public function test_weekly_quota_usage_is_computed(): void
-    {
-        // Milieu de semaine club gelé : lancé un dimanche soir, « now + 2h » basculerait la séance
-        // sur la semaine locale suivante — hors de l'usage hebdo affiché (test date-dépendant).
-        $this->travelTo(Carbon::now(ClubSettings::current()->timezone)
-            ->startOfWeek(Carbon::MONDAY)->addDays(2)->setTime(12, 0));
-
-        $u = $this->athlete();
-        $tag = QuotaTag::create(['code' => 'piscine', 'label' => 'Piscine', 'max_per_week' => 2]);
-        $session = $this->targetCategory(Session::create([
-            'kind' => 'training', 'title' => 'Natation seuil',
-            'start_at' => Carbon::now()->addHours(2), 'duration_min' => 60,
-            'capacity' => 10, 'quota_tag_id' => $tag->id,
-            'created_by' => User::factory()->coach()->create()->id,
-        ])); // séance ciblant la catégorie ouverte (§4.5).
-        app(RegistrationService::class)->register($session, $u, $u);
-
-        Livewire::actingAs($u)->test(Profil::class)
-            ->set('tab', 'quotas')
-            ->assertSee('Piscine')
-            ->assertSee('Natation seuil');
     }
 
     // ── Suppression de compte (§4.3 voie 1, choix pragmatique) ──

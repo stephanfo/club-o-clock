@@ -7,9 +7,6 @@
         {{-- Composant imbriqué (#114), une instance par coquille : clé distincte. --}}
         <livewire:allures :key="'allures-'.$coquille" />
         @break
-    @case('quotas')
-        @include('livewire.profil._quotas')
-        @break
     @case('trombi')
         {{-- Composant imbriqué (#72), une instance par coquille : clé distincte. --}}
         <livewire:trombi-settings :subject-id="$user->id" :key="'trombi-'.$coquille" />

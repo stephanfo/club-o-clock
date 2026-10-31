@@ -8,11 +8,10 @@
         ['v' => 'identite', 'l' => 'Identité'],
         ['v' => 'notifs', 'l' => 'Notifs'],
         ['v' => 'allures', 'l' => 'Allures'],
-        ['v' => 'quotas', 'l' => 'Quotas'],
         ['v' => 'trombi', 'l' => 'Trombi'],
         ['v' => 'connexion', 'l' => 'Connexion'],
     ];
-    $navIcons = ['identite' => 'user', 'notifs' => 'bell', 'allures' => 'footprints', 'quotas' => 'bar-chart', 'trombi' => 'users', 'connexion' => 'shield'];
+    $navIcons = ['identite' => 'user', 'notifs' => 'bell', 'allures' => 'footprints', 'trombi' => 'users', 'connexion' => 'shield'];
 @endphp
 <div class="profil-screen">
     {{-- Feedback d'action global (revue UX 2026-07-11) : bannière flottante auto-masquée,
