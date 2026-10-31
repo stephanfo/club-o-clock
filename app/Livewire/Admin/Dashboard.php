@@ -106,8 +106,9 @@ class Dashboard extends Component
 
             return view('livewire.admin.dashboard', $common + [
                 'full' => false,
-                'coachActivity' => ['disciplines' => $coachActivity['disciplines'], 'rows' => $mine, 'staffed' => []],
-            ]);
+                'coachActivity' => ['disciplines' => $coachActivity['disciplines'], 'rows' => $mine],
+                'staffed' => [],
+            ])->title('Pilotage');
         }
 
         return view('livewire.admin.dashboard', $common + [
@@ -120,6 +121,7 @@ class Dashboard extends Component
             'usage' => $stats->appUsage(),
             'waitlist' => $stats->waitlist($f),
             'coachActivity' => $coachActivity,
+            'staffed' => $stats->staffedShare($f),
             'eligibleCount' => User::deletionEligible()->count(),
         ]);
     }

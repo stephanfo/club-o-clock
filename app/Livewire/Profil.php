@@ -40,7 +40,9 @@ class Profil extends Component
     // politique de mot de passe pour toutes les surfaces.
     use PasswordValidationRules;
 
-    /** Onglet actif : identite | notifs | allures | trombi | connexion. */
+    public const TABS = ['identite', 'notifs', 'allures', 'trombi', 'connexion'];
+
+    /** Onglet actif : un des TABS. */
     #[Url]
     public string $tab = 'identite';
 
@@ -79,6 +81,12 @@ class Profil extends Component
 
     public function mount(NotificationPreferenceService $prefs): void
     {
+        // Onglet inconnu (adresse d'un onglet retiré, comme « quotas ») : retour à l'identité plutôt
+        // qu'un panneau vide sans onglet allumé.
+        if (! in_array($this->tab, self::TABS, true)) {
+            $this->tab = 'identite';
+        }
+
         $u = auth()->user();
         $this->first_name = (string) $u->first_name;
         $this->last_name = (string) $u->last_name;

@@ -234,7 +234,11 @@ class DashboardUiTest extends TestCase
 
     public function test_coach_reaches_the_screen_by_url_but_athlete_does_not(): void
     {
-        $this->actingAs(User::factory()->coach()->create())->get(route('admin.dashboard'))->assertOk();
+        // Onglet du navigateur au nom de l'écran (§4.16.3) ; l'admin garde « Statistiques ».
+        $this->actingAs(User::factory()->coach()->create())->get(route('admin.dashboard'))
+            ->assertOk()->assertSee('<title>Pilotage', false);
+        $this->actingAs(User::factory()->admin()->create())->get(route('admin.dashboard'))
+            ->assertSee('<title>Statistiques', false);
         $this->actingAs(User::factory()->create())->get(route('admin.dashboard'))->assertForbidden();
     }
 

@@ -359,10 +359,11 @@ class StatsService
     // ── Activité coachs (§4.16.1, bloc dédié) ──
 
     /**
-     * Séances training encadrées par coach × discipline sur la fenêtre, et part des séances tenues
-     * encadrées par discipline. Seuls les `training` comptent (pas competition/club_event).
+     * Séances training encadrées par coach × discipline sur la fenêtre. Seuls les `training` comptent
+     * (pas competition/club_event). La part encadrée par discipline est à part (staffedShare) : la vue
+     * coach n'en a pas l'usage.
      *
-     * @return array{disciplines:Collection<int,Discipline>,rows:array<int,array{id:int,coach:string,by_discipline:array<int,int>,total:int}>,staffed:array<int,array{discipline:string,sessions:int,staffed:int,pct:int}>}
+     * @return array{disciplines:Collection<int,Discipline>,rows:array<int,array{id:int,coach:string,by_discipline:array<int,int>,total:int}>}
      */
     public function coachActivity(array $f): array
     {
@@ -391,7 +392,7 @@ class StatsService
             return ['id' => $c['id'], 'coach' => $c['coach'], 'by_discipline' => $byDiscipline, 'total' => $total];
         })->sortByDesc('total')->values()->all();
 
-        return ['disciplines' => $disciplines, 'rows' => $rows, 'staffed' => $this->staffedShare($f)];
+        return ['disciplines' => $disciplines, 'rows' => $rows];
     }
 
     /**
@@ -400,7 +401,7 @@ class StatsService
      *
      * @return array<int,array{discipline:string,sessions:int,staffed:int,pct:int}>
      */
-    private function staffedShare(array $f): array
+    public function staffedShare(array $f): array
     {
         $sessions = $this->heldTrainingSessions($f)->withCount('coaches')
             ->get(['id', 'discipline_id', 'external_staff_label']);
@@ -459,8 +460,6 @@ class StatsService
             'discipline' => $s->discipline?->label,
         ])->all();
     }
-
-    // ── Détails pour l'export XLSX (non affichés à l'écran, fidèle au design) ──
 
     // ── Effectifs (§4.16.2, bloc 8) ──
 

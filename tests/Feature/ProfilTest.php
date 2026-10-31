@@ -25,6 +25,20 @@ class ProfilTest extends TestCase
         Livewire::actingAs(User::factory()->create())->test(Profil::class)->assertOk();
     }
 
+    /** Une ancienne adresse d'onglet retiré (#172) ouvre l'identité, pas un panneau vide. */
+    public function test_unknown_tab_falls_back_to_identity(): void
+    {
+        Livewire::actingAs(User::factory()->create())
+            ->withQueryParams(['tab' => 'quotas'])
+            ->test(Profil::class)
+            ->assertSet('tab', 'identite');
+
+        Livewire::actingAs(User::factory()->create())
+            ->withQueryParams(['tab' => 'notifs'])
+            ->test(Profil::class)
+            ->assertSet('tab', 'notifs');
+    }
+
     public function test_guest_is_redirected_from_route(): void
     {
         $this->get('/profil')->assertRedirect();
