@@ -183,7 +183,8 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
 
   // Un inscrit mène à sa fiche du trombinoscope, et le retour ramène à la séance.
   const lien = page.locator('.reg-list:visible a.reg-link').first();
-  const nom = (await lien.innerText()).trim();
+  // Le lien porte aussi l'avatar : ses initiales précèdent le nom (#148).
+  const nom = (await lien.innerText()).trim().split('\n').pop().trim();
   const href = await lien.getAttribute('href');
   s.check('les inscrits sont des liens vers leur fiche', await page.locator('.reg-list:visible a.reg-link').count() > 0);
   await lien.click();
@@ -220,7 +221,9 @@ for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
   const html = await page.content();
   s.check('fonction Trésorier·e sélectionnée', await page.locator('select[aria-label="Fonction au bureau"]').inputValue() === 'treasurer');
   s.check('l’admin voit que la photo et le numéro existent', (await page.locator('.mc-show-grid').innerText()).includes('Photo : déposée · Téléphone : saisi'));
-  s.check('mais ne voit ni le numéro ni la photo', !html.includes('39 98 01 12') && !html.includes('trombi-photo'));
+  // Le numéro reste invisible de l'admin ; la photo partagée, elle, s'affiche pour la modérer (#149).
+  s.check('mais ne voit pas le numéro', !html.includes('39 98 01 12'));
+  s.check('la photo partagée s’affiche pour la modérer', html.includes('trombi-photo'));
   s.checkJs(page);
   tous.push(s.report());
   await ctx.close();

@@ -249,8 +249,8 @@ const tous = [];
   // Pilotage en vue réduite (PRD §4.16.3) : l'écran s'ouvre, sans les blocs réservés à l'admin.
   const resp = await page.goto(BASE + '/admin/dashboard', { waitUntil: 'domcontentloaded' });
   const texte = await page.locator('body').innerText();
-  s.check('coach ouvre le pilotage', resp.status() === 200 && /Mon activité/.test(texte), `HTTP ${resp.status()}`);
-  s.check('pilotage coach sans décrochage ni export', !/Décrochage|XLSX/.test(texte));
+  s.check('coach ouvre le pilotage', resp.status() === 200 && /Mon activité/i.test(texte), `HTTP ${resp.status()}`);
+  s.check('pilotage coach sans décrochage ni export', !/Décrochage|XLSX/i.test(texte));
   tous.push(s.report());
   await ctx.close();
 }

@@ -207,6 +207,9 @@ const tous = [];
   // L'horodatage du lien est réécrit par le remplacement : le restaurer aussi, sans quoi le jeu de
   // démo dérive d'un run à l'autre sans que rien ne le signale (règle de restauration, README E2E).
   const lieOrigine = sql(`SELECT guardianship_linked_at FROM users WHERE id=${pupille}`);
+  // Changer de garant révoque les accords trombinoscope donnés par le sortant (#72) : les noter pour
+  // les rouvrir, sans quoi T5 (trombi.mjs) trouve ensuite l'enfant sans accord.
+  const accords = sql(`SELECT GROUP_CONCAT(id) FROM consents WHERE user_id=${pupille} AND revoked_at IS NULL`);
   const entrant = sql(`SELECT id FROM users
       WHERE id <> ${pupille} AND id <> ${garantOrigine} AND is_active=1 AND anonymized_at IS NULL
         AND (dob IS NULL OR dob <= DATE_SUB(CURDATE(), INTERVAL 18 YEAR))
@@ -263,9 +266,14 @@ const tous = [];
   // Restauration : le lien d'origine ET son horodatage, puis les journaux et la file d'envoi.
   const lieSql = lieOrigine === '' ? 'NULL' : `'${lieOrigine}'`;
   sql(`UPDATE users SET guardian_id=${garantOrigine}, guardianship_linked_at=${lieSql} WHERE id=${pupille}`);
+  if (accords !== '' && accords !== 'NULL') {
+    sql(`UPDATE consents SET revoked_at=NULL, revoked_by=NULL WHERE id IN (${accords})`);
+  }
   purgeJournaux(journaux);
   s.check('état restauré (lien d\'origine)',
     sql(`SELECT guardian_id FROM users WHERE id=${pupille}`) === garantOrigine);
+  s.check('état restauré (accords trombinoscope)',
+    sql(`SELECT COUNT(*) FROM consents WHERE user_id=${pupille} AND revoked_at IS NOT NULL`) === '0');
   s.check('état restauré (horodatage du lien)',
     sql(`SELECT guardianship_linked_at FROM users WHERE id=${pupille}`) === lieOrigine, lieOrigine);
   s.check('état restauré (journaux et file d\'envoi)',
