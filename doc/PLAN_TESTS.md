@@ -236,7 +236,7 @@
 - [ ] Archiver un template → il ne génère plus ; les séances déjà créées restent.
 
 ### 8.6 Dashboard, journaux, envois (PRD §4.16, §4.18, §4.15.6)
-- [ ] Dashboard : chiffres clés (pratiquants / comptes, participations par semaine, remplissage, compétiteurs) ; **fréquentation par semaine** avec axe gradué, mois sous les barres, semaine en cours atténuée, « Détail par semaine » dépliable ; activité coachs, compteur « séances futures sans coach » ; **export XLSX** (feuille « Fréquentation hebdo ») téléchargeable et ouvrable.
+- [ ] Dashboard : chiffres clés (pratiquants / comptes, participations par semaine, remplissage, compétiteurs) ; **fréquentation par semaine** avec axe gradué, mois sous les barres, semaine en cours atténuée, « Détail par semaine » dépliable ; **créneaux** (une ligne par modèle, « Séances ponctuelles » par discipline, triés par moyenne d'inscrits, remplissage « — » sans capacité, part sans encadrement) en cartes au téléphone ; **désinscriptions** par discipline avec la part faite moins de 24 h avant le début ; activité coachs, compteur « séances futures sans coach » ; **export XLSX** (feuilles « Fréquentation hebdo », « Créneaux », « Désinscriptions ») téléchargeable et ouvrable.
 - [ ] `[auto:S13,S14]` Journaux : **Audit** (overrides, suppressions, tutelle…) et **Activité** (inscriptions…) séparés, filtrables, exportables ; accessibles à l'admin seul (vérifier 403 avec un coach).
 - [ ] **Envois** : lignes `sent` et `pending` (seed), filtres par statut/canal ; **annuler** une ligne pending ; **rejouer** une ligne échouée ; déclencher un envoi manuel.
 

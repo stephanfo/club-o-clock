@@ -1175,6 +1175,8 @@ body:has(.scrim) { overflow: hidden; }
 .chart-detail { margin-top: var(--space-3); font-size: var(--text-xs); }
 .chart-detail > summary { cursor: pointer; color: var(--link); font-weight: 600; }
 .chart-detail .tbl { margin-top: var(--space-2); font-size: var(--text-xs); }
+/* Colonnes chiffrées des tableaux du dashboard (créneaux, désinscriptions) : alignées à droite au bureau. */
+.tbl th.r, .tbl td.r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 @media (max-width: 768px) {
     .chart-frame { height: 150px; }
 }

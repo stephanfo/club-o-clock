@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\ActivityLog;
 use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\Discipline;
 use App\Models\Registration;
 use App\Models\Session;
+use App\Models\SessionTemplate;
 use App\Models\User;
 use App\Services\StatsExportService;
 use App\Services\StatsService;
@@ -132,19 +134,106 @@ class StatsServiceTest extends TestCase
         $this->assertSame(1, $this->stats()->headline($f)['competitions']);
     }
 
-    public function test_top_sessions_ranked_by_fill(): void
+    /** Rattache une séance à un modèle sans passer par le générateur. */
+    private function fromTemplate(Session $s, SessionTemplate $t): Session
     {
-        $low = $this->training($this->swim, 10, Carbon::now()->subDays(6));
-        $this->participate($low, User::factory()->create());
-        $high = $this->training($this->bike, 10, Carbon::now()->subDays(6));
-        foreach (User::factory()->count(9)->create() as $u) {
-            $this->participate($high, $u);
+        $s->forceFill(['source_template_id' => $t->id])->save();
+
+        return $s;
+    }
+
+    /** Journalise une désinscription comme RegistrationService::unregister, à l'instant donné. */
+    private function unregisterLog(Session $s, Carbon $at, string $action = 'desinscription'): void
+    {
+        $u = User::factory()->create();
+        ActivityLog::create(['actor_id' => $u->id, 'action' => $action, 'user_id' => $u->id,
+            'session_id' => $s->id, 'resulting_status' => 'cancelled', 'created_at' => $at]);
+    }
+
+    public function test_slots_aggregate_sessions_of_a_template_and_group_one_offs_by_discipline(): void
+    {
+        $jeudi = SessionTemplate::factory()->archived()->create(['label' => 'Natation jeudi', 'discipline_id' => $this->swim->id,
+            'day_of_week' => 4, 'start_time_of_day' => '18:30:00']);
+
+        $a = $this->fromTemplate($this->training($this->swim, 10, Carbon::now()->subDays(14)), $jeudi);
+        $b = $this->fromTemplate($this->training($this->swim, 10, Carbon::now()->subDays(7)), $jeudi);
+        foreach (User::factory()->count(6)->create() as $u) {
+            $this->participate($a, $u);
         }
+        foreach (User::factory()->count(2)->create() as $u) {
+            $this->participate($b, $u);
+        }
+        $a->coaches()->attach(User::factory()->coach()->create()->id); // $b reste sans encadrement
 
-        $top = $this->stats()->topSessions($this->season());
+        // Ponctuelle vélo, sans capacité, tenue par un intervenant extérieur : encadrée.
+        $p = $this->training($this->bike, null, Carbon::now()->subDays(3));
+        $p->forceFill(['external_staff_label' => 'Moniteur prestataire'])->save();
+        $this->participate($p, User::factory()->create());
 
-        $this->assertSame(90, $top[0]['fill']); // le plus rempli en tête
-        $this->assertSame(10, $top[1]['fill']);
+        // Exclues : annulée, future, inscription non `participating`.
+        $c = $this->fromTemplate($this->training($this->swim, 10, Carbon::now()->subDays(1)), $jeudi);
+        $c->forceFill(['cancelled_at' => Carbon::now()])->save();
+        $this->fromTemplate($this->training($this->swim, 10, Carbon::now()->addDays(2)), $jeudi);
+        $this->participate($b, User::factory()->create(), 'waitlist', ['waitlist_reason' => 'capacity', 'waitlist_position' => 1]);
+
+        $slots = $this->stats()->slots($this->season());
+
+        $this->assertCount(2, $slots);
+        $this->assertSame('Natation jeudi', $slots[0]['label']); // moyenne 4 > 1 : en tête
+        $this->assertSame('jeudi', $slots[0]['day']);
+        $this->assertSame('18:30', $slots[0]['time']);
+        $this->assertSame(2, $slots[0]['sessions']);
+        $this->assertSame(4.0, $slots[0]['avg']);
+        $this->assertSame([2, 6], [$slots[0]['min'], $slots[0]['max']]);
+        $this->assertSame(40, $slots[0]['fill']); // 8 / 20
+        $this->assertSame(50, $slots[0]['unstaffed']);
+
+        $this->assertSame('Séances ponctuelles', $slots[1]['label']);
+        $this->assertSame($this->bike->id, $slots[1]['discipline']->id);
+        $this->assertNull($slots[1]['day']);
+        $this->assertNull($slots[1]['fill']); // sans capacité : « — », pas 0 %
+        $this->assertSame(0, $slots[1]['unstaffed']);
+    }
+
+    public function test_slots_apply_discipline_and_category_filters(): void
+    {
+        $cat = Category::create(['label' => 'Jeunes', 'age_min' => 10, 'age_max' => 17, 'sort_order' => 1]);
+        $swim = $this->training($this->swim, 10, Carbon::now()->subDays(2));
+        $swim->categories()->attach($cat->id);
+        $this->training($this->bike, 10, Carbon::now()->subDays(2));
+
+        $season = $this->season();
+        $this->assertCount(1, $this->stats()->slots(['discipline_id' => $this->bike->id] + $season));
+        $this->assertSame($this->bike->id, $this->stats()->slots(['discipline_id' => $this->bike->id] + $season)[0]['discipline']->id);
+        $this->assertSame($this->swim->id, $this->stats()->slots(['category_id' => $cat->id] + $season)[0]['discipline']->id);
+        $this->assertCount(1, $this->stats()->slots(['category_id' => $cat->id] + $season));
+    }
+
+    public function test_unregistrations_count_late_ones_from_the_activity_log(): void
+    {
+        $s = $this->training($this->swim, 10, Carbon::now()->subDays(2));
+        $this->unregisterLog($s, $s->start_at->copy()->subHours(23));          // tardive
+        $this->unregisterLog($s, $s->start_at->copy()->subHours(25), 'desinscription_for_other'); // à temps
+        $this->unregisterLog($s, $s->start_at->copy()->subDays(4));
+
+        // Séance annulée : ses désinscriptions n'entrent pas, même tardives.
+        $cancelled = $this->training($this->bike, 10, Carbon::now()->subDays(3));
+        $cancelled->forceFill(['cancelled_at' => Carbon::now()->subDays(4)])->save();
+        $this->unregisterLog($cancelled, $cancelled->start_at->copy()->subHour());
+
+        // Autre action du journal sur la même séance : ignorée.
+        ActivityLog::create(['action' => 'inscription', 'session_id' => $s->id, 'created_at' => $s->start_at->copy()->subHour()]);
+
+        $u = $this->stats()->unregistrations($this->season());
+
+        $this->assertSame(3, $u['total']);
+        $this->assertSame(1, $u['late']);
+        $this->assertSame(33, $u['late_pct']);
+        $this->assertCount(1, $u['rows']);
+        $this->assertSame($this->swim->id, $u['rows'][0]['discipline']->id);
+
+        $this->assertSame(0, $this->stats()->unregistrations(['discipline_id' => $this->bike->id] + $this->season())['total']);
+        $this->assertNull($this->stats()->unregistrations(['discipline_id' => $this->bike->id] + $this->season())['late_pct']);
     }
 
     public function test_waitlist_counts_and_promotion_rate(): void
@@ -348,6 +437,21 @@ class StatsServiceTest extends TestCase
 
         $this->assertSame('=SUM(99)', $cell->getValue()); // valeur littérale préservée
         $this->assertSame(DataType::TYPE_STRING, $cell->getDataType()); // stockée en texte, pas formule
+    }
+
+    public function test_export_has_slot_and_unregistration_sheets(): void
+    {
+        $s = $this->training($this->swim, 5, Carbon::now()->subDays(3));
+        $this->participate($s, User::factory()->create());
+        $this->unregisterLog($s, $s->start_at->copy()->subHours(2));
+
+        $book = app(StatsExportService::class)->build($this->season(), $this->stats()->resolvePeriod('season'));
+
+        $this->assertNull($book->getSheetByName('Top séances'));
+        $this->assertSame('Séances ponctuelles', $book->getSheetByName('Créneaux')->getCell('A2')->getValue());
+        $this->assertSame('Natation', $book->getSheetByName('Désinscriptions')->getCell('A2')->getValue());
+        $this->assertSame('Total', $book->getSheetByName('Désinscriptions')->getCell('A3')->getValue());
+        $this->assertSame(100, $book->getSheetByName('Désinscriptions')->getCell('D3')->getValue());
     }
 
     public function test_active_members_by_category_for_export(): void
