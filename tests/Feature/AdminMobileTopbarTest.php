@@ -24,8 +24,8 @@ class AdminMobileTopbarTest extends TestCase
             route('admin.templates') => ['Modèles', 'Retour au club', 'Nouveau modèle'],
             route('admin.templates.create') => ['Nouveau modèle', 'Retour aux modèles', 'Générer &amp; enregistrer'],
             route('admin.journal') => ['Journaux', 'Retour au club', null],
-            route('admin.outbox') => ['Envois sortants', 'Retour au club', null],
-            route('admin.infos') => ['Pages d&#039;information', 'Retour au club', 'Nouvelle page'],
+            route('admin.outbox') => ['Envois', 'Retour au club', 'Annuler tous les en attente'],
+            route('admin.infos') => ['Pages d&#039;info', 'Retour au club', 'Nouvelle page'],
             route('admin.infos.create') => ['Nouvelle page d’info', 'Retour aux pages', 'Enregistrer'],
             route('admin.settings') => ['Paramètres du club', 'Retour au club', null],
             route('admin.catalogues', 'allure_zone') => ['Zones d’allure course', 'Retour aux paramètres', 'Ajouter'],
@@ -60,6 +60,18 @@ class AdminMobileTopbarTest extends TestCase
         $journal = $this->actingAs($admin)->get(route('admin.journal'))->getContent();
         $this->assertStringContainsString('wire:click="export"', $journal);
         $this->assertStringNotContainsString('export', $this->topbar($journal, 'journal'));
+    }
+
+    public function test_l_invitation_groupee_n_apparait_que_s_il_reste_des_comptes_en_attente(): void
+    {
+        $admin = User::factory()->create(['roles' => ['admin']]);
+        $topbar = fn () => $this->topbar($this->actingAs($admin)->get(route('admin.members'))->getContent(), 'adhérents');
+
+        $this->assertStringContainsString('aria-label="Ajouter un adhérent"', $topbar());
+        $this->assertStringNotContainsString('confirmBulkInvite', $topbar());
+
+        User::factory()->create(['email' => 'jamais@club.test', 'password' => null]);
+        $this->assertStringContainsString('aria-label="Inviter 1 en attente"', $topbar());
     }
 
     public function test_l_onglet_club_reste_allume_dans_l_administration(): void

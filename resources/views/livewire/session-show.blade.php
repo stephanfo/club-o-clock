@@ -190,7 +190,7 @@
                      SEULE action d'encadrement absente du mobile : restaurer (barre collante),
                      inscrire un athlète (onglet Inscrits) et remplir la file quota (onglet Waitlist)
                      y sont déjà. Asymétrie, pas un choix — la fiche séance est mobile-first, à la
-                     différence des écrans admin assumés desktop.
+                     différence des réglages admin assumés desktop.
                      Hors de la barre collante : elle porte le CTA d'inscription, et un bouton rouge
                      qui notifie tous les inscrits n'a rien à faire à côté, au pouce. --}}
                 @if (! $session->isCancelled())

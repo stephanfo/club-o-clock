@@ -29,6 +29,7 @@ class Club extends Component
             'user' => $user,
             'roleSub' => $roleSub,
             'canTrombi' => app(TrombiPolicy::class)->consult($user),
+            'isAdmin' => $user->hasRole('admin'),
             'unreadAlerts' => NotificationOutbox::unreadCountFor($user->id),
         ]);
     }

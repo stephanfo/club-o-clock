@@ -40,6 +40,24 @@ class ClubHubTest extends TestCase
             ->assertDontSee('href="'.route('trombi').'"', false);
     }
 
+    public function test_l_administration_n_apparait_qu_aux_admins(): void
+    {
+        // Les écrans de suivi adaptés au mobile, dans l'ordre de la barre latérale ; les réglages,
+        // assumés desktop, n'y figurent pas.
+        Livewire::actingAs(User::factory()->create(['roles' => ['admin']]))->test(Club::class)
+            ->assertSee('Administration')
+            ->assertSeeInOrder(array_map(fn ($r) => 'href="'.route($r).'"', [
+                'admin.dashboard', 'admin.members', 'admin.journal', 'admin.outbox', 'admin.infos',
+            ]), false)
+            ->assertDontSee('href="'.route('admin.settings').'"', false)
+            ->assertDontSee('href="'.route('admin.templates').'"', false);
+
+        Livewire::actingAs(User::factory()->create(['roles' => ['coach', 'athlete']]))->test(Club::class)
+            ->assertSee('href="'.route('infos').'"', false)
+            ->assertDontSee('Administration')
+            ->assertDontSee('href="'.route('admin.members').'"', false);
+    }
+
     public function test_la_barre_du_bas_mene_au_hub_et_non_plus_au_profil(): void
     {
         $u = User::factory()->create();

@@ -1,13 +1,22 @@
 {{-- Hub « Club » (#150) — index mobile des écrans hors barre du bas. Rangées reprises de
      l'entrée trombinoscope de l'accueil (card row row-press), intertitres comme la barre latérale.
-     La section « Administration » viendra avec #151-#153 : un écran n'y entre qu'une fois adapté
-     au mobile, jamais avant. --}}
+     Section « Administration » (admins) : un écran n'y entre qu'une fois adapté au mobile, jamais
+     avant (#152, #153). Les réglages (paramètres, catalogues, allures, modèles) restent au bureau
+     et n'y figurent pas. --}}
 @php
     // color:inherit + bordure explicite : sans elles, la règle globale `a` (club-tokens.css) teinte
     // le libellé en couleur de lien et souligne la rangée.
     $rowStyle = 'padding:12px 14px;color:inherit;';
     $sep = 'border-bottom:1px solid var(--divider);';
     $last = 'border-bottom:none;';
+    // Ordre et icônes de la barre latérale ; seuls les écrans adaptés au mobile y figurent.
+    $adminEntrees = [
+        ['admin.dashboard', 'bar-chart', 'Dashboard'],
+        ['admin.members', 'users', 'Adhérents'],
+        ['admin.journal', 'file-text', 'Journaux'],
+        ['admin.outbox', 'send', 'Envois'],
+        ['admin.infos', 'info', "Pages d'info"],
+    ];
 @endphp
 <div class="form-screen">
     <x-flash-float />
@@ -56,6 +65,21 @@
                     </a>
                 </div>
             </div>
+
+            @if ($isAdmin)
+                <div>
+                    <div class="sect-head"><span class="sect-title">Administration</span></div>
+                    <div class="card" style="overflow:hidden">
+                        @foreach ($adminEntrees as [$route, $icone, $libelle])
+                            <a href="{{ route($route) }}" wire:navigate class="row row-press" style="{{ $loop->last ? $last : $sep }}{{ $rowStyle }}">
+                                <x-icon :name="$icone" :size="18" style="color:var(--fg-muted);flex:0 0 auto" />
+                                <span class="f1" style="font-weight:700;font-size:14px">{{ $libelle }}</span>
+                                <x-icon name="chevron-right" style="color:var(--fg-muted);flex:0 0 auto" />
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
 
             <a href="{{ route('legal') }}" class="card row row-press" style="{{ $rowStyle }}">
                 <x-icon name="shield" :size="18" style="color:var(--fg-muted);flex:0 0 auto" />
