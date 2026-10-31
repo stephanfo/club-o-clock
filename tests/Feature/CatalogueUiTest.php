@@ -33,6 +33,35 @@ class CatalogueUiTest extends TestCase
         $this->assertSame(21, ClubSettings::current()->invitation_link_days);
     }
 
+    public function test_admin_sets_dropout_threshold_and_it_is_audited(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $this->assertSame(21, ClubSettings::current()->dropout_threshold_days);
+
+        Livewire::actingAs($admin)->test(ClubSettingsForm::class)
+            ->assertSet('dropout_threshold_days', 21)
+            ->set('dropout_threshold_days', 30)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertSame(30, ClubSettings::current()->fresh()->dropout_threshold_days);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'club_settings_updated', 'actor_id' => $admin->id]);
+
+        Livewire::actingAs($admin)->test(ClubSettingsForm::class)
+            ->set('dropout_threshold_days', 3)
+            ->call('save')
+            ->assertHasErrors(['dropout_threshold_days']);
+    }
+
+    public function test_non_admin_cannot_change_dropout_threshold(): void
+    {
+        Livewire::actingAs(User::factory()->coach()->create())
+            ->test(ClubSettingsForm::class)
+            ->assertForbidden();
+
+        $this->assertSame(21, ClubSettings::current()->dropout_threshold_days);
+    }
+
     public function test_color_pickers_are_prefilled_with_starter_palette_but_not_persisted(): void
     {
         $admin = User::factory()->admin()->create();

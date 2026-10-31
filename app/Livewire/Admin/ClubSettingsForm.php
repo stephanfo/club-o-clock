@@ -51,6 +51,8 @@ class ClubSettingsForm extends Component
 
     public int $season_start_month = 9;
 
+    public int $dropout_threshold_days = 21;
+
     public ?string $primary_color = null;
 
     public ?string $accent_color = null;
@@ -130,6 +132,7 @@ class ClubSettingsForm extends Component
         $this->timezone = $s->timezone;
         $this->invitation_link_days = $s->invitation_link_days;
         $this->season_start_month = $s->season_start_month ?: 9;
+        $this->dropout_threshold_days = $s->dropout_threshold_days ?: 21;
         // Affichage seulement : tant que le club n'a rien personnalisé, on préremplit les color
         // pickers avec les couleurs de démarrage réellement actives (sinon un <input type="color">
         // vide affiche noir, donnant l'impression trompeuse que la palette active est noire). Le
@@ -223,6 +226,7 @@ class ClubSettingsForm extends Component
             'timezone' => ['required', 'timezone'],
             'invitation_link_days' => ['required', 'integer', 'min:1', 'max:365'],
             'season_start_month' => ['required', 'integer', 'min:1', 'max:12'],
+            'dropout_threshold_days' => ['required', 'integer', 'min:7', 'max:180'],
             'primary_color' => ['nullable', 'regex:'.ClubPalette::HEX_PATTERN],
             'accent_color' => ['nullable', 'regex:'.ClubPalette::HEX_PATTERN],
             'info_color' => ['nullable', 'regex:'.ClubPalette::HEX_PATTERN],

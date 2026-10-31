@@ -145,12 +145,6 @@ parameters:
 			path: app/Services/RegistrationService.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$categories\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/StatsService.php
-
-		-
 			message: '#^Parameter \#1 \$groupBy of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:groupBy\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: non\-falsy\-string\)\|list\<Closure\|string\>\|string, Closure\(App\\Models\\AuditLog\)\: non\-falsy\-string given\.$#'
 			identifier: argument.type
 			count: 1

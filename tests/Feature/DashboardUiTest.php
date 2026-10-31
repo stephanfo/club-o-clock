@@ -124,11 +124,39 @@ class DashboardUiTest extends TestCase
             ->assertDontSee('class="chart"', false);
     }
 
+    public function test_shows_dropouts_with_guardian_and_member_links(): void
+    {
+        $guardian = User::factory()->create(['roles' => ['parent'], 'first_name' => 'Florence', 'last_name' => 'Martin']);
+        $ward = User::factory()->minorP1()->create(['first_name' => 'Lucie', 'last_name' => 'Martin', 'guardian_id' => $guardian->id]);
+
+        Livewire::actingAs(User::factory()->admin()->create())
+            ->test(Dashboard::class)
+            ->assertSee('Décrochage')
+            ->assertSee('sans séance depuis plus de 21 jours')
+            ->assertSee('Jamais venus · 1')
+            ->assertSee('Lucie Martin')
+            ->assertSee('garant : Florence Martin')
+            ->assertSee(route('admin.members.show', $ward), false)
+            ->assertSee('jamais connecté')
+            ->assertSee('Effectifs · par catégorie');
+    }
+
     public function test_non_admin_is_forbidden(): void
     {
         Livewire::actingAs(User::factory()->create()) // athlète simple
             ->test(Dashboard::class)
             ->assertForbidden();
+    }
+
+    /** Le décrochage est nominatif : un coach n'y accède pas, même en forçant l'écran (garde serveur). */
+    public function test_coach_cannot_reach_dropouts(): void
+    {
+        User::factory()->create(['first_name' => 'Lucie', 'last_name' => 'Martin']);
+
+        Livewire::actingAs(User::factory()->coach()->create())
+            ->test(Dashboard::class)
+            ->assertForbidden()
+            ->assertDontSee('Lucie Martin');
     }
 
     public function test_period_and_filters_are_settable(): void

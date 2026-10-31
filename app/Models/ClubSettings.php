@@ -41,7 +41,7 @@ class ClubSettings extends Model
     protected $fillable = [
         'name', 'tagline', 'logo_path', 'primary_color', 'accent_color', 'info_color', 'timezone',
         'icon_192_path', 'icon_512_path', 'icon_apple_path',
-        'invitation_link_days', 'season_rollover_at', 'season_start_month',
+        'invitation_link_days', 'season_rollover_at', 'season_start_month', 'dropout_threshold_days',
         'legal_publisher', 'legal_host', 'legal_director', 'legal_contact_email',
         'legal_source_url', 'legal_mail_provider',
         'notif_push_enabled', 'notif_email_enabled',
@@ -53,6 +53,7 @@ class ClubSettings extends Model
         'invitation_link_days' => 'integer',
         'season_rollover_at' => 'datetime',
         'season_start_month' => 'integer',
+        'dropout_threshold_days' => 'integer',
         'notif_push_enabled' => 'boolean',
         'notif_email_enabled' => 'boolean',
         'auth_magic_link_enabled' => 'boolean',
@@ -236,6 +237,7 @@ class ClubSettings extends Model
             'timezone' => 'Europe/Paris',
             'invitation_link_days' => 30,
             'season_start_month' => 9,
+            'dropout_threshold_days' => 21,
             // Répétés ici malgré leur DEFAULT SQL : l'instance renvoyée par create() ne relit pas
             // la base, ses attributs non fournis resteraient null jusqu'au prochain refresh — et
             // channelEnabled() / les propriétés typées du formulaire admin exigent des booléens.
