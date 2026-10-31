@@ -264,6 +264,34 @@
                 @endif
             </div>
 
+            {{-- ═══ Compétitions (§4.16.2, bloc 9) — filtre catégorie seul, une compétition n'a pas de discipline ═══ --}}
+            <div class="card card-pad">
+                <div class="flex ac jb wrap g8"><div class="eyebrow">Compétitions</div><span class="meta" style="font-size:12px">participants déclarés · {{ $periodLabel }}</span></div>
+                @if (count($competitions))
+                    <div style="font-size:14px;margin-top:10px">
+                        <b class="num">{{ $headline['competitors'] }}</b> compétiteur{{ $headline['competitors'] > 1 ? 's' : '' }} distinct{{ $headline['competitors'] > 1 ? 's' : '' }}
+                        sur <b class="num">{{ count($competitions) }}</b> compétition{{ count($competitions) > 1 ? 's' : '' }}
+                    </div>
+                    <div style="overflow-x:auto;margin-top:6px">
+                        <table class="tbl tbl-cartes">
+                            <thead><tr><th>Course</th><th>Date</th><th class="r">Participants</th></tr></thead>
+                            <tbody>
+                                @foreach ($competitions as $c)
+                                    <tr class="row-press" style="cursor:pointer" wire:key="comp-{{ $c['id'] }}"
+                                        onclick="window.location='{{ route('sessions.show', $c['id']) }}'">
+                                        <td class="tbl-m-titre" style="font-weight:700"><a href="{{ route('sessions.show', $c['id']) }}" wire:navigate onclick="event.stopPropagation()">{{ $c['title'] }}</a></td>
+                                        <td class="tbl-m-ligne meta">{{ $c['date']->copy()->setTimezone($tz)->locale('fr')->isoFormat('ddd D MMM') }}</td>
+                                        <td class="r num" data-label="Participants">{{ $c['participants'] }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="meta" style="font-size:13px;margin-top:12px">Aucune compétition sur la période.</div>
+                @endif
+            </div>
+
             {{-- ═══ Liste d'attente (§4.16.2, bloc 10 — ligne compacte) ═══ --}}
             <div class="card card-pad flex ac jb wrap g8">
                 <div class="eyebrow">Liste d'attente</div>
@@ -316,6 +344,28 @@
                     </table>
                 @endif
             </div>
+
+            {{-- ═══ Usage de l'app (§4.16.2, bloc 12) — état courant, agrégats seulement ═══ --}}
+            <div class="card card-pad">
+                <div class="flex ac jb wrap g8"><div class="eyebrow">Usage de l'app</div><span class="meta" style="font-size:12px">état courant · sur {{ $usage['accounts'] }} comptes actifs</span></div>
+                <table class="tbl tbl-cartes" style="margin-top:6px">
+                    <thead><tr><th>Canal</th><th class="r">Comptes</th></tr></thead>
+                    <tbody>
+                        @foreach ([
+                            ['Connectés dans les '.\App\Services\StatsService::USAGE_LOGIN_DAYS.' derniers jours', $usage['logged_in']],
+                            ['Au moins un appareil push', $usage['push']],
+                            ['Flux agenda actif', $usage['calendar']],
+                        ] as [$label, $n])
+                            <tr>
+                                <td class="tbl-m-titre" style="font-weight:700">{{ $label }}</td>
+                                <td class="r num" data-label="Comptes">{{ $n }}@if ($usage['accounts'] > 0) <span class="meta">· {{ (int) round($n / $usage['accounts'] * 100) }} %</span>@endif</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="text-align:center"><a href="{{ route('admin.journal') }}" wire:navigate class="meta" style="font-size:13px">Consulter les journaux →</a></div>
 
         </div>
     </div>

@@ -9,9 +9,9 @@ use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
-// Export XLSX du dashboard bureau (PRD §4.16.2, cadrage §7.11). Une feuille par tableau, en-têtes en
-// gras, dates au format FR. Reprend les filtres en cours (passés résolus). Volumes faibles (quelques
-// dizaines de lignes) → PhpSpreadsheet en mémoire convient. Pur assemblage : la donnée vient de StatsService.
+// Export XLSX du dashboard bureau (PRD §4.16.4, cadrage §7.11). Une feuille par tableau de l'écran
+// sauf le décrochage, en-têtes en gras, dates au format FR. Reprend les filtres en cours (passés
+// résolus). Volumes faibles (quelques dizaines de lignes) → PhpSpreadsheet en mémoire convient. Pur assemblage : la donnée vient de StatsService.
 class StatsExportService
 {
     public function __construct(private StatsService $stats) {}
@@ -89,11 +89,14 @@ class StatsExportService
             ['Taux de promotion (%)', $w['promotion_rate'] ?? '—'],
         ]);
 
-        $this->addSheet($book, 'Compétitions', ['Course', 'Date', 'Participants'],
-            array_map(fn ($r) => [$r['title'], $this->frDate($r['date']), $r['participants']], $this->stats->competitionsPerCourse($f)));
+        // Le total compte des personnes, pas des inscriptions : il ne se déduit pas de la colonne.
+        $this->addSheet($book, 'Compétitions', ['Course', 'Date', 'Participants déclarés'],
+            [...array_map(fn ($r) => [$r['title'], $this->frDate($r['date']), $r['participants']], $this->stats->competitionsPerCourse($f)),
+                ['Compétiteurs distincts', '', $headline['competitors']]]);
 
-        $this->addSheet($book, 'Overrides', ['Motif', 'Nombre'],
-            array_map(fn ($r) => [$r['motif'], $r['count']], $this->stats->overridesPerMotif($f)));
+        // Retirés de l'écran, les overrides restent ici, agrégés (le détail vit dans les journaux §4.18).
+        $this->addSheet($book, 'Overrides', ['Coach', 'Motif', 'Nombre'],
+            array_map(fn ($r) => [$r['coach'], $r['motif'], $r['count']], $this->stats->overridesPerCoach($f)));
 
         $coach = $this->stats->coachActivity($f);
         $coachHeader = array_merge(['Coach'], $coach['disciplines']->pluck('label')->all(), ['Total']);
@@ -114,6 +117,15 @@ class StatsExportService
         // Le décrochage (§4.16.2 bloc 5) n'a pas de feuille : une liste nominative de suivi ne circule pas en fichier.
         $this->addSheet($book, 'Adhérents actifs', ['Catégorie', 'Effectif', 'Pratiquants sur la période'],
             array_map(fn ($r) => [$r['label'], $r['count'], $r['practitioners']], $this->stats->activeMembersByCategory($f)));
+
+        // État courant : ni la période ni les filtres ne s'appliquent, comme à l'écran.
+        $usage = $this->stats->appUsage();
+        $this->addSheet($book, 'Usage de l\'app', ['Indicateur', 'Comptes'], [
+            ['Comptes actifs', $usage['accounts']],
+            ['Connectés dans les '.StatsService::USAGE_LOGIN_DAYS.' derniers jours', $usage['logged_in']],
+            ['Au moins un appareil push', $usage['push']],
+            ['Flux agenda actif', $usage['calendar']],
+        ]);
 
         $book->setActiveSheetIndex(0);
 
