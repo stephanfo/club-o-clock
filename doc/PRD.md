@@ -76,7 +76,7 @@ Remplacer le tableur Google Sheets actuel par une **PWA** qui offre aux adhéren
 - Flag « j'offre l'apéro » sur les inscrits actifs.
 - Notifications push web + email transactionnel UE, matrice de préférences + pause globale ; choix à la sauvegarde d'une séance (annuler / silence / notifier) avec option d'envoi immédiat vs différé.
 - Gestion des envois sortants côté bureau : consultation/filtre de la file de notifications, rattrapage (annulation d'envois en attente), envoi manuel immédiat, rejeu des échecs.
-- Dashboard stats bureau + export XLSX.
+- Dashboard de pilotage (complet pour le bureau, réduit pour les coachs) + export XLSX.
 - Paramètres club (identité, fuseau, catalogues, lien d'invitation, bascule de saison).
 - Deux journaux séparés : `AuditLog` (gouvernance) et `ActivityLog` (opérationnel), accès admin uniquement.
 - Pages d'information (notes club) éditables par l'admin, avec visibilité par niveau de rôle et épinglage en bannière d'accueil (ajout post-cadrage, cf. §4.19).
@@ -668,7 +668,7 @@ Le coach peut **forcer une inscription `participating`**, en outrepassant quota 
 
 **Pas d'alerte programmée V1** sur séance sans coach (pas de cron / scheduler en V1). Détection par deux signaux in-context :
 - **Bandeau d'alerte douce** sur la fiche séance (§4.11.4).
-- **Compteur « séances futures sans coach »** dans le dashboard admin (§4.16).
+- **Liste « séances à encadrer »** (15 prochains jours) dans le dashboard de pilotage, visible des admins et des coachs (§4.16).
 
 **Intervenant extérieur** (`training` uniquement) : certaines séances sont encadrées par un prestataire non adhérent et sans compte — surveillant de baignade, MNS. `Session.externalStaffLabel` signale **qu'il y en a un**, sans nommer la personne : ni compte fictif (qui ferait pousser des notifications vers une adresse morte et polluerait pickers et statistiques), ni fiche sur un tiers non adhérent. Une séance qui le porte est considérée **encadrée** par les deux signaux ci-dessus. Champ **non structurant** : le renseigner ne notifie pas les inscrits (§4.7). Il se règle au formulaire de séance ou de modèle, **et depuis la fiche** (bloc Encadrement) par une fenêtre dédiée — distincte de « Inscrire un coach », qui agit au clic et notifie — ouverte à tout coach et tout admin tant que la séance n'a ni commencé ni été annulée.
 
@@ -1005,28 +1005,54 @@ Chaque adhérent retrouve dans l'application les **notifications push qu'il a re
 - **Regroupement** : les alertes d'un même envoi portant sur la même séance et le même type, mais sur des sujets différents (§4.15.5), forment **une seule entrée** qui nomme chacun (« Toi, Léa et Tom · … ») ; la retirer les retire toutes. Deux déclenchements distincts restent deux entrées.
 - Les alertes retirées ou expirées **ne comptent plus** parmi les non-lues.
 
-### 4.16 Dashboard statistiques bureau
+### 4.16 Dashboard de pilotage
 
-#### 4.16.1 Indicateurs V1
-- **Adhérents actifs** : total, par section, par sous-catégorie.
-- **Taux de remplissage** : `participating` + `waitlist` **combinés et distingués** (waitlist comme indicateur de demande non satisfaite), par séance / série / discipline / catégorie sur période.
-- **Top séances** : les plus / moins fréquentées.
-- **Évolution mensuelle** : graphique d'inscriptions.
-- **Compétitions** : nb de participants déclarés par course.
-- **Liste d'attente** : nb en waitlist, taux de promotion.
-- **Overrides coach** : nb d'inscriptions forcées par coach, par motif (agrégat — détail brut dans la page « Journaux » §4.18).
-- **Activité coachs** (bloc dédié) : nb de séances **`training`** encadrées par coach × discipline × période, évolution mensuelle, compteur live de **séances futures sans coach**. Les `competition` et `club_event` ne sont pas comptabilisés.
-- **Filtres globaux** : période, discipline, catégorie.
+Le dashboard sert à **décider**, pas à constater : chaque bloc répond à une question que le bureau ou les coachs se posent (« ce créneau prend-il ? », « qui encadre jeudi ? », « qui avons-nous perdu ? »). Un indicateur qui ne déclenche aucune décision n'y a pas sa place ; il reste dans l'export ou les journaux (§4.18).
 
-**Bandeau d'alerte douce — comptes éligibles à suppression définitive** : dès qu'au moins un `User` est éligible (`deletionRequestedAt ≥ J-7`), bandeau passif en tête de dashboard avec lien direct vers la page Adhérents filtrée. Disparaît dès que la liste est vide. Pas de notification active.
+#### 4.16.1 Principes
+- **Ordre de la page** : d'abord ce qui appelle une action (alertes, séances à encadrer, décrochage), ensuite la tendance (fréquentation), enfin l'analyse (créneaux, désinscriptions, effectifs, compétitions, usage).
+- **Filtres globaux** : période (saison en cours, 30 jours, 90 jours, 12 mois), discipline, catégorie. Les blocs **« à venir »** (séances à encadrer) et **« état courant »** (décrochage, usage de l'app, liste d'attente vive) ignorent la période, et le disent.
+- **Fréquentation = date de la séance**, jamais date de création de l'inscription : une inscription prise en septembre pour une séance d'octobre compte en octobre. Seules les inscriptions `participating` aux `training` non annulés comptent ; `competition` et `club_event` ont leur propre bloc.
+- **Graphiques lisibles sans interaction** : tout graphique porte un **axe des valeurs gradué** avec son unité, et ses valeurs se lisent sans survol (l'écran est consulté au téléphone, où le survol n'existe pas).
+- **Mobile et desktop** : même contenu sur les deux formats, blocs empilés au téléphone.
+- **Exigence non-fonctionnelle** : tous les indicateurs sont calculés **par agrégats en base**, en temps raisonnable sur l'hébergement cible (de l'ordre de la seconde pour une saison complète), sans charger l'historique des inscriptions en mémoire.
 
-Pas de stats de présence / no-show V1 (absence de pointage).
+#### 4.16.2 Indicateurs
+1. **Bandeaux d'alerte** (inchangés) : comptes éligibles à suppression définitive (`deletionRequestedAt ≥ J-7`) avec lien vers la page Adhérents filtrée ; rappel de bascule de saison (§4.4). Passifs, sans notification.
+2. **Séances à encadrer** (à venir) : liste des séances `training` des **15 prochains jours** sans coach inscrit ni intervenant extérieur (§4.11), chacune cliquable vers sa fiche (date, heure, créneau, discipline). Remplace le simple compteur.
+3. **Chiffres clés** (période) :
+   - **Pratiquants** : athlètes ayant au moins une participation `training` sur la période, **rapportés aux comptes athlètes actifs** (accès non suspendu) — « 140 / 142 ».
+   - **Participations par semaine** : moyenne sur les semaines de la période où le club a proposé au moins une séance.
+   - **Taux de remplissage** : `participating` / capacité, sur les seules séances à capacité bornée (le périmètre est affiché : une discipline sans capacité n'y entre pas).
+   - **Compétiteurs** : athlètes distincts déclarés sur au moins une `competition` de la période.
+4. **Fréquentation hebdomadaire** (période) : par semaine, nombre de **participations** et d'**athlètes distincts**. Les semaines sans séance (vacances) apparaissent à zéro ; la semaine en cours est signalée comme partielle ; les semaines futures sont exclues.
+5. **Décrochage** (état courant, **nominatif, admin uniquement**) :
+   - **Absents** : athlètes actifs dont la dernière participation `training` passée remonte à plus de **N jours** (défaut 21, réglable §4.17), avec catégorie, date de la dernière séance et nombre de séances sur la saison ;
+   - **Jamais venus** : athlètes actifs sans aucune participation `training`, avec la date de création du compte et s'il s'est déjà connecté.
+   - Un pupille affiche son **garant** (c'est lui que le bureau contacte). Chaque ligne mène à la fiche adhérent. **Aucune action automatique** : la relance est humaine, rien n'est envoyé. Liste **calculée à la volée**, rien n'est stocké, et **absente de l'export** (une liste nominative de suivi ne circule pas en fichier).
+6. **Créneaux** (période) : une ligne par **modèle de séance** (§4.8) ayant produit des séances sur la période — les séances hors modèle sont regroupées par discipline en « ponctuelles ». Colonnes : créneau (libellé, jour, heure), discipline, séances tenues, **moyenne d'inscrits**, min–max, remplissage (si capacité), part des séances **sans encadrement**. Trié par moyenne décroissante : les créneaux les moins fréquentés sont en bas. Remplace « top séances » et couvre « plus / moins fréquentées ».
+7. **Désinscriptions** (période) : par discipline, nombre de désinscriptions sur séances non annulées et **part faite moins de 24 h avant le début** (places libérées trop tard pour être reprises). L'horodatage est celui du journal d'activité (§4.18), pas celui de la ligne d'inscription. Les désinscriptions causées par l'annulation d'une séance n'y entrent pas.
+8. **Effectifs** (état courant) : athlètes actifs par **catégorie principale**, et parmi eux les pratiquants de la période.
+9. **Compétitions** (période) : liste des compétitions avec nombre de participants déclarés, et total des compétiteurs distincts.
+10. **Liste d'attente** (ligne compacte) : nombre en attente sur séances futures (file capacité + file quota) et taux de promotion sur la période.
+11. **Activité coachs** (période) : séances `training` encadrées par coach × discipline (les `competition` et `club_event` ne comptent pas), et part des séances passées encadrées par discipline.
+12. **Usage de l'app** (état courant, agrégats seulement) : comptes connectés dans les 30 derniers jours, comptes ayant au moins un appareil push actif (§4.15), flux agenda actifs (§4.21) — de quoi juger si un canal peut être allégé.
 
-Depuis le dashboard, lien **« Consulter les journaux »** mène à la page admin « Journaux » §4.18.
+Lien **« Consulter les journaux »** vers la page §4.18.
 
-#### 4.16.2 Export
-- **Format XLSX** (pas CSV).
-- Une feuille par tableau, formatage minimal (en-têtes en gras, dates formatées FR).
+**Retirés** de l'écran : le compteur d'**overrides coach** (agrégat par coach et motif conservé dans l'export, détail dans les journaux §4.18) et le graphique mensuel par date de création d'inscription (remplacé par le bloc 4).
+
+Pas de stats de présence / no-show V1 (absence de pointage) : « participation » veut dire « inscrit `participating` à une séance tenue ».
+
+#### 4.16.3 Visibilité par rôle
+Un seul écran **« Pilotage »**, dont le contenu dépend du rôle :
+- **Admin** : tous les blocs.
+- **Coach** (sans rôle admin) : **séances à encadrer** (2), **fréquentation hebdomadaire** (4), **créneaux** (6) et **sa propre activité** d'encadrement (bloc 11 réduit à sa ligne — pas le tableau des autres coachs). Ni décrochage, ni effectifs, ni usage de l'app, ni export. Entrée dans le hub Club pour les coachs.
+- Le refus est **gardé côté serveur** : un coach qui force l'URL d'un bloc admin ou l'export est refusé.
+
+#### 4.16.4 Export
+- **Format XLSX** (pas CSV), réservé à l'admin.
+- Une feuille par tableau de l'écran **sauf le décrochage**, plus l'agrégat des overrides par coach et par motif ; formatage minimal (en-têtes en gras, dates formatées FR), filtres en cours appliqués.
 - L'export du journal d'audit / activité est distinct du dashboard et applique les filtres en cours de la page « Journaux ».
 
 ### 4.17 Paramètres club configurables (admin)
@@ -1050,6 +1076,7 @@ Page admin « Paramètres du club » :
 - **Tags de quota** : création, renommage, définition du `maxPerWeek`, **archivage soft delete**. Suppression dure si zéro référence. `AuditLog quota_tag_modified`.
 - **Qualifications coach** (cf. §4.11.3).
 - **Comptes** : durée du lien d'invitation/activation (défaut 30 jours).
+- **Pilotage** : seuil de décrochage en jours sans séance (défaut 21, cf. §4.16).
 - **Notifications** : activation de chaque **canal** (push, email) pour tout le club — cf. §4.15.1.
 - **Moyens de connexion** : activation du **lien magique** et de la **connexion Google** (cf. §4.1.1).
   La connexion par mot de passe n'est pas désactivable : elle garantit qu'une voie d'accès subsiste.

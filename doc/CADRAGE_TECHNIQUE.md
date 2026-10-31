@@ -290,7 +290,7 @@ Lecture : *énoncé PRD → implication → où c'est tranché*. Les exigences s
   le scheduler du framework (inventaire exhaustif en §7.13). Le **reset annuel des surclassements** est
   une **action admin manuelle** (pas un cron, §7.9) ; les **sauvegardes** sont natives OVH (§8.2). → §7.13, §7.14, §8.
 
-### 4.8 Export XLSX (PRD §4.16.2, §4.18.5)
+### 4.8 Export XLSX (PRD §4.16.4, §4.18.5)
 - Dashboard stats + journaux exportés en **XLSX** (pas CSV), formatage FR. → lib PHP serveur. → §7.11.
 
 ### 4.9 Plateforme d'ingénierie (PRD §6)
@@ -383,6 +383,13 @@ indépendantes de la coquille serveur) :
 - **WYSIWYG** : éditeur client de la famille **ProseMirror/TipTap** restreint aux marques autorisées
   (gras, italique, barré, listes, liens, h2/h3, citation), **export markdown**. La **sanitisation serveur PHP fait foi**. Réutilisé tel quel pour `contentMarkdown`, `agenda` et `Debrief.contentMarkdown` (PRD §4.12.5).
 - **Cartes** : lib de cartographie côté client (**Leaflet**) sur fond **OpenStreetMap**, **chargée à la demande** (import dynamique, pas en tête de bundle). Mutualisée entre le **tracé GPX** (`gpxMap`) et l'**aperçu de lieu** (`locationMap`, un marqueur) — ce dernier sert au formulaire Lieux (recentré en direct via l'event Livewire `location-located`) et au bloc « Lieu » de la fiche séance (§4.13.4).
+- **Graphiques** (dashboard de pilotage, PRD §4.16) : **pas de librairie**. Composants Blade qui rendent
+  un **SVG côté serveur** — axes gradués, valeurs écrites, couleurs par tokens —, sur le modèle du profil
+  altimétrique (`x-alt-profile`). Les volumes sont minuscules (une cinquantaine de points par série) et
+  le PRD exige des valeurs lisibles **sans survol** : une lib de graphiques (Chart.js ~70 Ko, uPlot)
+  n'apporterait que l'interactivité qu'on s'interdit, au prix d'une dépendance, d'un thème à caler sur les
+  tokens et d'un rendu canvas à vérifier sur WebKit iOS. Le SVG s'imprime, s'exporte en capture et se
+  teste en PHPUnit (assertions sur le balisage).
 - **Parsing GPX** : lib JS dédiée, **côté client uniquement** (le serveur ne stocke que fichier +
   métadonnées validées).
 
@@ -532,7 +539,7 @@ vérité** pour l'implémentation du frontend.
 | 7.8 | **Météo** (PRD §4.13.5) | Open-Meteo, **cache serveur 3h** par `(lieu, créneau)`, **pré-calcul périodique** des séances de la fenêtre J-16 via cron. |
 | 7.9 | **Reset surclassements / nouvelle année sportive** (PRD §4.5) | **Action admin manuelle, PAS un cron** : bouton « Démarrer la nouvelle année sportive » → recalcul de la catégorie principale + suppression des `UserCategory` non-principales, en une transaction. Bandeau de rappel passif sur le dashboard à partir du 1er sept. Décision humaine (le club se met d'accord avant). |
 | 7.10 | **Conversion HEIC** (uploads iPhone, PRD §4.12.2) | **Côté client** avant upload (lib JS), pour ne pas charger le serveur ni le mutualisé. |
-| 7.11 | **Génération XLSX** (PRD §4.16.2) | **Lib PHP serveur**, une feuille par tableau, en-têtes en gras, dates FR. |
+| 7.11 | **Génération XLSX** (PRD §4.16.4) | **Lib PHP serveur**, une feuille par tableau, en-têtes en gras, dates FR. |
 | 7.12 | **OpenRunner embed** (PRD §4.13.1) | Stocker **uniquement l'URL `src`**, **validation whitelist serveur stricte** (hôte `www.openrunner.com`, path `/embed.html`, param `code`), **iframe régénérée côté client** à attributs figés. |
 
 ### 7.13 Inventaire des tâches planifiées (périmètre exact du cron)
