@@ -16,7 +16,13 @@
     {{-- ─── Topbar ─── --}}
     {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. Actions de terrain seulement,
          l'export XLSX et l'import CSV restent au bureau. --}}
-    <x-topbar title="Envois sortants" :back="route('club')" back-label="Retour au club" />
+    <x-topbar title="Envois" :back="route('club')" back-label="Retour au club">
+        {{-- Annuler la file est le geste urgent du terrain (#153) : un envoi parti par erreur. --}}
+        <x-slot:trailing>
+            <button type="button" wire:click="pushAllPending" wire:loading.attr="disabled" wire:target="pushAllPending" class="iconbtn" aria-label="Pousser tous les en attente"><x-icon name="send" /></button>
+            <button type="button" wire:click="askCancel('all')" class="iconbtn" aria-label="Annuler tous les en attente"><x-icon name="x" /></button>
+        </x-slot:trailing>
+    </x-topbar>
     <div class="dk-topbar">
         <div class="f1">
             <div class="dsp" style="font-size:24px">Envois sortants</div>
@@ -99,7 +105,7 @@
 
         {{-- ═══ Filtres (§4.15.6) ═══ --}}
         <div class="flex g8 ac wrap" style="margin-bottom:14px">
-            <x-segmented :items="[['v'=>'','l'=>'Tous'],['v'=>'pending','l'=>'En attente'],['v'=>'sent','l'=>'Envoyées'],['v'=>'failed','l'=>'En échec'],['v'=>'cancelled','l'=>'Annulées'],['v'=>'no_target','l'=>'Sans destinataire']]"
+            <x-segmented class="seg-defile" :items="[['v'=>'','l'=>'Tous'],['v'=>'pending','l'=>'En attente'],['v'=>'sent','l'=>'Envoyées'],['v'=>'failed','l'=>'En échec'],['v'=>'cancelled','l'=>'Annulées'],['v'=>'no_target','l'=>'Sans destinataire']]"
                          :value="$status" wire-set="status" />
 
             <x-segmented :items="[['v'=>'','l'=>'Tous canaux'],['v'=>'push','l'=>'Push'],['v'=>'email','l'=>'Email']]"
@@ -151,7 +157,7 @@
 
         {{-- ═══ Barre d'actions sur la sélection (§4.15.6) ═══ --}}
         @if ($selectedCount)
-            <div class="card card-pad flex ac jb" style="margin-bottom:12px;gap:12px">
+            <div class="card card-pad flex ac jb wrap" style="margin-bottom:12px;gap:12px">
                 <span class="meta">{{ $selectedCount }} sélectionné(s)</span>
                 <div class="flex g8 ac">
                     <button type="button" wire:click="pushSelected" class="btn btn-primary btn-sm"><x-icon name="send" :size="14" /> Pousser</button>

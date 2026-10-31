@@ -50,7 +50,7 @@
             @endif
 
             {{-- ═══ KPI ═══ --}}
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
+            <div class="dash-kpi">
                 <div class="stat">
                     <div class="n">{{ $headline['active'] }}</div><div class="l">adhérents actifs</div>
                     @if ($headline['new_since_season'] > 0)
@@ -71,7 +71,7 @@
             </div>
 
             {{-- ═══ Évolution mensuelle + Top séances ═══ --}}
-            <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:16px">
+            <div class="dash-duo">
                 <div class="card card-pad">
                     <div class="flex ac jb"><div class="eyebrow">Évolution des inscriptions · mensuel</div><span class="meta" style="font-size:12px">{{ $periodLabel }}</span></div>
                     @php $maxBar = max(1, collect($monthly)->max('count')); @endphp
@@ -105,7 +105,7 @@
             {{-- ═══ Liste d'attente ═══ --}}
             <div class="card card-pad">
                 <div class="flex ac jb" style="margin-bottom:12px"><div class="eyebrow">Liste d'attente</div><span class="meta" style="font-size:12px">demande non satisfaite · {{ $periodLabel }}</span></div>
-                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+                <div class="dash-trio">
                     <div><div class="num" style="font-size:28px">{{ $waitlist['total'] }}</div><div class="meta" style="font-size:12px;margin-top:2px">inscriptions en file d'attente</div></div>
                     <div><div class="num" style="font-size:28px">{{ $waitlist['capacity'] }} <span class="meta" style="font-size:13px">+ {{ $waitlist['quota'] }}</span></div><div class="meta" style="font-size:12px;margin-top:2px">file capacité · file quota</div></div>
                     <div><div class="num" style="font-size:28px;color:var(--brand-700)">{{ $waitlist['promotion_rate'] !== null ? $waitlist['promotion_rate'].'%' : '—' }}</div><div class="meta" style="font-size:12px;margin-top:2px">taux de promotion vers inscrit·e</div></div>

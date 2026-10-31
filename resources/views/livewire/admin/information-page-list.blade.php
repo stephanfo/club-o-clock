@@ -7,7 +7,7 @@
     {{-- ─── Topbar ─── --}}
     {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. Actions de terrain seulement,
          l'export XLSX et l'import CSV restent au bureau. --}}
-    <x-topbar title="Pages d'information" :back="route('club')" back-label="Retour au club">
+    <x-topbar title="Pages d'info" :back="route('club')" back-label="Retour au club">
         <x-slot:trailing>
             <a href="{{ route('admin.infos.create') }}" wire:navigate class="iconbtn" aria-label="Nouvelle page"><x-icon name="plus" /></a>
         </x-slot:trailing>
@@ -33,7 +33,7 @@
                     <div style="display:flex;flex-direction:column;gap:8px">
                         @foreach ($active as $page)
                             <div class="card card-pad">
-                                <div class="flex ac g10">
+                                <div class="flex ac g10 ligne-repliable">
                                     {{-- Réordonnancement manuel : ↑/↓ échangent la position avec la voisine.
                                          Dimensions réduites en ligne (cf. override .weeknav .iconbtn). --}}
                                     <div class="flex" style="flex-direction:column;gap:2px">
@@ -53,7 +53,7 @@
                                         </div>
                                         <div class="meta" style="font-size:11px;margin-top:2px">{{ $page->visibilityLabel() }}</div>
                                     </div>
-                                    <div class="flex ac g6">
+                                    <div class="flex ac g6 ligne-repliable-actions">
                                         <button type="button" wire:click="togglePin({{ $page->id }})" class="btn btn-ghost btn-sm"
                                             title="{{ $page->pinned ? 'Désépingler' : 'Épingler en bannière' }}">
                                             <x-icon name="star" :size="14" /> {{ $page->pinned ? 'Désépingler' : 'Épingler' }}
@@ -81,12 +81,12 @@
                     <div style="display:flex;flex-direction:column;gap:8px">
                         @foreach ($archived as $page)
                             <div class="card card-pad" style="background:var(--bg-alt)">
-                                <div class="flex ac g10">
+                                <div class="flex ac g10 ligne-repliable">
                                     <div class="f1" style="min-width:0">
                                         <div style="font-weight:700;font-size:13px;color:var(--fg-soft)">{{ $page->title }}</div>
                                         <div class="meta" style="font-size:11px">{{ $page->visibilityLabel() }}</div>
                                     </div>
-                                    <div class="flex ac g6">
+                                    <div class="flex ac g6 ligne-repliable-actions">
                                         <button type="button" wire:click="restore({{ $page->id }})" class="btn btn-ghost btn-sm">
                                             <x-icon name="rotate-ccw" :size="14" /> Restaurer
                                         </button>

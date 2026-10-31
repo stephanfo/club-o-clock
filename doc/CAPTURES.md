@@ -5,7 +5,9 @@ entièrement fictives** (club « TEAM44 », adresses `@demo.club`). Tu peux refa
 manipulations toi-même : les identifiants sont affichés sur l'écran de connexion.
 
 Les écrans mobiles sont capturés en 390 × 843 (format téléphone), les écrans d'administration en
-1024 × 844 — l'administration est **assumée desktop**, elle n'est pas conçue pour le téléphone.
+1024 × 844 — le format du poste du bureau. Les écrans de suivi (dashboard, adhérents, journaux,
+envois, pages d'info) restent utilisables au téléphone depuis l'onglet **Club** ; les réglages sont
+conçus pour l'ordinateur.
 
 ---
 
