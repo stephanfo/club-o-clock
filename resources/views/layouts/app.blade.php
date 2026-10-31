@@ -21,6 +21,7 @@
         // L'ORDRE COMPTE : le premier motif qui correspond gagne — 'admin.settings' avant les
         // motifs larges, et 'gpx-routes.*' couvre index/creer/modifier d'un seul tenant.
         $active = $active ?? collect([
+            'club' => 'club',
             'profil' => 'profil',
             'alerts' => 'alerts',
             'planning' => 'planning',
@@ -175,8 +176,10 @@
                 <x-icon name="users" :size="22" /><span>Enfants</span>
             </a>
         @endif
-        <a href="{{ route('profil') }}" wire:navigate class="botnav-item {{ $active === 'profil' ? 'on' : '' }}">
-            <x-icon name="user" :size="22" /><span>Profil</span>
+        {{-- Hub « Club » (#150) : index des écrans sans entrée dans la barre. L'onglet reste allumé
+             sur ces écrans, pour qu'on sache d'où l'on vient. --}}
+        <a href="{{ route('club') }}" wire:navigate class="botnav-item {{ in_array($active, ['club', 'profil', 'trombi', 'infos', 'alerts'], true) ? 'on' : '' }}">
+            <x-icon name="menu" :size="22" /><span>Club</span>
         </a>
     </nav>
 
