@@ -143,7 +143,11 @@ class StatsService
         return $this->trainingSessions($f)->where('start_at', '<=', Carbon::now());
     }
 
-    /** Athlètes actifs : rôle athlete, non anonymisé, actif, accès non suspendu, filtre catégorie. */
+    /**
+     * Athlètes actifs : rôle athlete, non anonymisé, actif, accès non suspendu, filtre catégorie.
+     *
+     * @return Builder<User>
+     */
     private function activeAthletesQuery(array $f): Builder
     {
         return User::query()
@@ -461,20 +465,78 @@ class StatsService
 
     // ── Détails pour l'export XLSX (non affichés à l'écran, fidèle au design) ──
 
-    /** @return array<int,array{label:string,count:int}> adhérents actifs par catégorie principale. */
+    // ── Effectifs (§4.16.2, bloc 8) ──
+
+    /**
+     * Athlètes actifs par catégorie principale (état courant), et parmi eux les pratiquants de la
+     * période — même définition que les chiffres clés. Trié par effectif décroissant.
+     *
+     * @return array<int,array{label:string,count:int,practitioners:int}>
+     */
     public function activeMembersByCategory(array $f): array
     {
-        $members = $this->activeAthletesQuery($f)->with(['categories'])->get();
+        $practitionerIds = $this->activeAthletesQuery($f)
+            ->whereHas('registrations', fn (Builder $r) => $r
+                ->where('status', 'participating')
+                ->whereIn('session_id', $this->heldTrainingSessions($f)->select('sessions.id')))
+            ->pluck('id')->flip();
 
         $byCat = [];
-        foreach ($members as $m) {
-            $primary = $m->categories->firstWhere('pivot.is_primary', true);
-            $label = $primary->label ?? 'Sans catégorie';
-            $byCat[$label] = ($byCat[$label] ?? 0) + 1;
+        foreach ($this->activeAthletesQuery($f)->with(['categories'])->get(['id']) as $m) {
+            $label = $m->categories->firstWhere('pivot.is_primary', true)->label ?? 'Sans catégorie';
+            $byCat[$label] ??= ['label' => $label, 'count' => 0, 'practitioners' => 0];
+            $byCat[$label]['count']++;
+            $byCat[$label]['practitioners'] += $practitionerIds->has($m->id) ? 1 : 0;
         }
-        arsort($byCat);
 
-        return collect($byCat)->map(fn ($count, $label) => ['label' => $label, 'count' => $count])->values()->all();
+        return collect($byCat)->sortByDesc('count')->values()->all();
+    }
+
+    // ── Décrochage (§4.16.2, bloc 5) — nominatif, admin seul, jamais exporté ──
+
+    /**
+     * Athlètes actifs à relancer, calculés à la volée (rien n'est stocké, rien n'est envoyé) :
+     * - absents : dernière participation training tenue plus vieille que le seuil ;
+     * - jamais venus : aucune participation training tenue — une inscription à une séance future
+     *   n'est pas encore une participation.
+     * État courant : ignore la période et la discipline, suit le filtre catégorie.
+     *
+     * @return array{threshold:int,absent:Collection<int,User>,never:Collection<int,User>}
+     */
+    public function dropouts(array $f): array
+    {
+        $now = Carbon::now();
+        $threshold = ClubSettings::current()->dropout_threshold_days ?: 21;
+        $athletes = ['category_id' => $f['category_id'] ?? null];
+
+        // Une ligne par athlète ayant participé : dernière séance tenue et nombre de séances de la saison.
+        $held = Registration::query()
+            ->join('sessions', 'sessions.id', '=', 'registrations.session_id')
+            ->where('registrations.status', 'participating')
+            ->where('sessions.kind', 'training')->whereNull('sessions.cancelled_at')
+            ->where('sessions.start_at', '<=', $now)
+            ->whereIn('registrations.user_id', $this->activeAthletesQuery($athletes)->select('users.id'))
+            ->groupBy('registrations.user_id')
+            ->selectRaw('registrations.user_id, MAX(sessions.start_at) AS last_at, SUM(CASE WHEN sessions.start_at >= ? THEN 1 ELSE 0 END) AS season_count',
+                [$this->resolvePeriod('season')['from']])
+            ->toBase()->get()->keyBy('user_id');
+
+        $cutoff = $now->copy()->subDays($threshold);
+        $absentIds = $held->filter(fn ($r) => Carbon::parse($r->last_at, 'UTC')->lt($cutoff))->keys();
+
+        $with = ['categories', 'guardian:id,first_name,last_name'];
+
+        $absent = $this->activeAthletesQuery($athletes)->with($with)->whereIn('id', $absentIds)->get()
+            ->each(function (User $u) use ($held) {
+                $u->setAttribute('last_training_at', Carbon::parse($held[$u->id]->last_at, 'UTC'));
+                $u->setAttribute('season_trainings', (int) $held[$u->id]->season_count);
+            })
+            ->sortBy('last_training_at')->values();
+
+        $never = $this->activeAthletesQuery($athletes)->with($with)->whereNotIn('id', $held->keys())
+            ->orderBy('created_at')->get();
+
+        return ['threshold' => $threshold, 'absent' => $absent, 'never' => $never];
     }
 
     /** @return array<int,array{title:string,date:Carbon,participants:int}> participants déclarés par course. */

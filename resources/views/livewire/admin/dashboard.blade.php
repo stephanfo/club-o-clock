@@ -72,6 +72,50 @@
                 @endif
             </div>
 
+            {{-- ═══ Décrochage (§4.16.2, bloc 5) — nominatif, admin seul, état courant, hors export ═══ --}}
+            <div class="card card-pad">
+                <div class="flex ac jb wrap g8"><div class="eyebrow">Décrochage</div><span class="meta" style="font-size:12px">état courant · relance à la main, rien n'est envoyé</span></div>
+                <div style="font-size:14px;margin-top:8px">
+                    <b class="num">{{ $dropouts['absent']->count() }}</b> sans séance depuis plus de {{ $dropouts['threshold'] }} jours
+                    · <b class="num">{{ $dropouts['never']->count() }}</b> jamais venu{{ $dropouts['never']->count() > 1 ? 's' : '' }}
+                </div>
+                @foreach ([['absent', 'Absents'], ['never', 'Jamais venus']] as [$key, $title])
+                    @if ($dropouts[$key]->isNotEmpty())
+                        <details class="chart-detail">
+                            <summary>{{ $title }} · {{ $dropouts[$key]->count() }}</summary>
+                            <div style="overflow-x:auto">
+                                <table class="tbl tbl-cartes">
+                                    <thead><tr><th>Athlète</th><th>Catégorie</th>
+                                        @if ($key === 'absent')<th>Dernière séance</th><th class="r">Séances saison</th>
+                                        @else<th>Compte créé</th><th>Connecté</th>@endif
+                                    </tr></thead>
+                                    <tbody>
+                                        @foreach ($dropouts[$key] as $u)
+                                            <tr class="row-press" style="cursor:pointer" wire:key="drop-{{ $key }}-{{ $u->id }}"
+                                                onclick="window.location='{{ route('admin.members.show', $u) }}'">
+                                                <td class="tbl-m-titre tbl-m-ligne">
+                                                    <a href="{{ route('admin.members.show', $u) }}" wire:navigate onclick="event.stopPropagation()" style="font-weight:700">{{ $u->fullName() }}</a>
+                                                    {{-- Pupille : c'est le garant que le bureau contacte. --}}
+                                                    @if ($u->guardian)<div class="meta">garant : {{ $u->guardian->fullName() }}</div>@endif
+                                                </td>
+                                                <td>{{ $u->categories->firstWhere('pivot.is_primary', true)->label ?? '—' }}</td>
+                                                @if ($key === 'absent')
+                                                    <td data-label="Dernière">{{ $u->last_training_at->copy()->setTimezone($tz)->locale('fr')->isoFormat('ddd D MMM') }}</td>
+                                                    <td class="r num" data-label="Saison">{{ $u->season_trainings }}</td>
+                                                @else
+                                                    <td data-label="Créé">{{ $u->created_at->copy()->setTimezone($tz)->locale('fr')->isoFormat('D MMM YYYY') }}</td>
+                                                    <td>{{ $u->last_login_at ? 'déjà connecté' : 'jamais connecté' }}</td>
+                                                @endif
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </details>
+                    @endif
+                @endforeach
+            </div>
+
             {{-- ═══ Chiffres clés (§4.16.2, bloc 3) ═══ --}}
             <div class="dash-kpi">
                 <div class="stat">
@@ -194,6 +238,29 @@
                     </table>
                 @else
                     <div class="meta" style="font-size:13px;margin-top:12px">Aucune désinscription sur la période.</div>
+                @endif
+            </div>
+
+            {{-- ═══ Effectifs (§4.16.2, bloc 8) — état courant, pratiquants de la période ═══ --}}
+            <div class="card card-pad">
+                <div class="flex ac jb wrap g8"><div class="eyebrow">Effectifs · par catégorie</div><span class="meta" style="font-size:12px">athlètes actifs · pratiquants {{ $periodLabel }}</span></div>
+                @if (count($members))
+                    <div style="overflow-x:auto;margin-top:6px">
+                        <table class="tbl tbl-cartes">
+                            <thead><tr><th>Catégorie</th><th class="r">Actifs</th><th class="r">Pratiquants</th></tr></thead>
+                            <tbody>
+                                @foreach ($members as $m)
+                                    <tr>
+                                        <td class="tbl-m-titre" style="font-weight:700">{{ $m['label'] }}</td>
+                                        <td class="r num" data-label="Actifs">{{ $m['count'] }}</td>
+                                        <td class="r num" data-label="Pratiquants">{{ $m['practitioners'] }} · {{ (int) round($m['practitioners'] / $m['count'] * 100) }} %</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="meta" style="font-size:13px;margin-top:12px">Aucun athlète actif.</div>
                 @endif
             </div>
 

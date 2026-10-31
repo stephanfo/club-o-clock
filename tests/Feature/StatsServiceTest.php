@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\ActivityLog;
 use App\Models\AuditLog;
 use App\Models\Category;
+use App\Models\ClubSettings;
 use App\Models\Discipline;
 use App\Models\Registration;
 use App\Models\Session;
@@ -521,9 +522,86 @@ class StatsServiceTest extends TestCase
         $u = User::factory()->create();
         $u->categories()->attach($senior->id, ['is_primary' => true]);
 
+        $this->participate($this->training($this->swim, null, Carbon::now()->subDays(3)), $u);
+        $u2 = User::factory()->create();
+        $u2->categories()->attach($senior->id, ['is_primary' => true]);
+        $this->participate($this->training($this->swim, null, Carbon::now()->addDays(3)), $u2); // à venir : pas pratiquant
+
         $rows = $this->stats()->activeMembersByCategory($this->season());
 
-        $this->assertSame('Sénior', $rows[0]['label']);
-        $this->assertSame(1, $rows[0]['count']);
+        $this->assertSame(['label' => 'Sénior', 'count' => 2, 'practitioners' => 1], $rows[0]);
+    }
+
+    // ── Décrochage (§4.16.2, bloc 5 — #163) ──
+
+    /** @return array{absent:list<int>,never:list<int>,threshold:int} */
+    private function dropoutIds(): array
+    {
+        $d = $this->stats()->dropouts($this->season());
+
+        return ['absent' => $d['absent']->pluck('id')->all(), 'never' => $d['never']->pluck('id')->all(), 'threshold' => $d['threshold']];
+    }
+
+    public function test_dropout_threshold_splits_absent_from_regular(): void
+    {
+        $absent = User::factory()->create();
+        $this->participate($this->training($this->swim, null, Carbon::now()->subDays(40)), $absent);
+        $this->participate($this->training($this->swim, null, Carbon::now()->subDays(22)), $absent);
+        $regular = User::factory()->create();
+        $this->participate($this->training($this->swim, null, Carbon::now()->subDays(20)), $regular);
+
+        $d = $this->stats()->dropouts($this->season());
+
+        $this->assertSame(21, $d['threshold']);
+        $this->assertSame([$absent->id], $d['absent']->pluck('id')->all());
+        $this->assertSame(2, $d['absent'][0]->season_trainings);
+        $this->assertTrue($d['absent'][0]->last_training_at->isSameDay(Carbon::now()->subDays(22)));
+        $this->assertSame([], $d['never']->all());
+    }
+
+    public function test_dropout_list_follows_the_club_threshold(): void
+    {
+        $u = User::factory()->create();
+        $this->participate($this->training($this->swim, null, Carbon::now()->subDays(20)), $u);
+        $this->assertSame([], $this->dropoutIds()['absent']);
+
+        ClubSettings::current()->update(['dropout_threshold_days' => 14]);
+
+        $this->assertSame([$u->id], $this->dropoutIds()['absent']);
+    }
+
+    public function test_a_future_registration_alone_means_never_came(): void
+    {
+        $u = User::factory()->create();
+        $this->participate($this->training($this->swim, null, Carbon::now()->addDays(2)), $u);
+        // Séance annulée ou simple liste d'attente : pas une participation non plus.
+        $cancelled = $this->training($this->swim, null, Carbon::now()->subDays(2));
+        $cancelled->forceFill(['cancelled_at' => Carbon::now()])->save();
+        $this->participate($cancelled, $u);
+        $this->participate($this->training($this->swim, 1, Carbon::now()->subDays(5)), $u, 'waitlist');
+
+        $this->assertSame(['absent' => [], 'never' => [$u->id], 'threshold' => 21], $this->dropoutIds());
+    }
+
+    public function test_dropout_lists_leave_out_suspended_anonymized_and_coaches(): void
+    {
+        $listed = User::factory()->create();
+        User::factory()->create(['athlete_access_suspended' => true]);
+        User::factory()->create(['anonymized_at' => Carbon::now()]);
+        User::factory()->create(['is_active' => false]);
+        User::factory()->coach()->create(); // coach sans rôle athlète
+
+        $this->assertSame([$listed->id], $this->dropoutIds()['never']);
+    }
+
+    public function test_ward_shows_its_guardian(): void
+    {
+        $guardian = User::factory()->create(['roles' => ['parent'], 'first_name' => 'Florence', 'last_name' => 'Martin']);
+        $ward = User::factory()->minorP1()->create(['guardian_id' => $guardian->id]);
+
+        $never = $this->stats()->dropouts($this->season())['never'];
+
+        $this->assertSame([$ward->id], $never->pluck('id')->all());
+        $this->assertSame('Florence Martin', $never[0]->guardian->fullName());
     }
 }

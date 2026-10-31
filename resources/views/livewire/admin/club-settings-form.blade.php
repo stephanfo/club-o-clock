@@ -115,6 +115,12 @@
                     @foreach ($months as $num => $label)<option value="{{ $num }}">{{ $label }}</option>@endforeach
                 </select>
 
+                {{-- Seuil du bloc « Décrochage » du dashboard (§4.16.2 bloc 5) : rien n'est envoyé, la liste
+                     sert seulement au bureau pour relancer à la main. --}}
+                <label class="field-label" style="margin-top:12px">Seuil de décrochage (jours sans séance)</label>
+                <div class="ifield"><input class="ifield-input" type="number" min="7" max="180" wire:model.blur="dropout_threshold_days"></div>
+                <div class="meta" style="font-size:12px;margin-top:6px">Au-delà, un athlète apparaît parmi les absents du dashboard. Aucune relance automatique.</div>
+
                 {{-- ── Icônes PWA (§4.17, cadrage §7.16) ──
                      Trois fichiers distincts, et non trois tailles d'un même rendu : les deux
                      formats du manifest sont rognés en cercle par Android (d'où la zone de

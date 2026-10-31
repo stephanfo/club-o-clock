@@ -200,6 +200,7 @@ CREATE TABLE `club_settings` (
   `accent_color` varchar(9) DEFAULT NULL,
   `info_color` varchar(9) DEFAULT NULL,
   `season_start_month` tinyint(3) unsigned NOT NULL DEFAULT 9,
+  `dropout_threshold_days` smallint(5) unsigned NOT NULL DEFAULT 21,
   `timezone` varchar(255) NOT NULL DEFAULT 'Europe/Paris',
   `invitation_link_days` smallint(5) unsigned NOT NULL DEFAULT 30,
   `season_rollover_at` timestamp NULL DEFAULT NULL,
@@ -943,5 +944,6 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (49,'2026_10_02_000
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (50,'2026_10_03_000000_add_push_health',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (51,'2026_10_04_000000_create_allures_tables',1);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (52,'2026_10_30_000000_create_trombinoscope',1);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (53,'2026_10_31_000000_add_dropout_threshold_days',2);
 COMMIT;
 SET AUTOCOMMIT=@OLD_AUTOCOMMIT;
