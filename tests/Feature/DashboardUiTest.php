@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Livewire\Admin\Dashboard;
 use App\Models\Discipline;
+use App\Models\Registration;
+use App\Models\Session;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -36,6 +38,34 @@ class DashboardUiTest extends TestCase
             ->assertSee('Dashboard admin')
             ->assertSee('taux de remplissage')
             ->assertSee('Activité coachs');
+    }
+
+    public function test_shows_weekly_attendance_and_key_figures_without_overrides(): void
+    {
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Natation', 'start_at' => Carbon::now()->subDays(3),
+            'duration_min' => 60, 'created_by' => User::factory()->coach()->create()->id,
+        ]);
+        Registration::create(['session_id' => $session->id, 'user_id' => User::factory()->create()->id,
+            'status' => 'participating', 'registered_at' => Carbon::now()->subDays(5)]);
+
+        Livewire::actingAs(User::factory()->admin()->create())
+            ->test(Dashboard::class)
+            ->assertSee('Fréquentation · par semaine')
+            ->assertSee('Détail par semaine')
+            ->assertSee('class="chart"', false)
+            ->assertSee('pratiquants')
+            ->assertSee('compétiteurs')
+            ->assertDontSee('overrides coach')
+            ->assertDontSee('Évolution des inscriptions');
+    }
+
+    public function test_weekly_block_says_so_when_nothing_was_held(): void
+    {
+        Livewire::actingAs(User::factory()->admin()->create())
+            ->test(Dashboard::class)
+            ->assertSee('Aucune séance tenue sur la période.')
+            ->assertDontSee('class="chart"', false);
     }
 
     public function test_non_admin_is_forbidden(): void

@@ -48,66 +48,99 @@
                 </x-banner>
             @endif
 
-            {{-- ═══ KPI ═══ --}}
+            {{-- ═══ Chiffres clés (§4.16.2, bloc 3) ═══ --}}
             <div class="dash-kpi">
                 <div class="stat">
-                    <div class="n">{{ $headline['active'] }}</div><div class="l">adhérents actifs</div>
-                    @if ($headline['new_since_season'] > 0)
-                        <div class="meta" style="font-size:11px;margin-top:4px">+{{ $headline['new_since_season'] }} depuis sept.</div>
-                    @endif
+                    <div class="n">{{ $headline['practitioners'] }}</div><div class="l">pratiquants</div>
+                    <div class="meta" style="font-size:11px;margin-top:4px">≥ 1 séance · sur {{ $headline['active'] }} comptes athlètes</div>
+                </div>
+                <div class="stat">
+                    <div class="n">{{ $headline['weekly_avg'] ?? '—' }}</div><div class="l">participations / semaine</div>
+                    <div class="meta" style="font-size:11px;margin-top:4px">moyenne, semaines avec séances</div>
                 </div>
                 <div class="stat">
                     <div class="n">{{ $headline['fill_rate'] !== null ? $headline['fill_rate'].'%' : '—' }}</div><div class="l">taux de remplissage</div>
-                    <div class="meta" style="font-size:11px;margin-top:4px">séances training</div>
+                    <div class="meta" style="font-size:11px;margin-top:4px">{{ $headline['fill_sessions'] }} séance{{ $headline['fill_sessions'] > 1 ? 's' : '' }} à capacité</div>
                 </div>
                 <div class="stat">
-                    <div class="n">{{ $headline['competitions'] }}</div><div class="l">compétitions</div>
-                    <div class="meta" style="font-size:11px;margin-top:4px">{{ $periodLabel }}</div>
-                </div>
-                <div class="stat">
-                    <div class="n">{{ $headline['overrides'] }}</div><div class="l">overrides coach</div>
+                    <div class="n">{{ $headline['competitors'] }}</div><div class="l">compétiteurs</div>
+                    <div class="meta" style="font-size:11px;margin-top:4px">sur {{ $headline['competitions'] }} compétition{{ $headline['competitions'] > 1 ? 's' : '' }}</div>
                 </div>
             </div>
 
-            {{-- ═══ Évolution mensuelle + Top séances ═══ --}}
-            <div class="dash-duo">
-                <div class="card card-pad">
-                    <div class="flex ac jb"><div class="eyebrow">Évolution des inscriptions · mensuel</div><span class="meta" style="font-size:12px">{{ $periodLabel }}</span></div>
-                    @php $maxBar = max(1, collect($monthly)->max('count')); @endphp
-                    <div style="display:flex;align-items:flex-end;gap:14px;height:130px;margin-top:14px;padding:0 4px">
-                        @foreach ($monthly as $m)
-                            <div class="f1 flex col ac" style="justify-content:flex-end;height:100%">
-                                <div title="{{ $m['count'] }} inscription{{ $m['count'] > 1 ? 's' : '' }}"
-                                     style="width:100%;height:{{ round($m['count'] / $maxBar * 100) }}%;{{ $m['count'] > 0 ? 'min-height:3px;' : '' }}background:var(--brand);border-radius:4px 4px 0 0"></div>
-                                <div class="meta" style="font-size:11px;margin-top:6px">{{ $m['label'] }}</div>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-                <div class="card card-pad">
-                    <div class="eyebrow" style="margin-bottom:12px">Top séances · remplissage</div>
-                    <div style="display:flex;flex-direction:column;gap:10px">
-                        @forelse ($topSessions as $i => $s)
-                            <div class="flex ac g8" style="font-size:13px">
-                                <span class="muted" style="width:14px">{{ $i + 1 }}</span>
-                                <span class="f1" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $s['title'] }}</span>
-                                <div class="qbar{{ $s['fill'] >= 100 ? ' full' : '' }}" style="max-width:80px"><i style="width:{{ min(100, $s['fill']) }}%"></i></div>
-                                <span class="num" style="font-size:13px;width:38px;text-align:right">{{ $s['fill'] }}%</span>
-                            </div>
-                        @empty
-                            <div class="meta" style="font-size:13px">Aucune séance à capacité sur la période.</div>
-                        @endforelse
-                    </div>
-                </div>
-            </div>
-
-            {{-- ═══ Liste d'attente ═══ --}}
+            {{-- ═══ Fréquentation hebdomadaire (§4.16.2, bloc 4) ═══ --}}
+            @php
+                // Abscisses : chaque semaine si elles sont peu nombreuses, sinon le mois à chaque
+                // changement de mois — sept libellés « 14 sept. » ne tiennent pas sur 300 px. Une semaine
+                // appartient au mois de son JEUDI (convention ISO) : la semaine du 31 août est celle de
+                // septembre, et deux libellés de mois ne tombent jamais sur des barres voisines.
+                $dense = count($weekly) > 6;
+                $prevMonth = null;
+                $weekPoints = [];
+                foreach ($weekly as $w) {
+                    $thursday = $w['start']->copy()->addDays(3);
+                    $month = $thursday->format('Y-m');
+                    $weekPoints[] = [
+                        'label' => $dense ? ($month !== $prevMonth ? $thursday->locale('fr')->isoFormat('MMM') : null) : $w['start']->locale('fr')->isoFormat('D MMM'),
+                        'value' => $w['participations'],
+                        'line' => $w['athletes'],
+                        'muted' => $w['partial'],
+                    ];
+                    $prevMonth = $month;
+                }
+            @endphp
             <div class="card card-pad">
-                <div class="flex ac jb" style="margin-bottom:12px"><div class="eyebrow">Liste d'attente</div><span class="meta" style="font-size:12px">demande non satisfaite · {{ $periodLabel }}</span></div>
-                <div class="dash-trio">
-                    <div><div class="num" style="font-size:28px">{{ $waitlist['total'] }}</div><div class="meta" style="font-size:12px;margin-top:2px">inscriptions en file d'attente</div></div>
-                    <div><div class="num" style="font-size:28px">{{ $waitlist['capacity'] }} <span class="meta" style="font-size:13px">+ {{ $waitlist['quota'] }}</span></div><div class="meta" style="font-size:12px;margin-top:2px">file capacité · file quota</div></div>
-                    <div><div class="num" style="font-size:28px;color:var(--brand-700)">{{ $waitlist['promotion_rate'] !== null ? $waitlist['promotion_rate'].'%' : '—' }}</div><div class="meta" style="font-size:12px;margin-top:2px">taux de promotion vers inscrit·e</div></div>
+                <div class="flex ac jb"><div class="eyebrow">Fréquentation · par semaine</div><span class="meta" style="font-size:12px">séances training tenues · {{ $periodLabel }}</span></div>
+                @if (collect($weekly)->sum('sessions') > 0)
+                    <x-bar-chart :points="$weekPoints" legend="Participations" line-legend="Athlètes distincts"
+                                 label="Participations et athlètes distincts par semaine" style="margin-top:12px" />
+                    <details class="chart-detail">
+                        <summary>Détail par semaine</summary>
+                        <div style="overflow-x:auto">
+                            <table class="tbl">
+                                <thead><tr><th>Semaine du</th><th>Séances</th><th>Participations</th><th>Athlètes</th></tr></thead>
+                                <tbody>
+                                    @foreach (array_reverse($weekly) as $w)
+                                        <tr>
+                                            <td>{{ $w['start']->locale('fr')->isoFormat('ddd D MMM') }}@if ($w['partial']) <span class="muted">· en cours</span>@endif</td>
+                                            <td>{{ $w['sessions'] }}</td>
+                                            <td>{{ $w['participations'] }}</td>
+                                            <td>{{ $w['athletes'] }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                @else
+                    <div class="meta" style="font-size:13px;margin-top:12px">Aucune séance tenue sur la période.</div>
+                @endif
+            </div>
+
+            {{-- ═══ Top séances (remplacé par le tableau par créneau, #161) ═══ --}}
+            <div class="card card-pad">
+                <div class="eyebrow" style="margin-bottom:12px">Top séances · remplissage</div>
+                <div style="display:flex;flex-direction:column;gap:10px">
+                    @forelse ($topSessions as $i => $s)
+                        <div class="flex ac g8" style="font-size:13px">
+                            <span class="muted" style="width:14px">{{ $i + 1 }}</span>
+                            <span class="f1" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $s['title'] }}</span>
+                            <div class="qbar{{ $s['fill'] >= 100 ? ' full' : '' }}" style="max-width:80px"><i style="width:{{ min(100, $s['fill']) }}%"></i></div>
+                            <span class="num" style="font-size:13px;width:38px;text-align:right">{{ $s['fill'] }}%</span>
+                        </div>
+                    @empty
+                        <div class="meta" style="font-size:13px">Aucune séance à capacité sur la période.</div>
+                    @endforelse
+                </div>
+            </div>
+
+            {{-- ═══ Liste d'attente (§4.16.2, bloc 10 — ligne compacte) ═══ --}}
+            <div class="card card-pad flex ac jb wrap g8">
+                <div class="eyebrow">Liste d'attente</div>
+                <div style="font-size:14px">
+                    <b class="num">{{ $waitlist['total'] }}</b> en attente
+                    <span class="meta">({{ $waitlist['capacity'] }} capacité · {{ $waitlist['quota'] }} quota)</span>
+                    · <b class="num">{{ $waitlist['promotion_rate'] !== null ? $waitlist['promotion_rate'].'%' : '—' }}</b> promus
                 </div>
             </div>
 

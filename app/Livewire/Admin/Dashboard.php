@@ -87,7 +87,7 @@ class Dashboard extends Component
         return view('livewire.admin.dashboard', [
             'periodLabel' => $period['label'],
             'headline' => $stats->headline($f),
-            'monthly' => $stats->monthlyRegistrations($f),
+            'weekly' => $stats->weeklyAttendance($f),
             'topSessions' => $stats->topSessions($f),
             'waitlist' => $stats->waitlist($f),
             'coachActivity' => $stats->coachActivity($f),

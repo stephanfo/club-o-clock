@@ -64,12 +64,13 @@ class StatsService
         );
     }
 
-    // ── Bandeau KPI (§4.16.1) ──
+    // ── Chiffres clés (§4.16.2, bloc 3) ──
 
     /**
-     * 4 cartes d'en-tête : adhérents actifs, taux de remplissage, compétitions, overrides.
+     * Cartes d'en-tête : pratiquants / comptes, participations par semaine, remplissage, compétiteurs.
+     * `new_since_season` et `overrides` ne sont plus affichés (§4.16.2) mais restent dans l'export.
      *
-     * @return array{active:int,new_since_season:int,fill_rate:?int,competitions:int,overrides:int}
+     * @return array{active:int,practitioners:int,weekly_avg:?int,fill_rate:?int,fill_sessions:int,competitors:int,competitions:int,new_since_season:int,overrides:int}
      */
     public function headline(array $f): array
     {
@@ -77,7 +78,8 @@ class StatsService
 
         $active = $this->activeAthletesQuery($f);
 
-        // Remplissage : sur les séances training à capacité bornée de la fenêtre.
+        // Remplissage : sur les séances training à capacité bornée de la fenêtre. Leur nombre est rendu
+        // avec le taux : une discipline sans capacité (vélo) n'y entre pas, et l'écran le dit.
         $sessions = $this->trainingSessions($f)->whereNotNull('capacity')->where('capacity', '>', 0)
             ->withCount(['registrations as participating_count' => fn (Builder $q) => $q->where('status', 'participating')])
             ->get(['id', 'capacity']);
@@ -85,21 +87,46 @@ class StatsService
         $filled = $sessions->sum('participating_count');
         $fillRate = $capacity > 0 ? (int) round($filled / $capacity * 100) : null;
 
+        // Pratiquants : parmi les comptes athlètes actifs, ceux qui ont au moins une participation à
+        // une séance tenue. Le dénominateur est le même ensemble, donc le rapport ne dépasse pas 100 %.
+        $practitioners = (clone $active)->whereHas('registrations', fn (Builder $r) => $r
+            ->where('status', 'participating')
+            ->whereIn('session_id', $this->heldTrainingSessions($f)->select('sessions.id')))
+            ->count();
+
+        // Participations par semaine : moyenne sur les seules semaines où le club a proposé une séance —
+        // deux semaines de vacances ne doivent pas faire croire à une baisse de fréquentation.
+        $weeks = collect($this->weeklyAttendance($f))->where('sessions', '>', 0);
+        $weeklyAvg = $weeks->isNotEmpty() ? (int) round($weeks->sum('participations') / $weeks->count()) : null;
+
         // Filtre discipline volontairement absent : une compétition n'en porte jamais (§4.7), le
         // sélecteur global la ferait sinon toujours retomber à 0 dès qu'une discipline précise est
         // choisie. Seul le filtre catégorie — commun aux 3 kind — s'applique.
         $competitions = Session::query()->where('kind', 'competition')->whereNull('cancelled_at')
             ->whereBetween('start_at', [$f['from'], $f['to']])
-            ->when(! empty($f['category_id']), fn (Builder $q) => $q->whereHas('categories', fn (Builder $c) => $c->whereKey($f['category_id'])))
-            ->count();
+            ->when(! empty($f['category_id']), fn (Builder $q) => $q->whereHas('categories', fn (Builder $c) => $c->whereKey($f['category_id'])));
+
+        $competitors = Registration::query()->where('status', 'participating')
+            ->whereIn('session_id', (clone $competitions)->select('sessions.id'))
+            ->distinct()->count('user_id');
 
         return [
             'active' => (clone $active)->count(),
-            'new_since_season' => (clone $active)->where('created_at', '>=', $seasonStart)->count(),
+            'practitioners' => $practitioners,
+            'weekly_avg' => $weeklyAvg,
             'fill_rate' => $fillRate,
-            'competitions' => $competitions,
+            'fill_sessions' => $sessions->count(),
+            'competitors' => $competitors,
+            'competitions' => $competitions->count(),
+            'new_since_season' => (clone $active)->where('created_at', '>=', $seasonStart)->count(),
             'overrides' => $this->overridesQuery($f)->count(),
         ];
+    }
+
+    /** Séances training de la fenêtre déjà commencées : une séance future n'a pas encore « eu lieu ». */
+    private function heldTrainingSessions(array $f): Builder
+    {
+        return $this->trainingSessions($f)->where('start_at', '<=', Carbon::now());
     }
 
     /** Athlètes actifs : rôle athlete, non anonymisé, actif, accès non suspendu, filtre catégorie. */
@@ -123,37 +150,63 @@ class StatsService
                 ->whereHas('session', fn (Builder $s) => $this->applySessionFilters($s, $f)));
     }
 
-    // ── Évolution mensuelle des inscriptions (§4.16.1, PRD : « graphique d'inscriptions ») ──
+    // ── Fréquentation hebdomadaire (§4.16.2, bloc 4) ──
 
-    /** @return array<int,array{label:string,count:int}> barres par mois sur la fenêtre. */
-    public function monthlyRegistrations(array $f): array
+    /**
+     * Par semaine (lundi → dimanche, heure du club) : séances tenues, participations et athlètes
+     * distincts, à la DATE DE LA SÉANCE — une inscription prise en septembre pour octobre compte en
+     * octobre. Semaines sans séance présentes à zéro (vacances visibles) ; la semaine en cours est
+     * marquée partielle ; rien au-delà de maintenant.
+     *
+     * Le regroupement se fait en base : un CASE sur les bornes UTC de chaque semaine locale, ce qui
+     * reste exact aux changements d'heure sans dépendre des tables de fuseaux du SGBD.
+     *
+     * @return array<int,array{start:Carbon,sessions:int,participations:int,athletes:int,partial:bool}>
+     */
+    public function weeklyAttendance(array $f): array
     {
-        $rows = Registration::query()->where('status', 'participating')
-            ->whereBetween('created_at', [$f['from'], $f['to']])
-            ->whereHas('session', fn (Builder $s) => $this->applySessionFilters($s, $f))
-            ->get(['created_at']);
+        $tz = ClubSettings::current()->timezone;
+        $now = Carbon::now();
+        $end = $f['to']->lt($now) ? $f['to'] : $now;
 
-        // Squelette de tous les mois de la fenêtre (zéros inclus), du plus ancien au plus récent.
-        $buckets = [];
-        $cursor = $f['from']->copy()->startOfMonth();
-        $end = $f['to']->copy()->startOfMonth();
-        while ($cursor->lte($end)) {
-            $buckets[$cursor->format('Y-m')] = 0;
-            $cursor->addMonthNoOverflow();
-        }
-        foreach ($rows as $r) {
-            $key = $r->created_at->format('Y-m');
-            if (array_key_exists($key, $buckets)) {
-                $buckets[$key]++;
-            }
+        $starts = [];
+        $cursor = $f['from']->copy()->setTimezone($tz)->startOfWeek(Carbon::MONDAY);
+        $last = $end->copy()->setTimezone($tz)->startOfWeek(Carbon::MONDAY);
+        while ($cursor->lte($last)) {
+            $starts[] = $cursor->copy();
+            $cursor->addWeek();
         }
 
-        $labels = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
+        if ($starts === []) {
+            return [];
+        }
 
-        return collect($buckets)->map(fn ($count, $ym) => [
-            'label' => $labels[(int) substr($ym, 5, 2) - 1],
-            'count' => $count,
-        ])->values()->all();
+        // Bornes hautes UTC de chaque semaine : WHEN start_at < borne(i) THEN i.
+        $bounds = array_map(fn (Carbon $s) => $s->copy()->addWeek()->utc()->format('Y-m-d H:i:s'), $starts);
+        $case = 'CASE '.implode(' ', array_map(fn ($i) => "WHEN sessions.start_at < ? THEN $i", array_keys($bounds))).' END';
+
+        $held = $this->heldTrainingSessions($f);
+
+        $sessionsPerWeek = (clone $held)->toBase()
+            ->selectRaw("$case as w, COUNT(*) as n", $bounds)
+            ->groupBy('w')->pluck('n', 'w');
+
+        $attendance = Registration::query()->toBase()
+            ->join('sessions', 'sessions.id', '=', 'registrations.session_id')
+            ->where('registrations.status', 'participating')
+            ->whereIn('registrations.session_id', (clone $held)->select('sessions.id'))
+            ->selectRaw("$case as w, COUNT(*) as n, COUNT(DISTINCT registrations.user_id) as a", $bounds)
+            ->groupBy('w')->get()->keyBy('w');
+
+        $currentWeek = $now->copy()->setTimezone($tz)->startOfWeek(Carbon::MONDAY);
+
+        return array_map(fn (int $i) => [
+            'start' => $starts[$i],
+            'sessions' => (int) ($sessionsPerWeek[$i] ?? 0),
+            'participations' => (int) ($attendance[$i]->n ?? 0),
+            'athletes' => (int) ($attendance[$i]->a ?? 0),
+            'partial' => $starts[$i]->equalTo($currentWeek),
+        ], array_keys($starts));
     }
 
     // ── Top séances par remplissage (§4.16.1) ──
