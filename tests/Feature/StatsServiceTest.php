@@ -189,19 +189,128 @@ class StatsServiceTest extends TestCase
         $this->assertSame(1, $ca['future_without_coach']);
     }
 
-    public function test_monthly_registrations_bucketed_by_month(): void
+    // ── Fréquentation hebdomadaire (§4.16.2, bloc 4 — #160) ──
+
+    /** Ligne de la semaine (heure club) qui contient $day. */
+    private function weekOf(array $weekly, Carbon $day): array
     {
-        $s = $this->training($this->swim, null, Carbon::now()->subDays(3));
-        // 2 inscriptions en avril, 1 en juin.
-        $this->participate($s, User::factory()->create())->forceFill(['created_at' => Carbon::create(2026, 4, 10)])->save();
-        $this->participate($s, User::factory()->create())->forceFill(['created_at' => Carbon::create(2026, 4, 20)])->save();
-        $this->participate($s, User::factory()->create())->forceFill(['created_at' => Carbon::create(2026, 6, 5)])->save();
+        $monday = $day->copy()->startOfWeek(Carbon::MONDAY)->format('Y-m-d');
 
-        $monthly = collect($this->stats()->monthlyRegistrations($this->season()));
+        return collect($weekly)->first(fn ($w) => $w['start']->format('Y-m-d') === $monday);
+    }
 
-        $this->assertSame(2, $monthly->firstWhere('label', 'avr')['count']);
-        $this->assertSame(1, $monthly->firstWhere('label', 'juin')['count']);
-        $this->assertSame(0, $monthly->firstWhere('label', 'mai')['count']);
+    public function test_weekly_attendance_counts_at_session_date_not_registration_date(): void
+    {
+        // Inscription prise en septembre pour une séance de mars : elle compte en mars.
+        $s = $this->training($this->swim, null, Carbon::create(2026, 3, 11, 18));
+        $this->participate($s, User::factory()->create())->forceFill(['created_at' => Carbon::create(2025, 9, 10)])->save();
+
+        $weekly = $this->stats()->weeklyAttendance($this->season());
+
+        $this->assertSame(1, $this->weekOf($weekly, Carbon::create(2026, 3, 11))['participations']);
+        $this->assertSame(0, $this->weekOf($weekly, Carbon::create(2025, 9, 10))['participations']);
+    }
+
+    public function test_weekly_attendance_counts_participations_and_distinct_athletes(): void
+    {
+        [$a, $b] = User::factory()->count(2)->create();
+        $mardi = $this->training($this->swim, null, Carbon::create(2026, 3, 10, 18));
+        $jeudi = $this->training($this->bike, null, Carbon::create(2026, 3, 12, 18));
+        $this->participate($mardi, $a);
+        $this->participate($mardi, $b);
+        $this->participate($jeudi, $a);
+
+        $w = $this->weekOf($this->stats()->weeklyAttendance($this->season()), Carbon::create(2026, 3, 10));
+
+        $this->assertSame(2, $w['sessions']);
+        $this->assertSame(3, $w['participations']);
+        $this->assertSame(2, $w['athletes']); // a compté une fois
+    }
+
+    public function test_weekly_attendance_excludes_non_participations(): void
+    {
+        $day = Carbon::create(2026, 3, 11, 18);
+        $ok = $this->training($this->swim, null, $day);
+        $this->participate($ok, User::factory()->create()); // contrôle positif
+        $this->participate($ok, User::factory()->create(), 'waitlist', ['waitlist_reason' => 'capacity']);
+        $this->participate($ok, User::factory()->create(), 'cancelled');
+
+        $annulee = $this->training($this->swim, null, $day);
+        $annulee->forceFill(['cancelled_at' => Carbon::create(2026, 3, 1)])->save();
+        $this->participate($annulee, User::factory()->create());
+
+        $competition = Session::create(['kind' => 'competition', 'title' => 'Tri', 'start_at' => $day,
+            'duration_min' => 60, 'created_by' => User::factory()->coach()->create()->id]);
+        $this->participate($competition, User::factory()->create());
+
+        $w = $this->weekOf($this->stats()->weeklyAttendance($this->season()), $day);
+
+        $this->assertSame(1, $w['sessions']);
+        $this->assertSame(1, $w['participations']);
+    }
+
+    public function test_weekly_attendance_shows_empty_weeks_and_flags_the_current_one(): void
+    {
+        $this->participate($this->training($this->swim, null, Carbon::create(2026, 3, 11, 18)), User::factory()->create());
+        // Séance plus tard aujourd'hui (samedi 20 juin, 12 h) : pas encore tenue, donc hors comptes.
+        $this->participate($this->training($this->swim, null, Carbon::now()->addHours(3)), User::factory()->create());
+
+        $weekly = $this->stats()->weeklyAttendance($this->season());
+
+        // Vacances : la semaine existe, à zéro.
+        $vacances = $this->weekOf($weekly, Carbon::create(2026, 4, 15));
+        $this->assertSame(0, $vacances['sessions']);
+        $this->assertFalse($vacances['partial']);
+
+        // Dernière semaine = semaine en cours, partielle, sans la séance de cet après-midi.
+        $last = end($weekly);
+        $this->assertSame('2026-06-15', $last['start']->format('Y-m-d'));
+        $this->assertTrue($last['partial']);
+        $this->assertSame(0, $last['participations']);
+    }
+
+    public function test_weekly_attendance_follows_the_club_week_across_dst(): void
+    {
+        // Lundi 30 mars 2026, 0 h 30 à Paris (heure d'été depuis la veille) = dimanche 29, 22 h 30 UTC :
+        // la séance appartient à la semaine locale du 30 mars. Un regroupement par semaine UTC la
+        // rangerait dans celle du 23.
+        $s = $this->training($this->swim, null, Carbon::create(2026, 3, 30, 0, 30, 0, 'Europe/Paris')->utc());
+        $this->participate($s, User::factory()->create());
+
+        $weekly = $this->stats()->weeklyAttendance($this->season());
+
+        $this->assertSame(1, $this->weekOf($weekly, Carbon::create(2026, 3, 30))['participations']);
+        $this->assertSame(0, $this->weekOf($weekly, Carbon::create(2026, 3, 23))['participations']);
+    }
+
+    public function test_headline_practitioners_weekly_average_and_competitors(): void
+    {
+        [$a, $b] = User::factory()->count(2)->create();
+        User::factory()->create(); // compte athlète sans séance : au dénominateur seulement
+
+        // Deux semaines avec séances (3 puis 1 participations) et des semaines vides entre elles.
+        $s1 = $this->training($this->swim, null, Carbon::create(2026, 3, 10, 18));
+        $s2 = $this->training($this->swim, null, Carbon::create(2026, 3, 12, 18));
+        $s3 = $this->training($this->swim, null, Carbon::create(2026, 5, 12, 18));
+        $this->participate($s1, $a);
+        $this->participate($s1, $b);
+        $this->participate($s2, $a);
+        $this->participate($s3, $b);
+
+        // Deux compétitions, b inscrit aux deux : un seul compétiteur pour lui.
+        foreach (['Tri M', 'Tri L'] as $t) {
+            $c = Session::create(['kind' => 'competition', 'title' => $t, 'start_at' => Carbon::create(2026, 5, 3, 9),
+                'duration_min' => 120, 'created_by' => User::factory()->coach()->create()->id]);
+            $this->participate($c, $b);
+        }
+
+        $h = $this->stats()->headline($this->season());
+
+        $this->assertSame(3, $h['active']);
+        $this->assertSame(2, $h['practitioners']);
+        $this->assertSame(2, $h['weekly_avg']); // (3 + 1) / 2 semaines avec séances
+        $this->assertSame(1, $h['competitors']);
+        $this->assertSame(2, $h['competitions']);
     }
 
     public function test_session_outside_period_is_excluded(): void

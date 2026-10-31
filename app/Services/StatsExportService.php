@@ -51,15 +51,20 @@ class StatsExportService
             ['Période', $period['label']],
             ['Du', $this->frDate($period['from'])],
             ['Au', $this->frDate($period['to'])],
-            ['Adhérents actifs', $headline['active']],
+            ['Comptes athlètes actifs', $headline['active']],
+            ['Pratiquants (≥ 1 séance sur la période)', $headline['practitioners']],
             ['Nouveaux depuis le début de saison', $headline['new_since_season']],
+            ['Participations par semaine (moyenne)', $headline['weekly_avg'] ?? '—'],
             ['Taux de remplissage (%)', $headline['fill_rate'] ?? '—'],
+            ['Séances à capacité prises en compte', $headline['fill_sessions']],
             ['Compétitions', $headline['competitions']],
+            ['Compétiteurs distincts', $headline['competitors']],
             ['Overrides coach', $headline['overrides']],
         ]);
 
-        $this->addSheet($book, 'Inscriptions mensuelles', ['Mois', 'Inscriptions'],
-            array_map(fn ($r) => [$r['label'], $r['count']], $this->stats->monthlyRegistrations($f)));
+        $this->addSheet($book, 'Fréquentation hebdo', ['Semaine du', 'Séances', 'Participations', 'Athlètes distincts'],
+            array_map(fn ($r) => [$this->frDate($r['start']).($r['partial'] ? ' (en cours)' : ''), $r['sessions'], $r['participations'], $r['athletes']],
+                $this->stats->weeklyAttendance($f)));
 
         $this->addSheet($book, 'Top séances', ['Séance', 'Date', 'Remplissage (%)'],
             array_map(fn ($r) => [$r['title'], $this->frDate($r['date']), $r['fill']], $this->stats->topSessions($f, 20)));
