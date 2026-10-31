@@ -9,6 +9,51 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Ajouté
 
+- **Un trombinoscope et un annuaire du club, sur accord.** Chacun choisit, donnée par donnée, ce
+  qu'il partage : nom complet, photo, catégorie, anniversaire, email, téléphone. Sans accord, il
+  apparaît en prénom + initiale, comme dans les listes d'inscrits ; aucun accord n'est pré-coché.
+  Pour un enfant, c'est le parent garant qui accorde, et un mineur ne montre jamais de coordonnées.
+  L'écran filtre par bureau, coachs et catégorie, et propose une vue des anniversaires du mois ; la
+  fiche ouvre l'appel ou l'email en un geste. La photo, recadrée au dépôt et réduite par le
+  navigateur, est réencodée sans aucune métadonnée. Dans une liste d'inscrits, l'avatar et le nom
+  mènent à la fiche de la personne. L'admin indique la fonction au bureau (dont « Membre du
+  bureau »), modère une photo partagée et enregistre un accord recueilli sur papier, mais ne voit
+  jamais ce qui n'est pas partagé (#72).
+
+- **Les allures de course, calculées depuis la VMA.** Profil → Allures : VMA saisie ou estimée
+  depuis une course récente (seule la distance est gardée, jamais le temps), allure au pourcentage
+  choisi avec sa zone, tableau des allures par zone et projection des temps de course, par le modèle
+  de Riegel ou la table du club. L'admin règle les zones d'allure et la table des allures cibles par
+  niveau ; les consignes de séance reconnaissent les zones (« Z3 », « SV2 ») (#113, #114).
+
+- **Une vue « Courses » dans le planning.** Un 4ᵉ segment liste toutes les compétitions à venir,
+  sans limite de date, et celles de la saison passées, la plus récente en tête. Chaque ligne donne
+  l'épreuve, la distance, le lieu, les membres du club inscrits, le nombre de débriefs et l'album
+  (#106).
+
+- **L'ouverture des inscriptions d'une compétition est annoncée.** Un champ facultatif « Ouverture
+  des inscriptions » (date, heure si on la connaît) s'affiche sur la fiche et dans la vue Courses. La
+  catégorie ciblée reçoit une notification 15 min avant l'heure, ou à 9 h le jour même sans heure ;
+  elle se coupe dans les préférences (#105).
+
+- **Les derniers débriefs sur l'accueil.** Le bloc « Derniers débriefs » liste les compétitions
+  débriefées depuis moins de 15 jours, et les cartes du planning portent le nombre de débriefs
+  (#104).
+
+- **Un débrief publié est annoncé à tout le club.** Les membres qui ne participaient pas à la
+  compétition reçoivent « Débrief d'une autre compétition », actif par défaut et désactivable ; les
+  participants gardent leur notification habituelle, sans doublon.
+
+- **Le lien OpenRunner se remplit tout seul.** Un fichier GPX exporté d'OpenRunner préremplit le lien
+  public du parcours, sans jamais écraser une saisie. Sans carte intégrée, la fiche séance ne montre
+  plus de bascule entre tracé et carte : le bouton « Ouvrir sur OpenRunner » passe sous le
+  téléchargement du GPX (#138).
+
+- **L'administration de suivi se consulte au téléphone.** Dashboard, adhérents (liste et fiche),
+  journaux, envois et pages d'info ont une barre de titre mobile avec retour et action principale,
+  et leurs tableaux passent en cartes sous 768 px. Les réglages (paramètres, catalogues, allures,
+  modèles, import CSV, export XLSX) restent au bureau (#151, #152, #153).
+
 - **La bibliothèque de parcours se trie et se filtre par usage.** Nouveaux filtres « Utilisé » (ce
   mois-ci, 3 derniers mois, cette saison, période libre, jamais utilisé — seules les séances qui ont
   eu lieu comptent) et « Départ » (lieu de départ du parcours). Un sélecteur trie la liste par nom,
@@ -212,6 +257,31 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
 
 ### Modifié
 
+- **Le dashboard devient un tableau de pilotage.** En tête, les séances des 15 prochains jours sans
+  encadrant, puis les adhérents qui décrochent (absents au-delà d'un seuil réglable dans Paramètres,
+  21 jours par défaut, et jamais venus), visibles de l'admin seul et jamais exportés. Suivent les
+  chiffres clés, la fréquentation par semaine à la date de la séance (l'ancien graphique comptait les
+  inscriptions à leur date de création), la fréquentation de chaque créneau, les désinscriptions
+  tardives, les effectifs par catégorie, les compétitions, la liste d'attente, l'activité des coachs
+  avec la part des séances encadrées, et l'usage de l'app. L'export XLSX suit : une feuille par
+  tableau, sauf le décrochage. Un coach ouvre désormais l'écran « Pilotage », réduit aux séances à
+  encadrer, à la fréquentation, aux créneaux et à sa propre activité, sans export (#160 à #165).
+
+- **Au téléphone, l'onglet « Club » remplace « Profil ».** Il regroupe le profil, le trombinoscope,
+  les infos du club, les alertes et, selon le rôle, l'administration ou le pilotage (#150).
+
+- **Les compteurs de quota ne sont plus que sur l'accueil.** L'onglet Quotas du profil doublait le
+  bloc « Mes quotas » de l'accueil, qui suit aussi l'enfant choisi par un parent ; ce bloc reprend
+  les séances comptées par étiquette et l'alerte « Quota atteint ». Les onglets du profil tiennent
+  désormais sur un iPhone.
+
+- **« Mes prochaines séances » liste aussi les séances qu'on encadre**, et la carte de la vue Semaine
+  au bureau affiche « Tu encadres » (#123).
+
+- **Créer une séance ne propose plus de date ni de durée.** Elles valaient « demain 18:30 » et
+  60 min, et s'enregistraient sans alerte si on oubliait de les changer. Elles sont désormais
+  obligatoires, et un champ date ou heure vide s'affiche grisé.
+
 - **« Tout effacer » les alertes demande une vraie confirmation.** Le bouton se contentait d'une
   petite fenêtre du navigateur, celle qui convient à un geste anodin qu'on refait d'un clic. Or il
   vide toute la liste, y compris les alertes plus anciennes qu'elle n'affiche pas, et rien ne les
@@ -279,6 +349,19 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le p
   garde est **serveur** : un bouton grisé contourné ne déclenche rien.
 
 ### Corrigé
+
+- **Sur iPhone, la barre d'état se raccorde à nouveau à l'app.** Depuis iOS 26.1, un fondu clair
+  recouvrait le haut de la PWA installée, heure en noir. La barre d'état prend la couleur de l'en-tête,
+  écran de connexion compris, et Android comme la PWA de bureau suivent la même couleur. Sur iPad,
+  iPadOS floute le haut de la page, comme pour les apps natives : c'est assumé (#112).
+  ⚠️ Les membres sur iPhone doivent **réinstaller la PWA** pour en profiter.
+
+- **Toucher une notification ouvre bien l'onglet annoncé**, même quand la fiche était déjà ouverte
+  sur un autre onglet ; et un toucher refusé par le système ouvre une nouvelle fenêtre au lieu de ne
+  rien faire.
+
+- **Un nom long ne masque plus les onglets du profil.** Le titre de la barre du haut est tronqué au
+  lieu de passer sur deux lignes et de recouvrir les onglets.
 
 - **Une erreur de configuration du push ne désabonne plus tout le club.** Un refus de signature
   (401/403) du service push, qui peut venir d'une clé mal saisie côté serveur, supprimait les
