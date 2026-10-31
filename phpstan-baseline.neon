@@ -145,62 +145,14 @@ parameters:
 			path: app/Services/RegistrationService.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\Session\:\:\$participants\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/StatsService.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Session\:\:\$participating_count\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/StatsService.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$categories\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Services/StatsService.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$coaches\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/StatsService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$discipline_id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/StatsService.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Services/StatsService.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{title\: string, date\: Illuminate\\Support\\Carbon\|null, fill\: int\}, Closure\(App\\Models\\Session\)\: array\{title\: string, date\: Illuminate\\Support\\Carbon\|null, fill\: int\} given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/StatsService.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{title\: string, date\: Illuminate\\Support\\Carbon\|null, participants\: mixed\}, Closure\(App\\Models\\Session\)\: array\{title\: string, date\: Illuminate\\Support\\Carbon\|null, participants\: mixed\} given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/StatsService.php
-
-		-
 			message: '#^Parameter \#1 \$groupBy of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:groupBy\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: non\-falsy\-string\)\|list\<Closure\|string\>\|string, Closure\(App\\Models\\AuditLog\)\: non\-falsy\-string given\.$#'
 			identifier: argument.type
-			count: 1
-			path: app/Services/StatsService.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>label" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Services/StatsService.php
 

@@ -47,7 +47,11 @@ class StatsService
     }
 
     /**
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  Builder<TModel>  $q
      * @param  array{from:Carbon,to:Carbon,discipline_id?:?int,category_id?:?int}  $f
+     * @return Builder<TModel>
      */
     private function applySessionFilters(Builder $q, array $f): Builder
     {
@@ -56,7 +60,11 @@ class StatsService
             ->when(! empty($f['category_id']), fn (Builder $q) => $q->whereHas('categories', fn (Builder $c) => $c->whereKey($f['category_id'])));
     }
 
-    /** Séances training non annulées de la fenêtre, filtrées discipline/catégorie. */
+    /**
+     * Séances training non annulées de la fenêtre, filtrées discipline/catégorie.
+     *
+     * @return Builder<Session>
+     */
     private function trainingSessions(array $f): Builder
     {
         return $this->applySessionFilters(
@@ -125,7 +133,11 @@ class StatsService
         ];
     }
 
-    /** Séances training de la fenêtre déjà commencées : une séance future n'a pas encore « eu lieu ». */
+    /**
+     * Séances training de la fenêtre déjà commencées : une séance future n'a pas encore « eu lieu ».
+     *
+     * @return Builder<Session>
+     */
     private function heldTrainingSessions(array $f): Builder
     {
         return $this->trainingSessions($f)->where('start_at', '<=', Carbon::now());
@@ -256,7 +268,7 @@ class StatsService
                 $unstaffed = $group->filter(fn (Session $s) => $s->coaches_count === 0 && blank($s->external_staff_label))->count();
 
                 return [
-                    'label' => $template?->label ?? 'Séances ponctuelles',
+                    'label' => $template->label ?? 'Séances ponctuelles',
                     'day' => $template ? $days[$template->day_of_week] ?? null : null,
                     'time' => $template ? substr((string) $template->start_time_of_day, 0, 5) : null,
                     'discipline' => $first->discipline,
@@ -400,7 +412,7 @@ class StatsService
         $byCat = [];
         foreach ($members as $m) {
             $primary = $m->categories->firstWhere('pivot.is_primary', true);
-            $label = $primary?->label ?? 'Sans catégorie';
+            $label = $primary->label ?? 'Sans catégorie';
             $byCat[$label] = ($byCat[$label] ?? 0) + 1;
         }
         arsort($byCat);
@@ -418,7 +430,7 @@ class StatsService
         )
             ->withCount(['registrations as participants' => fn (Builder $q) => $q->where('status', 'participating')])
             ->orderBy('start_at')->get()
-            ->map(fn (Session $s) => ['title' => $s->title, 'date' => $s->start_at, 'participants' => $s->participants])
+            ->map(fn (Session $s) => ['title' => $s->title, 'date' => $s->start_at, 'participants' => (int) $s->getAttribute('participants')])
             ->all();
     }
 
