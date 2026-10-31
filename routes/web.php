@@ -27,6 +27,7 @@ use App\Livewire\Admin\TemplateForm;
 use App\Livewire\Admin\TemplateList;
 use App\Livewire\Alerts;
 use App\Livewire\ChildTrombi;
+use App\Livewire\Club;
 use App\Livewire\GpxRouteForm;
 use App\Livewire\GpxRouteLibrary;
 use App\Livewire\GpxRouteShow;
@@ -93,6 +94,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Écran d'accueil d'une activation d'invitation (§4.1.3) : choix de la méthode de connexion.
     // S'affiche une seule fois, sur le drapeau de session posé par InvitationActivationController.
     Route::get('/bienvenue', Activation::class)->name('activation');
+
+    // Hub mobile « Club » (#150) : dernier onglet de la barre du bas.
+    Route::get('/club', Club::class)->name('club');
 
     // Profil utilisateur — compte courant (J8.4, PRD §4.15.3/.4, §4.10, §4.1.1). Self only.
     Route::get('/profil', Profil::class)->name('profil');

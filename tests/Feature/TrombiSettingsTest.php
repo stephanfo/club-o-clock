@@ -30,7 +30,7 @@ class TrombiSettingsTest extends TestCase
         $u = User::factory()->create();
 
         $this->actingAs($u)->get(route('profil', ['tab' => 'trombi']))
-            ->assertOk()->assertSee('Ce que voient les adhérents')->assertSee('Trombinoscope du club');
+            ->assertOk()->assertSee('Ce que voient les adhérents');
     }
 
     public function test_accords_un_par_un_et_tout(): void

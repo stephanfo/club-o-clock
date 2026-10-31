@@ -25,28 +25,15 @@
 
     {{-- ─── MOBILE ─── --}}
     <div class="profil-mobile">
-        <x-topbar :title="$user->fullName()" :sub="$roleSub">
-            <x-slot:leading><x-avatar :name="$user->fullName()" tint="tint-run" /></x-slot:leading>
+        {{-- Le profil s'ouvre depuis le hub Club (#150) : le chevron y ramène. --}}
+        <x-topbar :title="$user->fullName()" :sub="$roleSub" :back="route('club')" back-label="Retour au club">
             <x-slot:trailing><x-alert-bell dark /></x-slot:trailing>
         </x-topbar>
         <x-tabs :items="$tabItems" :value="$tab" wire-set="tab" class="tabstrip-fit" />
         <div class="pa-scroll" style="padding:16px;background:var(--app-bg)">
             @include('livewire.profil._panel', ['coquille' => 'mobile'])
 
-            {{-- Accès mobile aux pages d'info (revue UX 2026-07-11) : sans ce lien, la page Infos
-                 n'est atteignable sur mobile que via une bannière épinglée sur l'Accueil. --}}
-            {{-- Accès mobile au trombinoscope (#72) : pas d'entrée dans la barre du bas. --}}
-            @if ($canTrombi)
-                <a href="{{ route('trombi') }}" wire:navigate class="btn btn-ghost btn-block" style="margin-top:14px">
-                    <x-icon name="users" :size="15" /> Trombinoscope du club
-                </a>
-            @endif
-            <a href="{{ route('infos') }}" wire:navigate class="btn btn-ghost btn-block" style="margin-top:{{ $canTrombi ? '6' : '14' }}px">
-                <x-icon name="info" :size="15" /> Infos du club
-            </a>
-            <a href="{{ route('legal') }}" class="btn btn-ghost btn-block" style="margin-top:6px">
-                <x-icon name="shield" :size="15" /> Mentions légales &amp; confidentialité
-            </a>
+            {{-- Trombinoscope, infos et mentions légales : dans le hub Club (#150). --}}
         </div>
     </div>
 

@@ -3,7 +3,7 @@
 <div class="form-screen">
     <x-flash-float />
 
-    {{-- Mobile : atteint depuis l'accueil ou le profil (pas d'entrée dans la barre du bas). --}}
+    {{-- Mobile : atteint depuis l'accueil ou le hub Club (pas d'entrée dans la barre du bas). --}}
     <x-topbar title="Trombinoscope" :sub="$total.' adhérent'.($total > 1 ? 's' : '')"
               :back="route('dashboard')" back-label="Retour">
         <x-slot:trailing><x-alert-bell dark /></x-slot:trailing>
