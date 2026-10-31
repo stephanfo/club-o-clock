@@ -109,12 +109,7 @@ class StatsService
         $weeks = collect($this->weeklyAttendance($f))->where('sessions', '>', 0);
         $weeklyAvg = $weeks->isNotEmpty() ? (int) round($weeks->sum('participations') / $weeks->count()) : null;
 
-        // Filtre discipline volontairement absent : une compétition n'en porte jamais (§4.7), le
-        // sélecteur global la ferait sinon toujours retomber à 0 dès qu'une discipline précise est
-        // choisie. Seul le filtre catégorie — commun aux 3 kind — s'applique.
-        $competitions = Session::query()->where('kind', 'competition')->whereNull('cancelled_at')
-            ->whereBetween('start_at', [$f['from'], $f['to']])
-            ->when(! empty($f['category_id']), fn (Builder $q) => $q->whereHas('categories', fn (Builder $c) => $c->whereKey($f['category_id'])));
+        $competitions = $this->competitionsQuery($f);
 
         $competitors = Registration::query()->where('status', 'participating')
             ->whereIn('session_id', (clone $competitions)->select('sessions.id'))
@@ -159,6 +154,8 @@ class StatsService
     /**
      * Inscriptions forcées par coach (§4.16.1) de la fenêtre, filtre discipline via la séance liée.
      * Couvre les deux mécanismes : override de quota (B) et promotion d'un waitlisté au-delà du quota (C).
+     *
+     * @return Builder<AuditLog>
      */
     private function overridesQuery(array $f): Builder
     {
@@ -539,29 +536,70 @@ class StatsService
         return ['threshold' => $threshold, 'absent' => $absent, 'never' => $never];
     }
 
-    /** @return array<int,array{title:string,date:Carbon,participants:int}> participants déclarés par course. */
+    // ── Compétitions (§4.16.2, bloc 9) ──
+
+    /**
+     * Compétitions non annulées de la fenêtre. Filtre discipline volontairement absent : une
+     * compétition n'en porte jamais (§4.7), le sélecteur global la ferait sinon toujours retomber
+     * à 0 dès qu'une discipline précise est choisie. Seul le filtre catégorie — commun aux 3 kind —
+     * s'applique.
+     *
+     * @return Builder<Session>
+     */
+    private function competitionsQuery(array $f): Builder
+    {
+        return Session::query()->where('kind', 'competition')->whereNull('cancelled_at')
+            ->whereBetween('start_at', [$f['from'], $f['to']])
+            ->when(! empty($f['category_id']), fn (Builder $q) => $q->whereHas('categories', fn (Builder $c) => $c->whereKey($f['category_id'])));
+    }
+
+    /** @return array<int,array{id:int,title:string,date:Carbon,participants:int}> participants déclarés par course. */
     public function competitionsPerCourse(array $f): array
     {
-        return $this->applySessionFilters(
-            Session::query()->where('kind', 'competition')->whereNull('cancelled_at')
-                ->whereBetween('start_at', [$f['from'], $f['to']]),
-            $f
-        )
+        return $this->competitionsQuery($f)
             ->withCount(['registrations as participants' => fn (Builder $q) => $q->where('status', 'participating')])
             ->orderBy('start_at')->get()
-            ->map(fn (Session $s) => ['title' => $s->title, 'date' => $s->start_at, 'participants' => (int) $s->getAttribute('participants')])
+            ->map(fn (Session $s) => ['id' => $s->id, 'title' => $s->title, 'date' => $s->start_at, 'participants' => (int) $s->getAttribute('participants')])
             ->all();
     }
 
-    /** @return array<int,array{motif:string,count:int}> overrides quota agrégés par motif. */
-    public function overridesPerMotif(array $f): array
-    {
-        $byMotif = $this->overridesQuery($f)->get(['motif'])
-            ->groupBy(fn (AuditLog $l) => $l->motif ?: '(sans motif)')
-            ->map->count();
+    // ── Usage de l'app (§4.16.2, bloc 12) ──
 
-        return collect($byMotif)->map(fn ($count, $motif) => ['motif' => $motif, 'count' => $count])
-            ->sortByDesc('count')->values()->all();
+    /** Fenêtre « connecté récemment » du bloc usage. */
+    public const USAGE_LOGIN_DAYS = 30;
+
+    /**
+     * Agrégats d'usage, état courant (ignore période et filtres) : de quoi juger si un canal peut
+     * être allégé. Base = comptes actifs non anonymisés, tous rôles confondus. Un abonnement push
+     * existant est un appareil actif : les abonnements morts sont purgés (#97).
+     *
+     * @return array{accounts:int,logged_in:int,push:int,calendar:int}
+     */
+    public function appUsage(): array
+    {
+        $accounts = User::query()->whereNull('anonymized_at')->where('is_active', true);
+
+        return [
+            'accounts' => (clone $accounts)->count(),
+            'logged_in' => (clone $accounts)->where('last_login_at', '>=', Carbon::now()->subDays(self::USAGE_LOGIN_DAYS))->count(),
+            'push' => (clone $accounts)->whereHas('pushSubscriptions')->count(),
+            'calendar' => (clone $accounts)->whereHas('calendarFeeds', fn (Builder $q) => $q->whereNull('revoked_at'))->count(),
+        ];
+    }
+
+    // ── Overrides (§4.16.4 — export seulement) ──
+
+    /** @return array<int,array{coach:string,motif:string,count:int}> overrides agrégés par coach et motif. */
+    public function overridesPerCoach(array $f): array
+    {
+        return $this->overridesQuery($f)->with('actor')->get(['actor_id', 'motif'])
+            ->groupBy(fn (AuditLog $l) => ($l->actor_id ?? 0).'|'.($l->motif ?: '(sans motif)'))
+            ->map(fn (Collection $group) => [
+                'coach' => $group->first()->actor?->fullName() ?? '(compte supprimé)',
+                'motif' => $group->first()->motif ?: '(sans motif)',
+                'count' => $group->count(),
+            ])
+            ->sortBy([['coach', 'asc'], ['count', 'desc']])->values()->all();
     }
 
     /** Catalogues pour les sélecteurs de filtres. @return array{disciplines:Collection,categories:Collection} */

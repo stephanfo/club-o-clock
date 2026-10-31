@@ -95,6 +95,8 @@ class Dashboard extends Component
             'slots' => $stats->slots($f),
             'unregistrations' => $stats->unregistrations($f),
             'members' => $stats->activeMembersByCategory($f),
+            'competitions' => $stats->competitionsPerCourse($f),
+            'usage' => $stats->appUsage(),
             'waitlist' => $stats->waitlist($f),
             'coachActivity' => $stats->coachActivity($f),
             'eligibleCount' => User::deletionEligible()->count(),

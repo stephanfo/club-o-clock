@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\ActivityLog;
 use App\Models\AuditLog;
+use App\Models\CalendarFeed;
 use App\Models\Category;
 use App\Models\ClubSettings;
 use App\Models\Discipline;
+use App\Models\PushSubscription;
 use App\Models\Registration;
 use App\Models\Session;
 use App\Models\SessionTemplate;
@@ -461,6 +463,96 @@ class StatsServiceTest extends TestCase
         $this->assertNull($this->stats()->headline($this->season())['fill_rate']); // aucune séance dans la fenêtre
     }
 
+    private function competition(string $title, Carbon $at): Session
+    {
+        return Session::create(['kind' => 'competition', 'title' => $title, 'start_at' => $at,
+            'duration_min' => 120, 'created_by' => User::factory()->coach()->create()->id]);
+    }
+
+    public function test_competitor_entered_in_two_races_is_counted_once(): void
+    {
+        $a = $this->competition('Duathlon', Carbon::now()->subDays(20));
+        $b = $this->competition('Triathlon S', Carbon::now()->subDays(5));
+        [$u1, $u2] = User::factory()->count(2)->create();
+        $this->participate($a, $u1);
+        $this->participate($b, $u1);
+        $this->participate($b, $u2);
+        $this->participate($b, User::factory()->create(), 'cancelled');
+
+        $list = $this->stats()->competitionsPerCourse($this->season());
+
+        $this->assertSame(['Duathlon', 'Triathlon S'], array_column($list, 'title'));
+        $this->assertSame([1, 2], array_column($list, 'participants'));
+        $this->assertSame(2, $this->stats()->headline($this->season())['competitors']); // 3 inscriptions, 2 personnes
+    }
+
+    /** La liste suit le filtre catégorie, pas le filtre discipline (une compétition n'en a pas). */
+    public function test_competition_list_follows_category_filter_but_not_discipline(): void
+    {
+        $cat = Category::create(['label' => 'Jeunes', 'age_min' => 10, 'age_max' => 17, 'sort_order' => 1]);
+        $this->competition('Toutes catégories', Carbon::now()->subDays(5));
+        $this->competition('Jeunes', Carbon::now()->subDays(4))->categories()->attach($cat->id);
+        $this->competition('Annulée', Carbon::now()->subDays(3))->forceFill(['cancelled_at' => Carbon::now()])->save();
+
+        $season = $this->season();
+        $byDiscipline = $this->stats()->competitionsPerCourse([...$season, 'discipline_id' => $this->swim->id, 'category_id' => null]);
+        $byCategory = $this->stats()->competitionsPerCourse([...$season, 'discipline_id' => null, 'category_id' => $cat->id]);
+
+        $this->assertSame(['Toutes catégories', 'Jeunes'], array_column($byDiscipline, 'title'));
+        $this->assertSame(['Jeunes'], array_column($byCategory, 'title'));
+    }
+
+    public function test_app_usage_counts_active_accounts_per_channel(): void
+    {
+        $recent = User::factory()->create(['last_login_at' => Carbon::now()->subDays(29)]);
+        User::factory()->create(['last_login_at' => Carbon::now()->subDays(31)]);
+        $gone = User::factory()->create(['is_active' => false, 'last_login_at' => Carbon::now()]); // hors base
+
+        foreach ([$recent, $recent, $gone] as $i => $u) { // deux appareils pour $recent : un seul compte
+            PushSubscription::create(['user_id' => $u->id, 'endpoint' => "https://push.test/$i",
+                'endpoint_hash' => PushSubscription::hashFor("https://push.test/$i"), 'p256dh' => 'k', 'auth' => 'a']);
+        }
+        CalendarFeed::create(['user_id' => $recent->id, 'token' => str_repeat('a', 64)]);
+        CalendarFeed::create(['user_id' => User::factory()->create()->id, 'token' => str_repeat('b', 64)])
+            ->forceFill(['revoked_at' => Carbon::now()])->save();
+
+        $this->assertSame(['accounts' => 3, 'logged_in' => 1, 'push' => 1, 'calendar' => 1], $this->stats()->appUsage());
+    }
+
+    public function test_overrides_are_aggregated_per_coach_and_motif(): void
+    {
+        $alice = User::factory()->coach()->create(['first_name' => 'Alice', 'last_name' => 'Coach']);
+        $bruno = User::factory()->coach()->create(['first_name' => 'Bruno', 'last_name' => 'Coach']);
+        $s = $this->training($this->swim, 5, Carbon::now()->subDays(3));
+        foreach ([[$alice, 'Stage'], [$alice, 'Stage'], [$alice, null], [$bruno, 'Stage']] as [$coach, $motif]) {
+            AuditLog::create(['action' => 'override_quota', 'actor_id' => $coach->id, 'session_id' => $s->id,
+                'motif' => $motif, 'created_at' => Carbon::now()->subDay()]);
+        }
+
+        $this->assertSame([
+            ['coach' => 'Alice Coach', 'motif' => 'Stage', 'count' => 2],
+            ['coach' => 'Alice Coach', 'motif' => '(sans motif)', 'count' => 1],
+            ['coach' => 'Bruno Coach', 'motif' => 'Stage', 'count' => 1],
+        ], $this->stats()->overridesPerCoach($this->season()));
+    }
+
+    /** §4.16.2 bloc 5 : la liste nominative du décrochage ne circule pas en fichier. */
+    public function test_export_leaves_out_dropout_names_but_has_screen_tables(): void
+    {
+        User::factory()->create(['first_name' => 'Zoé', 'last_name' => 'Décrochée']); // jamais venue
+        $this->assertContains('Zoé Décrochée', $this->stats()->dropouts($this->season())['never']->map->fullName()->all());
+        $this->competition('Duathlon', Carbon::now()->subDays(5));
+
+        $book = app(StatsExportService::class)->build($this->season(), $this->stats()->resolvePeriod('season'));
+
+        $cells = collect($book->getAllSheets())->flatMap(fn ($sheet) => collect($sheet->toArray())->flatten())->filter()->implode(' | ');
+        $this->assertNotNull($book->getSheetByName('Créneaux'));
+        $this->assertStringNotContainsString('Décrochée', $cells);
+        $this->assertNull($book->getSheetByName('Décrochage'));
+        $this->assertSame('Compétiteurs distincts', $book->getSheetByName('Compétitions')->getCell('A3')->getValue());
+        $this->assertSame('Comptes actifs', $book->getSheetByName('Usage de l\'app')->getCell('A2')->getValue());
+    }
+
     public function test_overrides_count_both_forcing_mechanisms(): void
     {
         $coach = User::factory()->coach()->create();
@@ -481,7 +573,7 @@ class StatsServiceTest extends TestCase
 
         $period = $this->stats()->resolvePeriod('season');
         $book = app(StatsExportService::class)->build($this->season(), $period);
-        $cell = $book->getSheetByName('Overrides')->getCell('A2');
+        $cell = $book->getSheetByName('Overrides')->getCell('B2'); // colonne motif
 
         $this->assertSame('=SUM(99)', $cell->getValue()); // valeur littérale préservée
         $this->assertSame(DataType::TYPE_STRING, $cell->getDataType()); // stockée en texte, pas formule

@@ -353,6 +353,16 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Abonnements agenda (#39), révoqués compris : filtrer sur `revoked_at`.
+     *
+     * @return HasMany<CalendarFeed, $this>
+     */
+    public function calendarFeeds(): HasMany
+    {
+        return $this->hasMany(CalendarFeed::class);
+    }
+
+    /**
      * Valeurs de référence d'allure (#114) — visibles du seul membre.
      *
      * @return HasMany<ReferenceValue, $this>

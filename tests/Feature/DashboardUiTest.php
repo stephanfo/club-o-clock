@@ -141,6 +141,31 @@ class DashboardUiTest extends TestCase
             ->assertSee('Effectifs · par catégorie');
     }
 
+    public function test_shows_competitions_usage_and_journal_link(): void
+    {
+        $race = Session::create(['kind' => 'competition', 'title' => 'Duathlon de la Plage',
+            'start_at' => Carbon::now()->subDays(4), 'duration_min' => 120, 'created_by' => User::factory()->coach()->create()->id]);
+        Registration::create(['session_id' => $race->id, 'user_id' => User::factory()->create()->id,
+            'status' => 'participating', 'registered_at' => Carbon::now()->subDays(9)]);
+
+        Livewire::actingAs(User::factory()->admin()->create(['last_login_at' => Carbon::now()]))
+            ->test(Dashboard::class)
+            ->assertSee('Duathlon de la Plage')
+            ->assertSee('1</b> compétiteur distinct', false)
+            ->assertSee(route('sessions.show', $race), false)
+            ->assertSee("Usage de l'app", false)
+            ->assertSee('Connectés dans les 30 derniers jours')
+            ->assertSee(route('admin.journal'), false)
+            ->assertDontSee('Aucune compétition sur la période.');
+    }
+
+    public function test_competitions_say_so_when_empty(): void
+    {
+        Livewire::actingAs(User::factory()->admin()->create())
+            ->test(Dashboard::class)
+            ->assertSee('Aucune compétition sur la période.');
+    }
+
     public function test_non_admin_is_forbidden(): void
     {
         Livewire::actingAs(User::factory()->create()) // athlète simple
