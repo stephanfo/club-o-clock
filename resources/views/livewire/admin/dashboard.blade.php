@@ -117,21 +117,60 @@
                 @endif
             </div>
 
-            {{-- ═══ Top séances (remplacé par le tableau par créneau, #161) ═══ --}}
+            {{-- ═══ Créneaux (§4.16.2, bloc 6) — une ligne par modèle, ponctuelles par discipline ═══ --}}
             <div class="card card-pad">
-                <div class="eyebrow" style="margin-bottom:12px">Top séances · remplissage</div>
-                <div style="display:flex;flex-direction:column;gap:10px">
-                    @forelse ($topSessions as $i => $s)
-                        <div class="flex ac g8" style="font-size:13px">
-                            <span class="muted" style="width:14px">{{ $i + 1 }}</span>
-                            <span class="f1" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $s['title'] }}</span>
-                            <div class="qbar{{ $s['fill'] >= 100 ? ' full' : '' }}" style="max-width:80px"><i style="width:{{ min(100, $s['fill']) }}%"></i></div>
-                            <span class="num" style="font-size:13px;width:38px;text-align:right">{{ $s['fill'] }}%</span>
-                        </div>
-                    @empty
-                        <div class="meta" style="font-size:13px">Aucune séance à capacité sur la période.</div>
-                    @endforelse
-                </div>
+                <div class="flex ac jb wrap g8"><div class="eyebrow">Créneaux · fréquentation</div><span class="meta" style="font-size:12px">séances tenues · {{ $periodLabel }}</span></div>
+                @if (count($slots))
+                    <div style="overflow-x:auto;margin-top:6px">
+                        <table class="tbl tbl-cartes">
+                            <thead><tr><th>Créneau</th><th class="r">Séances</th><th class="r">Inscrits moy.</th><th class="r">Remplissage</th><th class="r">Sans encadrement</th></tr></thead>
+                            <tbody>
+                                @foreach ($slots as $c)
+                                    <tr>
+                                        <td class="tbl-m-titre tbl-m-ligne">
+                                            <div style="font-weight:700">{{ $c['label'] }}</div>
+                                            <div class="meta flex ac wrap" style="font-size:11px;gap:2px 6px">
+                                                @if ($c['day'])<span>{{ ucfirst($c['day']) }} · {{ $c['time'] }}</span>@endif
+                                                @if ($c['discipline'])<span style="white-space:nowrap"><span class="dot dot-{{ $c['discipline']->colorClass() }}"></span> {{ $c['discipline']->label }}</span>@endif
+                                            </div>
+                                        </td>
+                                        <td class="r num" data-label="Séances">{{ $c['sessions'] }}</td>
+                                        <td class="r num" data-label="Moyenne"><b>{{ number_format($c['avg'], 1, ',', '') }}</b> <span class="meta" style="font-size:11px">({{ $c['min'] }}–{{ $c['max'] }})</span></td>
+                                        <td class="r num" data-label="Remplissage">{{ $c['fill'] !== null ? $c['fill'].' %' : '—' }}</td>
+                                        <td class="r num" data-label="Sans encadrement" @if ($c['unstaffed'] > 0) style="color:var(--warning-text)" @endif>{{ $c['unstaffed'] }} %</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="meta" style="font-size:13px;margin-top:12px">Aucune séance tenue sur la période.</div>
+                @endif
+            </div>
+
+            {{-- ═══ Désinscriptions (§4.16.2, bloc 7) — horodatées par le journal d'activité ═══ --}}
+            <div class="card card-pad">
+                <div class="flex ac jb wrap g8"><div class="eyebrow">Désinscriptions</div><span class="meta" style="font-size:12px">séances non annulées · {{ $periodLabel }}</span></div>
+                @if ($unregistrations['total'] > 0)
+                    <div style="font-size:14px;margin-top:10px">
+                        <b class="num">{{ $unregistrations['total'] }}</b> désinscription{{ $unregistrations['total'] > 1 ? 's' : '' }}
+                        · <b class="num">{{ $unregistrations['late_pct'] }} %</b> moins de 24 h avant le début
+                    </div>
+                    <table class="tbl" style="margin-top:6px">
+                        <thead><tr><th>Discipline</th><th class="r">Total</th><th class="r">&lt; 24 h</th></tr></thead>
+                        <tbody>
+                            @foreach ($unregistrations['rows'] as $r)
+                                <tr>
+                                    <td>@if ($r['discipline'])<span class="dot dot-{{ $r['discipline']->colorClass() }}"></span> {{ $r['discipline']->label }}@else<span class="meta">—</span>@endif</td>
+                                    <td class="r num">{{ $r['total'] }}</td>
+                                    <td class="r num">{{ $r['late'] }} <span class="meta">({{ $r['late_pct'] }} %)</span></td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @else
+                    <div class="meta" style="font-size:13px;margin-top:12px">Aucune désinscription sur la période.</div>
+                @endif
             </div>
 
             {{-- ═══ Liste d'attente (§4.16.2, bloc 10 — ligne compacte) ═══ --}}

@@ -2,12 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\ActivityLog;
 use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\ClubSettings;
 use App\Models\Discipline;
 use App\Models\Registration;
 use App\Models\Session;
+use App\Models\SessionTemplate;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -45,7 +47,11 @@ class StatsService
     }
 
     /**
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  Builder<TModel>  $q
      * @param  array{from:Carbon,to:Carbon,discipline_id?:?int,category_id?:?int}  $f
+     * @return Builder<TModel>
      */
     private function applySessionFilters(Builder $q, array $f): Builder
     {
@@ -54,7 +60,11 @@ class StatsService
             ->when(! empty($f['category_id']), fn (Builder $q) => $q->whereHas('categories', fn (Builder $c) => $c->whereKey($f['category_id'])));
     }
 
-    /** Séances training non annulées de la fenêtre, filtrées discipline/catégorie. */
+    /**
+     * Séances training non annulées de la fenêtre, filtrées discipline/catégorie.
+     *
+     * @return Builder<Session>
+     */
     private function trainingSessions(array $f): Builder
     {
         return $this->applySessionFilters(
@@ -123,7 +133,11 @@ class StatsService
         ];
     }
 
-    /** Séances training de la fenêtre déjà commencées : une séance future n'a pas encore « eu lieu ». */
+    /**
+     * Séances training de la fenêtre déjà commencées : une séance future n'a pas encore « eu lieu ».
+     *
+     * @return Builder<Session>
+     */
     private function heldTrainingSessions(array $f): Builder
     {
         return $this->trainingSessions($f)->where('start_at', '<=', Carbon::now());
@@ -209,20 +223,111 @@ class StatsService
         ], array_keys($starts));
     }
 
-    // ── Top séances par remplissage (§4.16.1) ──
+    // ── Créneaux (§4.16.2, bloc 6) ──
 
-    /** @return array<int,array{title:string,date:Carbon,fill:int}> */
-    public function topSessions(array $f, int $limit = 4): array
+    /**
+     * Une ligne par modèle de séance (§4.8) ayant produit des séances tenues sur la période, archivés
+     * compris : un créneau supprimé en cours de saison a quand même eu lieu. Les séances hors modèle
+     * sont regroupées par discipline en « ponctuelles ». Triées par moyenne d'inscrits décroissante,
+     * pour que les créneaux qui ne prennent pas tombent en bas.
+     *
+     * @return array<int,array{label:string,day:?string,time:?string,discipline:?Discipline,sessions:int,avg:float,min:int,max:int,fill:?int,unstaffed:int}>
+     */
+    public function slots(array $f): array
     {
-        return $this->trainingSessions($f)->whereNotNull('capacity')->where('capacity', '>', 0)
-            ->withCount(['registrations as participating_count' => fn (Builder $q) => $q->where('status', 'participating')])
-            ->get()
-            ->map(fn (Session $s) => [
-                'title' => $s->title,
-                'date' => $s->start_at,
-                'fill' => (int) round($s->participating_count / $s->capacity * 100),
+        $sessions = $this->heldTrainingSessions($f)
+            ->with('discipline')
+            ->withCount([
+                'registrations as participating_count' => fn (Builder $q) => $q->where('status', 'participating'),
+                'coaches',
             ])
-            ->sortByDesc('fill')->take($limit)->values()->all();
+            ->get(['id', 'source_template_id', 'discipline_id', 'capacity', 'external_staff_label']);
+
+        $templates = SessionTemplate::query()
+            ->whereIn('id', $sessions->pluck('source_template_id')->filter()->unique())
+            ->get(['id', 'label', 'day_of_week', 'start_time_of_day'])->keyBy('id');
+
+        $days = [1 => 'lundi', 2 => 'mardi', 3 => 'mercredi', 4 => 'jeudi', 5 => 'vendredi', 6 => 'samedi', 7 => 'dimanche'];
+
+        return $sessions
+            // Un id de modèle disparu (modèle supprimé, FK mise à null ou orpheline) retombe en ponctuelle.
+            ->groupBy(fn (Session $s) => $templates->has($s->source_template_id)
+                ? 'm'.$s->source_template_id
+                : 'p'.$s->discipline_id)
+            ->map(function (Collection $group) use ($templates, $days) {
+                $first = $group->first();
+                $template = $templates->get($first->source_template_id);
+                $counts = $group->pluck('participating_count');
+
+                // Remplissage : sur les seules séances à capacité du créneau — null si aucune, pour
+                // afficher « — » et non un 0 % qui ferait croire à un créneau vide.
+                $bounded = $group->filter(fn (Session $s) => $s->capacity > 0);
+                $capacity = $bounded->sum('capacity');
+
+                // Sans encadrement : ni coach inscrit ni intervenant extérieur (#38).
+                $unstaffed = $group->filter(fn (Session $s) => $s->coaches_count === 0 && blank($s->external_staff_label))->count();
+
+                return [
+                    'label' => $template->label ?? 'Séances ponctuelles',
+                    'day' => $template ? $days[$template->day_of_week] ?? null : null,
+                    'time' => $template ? substr((string) $template->start_time_of_day, 0, 5) : null,
+                    'discipline' => $first->discipline,
+                    'sessions' => $group->count(),
+                    'avg' => round($counts->avg(), 1),
+                    'min' => (int) $counts->min(),
+                    'max' => (int) $counts->max(),
+                    'fill' => $capacity > 0 ? (int) round($bounded->sum('participating_count') / $capacity * 100) : null,
+                    'unstaffed' => (int) round($unstaffed / $group->count() * 100),
+                ];
+            })
+            ->sortByDesc('avg')->values()->all();
+    }
+
+    // ── Désinscriptions (§4.16.2, bloc 7) ──
+
+    /** Une désinscription est « tardive » quand elle intervient moins de tant d'heures avant le début. */
+    public const LATE_UNREGISTRATION_HOURS = 24;
+
+    /**
+     * Par discipline : désinscriptions sur les séances training non annulées de la période, et celles
+     * faites trop tard pour que la place soit reprise. L'horodatage vient du journal d'activité
+     * (§4.18) : `registrations.updated_at` bouge à chaque changement de la ligne, une désinscription
+     * suivie d'une réinscription l'effacerait. Une séance annulée sort du calcul : ses inscrits n'ont
+     * pas choisi de se retirer.
+     *
+     * @return array{rows:array<int,array{discipline:?Discipline,total:int,late:int,late_pct:int}>,total:int,late:int,late_pct:?int}
+     */
+    public function unregistrations(array $f): array
+    {
+        $logs = ActivityLog::query()
+            ->join('sessions', 'sessions.id', '=', 'activity_logs.session_id')
+            ->whereIn('activity_logs.action', ['desinscription', 'desinscription_for_other'])
+            ->whereIn('activity_logs.session_id', $this->trainingSessions($f)->select('sessions.id'))
+            ->get(['activity_logs.created_at', 'sessions.start_at', 'sessions.discipline_id']);
+
+        $late = fn ($l) => Carbon::parse($l->created_at)->greaterThan(Carbon::parse($l->start_at)->subHours(self::LATE_UNREGISTRATION_HOURS));
+        $disciplines = Discipline::query()->whereIn('id', $logs->pluck('discipline_id')->filter()->unique())->get()->keyBy('id');
+
+        $rows = $logs->groupBy('discipline_id')->map(function (Collection $group, $id) use ($late, $disciplines) {
+            $n = $group->filter($late)->count();
+
+            return [
+                'discipline' => $disciplines->get($id),
+                'total' => $group->count(),
+                'late' => $n,
+                'late_pct' => (int) round($n / $group->count() * 100),
+            ];
+        })->sortByDesc('total')->values()->all();
+
+        $total = $logs->count();
+        $lateTotal = $logs->filter($late)->count();
+
+        return [
+            'rows' => $rows,
+            'total' => $total,
+            'late' => $lateTotal,
+            'late_pct' => $total > 0 ? (int) round($lateTotal / $total * 100) : null,
+        ];
     }
 
     // ── Liste d'attente (§4.16.1) ──
@@ -307,7 +412,7 @@ class StatsService
         $byCat = [];
         foreach ($members as $m) {
             $primary = $m->categories->firstWhere('pivot.is_primary', true);
-            $label = $primary?->label ?? 'Sans catégorie';
+            $label = $primary->label ?? 'Sans catégorie';
             $byCat[$label] = ($byCat[$label] ?? 0) + 1;
         }
         arsort($byCat);
@@ -325,7 +430,7 @@ class StatsService
         )
             ->withCount(['registrations as participants' => fn (Builder $q) => $q->where('status', 'participating')])
             ->orderBy('start_at')->get()
-            ->map(fn (Session $s) => ['title' => $s->title, 'date' => $s->start_at, 'participants' => $s->participants])
+            ->map(fn (Session $s) => ['title' => $s->title, 'date' => $s->start_at, 'participants' => (int) $s->getAttribute('participants')])
             ->all();
     }
 

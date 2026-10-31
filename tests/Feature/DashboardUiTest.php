@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\Admin\Dashboard;
+use App\Models\ActivityLog;
 use App\Models\Discipline;
 use App\Models\Registration;
 use App\Models\Session;
@@ -58,6 +59,34 @@ class DashboardUiTest extends TestCase
             ->assertSee('compétiteurs')
             ->assertDontSee('overrides coach')
             ->assertDontSee('Évolution des inscriptions');
+    }
+
+    public function test_shows_slots_and_unregistrations_instead_of_top_sessions(): void
+    {
+        $session = Session::create([
+            'kind' => 'training', 'title' => 'Natation', 'discipline_id' => Discipline::first()->id,
+            'start_at' => Carbon::now()->subDays(3), 'duration_min' => 60, 'created_by' => User::factory()->coach()->create()->id,
+        ]);
+        Registration::create(['session_id' => $session->id, 'user_id' => User::factory()->create()->id,
+            'status' => 'participating', 'registered_at' => Carbon::now()->subDays(5)]);
+        ActivityLog::create(['action' => 'desinscription', 'session_id' => $session->id, 'created_at' => Carbon::now()->subDays(3)->subHours(2)]);
+
+        Livewire::actingAs(User::factory()->admin()->create())
+            ->test(Dashboard::class)
+            ->assertSee('Créneaux · fréquentation')
+            ->assertSee('Séances ponctuelles')
+            ->assertSee('class="tbl tbl-cartes"', false)
+            ->assertSee('moins de 24 h avant le début')
+            ->assertDontSee('Top séances');
+    }
+
+    public function test_slots_and_unregistrations_say_so_when_empty(): void
+    {
+        Livewire::actingAs(User::factory()->admin()->create())
+            ->test(Dashboard::class)
+            ->assertSee('Créneaux · fréquentation')
+            ->assertSee('Aucune désinscription sur la période.')
+            ->assertDontSee('Séances ponctuelles');
     }
 
     public function test_weekly_block_says_so_when_nothing_was_held(): void

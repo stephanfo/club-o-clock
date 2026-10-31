@@ -66,8 +66,14 @@ class StatsExportService
             array_map(fn ($r) => [$this->frDate($r['start']).($r['partial'] ? ' (en cours)' : ''), $r['sessions'], $r['participations'], $r['athletes']],
                 $this->stats->weeklyAttendance($f)));
 
-        $this->addSheet($book, 'Top séances', ['Séance', 'Date', 'Remplissage (%)'],
-            array_map(fn ($r) => [$r['title'], $this->frDate($r['date']), $r['fill']], $this->stats->topSessions($f, 20)));
+        $this->addSheet($book, 'Créneaux', ['Créneau', 'Jour', 'Heure', 'Discipline', 'Séances tenues', 'Inscrits (moyenne)', 'Min', 'Max', 'Remplissage (%)', 'Sans encadrement (%)'],
+            array_map(fn ($r) => [$r['label'], $r['day'] ?? '—', $r['time'] ?? '—', $r['discipline']->label ?? '—', $r['sessions'], $r['avg'], $r['min'], $r['max'], $r['fill'] ?? '—', $r['unstaffed']],
+                $this->stats->slots($f)));
+
+        $u = $this->stats->unregistrations($f);
+        $this->addSheet($book, 'Désinscriptions', ['Discipline', 'Désinscriptions', 'Moins de 24 h avant', 'Part tardive (%)'],
+            [...array_map(fn ($r) => [$r['discipline']->label ?? '—', $r['total'], $r['late'], $r['late_pct']], $u['rows']),
+                ['Total', $u['total'], $u['late'], $u['late_pct'] ?? '—']]);
 
         $w = $this->stats->waitlist($f);
         $this->addSheet($book, 'Liste d\'attente', ['Indicateur', 'Valeur'], [
