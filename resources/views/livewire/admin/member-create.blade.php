@@ -11,8 +11,7 @@
          flash('status') = succès (vert) · flash('warn') = refus (orange). --}}
     <x-flash-float />
     {{-- ─── Topbar ─── --}}
-    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. Actions de terrain seulement,
-         l'export XLSX et l'import CSV restent au bureau. --}}
+    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. --}}
     <x-topbar title="Ajouter un adhérent" :back="route('admin.members')" back-label="Retour aux adhérents">
         <x-slot:trailing>
             <button type="button" wire:click="create" class="iconbtn" aria-label="Créer l'adhérent" @disabled(! $this->ready) wire:loading.attr="disabled" wire:target="create"><x-icon name="user-plus" /></button>

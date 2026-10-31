@@ -285,6 +285,25 @@ class User extends Authenticatable implements MustVerifyEmail
         return trim("{$this->first_name} {$this->last_name}");
     }
 
+    /** Rôles cumulés en libellés français (« Athlète », « Coach », « Admin »). */
+    public function roleLabels(): array
+    {
+        $labels = ['athlete' => 'Athlète', 'coach' => 'Coach', 'admin' => 'Admin'];
+
+        return array_map(fn ($r) => $labels[$r] ?? ucfirst($r), $this->roles ?? []);
+    }
+
+    /** Sous-titre « Athlète · Coach · Senior » : rôles puis catégorie principale (hub Club, profil). */
+    public function roleSummary(): string
+    {
+        $parts = $this->roleLabels();
+        if ($cat = $this->primaryCategory()) {
+            $parts[] = $cat->label;
+        }
+
+        return implode(' · ', $parts);
+    }
+
     /**
      * Email de réinitialisation en français (§ « Langue du projet »). La notification par défaut de
      * Laravel est intégralement anglaise et ses chaînes sont à clé JSON, hors de portée de `lang/fr/`.

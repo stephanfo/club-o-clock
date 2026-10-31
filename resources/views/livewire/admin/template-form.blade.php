@@ -16,11 +16,10 @@
          flash('status') = succès (vert) · flash('warn') = refus (orange). --}}
     <x-flash-float />
     {{-- ─── Topbar (porté de AdminModeleCreate dk-topbar) ─── --}}
-    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. Actions de terrain seulement,
-         l'export XLSX et l'import CSV restent au bureau. --}}
+    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. --}}
     <x-topbar :title="$edit ? 'Éditer le modèle' : 'Nouveau modèle'" :back="route('admin.templates')" back-label="Retour aux modèles">
         <x-slot:trailing>
-            <button type="submit" form="template-form" class="iconbtn" aria-label="{{ $edit ? 'Enregistrer le modèle' : 'Générer & enregistrer' }}"><x-icon name="check" /></button>
+            <button type="submit" form="template-form" wire:loading.attr="disabled" wire:target="save" class="iconbtn" aria-label="{{ $edit ? 'Enregistrer le modèle' : 'Générer & enregistrer' }}"><x-icon name="check" /></button>
         </x-slot:trailing>
     </x-topbar>
     <div class="dk-topbar">

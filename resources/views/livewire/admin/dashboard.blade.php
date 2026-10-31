@@ -5,8 +5,7 @@
          flash('status') = succès (vert) · flash('warn') = refus (orange). --}}
     <x-flash-float />
     {{-- ─── Topbar ─── --}}
-    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. Actions de terrain seulement,
-         l'export XLSX et l'import CSV restent au bureau. --}}
+    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. L'export XLSX reste au bureau. --}}
     <x-topbar title="Dashboard admin" :sub="$periodLabel" :back="route('club')" back-label="Retour au club" />
     <div class="dk-topbar">
         <div class="f1">

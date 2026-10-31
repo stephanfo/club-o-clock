@@ -6,7 +6,6 @@ use App\Actions\Fortify\PasswordValidationRules;
 use App\Models\CalendarFeed;
 use App\Models\PushSubscription;
 use App\Notifications\Channels\PushChannel;
-use App\Policies\TrombiPolicy;
 use App\Services\AuthMethodService;
 use App\Services\CalendarFeedService;
 use App\Services\MemberService;
@@ -443,7 +442,6 @@ class Profil extends Component
             'canRemovePassword' => auth()->user()->password !== null
                 && $authMethods->keepsAnotherWayIn(auth()->user(), 'password'),
             'demo' => DemoMode::enabled(),
-            'canTrombi' => app(TrombiPolicy::class)->consult(auth()->user()),
             'feed' => $this->tab === 'notifs' ? $feeds->active(auth()->user()) : null,
             'pushDevices' => $this->tab === 'notifs' ? $this->pushDevices() : [],
             'feedHasWards' => $this->tab === 'notifs' && $feeds->hasWards(auth()->user()),

@@ -5,8 +5,7 @@
          flash('status') = succès (vert) · flash('warn') = refus (orange). --}}
     <x-flash-float />
     {{-- ─── Topbar ─── --}}
-    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. Actions de terrain seulement,
-         l'export XLSX et l'import CSV restent au bureau. --}}
+    {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. --}}
     <x-topbar :title="$isEdit ? 'Modifier la page' : 'Nouvelle page d’info'" :back="route('admin.infos')" back-label="Retour aux pages">
         <x-slot:trailing>
             <button type="button" wire:click="save" wire:loading.attr="disabled" wire:target="save" class="iconbtn" aria-label="Enregistrer"><x-icon name="check" /></button>
