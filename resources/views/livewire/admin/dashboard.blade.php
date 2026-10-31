@@ -335,12 +335,12 @@
                     </tbody>
                 </table>
                 </div>
-                @if (count($coachActivity['staffed']))
+                @if (count($staffed))
                     <div class="eyebrow" style="margin-top:16px">Séances tenues encadrées · par discipline</div>
                     <table class="tbl tbl-cartes" style="margin-top:6px">
                         <thead><tr><th>Discipline</th><th class="r">Séances</th><th class="r">Encadrées</th></tr></thead>
                         <tbody>
-                            @foreach ($coachActivity['staffed'] as $d)
+                            @foreach ($staffed as $d)
                                 <tr>
                                     <td class="tbl-m-titre" style="font-weight:700">{{ $d['discipline'] }}</td>
                                     <td class="r num" data-label="Séances">{{ $d['sessions'] }}</td>

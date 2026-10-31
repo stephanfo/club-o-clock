@@ -112,7 +112,7 @@ class StatsExportService
         $this->addSheet($book, 'Activité coachs', $coachHeader, $coachRows);
 
         $this->addSheet($book, 'Encadrement', ['Discipline', 'Séances tenues', 'Encadrées', 'Part encadrée (%)'],
-            array_map(fn ($r) => [$r['discipline'], $r['sessions'], $r['staffed'], $r['pct']], $coach['staffed']));
+            array_map(fn ($r) => [$r['discipline'], $r['sessions'], $r['staffed'], $r['pct']], $this->stats->staffedShare($f)));
 
         // Le décrochage (§4.16.2 bloc 5) n'a pas de feuille : une liste nominative de suivi ne circule pas en fichier.
         $this->addSheet($book, 'Adhérents actifs', ['Catégorie', 'Effectif', 'Pratiquants sur la période'],

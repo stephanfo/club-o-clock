@@ -287,7 +287,7 @@ class StatsServiceTest extends TestCase
         $this->training($this->swim, null, Carbon::now()->subDays(4))->update(['external_staff_label' => 'MNS piscine']);
         $this->training($this->bike, null, Carbon::now()->addDays(2)); // à venir : pas encore tenue
 
-        $staffed = collect($this->stats()->coachActivity($this->season())['staffed'])->keyBy('discipline');
+        $staffed = collect($this->stats()->staffedShare($this->season()))->keyBy('discipline');
 
         $this->assertSame(['discipline' => 'Vélo', 'sessions' => 2, 'staffed' => 1, 'pct' => 50], $staffed['Vélo']);
         $this->assertSame(100, $staffed['Natation']['pct']); // un intervenant extérieur vaut encadrement
