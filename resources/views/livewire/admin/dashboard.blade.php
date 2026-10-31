@@ -1,20 +1,23 @@
 {{-- Dashboard statistiques bureau (PRD §4.16 — J6.6) — porté de screen-admin.jsx AdminDashboard.
-     Filtres globaux (période/discipline/catégorie) + indicateurs + export XLSX. Admin uniquement. --}}
+     Filtres globaux (période/discipline/catégorie) + indicateurs + export XLSX. Vue réduite pour un coach
+     (§4.16.3, $full faux) : à encadrer, fréquentation, créneaux et sa seule ligne d'activité. --}}
 <div class="form-screen">
     {{-- Feedback d'action global (revue UX 2026-07-11) : bannière flottante auto-masquée,
          flash('status') = succès (vert) · flash('warn') = refus (orange). --}}
     <x-flash-float />
     {{-- ─── Topbar ─── --}}
     {{-- Topbar mobile (#151) : le dk-topbar est masqué sous 768px. L'export XLSX reste au bureau. --}}
-    <x-topbar title="Dashboard admin" :sub="$periodLabel" :back="route('club')" back-label="Retour au club" />
+    <x-topbar :title="$full ? 'Dashboard admin' : 'Pilotage'" :sub="$periodLabel" :back="route('club')" back-label="Retour au club" />
     <div class="dk-topbar">
         <div class="f1">
-            <div class="dsp" style="font-size:26px">Dashboard admin</div>
+            <div class="dsp" style="font-size:26px">{{ $full ? 'Dashboard admin' : 'Pilotage' }}</div>
             <div class="meta">{{ $periodLabel }}</div>
         </div>
-        <button type="button" wire:click="export" class="btn btn-ghost btn-sm" wire:loading.attr="disabled" wire:target="export">
-            <x-icon name="download" :size="15" /> XLSX
-        </button>
+        @if ($full)
+            <button type="button" wire:click="export" class="btn btn-ghost btn-sm" wire:loading.attr="disabled" wire:target="export">
+                <x-icon name="download" :size="15" /> XLSX
+            </button>
+        @endif
     </div>
 
     <div class="dk-body">
@@ -39,7 +42,7 @@
             </div>
 
             {{-- Bandeau d'alerte douce — comptes éligibles à suppression définitive (§4.16) --}}
-            @if ($eligibleCount > 0)
+            @if ($full && $eligibleCount > 0)
                 <x-banner kind="warn">
                     <div class="flex ac jb">
                         <span><b>{{ $eligibleCount }} compte{{ $eligibleCount > 1 ? 's' : '' }} éligible{{ $eligibleCount > 1 ? 's' : '' }} à suppression définitive</b> (suspendu depuis plus de 7 jours)</span>
@@ -72,6 +75,7 @@
                 @endif
             </div>
 
+            @if ($full)
             {{-- ═══ Décrochage (§4.16.2, bloc 5) — nominatif, admin seul, état courant, hors export ═══ --}}
             <div class="card card-pad">
                 <div class="flex ac jb wrap g8"><div class="eyebrow">Décrochage</div><span class="meta" style="font-size:12px">état courant · relance à la main, rien n'est envoyé</span></div>
@@ -135,6 +139,7 @@
                     <div class="meta" style="font-size:11px;margin-top:4px">sur {{ $headline['competitions'] }} compétition{{ $headline['competitions'] > 1 ? 's' : '' }}</div>
                 </div>
             </div>
+            @endif
 
             {{-- ═══ Fréquentation hebdomadaire (§4.16.2, bloc 4) ═══ --}}
             @php
@@ -216,6 +221,7 @@
                 @endif
             </div>
 
+            @if ($full)
             {{-- ═══ Désinscriptions (§4.16.2, bloc 7) — horodatées par le journal d'activité ═══ --}}
             <div class="card card-pad">
                 <div class="flex ac jb wrap g8"><div class="eyebrow">Désinscriptions</div><span class="meta" style="font-size:12px">séances non annulées · {{ $periodLabel }}</span></div>
@@ -301,10 +307,11 @@
                     · <b class="num">{{ $waitlist['promotion_rate'] !== null ? $waitlist['promotion_rate'].'%' : '—' }}</b> promus
                 </div>
             </div>
+            @endif
 
             {{-- ═══ Activité coachs ═══ --}}
             <div class="card card-pad">
-                <div class="flex ac jb" style="margin-bottom:10px"><div class="eyebrow">Activité coachs</div><span class="meta" style="font-size:12px">séances training · {{ $periodLabel }}</span></div>
+                <div class="flex ac jb" style="margin-bottom:10px"><div class="eyebrow">{{ $full ? 'Activité coachs' : 'Mon activité' }}</div><span class="meta" style="font-size:12px">séances training · {{ $periodLabel }}</span></div>
                 {{-- Tableau croisé (une colonne par discipline) : défilement horizontal, coach figé (#151). --}}
                 <div style="overflow-x:auto">
                 <table class="tbl tbl-figee">
@@ -345,6 +352,7 @@
                 @endif
             </div>
 
+            @if ($full)
             {{-- ═══ Usage de l'app (§4.16.2, bloc 12) — état courant, agrégats seulement ═══ --}}
             <div class="card card-pad">
                 <div class="flex ac jb wrap g8"><div class="eyebrow">Usage de l'app</div><span class="meta" style="font-size:12px">état courant · sur {{ $usage['accounts'] }} comptes actifs</span></div>
@@ -366,6 +374,7 @@
             </div>
 
             <div style="text-align:center"><a href="{{ route('admin.journal') }}" wire:navigate class="meta" style="font-size:13px">Consulter les journaux →</a></div>
+            @endif
 
         </div>
     </div>

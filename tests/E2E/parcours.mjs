@@ -240,12 +240,17 @@ const tous = [];
 
 // ── S13 · Cloisonnement admin : un coach est refusé (PRD §4.17) ───────
 {
-  const s = new Scenario('S13 · Écrans admin — 403 pour un coach');
+  const s = new Scenario('S13 · Écrans admin — 403 pour un coach, pilotage réduit');
   const { ctx, page } = await session(browser, 'vincent@demo.club', DESKTOP);
-  for (const p of ['/admin/dashboard', '/admin/adherents', '/admin/journaux', '/admin/parametres', '/admin/infos']) {
+  for (const p of ['/admin/adherents', '/admin/journaux', '/admin/parametres', '/admin/infos']) {
     const resp = await page.goto(BASE + p, { waitUntil: 'domcontentloaded' });
     s.check(`coach refusé sur ${p}`, resp.status() === 403, `HTTP ${resp.status()}`);
   }
+  // Pilotage en vue réduite (PRD §4.16.3) : l'écran s'ouvre, sans les blocs réservés à l'admin.
+  const resp = await page.goto(BASE + '/admin/dashboard', { waitUntil: 'domcontentloaded' });
+  const texte = await page.locator('body').innerText();
+  s.check('coach ouvre le pilotage', resp.status() === 200 && /Mon activité/.test(texte), `HTTP ${resp.status()}`);
+  s.check('pilotage coach sans décrochage ni export', !/Décrochage|XLSX/.test(texte));
   tous.push(s.report());
   await ctx.close();
 }

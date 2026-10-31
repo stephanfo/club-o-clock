@@ -173,15 +173,69 @@ class DashboardUiTest extends TestCase
             ->assertForbidden();
     }
 
-    /** Le décrochage est nominatif : un coach n'y accède pas, même en forçant l'écran (garde serveur). */
-    public function test_coach_cannot_reach_dropouts(): void
+    /** Vue coach (§4.16.3) : les blocs autorisés, sans décrochage, effectifs, usage ni export. */
+    public function test_coach_sees_reduced_view_without_admin_blocks(): void
     {
-        User::factory()->create(['first_name' => 'Lucie', 'last_name' => 'Martin']);
+        User::factory()->minorP1()->create(['first_name' => 'Lucie', 'last_name' => 'Martin']); // jamais venue
+        $race = Session::create(['kind' => 'competition', 'title' => 'Duathlon de la Plage',
+            'start_at' => Carbon::now()->subDays(4), 'duration_min' => 120, 'created_by' => User::factory()->coach()->create()->id]);
+        Registration::create(['session_id' => $race->id, 'user_id' => User::factory()->create()->id,
+            'status' => 'participating', 'registered_at' => Carbon::now()->subDays(9)]);
 
         Livewire::actingAs(User::factory()->coach()->create())
             ->test(Dashboard::class)
-            ->assertForbidden()
-            ->assertDontSee('Lucie Martin');
+            ->assertOk()
+            ->assertSee('Pilotage')
+            ->assertSee('Séances à encadrer')
+            ->assertSee('Fréquentation · par semaine')
+            ->assertSee('Créneaux · fréquentation')
+            ->assertSee('Mon activité')
+            ->assertDontSee('Dashboard admin')
+            ->assertDontSee('Décrochage')
+            ->assertDontSee('Lucie Martin')
+            ->assertDontSee('Effectifs · par catégorie')
+            ->assertDontSee('Duathlon de la Plage')
+            ->assertDontSee("Usage de l'app", false)
+            ->assertDontSee('Activité coachs')
+            ->assertDontSee('wire:click="export"', false)
+            ->assertDontSee(route('admin.journal'), false);
+    }
+
+    /** L'export est gardé côté serveur : le bouton absent ne suffit pas, l'appel forcé est refusé. */
+    public function test_coach_cannot_export(): void
+    {
+        Livewire::actingAs(User::factory()->coach()->create())
+            ->test(Dashboard::class)
+            ->call('export')
+            ->assertForbidden();
+    }
+
+    /** Sa propre ligne d'activité, pas celle des autres coachs. */
+    public function test_coach_sees_only_own_activity_row(): void
+    {
+        $me = User::factory()->coach()->create(['first_name' => 'Camille', 'last_name' => 'Durand']);
+        $other = User::factory()->coach()->create(['first_name' => 'Bruno', 'last_name' => 'Lefort']);
+        foreach ([$me, $other] as $coach) {
+            $s = Session::create(['kind' => 'training', 'title' => 'Natation', 'discipline_id' => Discipline::first()->id,
+                'start_at' => Carbon::now()->subDays(3), 'duration_min' => 60, 'created_by' => $coach->id]);
+            $s->coaches()->attach($coach->id);
+        }
+
+        Livewire::actingAs($me)->test(Dashboard::class)
+            ->assertSee('Camille Durand')
+            ->assertDontSee('Bruno Lefort')
+            ->assertDontSee('Séances tenues encadrées');
+
+        // Contrôle : l'admin, lui, voit les deux.
+        Livewire::actingAs(User::factory()->admin()->create())->test(Dashboard::class)
+            ->assertSee('Camille Durand')
+            ->assertSee('Bruno Lefort');
+    }
+
+    public function test_coach_reaches_the_screen_by_url_but_athlete_does_not(): void
+    {
+        $this->actingAs(User::factory()->coach()->create())->get(route('admin.dashboard'))->assertOk();
+        $this->actingAs(User::factory()->create())->get(route('admin.dashboard'))->assertForbidden();
     }
 
     public function test_period_and_filters_are_settable(): void

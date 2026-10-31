@@ -98,6 +98,12 @@
                     <a href="{{ route('sessions.create') }}" wire:navigate class="dk-navitem {{ $active === 'create' ? 'on' : '' }}">
                         <x-icon name="plus" /> Créer une séance
                     </a>
+                    @unless ($isAdmin)
+                        {{-- Pilotage en vue réduite (§4.16.3) ; l'admin l'a sous « Admin ». --}}
+                        <a href="{{ route('admin.dashboard') }}" wire:navigate class="dk-navitem {{ $active === 'admin-dashboard' ? 'on' : '' }}">
+                            <x-icon name="bar-chart" /> Pilotage
+                        </a>
+                    @endunless
                 @endif
 
                 @if ($isAdmin)

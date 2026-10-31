@@ -155,7 +155,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/admin/modeles/creer', TemplateForm::class)->name('admin.templates.create');
     Route::get('/admin/modeles/{template}/modifier', TemplateForm::class)->name('admin.templates.edit');
 
-    // Dashboard statistiques bureau + export XLSX — admin uniquement (J6.6, PRD §4.16). Garde Gate.
+    // Pilotage (PRD §4.16) : vue complète + export XLSX pour l'admin, vue réduite pour un coach (§4.16.3). Garde Gate.
     Route::get('/admin/dashboard', Dashboard::class)->name('admin.dashboard');
 
     // Journaux Audit/Activity + export XLSX — admin uniquement (J6.7, PRD §4.18). Garde Gate.
