@@ -21,8 +21,12 @@ class TrombiService
 {
     public const MAX_BYTES = 5 * 1024 * 1024;
 
-    /** Au-delà, refus AVANT décodage : un JPEG de 5 Mo peut se décompresser en centaines de Mo. */
-    public const MAX_PIXELS = 40_000_000;
+    /**
+     * Au-delà, refus AVANT décodage : un JPEG de 5 Mo peut se décompresser en centaines de Mo. Le
+     * recadrage de l'appareil envoie un carré de 1024 px (photo-crop.js) : 2048² laisse de la marge
+     * sans laisser un appel direct au composant réserver des centaines de Mo du mutualisé.
+     */
+    public const MAX_PIXELS = 2048 * 2048;
 
     /** Grille (192) et fiche (512), en WebP. */
     public const SIZES = [192, 512];
@@ -220,7 +224,7 @@ class TrombiService
         }
         [$width, $height] = $info;
         if ($width * $height > self::MAX_PIXELS) {
-            throw new RuntimeException('Cette photo est trop grande (40 mégapixels au plus).');
+            throw new RuntimeException('Cette photo est trop grande (2048 × 2048 pixels au plus).');
         }
 
         $this->ensureMemory($width * $height);
@@ -285,9 +289,9 @@ class TrombiService
     }
 
     /**
-     * GD tient l'image décodée en mémoire, ~5 octets par pixel, plus la copie d'une rotation :
-     * une photo de téléphone de 24 Mpx dépasse le `memory_limit` courant du mutualisé (128 Mo).
-     * On relève la limite pour ce traitement seulement, sans dépasser 512 Mo.
+     * GD tient l'image décodée en mémoire, ~5 octets par pixel, plus la copie d'une rotation : au
+     * plafond MAX_PIXELS, ~75 Mo, sous le `memory_limit` courant du mutualisé (128 Mo) mais pas d'un
+     * hébergement plus serré. On relève la limite pour ce traitement seulement, sans dépasser 512 Mo.
      */
     private function ensureMemory(int $pixels): void
     {
