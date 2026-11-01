@@ -1121,6 +1121,69 @@ async function ongletMobile(page, nom) {
   tous.push(s.report());
 }
 
+// ── S39 · Dupliquer une séance (#176) ─────────────────────────────────
+//
+// La fiche ouvre la création pré-remplie : date +7 jours, contenu vide. NON destructif : la copie
+// enregistrée est supprimée par son id, et les journaux qu'elle a produits par repère.
+{
+  const s = new Scenario('S39 · Dupliquer une séance depuis sa fiche');
+  const src = seanceFuture(`content_markdown IS NOT NULL AND content_markdown <> ''`);
+  const [titre, utc] = ligne(`SELECT title, start_at FROM sessions WHERE id = ${src}`, 'la séance source');
+  // +7 jours en heure club (pas +168 h) : même calcul que le formulaire, sans dépendre des tables de
+  // fuseaux du serveur SQL.
+  const local = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+    .format(new Date(utc.replace(' ', 'T') + 'Z'));
+  const [j, h] = local.split(' ');
+  const debut = `${j}T${h}`;
+  const [y, m, d] = j.split('-').map(Number);
+  const attendu = `${new Date(Date.UTC(y, m - 1, d + 7)).toISOString().slice(0, 10)}T${h}`;
+  const repere = repereJournaux();
+  const avant = sql('SELECT IFNULL(MAX(id),0) FROM sessions');
+  const vincent = sql(`SELECT id FROM users WHERE email = 'vincent@demo.club'`);
+
+  for (const [format, viewport] of [['mobile', MOBILE], ['desktop', DESKTOP]]) {
+    const { ctx, page } = await session(browser, 'vincent@demo.club', viewport);
+    await fiche(page, src);
+    const bouton = format === 'mobile'
+      ? page.locator('a[aria-label="Dupliquer la séance"]:visible')
+      : page.locator('a:visible', { hasText: 'Dupliquer' });
+    s.check(`${format} — bouton Dupliquer sur la fiche`, await bouton.count() === 1);
+    await bouton.click();
+    await page.waitForURL(/\/seances\/creer\?depuis=/);
+    await page.waitForLoadState('networkidle');
+
+    const texte = (await page.locator('body').innerText()).toLowerCase();
+    s.check(`${format} — titre « Dupliquer »`, texte.includes('dupliquer la séance'));
+    s.check(`${format} — rappel de la source`, texte.includes(`copie de ${titre.toLowerCase()}`));
+    s.check(`${format} — titre repris`, await page.locator('input[wire\\:model\\.blur="title"]:visible').inputValue() === titre);
+    const date = await page.locator('input[type=datetime-local]:visible').inputValue();
+    s.check(`${format} — date à +7 jours`, date === attendu, `${debut} → ${date}`);
+    // Aucun débordement horizontal (mobile surtout : le sous-titre de topbar est long).
+    const deborde = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    s.check(`${format} — pas de débordement horizontal`, !deborde);
+    await s.shot(page, `s39-dupliquer-${format}`);
+
+    if (format === 'desktop') {
+      await page.locator('.dk-topbar button[type=submit]').click();
+      await page.waitForURL(/\/seances\/\d+$/);
+      await page.waitForLoadState('networkidle');
+      const [id, auteur, contenu] = ligne(`SELECT id, created_by, IF(IFNULL(content_markdown, '') = '', 'vide', 'rempli') FROM sessions WHERE id > ${avant}`, 'la copie');
+      s.check('copie enregistrée par le coach', auteur === vincent, auteur);
+      s.check('copie sans contenu', contenu === 'vide', contenu);
+      s.check('copie sans inscrit', sql(`SELECT COUNT(*) FROM registrations WHERE session_id = ${id}`) === '0');
+      s.check('source intacte', sql(`SELECT COUNT(*) FROM sessions WHERE id = ${src} AND content_markdown <> ''`) === '1');
+      await s.shot(page, 's39-copie-fiche');
+      sql(`DELETE FROM sessions WHERE id = ${id}`);
+    }
+    s.checkJs(page);
+    await ctx.close();
+  }
+
+  purgeJournaux(repere);
+  s.check('restauration : aucune copie laissée', sql(`SELECT COUNT(*) FROM sessions WHERE id > ${avant}`) === '0');
+  tous.push(s.report());
+}
+
 await browser.close();
 const ok = tous.every(Boolean);
 console.log(`\n${'═'.repeat(46)}\n${ok ? '✅ TOUS LES PARCOURS PASSENT' : '❌ AU MOINS UN PARCOURS ÉCHOUE'}  (${tous.filter(Boolean).length}/${tous.length})\n`);
