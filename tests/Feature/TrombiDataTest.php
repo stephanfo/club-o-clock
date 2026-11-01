@@ -128,6 +128,26 @@ class TrombiDataTest extends TestCase
         $this->assertSame([], Storage::disk('local')->allFiles('trombi'));
     }
 
+    public function test_plafond_de_pixels_proche_de_ce_qu_envoie_le_recadrage(): void
+    {
+        $u = User::factory()->create();
+
+        // 3000×2000 (6 Mpx) : très au-delà du carré de 1024 px du recadrage, refusé sur l'en-tête
+        // sans que GD ne décode ni ne réserve de mémoire.
+        $png = imagecreatetruecolor(4, 4);
+        ob_start();
+        imagepng($png);
+        $bytes = (string) ob_get_clean();
+
+        try {
+            $this->service()->storePhoto($u, $this->tmp(substr($bytes, 0, 16).pack('NN', 3000, 2000).substr($bytes, 24)), $u);
+            $this->fail('Photo de 6 Mpx acceptée.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('trop grande', $e->getMessage());
+        }
+        $this->assertNull($u->fresh()->photo_path);
+    }
+
     public function test_remplacer_efface_l_ancienne_et_renouvelle_le_nom(): void
     {
         $u = User::factory()->create();

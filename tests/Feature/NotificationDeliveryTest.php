@@ -317,6 +317,15 @@ class NotificationDeliveryTest extends TestCase
         $mail->assertSeeInHtml('https://club.test/seances/9');
     }
 
+    public function test_markdown_from_a_user_input_does_not_become_a_link(): void
+    {
+        // Source d'un accord saisie par l'admin, titre de séance saisi par un coach : du texte.
+        $mail = new OutboxNotificationMail('Accord enregistré', 'Photo d\'après « [bulletin](https://piege.test) »', 'https://club.test/profil');
+
+        $mail->assertDontSeeInHtml('href="https://piege.test"', false);
+        $mail->assertSeeInHtml('[bulletin](https://piege.test)', false);
+    }
+
     public function test_ordinary_mail_footer_points_to_the_profile_settings(): void
     {
         // Contrôle positif apparié du test suivant : le pied de page « notifications » reste servi

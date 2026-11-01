@@ -10,6 +10,7 @@ use App\Support\DemoMode;
 use App\Support\FrontBuild;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Mail\Markdown;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
@@ -64,6 +65,11 @@ class AppServiceProvider extends ServiceProvider
         if (str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }
+
+        // Emails Markdown : un `[` venu d'une saisie (titre de séance, source d'un accord enregistré
+        // par l'admin…) est échappé avant le rendu, sinon `[ici](https://…)` devient un lien
+        // cliquable dans un email signé du club.
+        Markdown::withSecuredEncoding();
 
         // Back-office (PRD §4.17, §4.6) : paramètres club + catalogues = admin uniquement.
         // Gates plutôt que 7 policies de modèle (les catalogues partagent la même règle).
