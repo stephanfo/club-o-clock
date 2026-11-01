@@ -320,6 +320,13 @@ class QuotaReleaseTest extends TestCase
         $this->assertNull($s->fresh()->quota_released_at);
     }
 
+    public function test_le_bloc_gestion_mobile_place_le_quota_avant_modifier(): void
+    {
+        // Le geste du jour J en tête, à l'écart de Modifier / Dupliquer (anti-tap malheureux).
+        Livewire::actingAs($this->coach)->test(SessionShow::class, ['session' => $this->piscine()])
+            ->assertSeeInOrder(['Gestion', 'Débloquer le quota', 'aria-label="Modifier la séance"', 'Annuler la séance'], false);
+    }
+
     public function test_athlete_sees_the_chip_but_cannot_release_or_close(): void
     {
         $s = $this->piscine();
