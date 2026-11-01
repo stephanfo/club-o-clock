@@ -950,19 +950,6 @@ body:has(.scrim) { overflow: hidden; }
     }
     /* Le contenu (badge, titre, chips) passe au-dessus du filigrane. */
     .fiche-screen .fiche-head-m > * { position: relative; z-index: 1; }
-    /* Éditer (staff) : icône seule à droite du titre, dans le héros vert. Pas de fond ni bordure —
-       même registre que les icônes claires de la topbar (retour, cloche) pour rester uniforme.
-       align-self:start = calée sur la ligne du titre, pas centrée sur le badge. */
-    .fiche-screen .fiche-head-m .fiche-edit-m {
-        flex: 0 0 auto; align-self: flex-start;
-        display: inline-flex; align-items: center; justify-content: center;
-        width: 38px; height: 38px; text-decoration: none;
-        /* Neutralise le soulignement global des <a> (club-tokens.css:241 : border-bottom
-           currentColor) qui, en blanc sur le vert, formait un trait sous l'icône. */
-        border-bottom: none;
-        color: var(--paper);
-    }
-    .fiche-screen .fiche-head-m .fiche-edit-m:hover { color: var(--brand-100); }
 }
 
 /* --- Accueil (J1) — porté de screen-home.jsx --- */

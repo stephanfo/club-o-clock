@@ -282,6 +282,27 @@ class SessionDuplicationTest extends TestCase
             ->assertDontSee(route('sessions.create', ['depuis' => $source->id]), false);
     }
 
+    public function test_le_bloc_gestion_mobile_porte_modifier_et_dupliquer_libelles(): void
+    {
+        // Les aria-label ne sont portés que par les boutons du bloc « Gestion » mobile (le desktop
+        // a ses boutons texte dans le dk-topbar) : ils signent leur présence.
+        $source = $this->source();
+
+        Livewire::actingAs($this->coach)->test(SessionShow::class, ['session' => $source])
+            ->assertSeeInOrder(['Gestion', 'aria-label="Modifier la séance"', 'aria-label="Dupliquer la séance"'], false);
+
+        Livewire::actingAs(User::factory()->create())->test(SessionShow::class, ['session' => $source])
+            ->assertSee('Fractionné piste')
+            ->assertDontSee('aria-label="Modifier la séance"', false)
+            ->assertDontSee('aria-label="Dupliquer la séance"', false);
+
+        // Séance annulée : plus de Modifier, mais Dupliquer reste — la reprogrammer est le cas d'usage.
+        $source->forceFill(['cancelled_at' => now()])->save();
+        Livewire::actingAs($this->coach)->test(SessionShow::class, ['session' => $source->fresh()])
+            ->assertSee('aria-label="Dupliquer la séance"', false)
+            ->assertDontSee('aria-label="Modifier la séance"', false);
+    }
+
     public function test_les_marqueurs_structurants_ne_s_affichent_qu_en_edition(): void
     {
         $source = $this->source();

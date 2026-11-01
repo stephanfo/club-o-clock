@@ -112,7 +112,7 @@
 
     {{-- ═══════════════ MOBILE : mini-barre fixe + héros fondu + tabs + barre collante ═══════════════ --}}
     <div class="fiche-mobile">
-        {{-- Mini-barre verte FIXE (retour + cloche + éditer) — même modèle que l'accueil : elle couvre
+        {{-- Mini-barre verte FIXE (retour + cloche) — même modèle que l'accueil : elle couvre
              la safe-area iOS et reste collée, le héros ci-dessous scrolle. Elle se fond dans le héros
              fondu (même dégradé vert), le libellé n'est donc pas nécessaire ici. --}}
         <div class="topbar topbar-fiche">
@@ -141,22 +141,10 @@
                     <div class="eyebrow" style="color:var(--brand-200)">{{ $eyebrow }}</div>
                     <div class="dsp" style="font-size:30px;margin-top:1px;color:var(--paper)">{{ $session->title }}</div>
                 </div>
-                {{-- Éditer (staff) — icône à droite du titre (revue coh. 2026-07-12) : compacte, rattachée
-                     à CETTE séance, plus dans la topbar où elle jouxtait la cloche. Icône claire sur le vert. --}}
-                @can('update', $session)
-                    @unless ($session->isCancelled())
-                        <a href="{{ route('sessions.edit', $session) }}" wire:navigate class="fiche-edit-m" aria-label="Modifier la séance">
-                            <x-icon name="pencil" :size="18" />
-                        </a>
-                    @endunless
-                @endcan
-                {{-- Dupliquer (#176) : ouvre la création pré-remplie. Aussi sur une séance annulée —
-                     la reprogrammer est justement un cas d'usage. --}}
-                @can('create', \App\Models\Session::class)
-                    <a href="{{ route('sessions.create', ['depuis' => $session->id]) }}" wire:navigate class="fiche-edit-m" aria-label="Dupliquer la séance">
-                        <x-icon name="copy" :size="18" />
-                    </a>
-                @endcan
+                {{-- Modifier / Dupliquer ne vivent plus ici mais dans le bloc « Gestion » de l'onglet
+                     Infos : deux icônes de 38 px collées sous la cloche, crayon et copie sans libellé,
+                     exposaient au faux tap et surtout à la confusion — modifier l'original en croyant
+                     travailler sur une copie. --}}
             </div>
             <div class="meta" style="margin-top:var(--space-2);color:var(--fg-on-dark-soft)">{{ $dateLine }}</div>
 
@@ -199,33 +187,58 @@
                      y sont déjà. Asymétrie, pas un choix — la fiche séance est mobile-first, à la
                      différence des réglages admin assumés desktop.
                      Hors de la barre collante : elle porte le CTA d'inscription, et un bouton rouge
-                     qui notifie tous les inscrits n'a rien à faire à côté, au pouce. --}}
-                @if (! $session->isCancelled())
-                    @php($canCancelHere = auth()->user()?->can('cancel', $session) ?? false)
-                    @if ($canToggleQuota || $canCancelHere)
-                        <div style="display:flex;flex-direction:column;gap:var(--space-3)">
-                            <div class="eyebrow">Gestion</div>
-                            @if ($canToggleQuota)
-                                @include('livewire.partials.quota-deblocage', ['quotaKey' => 'm-infos'])
-                            @endif
-                            @if ($canCancelHere)
-                                <button wire:click="openCancelConfirm" class="btn btn-danger btn-block">
-                                    <x-icon name="x" :size="15" /> Annuler la séance
-                                </button>
-                            @endif
-                        </div>
-                    @endif
-                @else
-                    {{-- Séance annulée : la barre collante offre « Restaurer », ce bloc offre son
-                         pendant définitif. Le geste se fait en deux temps — annuler puis supprimer —
-                         et l'annulation est disponible ici : réserver le second temps au desktop
-                         obligerait à changer d'appareil au milieu du geste. --}}
-                    @can('delete', $session)
-                        <div>
-                            <div class="eyebrow" style="margin-bottom:6px">Gestion</div>
-                            @include('livewire.partials.fiche-suppression')
-                        </div>
-                    @endcan
+                     qui notifie tous les inscrits n'a rien à faire à côté, au pouce.
+                     Modifier / Dupliquer y sont aussi, libellés, en tête et à l'écart du bouton rouge.
+                     Dupliquer reste offert sur une séance annulée : la reprogrammer est justement un
+                     cas d'usage (#176).
+                     Séance annulée : la barre collante offre « Restaurer », ce bloc offre son pendant
+                     définitif. Le geste se fait en deux temps — annuler puis supprimer — et
+                     l'annulation est disponible ici : réserver le second temps au desktop obligerait
+                     à changer d'appareil au milieu du geste. --}}
+                @php
+                    $annulee = $session->isCancelled();
+                    $canEditHere = ! $annulee && ($me?->can('update', $session) ?? false);
+                    $canDupHere = $me?->can('create', \App\Models\Session::class) ?? false;
+                    $canQuotaHere = ! $annulee && $canToggleQuota;
+                    $canCancelHere = ! $annulee && ($me?->can('cancel', $session) ?? false);
+                    $canDeleteHere = $annulee && ($me?->can('delete', $session) ?? false);
+                @endphp
+                @if ($canEditHere || $canDupHere || $canQuotaHere || $canCancelHere || $canDeleteHere)
+                    <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+                        <div class="eyebrow">Gestion</div>
+                        {{-- Le quota d'abord — le geste du jour J, son bouton plein attire le pouce —,
+                             puis un vide marqué avant le reste, pour qu'un tap visant « Débloquer »
+                             ne tombe jamais sur Modifier ou Dupliquer. --}}
+                        @if ($canQuotaHere)
+                            @include('livewire.partials.quota-deblocage', ['quotaKey' => 'm-infos'])
+                        @endif
+                        @if ($canEditHere || $canDupHere || $canCancelHere || $canDeleteHere)
+                            <div style="display:flex;flex-direction:column;gap:var(--space-3){{ $canQuotaHere ? ';margin-top:var(--space-3)' : '' }}">
+                                @if ($canEditHere || $canDupHere)
+                                    <div style="display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:var(--space-2)">
+                                        @if ($canEditHere)
+                                            <a href="{{ route('sessions.edit', $session) }}" wire:navigate class="btn btn-ghost btn-block" aria-label="Modifier la séance">
+                                                <x-icon name="pencil" :size="15" /> Modifier
+                                            </a>
+                                        @endif
+                                        @if ($canDupHere)
+                                            <a href="{{ route('sessions.create', ['depuis' => $session->id]) }}" wire:navigate class="btn btn-ghost btn-block" aria-label="Dupliquer la séance">
+                                                <x-icon name="copy" :size="15" /> Dupliquer
+                                            </a>
+                                        @endif
+                                    </div>
+                                @endif
+                                @if ($canCancelHere)
+                                    <button wire:click="openCancelConfirm" class="btn btn-danger btn-block">
+                                        <x-icon name="x" :size="15" /> Annuler la séance
+                                    </button>
+                                @endif
+                                @if ($canDeleteHere)
+                                    <div>@include('livewire.partials.fiche-suppression')</div>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
                 @endif
                 </div>
             </div>
