@@ -1,5 +1,10 @@
 @php
-    $edit = $session?->exists;
+    // Booléen strict : hors édition, `$session?->exists` vaut null, et `:show="null"` retombe sur le
+    // défaut `true` de <x-struct-tag> — les cloches « structurant » s'affichaient en création.
+    $edit = (bool) $session?->exists;
+    // Duplication (#176) : création pré-remplie, avec la source comme point de retour.
+    $dup = ! $edit && $source !== null;
+    $sourceLabel = $dup ? $source->title.' · '.$source->start_at->copy()->setTimezone(\App\Models\ClubSettings::current()->timezone)->locale('fr')->isoFormat('ddd D MMM') : null;
     $titleWord = ['training' => 'la séance', 'competition' => 'la compétition', 'club_event' => "l'événement"][$kind];
     $kindOpts = [
         ['k' => 'training', 'l' => 'Entraînement', 'icon' => 'zap', 'sub' => 'tag · waitlist · quota'],
@@ -29,9 +34,11 @@
          atteint depuis n'importe où — aucune destination de retour n'est « la bonne », et les autres
          écrans de nav (Planning, Parcours, Infos) n'en ont pas non plus. La sortie explicite est le
          bouton Annuler du formulaire. --}}
-    <x-topbar :title="$edit ? 'Modifier '.$titleWord : 'Créer '.$titleWord"
-              :sub="$edit ? $session->title.' · édition isolée' : 'Création autonome · pas un modèle'"
-              :back="$edit ? route('sessions.show', $session) : null"
+    {{-- Duplication : on vient toujours de la fiche source, le retour y ramène (retour arrière
+         ordinaire, sans back-target : aucun enregistrement ne redirige vers cet écran). --}}
+    <x-topbar :title="$edit ? 'Modifier '.$titleWord : ($dup ? 'Dupliquer '.$titleWord : 'Créer '.$titleWord)"
+              :sub="$edit ? $session->title.' · édition isolée' : ($dup ? 'Copie de '.$sourceLabel : 'Création autonome · pas un modèle')"
+              :back="$edit ? route('sessions.show', $session) : ($dup ? route('sessions.show', $source) : null)"
               :back-target="$edit ? route('sessions.show', $session) : null"
               back-label="Retour fiche" />
     {{-- ─── Topbar desktop (porté de screen-creation.jsx CreationDesktop) — masquée sur mobile. --}}
@@ -42,10 +49,15 @@
                onclick="return !window.clubBack?.('{{ route('sessions.show', $session) }}')">
                 <x-icon name="chevron-left" :size="15" /> Fiche
             </a>
+        @elseif ($dup)
+            <a href="{{ route('sessions.show', $source) }}" class="btn btn-ghost btn-sm"
+               onclick="return !window.clubBack?.()">
+                <x-icon name="chevron-left" :size="15" /> Fiche
+            </a>
         @endif
         <div class="f1">
-            <div class="dsp" style="font-size:24px">{{ $edit ? 'Modifier '.$titleWord : 'Créer '.$titleWord }}</div>
-            <div class="meta">{{ $edit ? $session->title.' · édition isolée' : 'Création autonome · pas un modèle' }}</div>
+            <div class="dsp" style="font-size:24px">{{ $edit ? 'Modifier '.$titleWord : ($dup ? 'Dupliquer '.$titleWord : 'Créer '.$titleWord) }}</div>
+            <div class="meta">{{ $edit ? $session->title.' · édition isolée' : ($dup ? 'Copie de '.$sourceLabel : 'Création autonome · pas un modèle') }}</div>
         </div>
         <button type="submit" form="session-form" class="btn btn-primary btn-sm">{{ $edit ? 'Enregistrer' : 'Publier' }}</button>
     </div>
@@ -72,6 +84,13 @@
             @if ($edit)
                 <x-banner kind="info" style="grid-column:1/-1">
                     <div><b>Édition isolée</b> — les modifications ne touchent que cette séance. Les champs marqués <x-icon name="bell" :size="11" style="color:var(--accent);vertical-align:middle" /> sont <b>structurants</b> : les modifier proposera de notifier les inscrits.</div>
+                </x-banner>
+            @endif
+
+            {{-- Duplication (#176) : dire d'où viennent les valeurs, et ce qui reste à écrire. --}}
+            @if ($dup)
+                <x-banner kind="info" icon="copy" style="grid-column:1/-1">
+                    <div>Copie de <a href="{{ route('sessions.show', $source) }}" wire:navigate><b>{{ $sourceLabel }}</b></a>, une semaine plus tard. Vérifie la date ; {{ $isTraining ? 'le contenu' : ($kind === 'club_event' ? "l'agenda" : 'les inscriptions officielles') }} et le parcours ne sont pas repris.</div>
                 </x-banner>
             @endif
 
@@ -148,6 +167,12 @@
                 </div>
 
                 {{-- Date / début / durée --}}
+                {{-- Doublon (#176) : non bloquant — deux groupes peuvent partager un créneau. --}}
+                @if ($doublon)
+                    <x-banner kind="warn">
+                        <div>Une séance <a href="{{ route('sessions.show', $doublon) }}" wire:navigate><b>{{ $doublon->title }}</b></a> existe déjà à cette date et cette heure. Tu peux enregistrer quand même.</div>
+                    </x-banner>
+                @endif
                 <div class="form-row2">
                     <div>
                         <label class="field-label">Date et heure<x-req-mark /><x-struct-tag :show="$edit" /></label>
@@ -538,7 +563,7 @@
 
             {{-- Barre d'action mobile (collante) --}}
             <div class="form-actions">
-                <a href="{{ $edit ? route('sessions.show', $session) : route('planning') }}" class="btn btn-ghost f1">Annuler</a>
+                <a href="{{ $edit ? route('sessions.show', $session) : ($dup ? route('sessions.show', $source) : route('planning')) }}" class="btn btn-ghost f1">Annuler</a>
                 <button type="submit" class="btn btn-primary" style="flex:2">{{ $edit ? 'Enregistrer' : 'Publier' }}</button>
             </div>
         </form>

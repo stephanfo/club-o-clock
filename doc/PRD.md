@@ -399,6 +399,11 @@ Modèle unique avec un **discriminator `kind`**.
 #### Création
 - **Coachs et admins** peuvent créer une `Session` standalone (formulaire individuel) sur les 3 `kind`.
 - **`createdBy` ≠ encadrant** : la personne qui crée n'est pas nécessairement dans `coaches[]` (voir §4.11.1).
+- **Dupliquer** : depuis la fiche d'une séance, passée, future ou annulée, un coach ou un admin ouvre le formulaire de création **pré-rempli**. Ce n'est pas un nouvel écran, et l'enregistrement est une création ordinaire : la nouvelle séance ne garde **aucun lien** avec sa source et a pour `createdBy` la personne qui duplique. Les entraînements créés à la main reviennent souvent d'une semaine à l'autre, et seul le générateur (§4.8, réservé aux admins) produisait jusque-là des séances en série.
+  - **Date proposée** : même heure de club, **une semaine plus tard**. Si cette date est déjà passée, le même jour de la semaine qui suit aujourd'hui. Modifiable.
+  - **Recopié** : type, titre, discipline, heure, durée, lieu, capacité, catégories, tag de quota, encadrants, intervenant extérieur ; pour une compétition, type d'épreuve, distance et lien organisateur ; pour un événement club, le lien. Une valeur qui n'est plus sélectionnable (catalogue archivé, encadrant qui a perdu le rôle coach) est écartée.
+  - **Non recopié** : contenu, agenda, pièce jointe et parcours, réécrits à chaque occurrence ; ouverture des inscriptions et album photos, propres à une édition ; et tout ce qui appartient à l'occurrence (inscriptions, annulation, déblocage du quota, débriefs).
+- **Doublon** : à la saisie, le formulaire **avertit sans bloquer** quand une séance non annulée de même titre existe déjà au même début, typiquement déjà générée par un template. Deux groupes peuvent légitimement partager un créneau.
 
 #### Modification d'une séance avec inscriptions
 - Inscriptions **conservées** (pas de reconfirmation requise).

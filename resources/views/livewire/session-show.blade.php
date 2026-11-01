@@ -150,6 +150,13 @@
                         </a>
                     @endunless
                 @endcan
+                {{-- Dupliquer (#176) : ouvre la création pré-remplie. Aussi sur une séance annulée —
+                     la reprogrammer est justement un cas d'usage. --}}
+                @can('create', \App\Models\Session::class)
+                    <a href="{{ route('sessions.create', ['depuis' => $session->id]) }}" wire:navigate class="fiche-edit-m" aria-label="Dupliquer la séance">
+                        <x-icon name="copy" :size="18" />
+                    </a>
+                @endcan
             </div>
             <div class="meta" style="margin-top:var(--space-2);color:var(--fg-on-dark-soft)">{{ $dateLine }}</div>
 
@@ -316,6 +323,9 @@
                 @unless ($session->isCancelled())
                     <a href="{{ route('sessions.edit', $session) }}" wire:navigate class="btn btn-ghost btn-sm"><x-icon name="edit" :size="14" /> Modifier</a>
                 @endunless
+            @endcan
+            @can('create', \App\Models\Session::class)
+                <a href="{{ route('sessions.create', ['depuis' => $session->id]) }}" wire:navigate class="btn btn-ghost btn-sm"><x-icon name="copy" :size="14" /> Dupliquer</a>
             @endcan
         </div>
 

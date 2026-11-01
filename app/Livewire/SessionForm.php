@@ -25,6 +25,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -37,6 +38,13 @@ class SessionForm extends Component
     use WithFileUploads;
 
     public ?Session $session = null;
+
+    /**
+     * Séance dupliquée (#176) : création pré-remplie depuis `?depuis={id}`. Purement d'affichage
+     * (titre, rappel, retour) — la séance créée ne garde aucun lien avec sa source.
+     */
+    #[Locked]
+    public ?int $source_id = null;
 
     // Communs
     public string $kind = 'training';
@@ -156,7 +164,77 @@ class SessionForm extends Component
             $this->fillFromSession($session);
         } else {
             $this->authorize('create', Session::class);
+            if ($depuis = request()->integer('depuis')) {
+                $this->fillFromSource(Session::with(['categories', 'coaches'])->findOrFail($depuis));
+            }
         }
+    }
+
+    /**
+     * Duplication (#176) : reprend ce qui décrit la séance, pas ce qui appartient à une occurrence.
+     * Contenu, agenda et parcours sont réécrits chaque semaine — les recopier ferait publier par
+     * mégarde ceux de la semaine passée. Ouverture des inscriptions et album photos sont propres à
+     * une édition. Inscriptions, annulation, déblocage de quota et débriefs ne sont pas des champs
+     * du formulaire : ils ne suivent pas, par construction.
+     */
+    private function fillFromSource(Session $src): void
+    {
+        $this->fillFromSession($src);
+        $this->source_id = $src->id;
+
+        $this->content_markdown = '';
+        $this->agenda = '';
+        $this->photos_album_url = '';
+        $this->registration_opens_date = '';
+        $this->registration_opens_time = '';
+        $this->route_openrunner_embed_url = '';
+        $this->route_openrunner_public_url = '';
+        $this->route_id = null;
+        $this->gpxStats = null;
+
+        // Le catalogue a pu bouger depuis la source : une valeur archivée n'est plus proposée à
+        // l'écran, et un encadrant qui a perdu le rôle coach ferait refuser le formulaire sans que
+        // rien de visible ne l'explique. On ne reprend que ce qui est encore sélectionnable.
+        $this->discipline_id = Discipline::whereKey($this->discipline_id)->whereNull('archived_at')->value('id');
+        $this->event_type_id = EventType::whereKey($this->event_type_id)->whereNull('archived_at')->value('id');
+        $this->quota_tag_id = QuotaTag::whereKey($this->quota_tag_id)->whereNull('archived_at')->value('id');
+        $this->location_id = Location::whereKey($this->location_id)->where('is_archived', false)->value('id');
+        $this->category_ids = Category::whereIn('id', $this->category_ids)->whereNull('archived_at')->pluck('id')->all();
+        $this->coach_ids = User::whereIn('id', $this->coach_ids)->whereJsonContains('roles', 'coach')->pluck('id')->all();
+
+        // Même heure, une semaine plus tard ; une source passée glisse au même jour de la semaine
+        // qui suit aujourd'hui. Calcul en heure club : +1 semaine garde 18:30 à 18:30 à travers un
+        // changement d'heure, là où +168 h en UTC le décalerait.
+        $tz = ClubSettings::current()->timezone;
+        $start = $src->start_at->copy()->setTimezone($tz)->addWeek();
+        while ($start->lte(now($tz))) {
+            $start->addWeek();
+        }
+        $this->start_at = $start->format('Y-m-d\TH:i');
+    }
+
+    /**
+     * Séance non annulée de même titre au même début (#176) — typiquement déjà générée par un
+     * template. Avertissement seulement : deux groupes peuvent légitimement partager un créneau.
+     */
+    public function doublon(): ?Session
+    {
+        if (trim($this->title) === '' || $this->start_at === '') {
+            return null;
+        }
+
+        try {
+            $start = Carbon::parse($this->start_at, ClubSettings::current()->timezone);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return Session::query()
+            ->where('title', trim($this->title))
+            ->where('start_at', $start->utc())
+            ->whereNull('cancelled_at')
+            ->when($this->session?->exists, fn ($q) => $q->whereKeyNot($this->session->id))
+            ->first();
     }
 
     private function fillFromSession(Session $s): void
@@ -852,6 +930,8 @@ class SessionForm extends Component
     public function render()
     {
         return view('livewire.session-form', [
+            'source' => $this->source_id ? Session::find($this->source_id) : null,
+            'doublon' => $this->doublon(),
             'disciplines' => Discipline::whereNull('archived_at')->orderBy('sort_order')->get(),
             'eventTypes' => EventType::whereNull('archived_at')->orderBy('sort_order')->get(),
             'quotaTags' => QuotaTag::whereNull('archived_at')->orderBy('label')->get(),
